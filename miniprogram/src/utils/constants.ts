@@ -1,0 +1,71 @@
+/**
+ * 常量定义
+ */
+
+// API 基础路径
+export const API_BASE_URL = process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:8080' 
+  : 'https://api.example.com'
+
+// 存储 Key
+export const StorageKey = {
+  TOKEN: 'token',
+  USER_INFO: 'userInfo',
+  MERCHANT_INFO: 'merchantInfo'
+} as const
+
+// 订单状态
+export const OrderStatus = {
+  PENDING_PAYMENT: 1,   // 待支付
+  PAID: 2,              // 已支付
+  COMPLETED: 3,         // 已完成
+  CANCELLED: 4,         // 已取消
+  REFUNDING: 5,         // 退款中
+  REFUNDED: 6           // 已退款
+} as const
+
+export const OrderStatusText: Record<number, string> = {
+  [OrderStatus.PENDING_PAYMENT]: '待支付',
+  [OrderStatus.PAID]: '已支付',
+  [OrderStatus.COMPLETED]: '已完成',
+  [OrderStatus.CANCELLED]: '已取消',
+  [OrderStatus.REFUNDING]: '退款中',
+  [OrderStatus.REFUNDED]: '已退款'
+}
+
+// 商品状态
+export const ProductStatus = {
+  OFF_SALE: 0,  // 下架
+  ON_SALE: 1    // 上架
+} as const
+
+// 配送类型
+export const DeliveryType = {
+  DELIVERY: 1,  // 配送
+  DINE_IN: 2,   // 堂食
+  PICKUP: 3     // 自提
+} as const
+
+// 邀请奖励类型
+export const RewardType = {
+  FREE_YEAR: 'free_year',     // 免年费
+  LOWEST_RATE: 'lowest_rate'  // 最低费率
+} as const
+
+// 邀请记录状态
+export const InviteStatus = {
+  PENDING: 0,     // 待完成
+  COMPLETED: 1,   // 已完成
+  CANCELLED: 2    // 已取消
+} as const
+
+export default {
+  API_BASE_URL,
+  StorageKey,
+  OrderStatus,
+  OrderStatusText,
+  ProductStatus,
+  DeliveryType,
+  RewardType,
+  InviteStatus
+}

@@ -1,0 +1,50 @@
+# 依赖
+node_modules/
+.pnp
+.pnp.js
+
+# 构建输出
+dist/
+unpackage/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 测试
+coverage/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# uni-app编译缓存
+uni_modules/
+sitemap.json
+
+# 微信开发者工具
+project.config.json
+project.private.config.json
+
+# 后端
+server/vendor/
+server/.env
+*.exe
+
+# 嵌套仓库（不纳入版本控制）
+fz_yyc/
+

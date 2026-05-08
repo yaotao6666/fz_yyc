@@ -1,0 +1,645 @@
+<template>
+  <view class="edit-container">
+    <scroll-view class="form-scroll" scroll-y>
+      <!-- 基本信息 -->
+      <view class="section">
+        <view class="section-title">基本信息</view>
+
+        <view class="form-item">
+          <view class="form-label">商品名称 <text class="required">*</text></view>
+          <input
+            v-model="formData.name"
+            class="form-input"
+            placeholder="请输入商品名称"
+          />
+        </view>
+
+        <view class="form-item">
+          <view class="form-label">商品分类 <text class="required">*</text></view>
+          <picker
+            :value="categoryIndex"
+            :range="categories"
+            range-key="name"
+            @change="onCategoryChange"
+          >
+            <view class="picker-value">
+              {{ selectedCategoryName || '请选择分类' }}
+              <text class="arrow">›</text>
+            </view>
+          </picker>
+        </view>
+
+        <view class="form-item">
+          <view class="form-label">商品描述</view>
+          <textarea
+            v-model="formData.description"
+            class="form-textarea"
+            placeholder="请输入商品描述（选填）"
+            :maxlength="500"
+          />
+        </view>
+      </view>
+
+      <!-- 价格库存 -->
+      <view class="section">
+        <view class="section-title">价格库存</view>
+
+        <view class="form-row">
+          <view class="form-item half">
+            <view class="form-label">售价 <text class="required">*</text></view>
+            <input
+              v-model.number="formData.price"
+              type="digit"
+              class="form-input"
+              placeholder="0.00"
+            />
+          </view>
+          <view class="form-item half">
+            <view class="form-label">原价</view>
+            <input
+              v-model.number="formData.original_price"
+              type="digit"
+              class="form-input"
+              placeholder="0.00"
+            />
+          </view>
+        </view>
+
+        <view class="form-row">
+          <view class="form-item half">
+            <view class="form-label">库存 <text class="required">*</text></view>
+            <input
+              v-model.number="formData.stock"
+              type="number"
+              class="form-input"
+              placeholder="0"
+            />
+          </view>
+          <view class="form-item half">
+            <view class="form-label">单位</view>
+            <input
+              v-model="formData.unit"
+              class="form-input"
+              placeholder="份/个/盒"
+            />
+          </view>
+        </view>
+      </view>
+
+      <!-- 商品图片 -->
+      <view class="section">
+        <view class="section-title">商品图片</view>
+        <view class="image-list">
+          <view
+            v-for="(img, index) in formData.images"
+            :key="index"
+            class="image-item"
+          >
+            <image :src="img" mode="aspectFill" />
+            <view class="delete-btn" @click="removeImage(index)">×</view>
+          </view>
+          <view
+            v-if="formData.images.length < 9"
+            class="add-image"
+            @click="chooseImage"
+          >
+            <text class="icon">+</text>
+            <text class="text">{{ formData.images.length }}/9</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 商品规格 -->
+      <view class="section">
+        <view class="section-header">
+          <view class="section-title">商品规格</view>
+          <view class="add-spec-btn" @click="addSpec">添加规格</view>
+        </view>
+
+        <view
+          v-for="(spec, specIndex) in formData.specs"
+          :key="specIndex"
+          class="spec-item"
+        >
+          <view class="spec-header">
+            <input
+              v-model="spec.name"
+              class="spec-name-input"
+              placeholder="规格名称（如：份量）"
+            />
+            <text class="delete-spec" @click="removeSpec(specIndex)">删除</text>
+          </view>
+          <view
+            v-for="(option, optIndex) in spec.options"
+            :key="optIndex"
+            class="spec-option"
+          >
+            <input
+              v-model="option.name"
+              class="option-name"
+              placeholder="选项名称"
+            />
+            <input
+              v-model.number="option.price"
+              type="digit"
+              class="option-price"
+              placeholder="价格"
+            />
+            <text class="delete-option" @click="removeOption(specIndex, optIndex)">×</text>
+          </view>
+          <view class="add-option" @click="addOption(specIndex)">+ 添加选项</view>
+        </view>
+      </view>
+
+      <!-- 排序 -->
+      <view class="section">
+        <view class="section-title">排序</view>
+        <view class="form-item">
+          <input
+            v-model.number="formData.sort"
+            type="number"
+            class="form-input"
+            placeholder="数字越小排序越靠前"
+          />
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- 底部按钮 -->
+    <view class="bottom-bar">
+      <button class="btn-draft" @click="saveDraft">保存草稿</button>
+      <button class="btn-publish" :disabled="submitting" @click="handleSubmit">
+        {{ submitting ? '发布中...' : '发布商品' }}
+      </button>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, computed, onLoad } from '@dcloudio/uni-app'
+import { getProduct, createProduct, updateProduct, getCategories, uploadImage } from '../../api'
+import type { Category, Product } from '../../types/api'
+
+const productId = ref<number | null>(null)
+const categories = ref<Category[]>([])
+const categoryIndex = ref(-1)
+const submitting = ref(false)
+
+const formData = reactive({
+  name: '',
+  category_id: 0,
+  description: '',
+  price: 0,
+  original_price: 0,
+  stock: 0,
+  unit: '份',
+  images: [] as string[],
+  specs: [] as { name: string; options: { name: string; price: number }[] }[],
+  sort: 0
+})
+
+const selectedCategoryName = computed(() => {
+  if (categoryIndex.value >= 0 && categories.value[categoryIndex.value]) {
+    return categories.value[categoryIndex.value].name
+  }
+  return ''
+})
+
+onLoad((options: any) => {
+  loadCategories()
+  
+  if (options.id) {
+    productId.value = Number(options.id)
+    loadProduct(productId.value)
+  }
+  
+  if (options.category_id) {
+    formData.category_id = Number(options.category_id)
+  }
+})
+
+async function loadCategories() {
+  try {
+    const res = await getCategories()
+    categories.value = res
+  } catch (error) {
+    console.error('加载分类失败:', error)
+  }
+}
+
+async function loadProduct(id: number) {
+  try {
+    const product = await getProduct(id)
+    
+    formData.name = product.name
+    formData.category_id = product.category_id
+    formData.description = product.description || ''
+    formData.price = product.price
+    formData.original_price = product.original_price || 0
+    formData.stock = product.stock
+    formData.unit = product.unit || '份'
+    formData.images = product.images || []
+    formData.specs = product.specs || []
+    formData.sort = product.sort || 0
+    
+    // 设置分类索引
+    const index = categories.value.findIndex(c => c.id === product.category_id)
+    if (index !== -1) {
+      categoryIndex.value = index
+    }
+  } catch (error) {
+    console.error('加载商品失败:', error)
+  }
+}
+
+function onCategoryChange(e: any) {
+  const index = e.detail.value
+  categoryIndex.value = index
+  formData.category_id = categories.value[index].id
+}
+
+function chooseImage() {
+  const count = 9 - formData.images.length
+  uni.chooseImage({
+    count,
+    sizeType: ['compressed'],
+    sourceType: ['album', 'camera'],
+    success: async (res) => {
+      uni.showLoading({ title: '上传中...' })
+      
+      try {
+        for (const tempFilePath of res.tempFilePaths) {
+          const result = await uploadImage(tempFilePath)
+          formData.images.push(result.url)
+        }
+      } catch (error) {
+        uni.showToast({ title: '上传失败', icon: 'none' })
+      } finally {
+        uni.hideLoading()
+      }
+    }
+  })
+}
+
+function removeImage(index: number) {
+  formData.images.splice(index, 1)
+}
+
+function addSpec() {
+  formData.specs.push({
+    name: '',
+    options: [{ name: '', price: 0 }]
+  })
+}
+
+function removeSpec(index: number) {
+  formData.specs.splice(index, 1)
+}
+
+function addOption(specIndex: number) {
+  formData.specs[specIndex].options.push({ name: '', price: 0 })
+}
+
+function removeOption(specIndex: number, optIndex: number) {
+  formData.specs[specIndex].options.splice(optIndex, 1)
+}
+
+function validateForm(): boolean {
+  if (!formData.name.trim()) {
+    uni.showToast({ title: '请输入商品名称', icon: 'none' })
+    return false
+  }
+  if (!formData.category_id) {
+    uni.showToast({ title: '请选择商品分类', icon: 'none' })
+    return false
+  }
+  if (!formData.price || formData.price <= 0) {
+    uni.showToast({ title: '请输入正确的售价', icon: 'none' })
+    return false
+  }
+  if (formData.stock < 0) {
+    uni.showToast({ title: '库存不能为负数', icon: 'none' })
+    return false
+  }
+  return true
+}
+
+async function saveDraft() {
+  if (!validateForm()) return
+  await submitForm(false)
+}
+
+async function handleSubmit() {
+  if (!validateForm()) return
+  await submitForm(true)
+}
+
+async function submitForm(publish: boolean) {
+  submitting.value = true
+
+  try {
+    const data = {
+      name: formData.name,
+      category_id: formData.category_id,
+      description: formData.description,
+      price: formData.price,
+      original_price: formData.original_price || undefined,
+      stock: formData.stock,
+      unit: formData.unit,
+      images: formData.images,
+      specs: formData.specs.filter(s => s.name && s.options.length > 0).map(s => ({
+        name: s.name,
+        options: s.options.filter(o => o.name).map(o => ({
+          name: o.name,
+          price: o.price || 0
+        }))
+      })),
+      sort: formData.sort
+    }
+
+    if (productId.value) {
+      await updateProduct(productId.value, data)
+    } else {
+      await createProduct(data)
+    }
+
+    uni.showToast({ title: publish ? '发布成功' : '保存成功', icon: 'success' })
+    
+    setTimeout(() => {
+      uni.navigateBack()
+    }, 1500)
+  } catch (error: any) {
+    uni.showToast({ title: error.message || '操作失败', icon: 'none' })
+  } finally {
+    submitting.value = false
+  }
+}
+</script>
+
+<style scoped>
+.edit-container {
+  min-height: 100vh;
+  background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-scroll {
+  flex: 1;
+  padding-bottom: 140rpx;
+}
+
+.section {
+  background: #ffffff;
+  margin: 24rpx;
+  border-radius: 16rpx;
+  padding: 32rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 24rpx;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+.add-spec-btn {
+  font-size: 28rpx;
+  color: #007AFF;
+}
+
+.form-item {
+  margin-bottom: 24rpx;
+}
+
+.form-item:last-child {
+  margin-bottom: 0;
+}
+
+.form-row {
+  display: flex;
+  gap: 24rpx;
+}
+
+.form-item.half {
+  flex: 1;
+}
+
+.form-label {
+  font-size: 28rpx;
+  color: #666666;
+  margin-bottom: 12rpx;
+}
+
+.required {
+  color: #ff4d4f;
+}
+
+.form-input, .form-textarea {
+  background: #f8f9fa;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 30rpx;
+  color: #1a1a1a;
+}
+
+.form-textarea {
+  height: 160rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.picker-value {
+  height: 88rpx;
+  background: #f8f9fa;
+  border-radius: 12rpx;
+  padding: 0 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 30rpx;
+  color: #1a1a1a;
+}
+
+.arrow {
+  font-size: 32rpx;
+  color: #cccccc;
+}
+
+.image-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.image-item {
+  position: relative;
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 12rpx;
+  overflow: hidden;
+}
+
+.image-item image {
+  width: 100%;
+  height: 100%;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 8rpx;
+  right: 8rpx;
+  width: 40rpx;
+  height: 40rpx;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 28rpx;
+}
+
+.add-image {
+  width: 200rpx;
+  height: 200rpx;
+  background: #f8f9fa;
+  border-radius: 12rpx;
+  border: 2rpx dashed #dddddd;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-image .icon {
+  font-size: 64rpx;
+  color: #cccccc;
+  line-height: 1;
+}
+
+.add-image .text {
+  font-size: 24rpx;
+  color: #999999;
+  margin-top: 8rpx;
+}
+
+.spec-item {
+  background: #f8f9fa;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+}
+
+.spec-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.spec-name-input {
+  flex: 1;
+  height: 72rpx;
+  background: #ffffff;
+  border-radius: 8rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+}
+
+.delete-spec {
+  margin-left: 16rpx;
+  font-size: 26rpx;
+  color: #ff4d4f;
+}
+
+.spec-option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.option-name {
+  flex: 1;
+  height: 72rpx;
+  background: #ffffff;
+  border-radius: 8rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+  margin-right: 12rpx;
+}
+
+.option-price {
+  width: 160rpx;
+  height: 72rpx;
+  background: #ffffff;
+  border-radius: 8rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+  margin-right: 12rpx;
+}
+
+.delete-option {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff4d4f;
+  font-size: 32rpx;
+}
+
+.add-option {
+  font-size: 28rpx;
+  color: #007AFF;
+  padding: 12rpx 0;
+}
+
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 24rpx;
+  padding: 16rpx 32rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: #ffffff;
+  box-shadow: 0 -2rpx 10rpx rgba(0, 0, 0, 0.05);
+}
+
+.btn-draft, .btn-publish {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-draft {
+  background: #f5f5f5;
+  color: #666666;
+}
+
+.btn-publish {
+  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  color: #ffffff;
+}
+
+.btn-publish[disabled] {
+  background: #cccccc;
+}
+</style>
