@@ -1,7 +1,7 @@
 <template>
   <view class="login-container">
     <view class="login-header">
-      <image class="logo" src="/static/logo.png" mode="aspectFit" />
+      <image class="logo" src="../../static/logo.png" mode="aspectFit" />
       <text class="title">寻梦私域管家</text>
       <text class="subtitle">商家管理平台</text>
     </view>
@@ -24,6 +24,7 @@
         <input
           v-model="formData.password"
           type="password"
+          password
           placeholder="请输入密码"
           class="input"
           @blur="validatePassword"
@@ -48,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from from 'vue'
+import { ref, reactive } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
@@ -118,7 +119,7 @@ function goRegister() {
 }
 </script>
 
-<style scoped>
+<style>
 .login-container {
   min-height: 100vh;
   background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);

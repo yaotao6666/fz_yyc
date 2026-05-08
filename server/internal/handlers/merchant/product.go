@@ -2,6 +2,7 @@ package merchant
 
 import (
 	"encoding/json"
+	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
@@ -16,11 +17,29 @@ func GetCategories(c *gin.Context) {
 
 	var categories []models.Category
 	if err := database.DB.Where("merchant_id = ?", merchantID).Order("sort ASC, id ASC").Find(&categories).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取分类列表失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取分类列表失败")
 		return
 	}
 
-	response.Success(c, categories)
+	var result []map[string]interface{}
+	for _, cat := range categories {
+		var count int64
+		database.DB.Model(&models.Product{}).Where("category_id = ? AND merchant_id = ?", cat.ID, merchantID).Count(&count)
+		
+		catMap := map[string]interface{}{
+			"id":             cat.ID,
+			"merchant_id":    cat.MerchantID,
+			"name":           cat.Name,
+			"sort":           cat.Sort,
+			"status":         cat.Status,
+			"created_at":     cat.CreatedAt,
+			"updated_at":     cat.UpdatedAt,
+			"product_count":  count,
+		}
+		result = append(result, catMap)
+	}
+
+	response.Success(c, result)
 }
 
 type CategoryRequest struct {
@@ -34,7 +53,7 @@ func CreateCategory(c *gin.Context) {
 
 	var req CategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
@@ -48,11 +67,11 @@ func CreateCategory(c *gin.Context) {
 		category.Sort = *req.Sort
 	}
 	if req.Status > 0 {
-		category.Status = *req.Status
+		category.Status = req.Status
 	}
 
 	if err := database.DB.Create(&category).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "创建分类失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建分类失败")
 		return
 	}
 
@@ -66,13 +85,13 @@ func UpdateCategory(c *gin.Context) {
 
 	var req CategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	var category models.Category
 	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&category).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "分类不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "分类不存在")
 		return
 	}
 
@@ -83,12 +102,12 @@ func UpdateCategory(c *gin.Context) {
 	if req.Sort != nil {
 		updates["sort"] = *req.Sort
 	}
-	if req.Status != nil {
-		updates["status"] = *req.Status
+	if req.Status > 0 {
+		updates["status"] = req.Status
 	}
 
 	if err := database.DB.Model(&category).Updates(updates).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新分类失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新分类失败")
 		return
 	}
 
@@ -102,7 +121,7 @@ func DeleteCategory(c *gin.Context) {
 	id, _ := strconv.ParseUint(categoryID, 10, 64)
 
 	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).Delete(&models.Category{}).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "删除分类失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "删除分类失败")
 		return
 	}
 
@@ -121,7 +140,7 @@ func SortCategories(c *gin.Context) {
 
 	var req SortCategoriesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
@@ -129,13 +148,27 @@ func SortCategories(c *gin.Context) {
 	for _, item := range req.Categories {
 		if err := tx.Model(&models.Category{}).Where("id = ? AND merchant_id = ?", item.ID, merchantID).Update("sort", item.Sort).Error; err != nil {
 			tx.Rollback()
-			response.Fail(c, http.StatusInternalServerError, response.ServerError, "排序失败")
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "排序失败")
 			return
 		}
 	}
 	tx.Commit()
 
 	response.Success(c, gin.H{"message": "排序成功"})
+}
+
+func GetProduct(c *gin.Context) {
+	merchantID := middleware.GetMerchantID(c)
+	productID := c.Param("product_id")
+	id, _ := strconv.ParseUint(productID, 10, 64)
+
+	var product models.Product
+	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).Preload("Category").Preload("Specs").First(&product).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
+		return
+	}
+
+	response.Success(c, product)
 }
 
 func GetProducts(c *gin.Context) {
@@ -173,7 +206,7 @@ func GetProducts(c *gin.Context) {
 	var products []models.Product
 	offset := (page - 1) * pageSize
 	if err := query.Preload("Category").Offset(offset).Limit(pageSize).Order("sort ASC, id DESC").Find(&products).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取商品列表失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取商品列表失败")
 		return
 	}
 
@@ -211,7 +244,7 @@ func CreateProduct(c *gin.Context) {
 
 	var req ProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
@@ -234,7 +267,7 @@ func CreateProduct(c *gin.Context) {
 	tx := database.DB.Begin()
 	if err := tx.Create(&product).Error; err != nil {
 		tx.Rollback()
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "创建商品失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建商品失败")
 		return
 	}
 
@@ -247,7 +280,7 @@ func CreateProduct(c *gin.Context) {
 		}
 		if err := tx.Create(&productSpec).Error; err != nil {
 			tx.Rollback()
-			response.Fail(c, http.StatusInternalServerError, response.ServerError, "创建规格失败")
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建规格失败")
 			return
 		}
 	}
@@ -265,13 +298,13 @@ func UpdateProduct(c *gin.Context) {
 
 	var req ProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	var product models.Product
 	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&product).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "商品不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
 	}
 
@@ -292,7 +325,7 @@ func UpdateProduct(c *gin.Context) {
 	tx := database.DB.Begin()
 	if err := tx.Model(&product).Updates(updates).Error; err != nil {
 		tx.Rollback()
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新商品失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新商品失败")
 		return
 	}
 
@@ -307,7 +340,7 @@ func UpdateProduct(c *gin.Context) {
 			}
 			if err := tx.Create(&productSpec).Error; err != nil {
 				tx.Rollback()
-				response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新规格失败")
+				response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新规格失败")
 				return
 			}
 		}
@@ -326,7 +359,7 @@ func ProductOnSale(c *gin.Context) {
 
 	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ?", id, merchantID).Update("status", 1)
 	if result.RowsAffected == 0 {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "商品不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
 	}
 
@@ -340,7 +373,7 @@ func ProductOffSale(c *gin.Context) {
 
 	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ?", id, merchantID).Update("status", 2)
 	if result.RowsAffected == 0 {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "商品不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
 	}
 
@@ -357,12 +390,12 @@ func BatchUpdateProductStatus(c *gin.Context) {
 
 	var req BatchStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	if err := database.DB.Model(&models.Product{}).Where("id IN ? AND merchant_id = ?", req.ProductIDs, merchantID).Update("status", req.Status).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "批量更新状态失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "批量更新状态失败")
 		return
 	}
 
@@ -377,7 +410,7 @@ func DeleteProduct(c *gin.Context) {
 	tx := database.DB.Begin()
 	if err := tx.Where("id = ? AND merchant_id = ?", id, merchantID).Delete(&models.Product{}).Error; err != nil {
 		tx.Rollback()
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "删除商品失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "删除商品失败")
 		return
 	}
 
@@ -398,13 +431,13 @@ func UpdateStock(c *gin.Context) {
 
 	var req StockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ?", id, merchantID).Update("stock", req.Stock)
 	if result.RowsAffected == 0 {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "商品不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
 	}
 

@@ -3,7 +3,7 @@
  * 统一管理所有API接口调用
  */
 
-import { get, post, put, del, upload } from '../utils/request'
+import { get, post, put, del } from '../utils/request'
 import type {
   MerchantLoginRequest,
   MerchantLoginResponse,
@@ -19,50 +19,77 @@ import type {
   Order,
   OrderListResponse,
   OrderStatistics,
-  CreateOrderRequest,
-  CreateOrderResponse,
-  SalesOverview,
-  SalesTrend,
-  ProductRanking,
-  HourlyAnalysis,
-  StockAlert,
   InviteInfo,
   MyInviteInfo,
   InviteRecordListResponse,
+  StockAlert,
+  ProductRanking,
+  HourlyAnalysis,
+  SalesOverview,
+  SalesTrend,
   StoreHomeInfo,
   StoreProductGroup,
-  PaginationParams
-} from '../types/api'
+  CreateOrderRequest,
+  CreateOrderResponse,
+} from '../types'
+import type { ApiResponse } from '../types'
+
+export { get, post, put, del }
+export * from '../types'
+
+export const ResponseCode = {
+  SUCCESS: 0,
+  PARAM_ERROR: 1001,
+  UNAUTHORIZED: 1002,
+  FORBIDDEN: 1003,
+  NOT_FOUND: 1004,
+  SERVER_ERROR: 5000,
+  PRODUCT_NOT_FOUND: 6001,
+  ORDER_NOT_FOUND: 6002,
+  CATEGORY_NOT_FOUND: 7001,
+  CATEGORY_HAS_PRODUCT: 7002,
+  QINIU_UPLOAD_FAILED: 8002,
+} as const
+
+const BASE_URL = 'http://localhost:8080'
+
+function getToken(): string {
+  return uni.getStorageSync('token') || ''
+}
 
 // ============ 认证相关 ============
 
 /**
  * 商家登录
  */
-export function merchantLogin(data: MerchantLoginRequest) {
-  return post<MerchantLoginResponse>('/api/v1/merchant/auth/login', data)
+export async function merchantLogin(data: MerchantLoginRequest): Promise<MerchantLoginResponse> {
+  const res = await post<MerchantLoginResponse>('/api/v1/auth/merchant/login', data)
+  if (res.token) {
+    uni.setStorageSync('token', res.token)
+    uni.setStorageSync('merchant_id', res.merchant_id)
+    uni.setStorageSync('merchant_info', res.staff)
+  }
+  return res
 }
 
 /**
- * 获取当前商家信息
+ * 获取商家信息
  */
-export function getMerchantProfile() {
+export async function getMerchantProfile() {
   return get<MerchantInfo>('/api/v1/merchant/profile')
 }
-
-// ============ 商家入驻相关 ============
 
 /**
  * 商家入驻申请
  */
-export function merchantRegister(data: MerchantRegisterRequest) {
-  return post<MerchantRegisterResponse>('/api/v1/merchant/register', data)
+export async function merchantRegister(data: MerchantRegisterRequest) {
+  return post<{ application_id: number }>('/api/v1/merchant/register', data)
 }
 
 /**
- * 获取商家进件状态
+ * 获取商家入驻状态
  */
-export function getMerchantApplicationStatus() {
+export async function getMerchantApplicationStatus() {
   return get<MerchantApplicationStatus>('/api/v1/merchant/application/status')
 }
 
@@ -104,9 +131,9 @@ export function updateDeliverySettings(data: Partial<DeliverySettings>) {
 }
 
 /**
- * 开启/关闭店铺
+ * 更新商家状态
  */
-export function updateMerchantStatus(status: 'active' | 'inactive') {
+export function updateMerchantStatus(status: number) {
   return post<null>('/api/v1/merchant/status', { status })
 }
 
@@ -218,7 +245,7 @@ export function productOffSale(productId: number) {
 /**
  * 批量更新商品状态
  */
-export function batchUpdateProductStatus(productIds: number[], status: 'on_sale' | 'off_sale') {
+export function batchUpdateProductStatus(productIds: number[], status: number) {
   return post<null>('/api/v1/merchant/products/batch-status', { product_ids: productIds, status })
 }
 
@@ -230,10 +257,10 @@ export function deleteProduct(productId: number) {
 }
 
 /**
- * 更新库存
+ * 更新商品库存
  */
-export function updateProductStock(productId: number, data: { stock: number; action: 'set' | 'add' | 'subtract' }) {
-  return put<null>(`/api/v1/merchant/products/${productId}/stock`, data)
+export function updateProductStock(productId: number, stock: number) {
+  return put<null>(`/api/v1/merchant/products/${productId}/stock`, { stock })
 }
 
 // ============ 订单管理相关 ============
@@ -270,20 +297,17 @@ export function completeOrder(orderId: number, verifyCode: string) {
 }
 
 /**
- * 订单退款
+ * 退款订单
  */
-export function refundOrder(orderId: number, data: { refund_amount: number; refund_reason: string }) {
-  return post<{ refund_id: number; refund_no: string; status: string }>(
-    `/api/v1/merchant/orders/${orderId}/refund`,
-    data
-  )
+export function refundOrder(orderId: number, reason?: string) {
+  return post<null>(`/api/v1/merchant/orders/${orderId}/refund`, { reason })
 }
 
 /**
  * 获取订单统计
  */
-export function getOrderStatistics(params?: { start_date?: string; end_date?: string }) {
-  return get<OrderStatistics>('/api/v1/merchant/orders/statistics', params)
+export function getOrderStatistics() {
+  return get<OrderStatistics>('/api/v1/merchant/orders/statistics')
 }
 
 // ============ 数据分析相关 ============
@@ -291,33 +315,28 @@ export function getOrderStatistics(params?: { start_date?: string; end_date?: st
 /**
  * 获取销售概览
  */
-export function getSalesOverview(params?: { period?: 'today' | 'week' | 'month' | 'year' }) {
+export function getSalesOverview(params?: { period?: string }) {
   return get<SalesOverview>('/api/v1/merchant/analytics/overview', params)
 }
 
 /**
  * 获取销售趋势
  */
-export function getSalesTrend(params: { start_date: string; end_date: string; granularity?: 'day' | 'week' | 'month' }) {
+export function getSalesTrend(params: { start_date: string; end_date: string; granularity?: string }) {
   return get<SalesTrend[]>('/api/v1/merchant/analytics/sales-trend', params)
 }
 
 /**
- * 获取商品销量排行
+ * 获取商品排行
  */
-export function getProductRanking(params?: {
-  start_date?: string
-  end_date?: string
-  limit?: number
-  sort_by?: 'sales' | 'amount'
-}) {
+export function getProductRanking(params?: { start_date?: string; end_date?: string; limit?: number; sort_by?: string }) {
   return get<ProductRanking[]>('/api/v1/merchant/analytics/product-ranking', params)
 }
 
 /**
  * 获取时段分析
  */
-export function getHourlyAnalysis(params?: { date?: string }) {
+export function getHourlyAnalysis(params: { date: string }) {
   return get<HourlyAnalysis[]>('/api/v1/merchant/analytics/hourly', params)
 }
 
@@ -328,13 +347,27 @@ export function getStockAlert(params?: { threshold?: number }) {
   return get<StockAlert[]>('/api/v1/merchant/analytics/stock-alert', params)
 }
 
+/**
+ * 获取客户分析
+ */
+export function getCustomerAnalysis() {
+  return get<any>('/api/v1/merchant/analytics/customers')
+}
+
+/**
+ * 获取客户趋势
+ */
+export function getCustomerTrend(params: { start_date: string; end_date: string }) {
+  return get<any[]>('/api/v1/merchant/analytics/customer-trend', params)
+}
+
 // ============ 邀请入驻相关 ============
 
 /**
  * 生成邀请码
  */
 export function generateInviteCode() {
-  return get<InviteInfo>('/api/v1/merchant/invite/generate')
+  return post<{ invite_code: string }>('/api/v1/merchant/invite/generate')
 }
 
 /**
@@ -347,8 +380,71 @@ export function getMyInviteInfo() {
 /**
  * 获取邀请记录
  */
-export function getInviteRecords(params?: PaginationParams & { status?: string }) {
+export function getInviteRecords(params?: { page?: number; page_size?: number }) {
   return get<InviteRecordListResponse>('/api/v1/merchant/invite/records', params)
+}
+
+// ============ 文件上传相关 ============
+
+/**
+ * 获取上传凭证
+ */
+export async function getUploadToken() {
+  const res = await get<{ token: string; domain: string; prefix: string }>('/api/v1/upload/token')
+  return res
+}
+
+/**
+ * 上传图片 - 客户端直传七牛云
+ */
+export async function uploadImage(filePath: string): Promise<{ url: string; key: string }> {
+  uni.showLoading({ title: '上传中...', mask: true })
+  
+  try {
+    const uploadData = await getUploadToken()
+    
+    const ext = filePath.split('.').pop() || 'jpg'
+    const key = `${uploadData.prefix}/${Date.now()}.${ext}`
+    
+    return new Promise((resolve, reject) => {
+      uni.uploadFile({
+        url: 'https://upload.qiniup.com',
+        filePath,
+        name: 'file',
+        formData: {
+          token: uploadData.token,
+          key: key
+        },
+        success: (res) => {
+          uni.hideLoading()
+          if (res.statusCode === 200) {
+            const data = JSON.parse(res.data)
+            if (data.key) {
+              resolve({
+                url: `${uploadData.domain}/${data.key}`,
+                key: data.key
+              })
+            } else {
+              uni.showToast({ title: '上传失败', icon: 'none' })
+              reject(new Error('上传失败'))
+            }
+          } else {
+            uni.showToast({ title: '上传失败', icon: 'none' })
+            reject(new Error(`上传失败: ${res.statusCode}`))
+          }
+        },
+        fail: (err) => {
+          uni.hideLoading()
+          uni.showToast({ title: '上传失败', icon: 'none' })
+          reject(err)
+        }
+      })
+    })
+  } catch (error) {
+    uni.hideLoading()
+    uni.showToast({ title: '获取上传凭证失败', icon: 'none' })
+    throw error
+  }
 }
 
 // ============ C端店铺相关 ============
@@ -387,7 +483,7 @@ export function getStoreDeliveryRules(merchantId: number) {
   }>(`/api/v1/store/${merchantId}/delivery-rules`)
 }
 
-// ============ C端用户订单相关 ============
+// ============ C端订单相关 ============
 
 /**
  * 创建订单
@@ -399,20 +495,8 @@ export function createOrder(merchantId: number, data: CreateOrderRequest) {
 /**
  * 获取我的订单列表
  */
-export function getMyOrders(params?: {
-  page?: number
-  page_size?: number
-  merchant_id?: number
-  status?: number
-}) {
+export function getMyOrders(params?: { page?: number; page_size?: number; status?: number }) {
   return get<OrderListResponse>('/api/v1/user/orders', params)
-}
-
-/**
- * 获取我的订单详情
- */
-export function getMyOrder(orderId: number) {
-  return get<Order>(`/api/v1/user/orders/${orderId}`)
 }
 
 /**
@@ -426,26 +510,16 @@ export function cancelMyOrder(orderId: number) {
  * 申请退款
  */
 export function applyRefund(orderId: number, data: { refund_reason: string }) {
-  return post<{ refund_id: number; refund_no: string; status: string }>(
-    `/api/v1/user/orders/${orderId}/refund`,
-    data
-  )
+  return post<any>(`/api/v1/user/orders/${orderId}/refund`, data)
 }
 
-// ============ 文件上传相关 ============
+// ============ 云打印相关 ============
 
 /**
- * 获取上传凭证
+ * 获取打印记录
  */
-export function getUploadToken() {
-  return get<{ token: string; domain: string }>('/api/v1/upload/token')
-}
-
-/**
- * 上传图片
- */
-export function uploadImage(filePath: string) {
-  return upload<{ url: string }>('/api/v1/upload/image', filePath, 'image')
+export function getPrintLogs(params?: { page?: number; page_size?: number; start_date?: string; end_date?: string }) {
+  return get<any>('/api/v1/merchant/print-logs', params)
 }
 
 export default {
@@ -490,10 +564,15 @@ export default {
   getProductRanking,
   getHourlyAnalysis,
   getStockAlert,
+  getCustomerAnalysis,
+  getCustomerTrend,
   // 邀请入驻
   generateInviteCode,
   getMyInviteInfo,
   getInviteRecords,
+  // 文件上传
+  getUploadToken,
+  uploadImage,
   // C端店铺
   getStoreHome,
   getStoreProducts,
@@ -502,10 +581,8 @@ export default {
   // C端订单
   createOrder,
   getMyOrders,
-  getMyOrder,
   cancelMyOrder,
   applyRefund,
-  // 文件上传
-  getUploadToken,
-  uploadImage
+  // 云打印
+  getPrintLogs,
 }

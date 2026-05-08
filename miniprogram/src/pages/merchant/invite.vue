@@ -106,10 +106,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onShow } from 'vue'
+import { ref, reactive } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { generateInviteCode, getMyInviteInfo, getInviteRecords } from '../../api'
-import type { InviteInfo, MyInviteInfo, InviteRecord } from '../../types/api'
+import type { InviteInfo, MyInviteInfo, InviteRecord } from '../../types/index'
 
 const authStore = useAuthStore()
 const merchantInfo = authStore.merchantInfo

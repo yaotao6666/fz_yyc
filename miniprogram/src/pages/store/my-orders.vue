@@ -70,7 +70,7 @@
             <view class="action-btn verify" @click="showVerifyCode(order)">核销码</view>
           </template>
           <template v-if="order.status === 2 || order.status === 5">
-            <view class="action-btn refund" @click="applyRefund(order)">申请退款</view>
+            <view class="action-btn refund" @click="handleApplyRefund(order)">申请退款</view>
           </template>
           <view class="action-btn primary" @click="goDetail(order.id)">查看详情</view>
         </view>
@@ -121,10 +121,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onShow } from 'vue'
+import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { getMyOrders, cancelMyOrder, applyRefund } from '../../api'
-import { OrderStatus, OrderStatusText } from '../../types/api'
-import type { Order } from '../../types/api'
+import { OrderStatus, OrderStatusText } from '../../types/index'
+import type { Order } from '../../types/index'
 
 const statusTabs = [
   { label: '全部', value: 0 },
@@ -269,7 +270,7 @@ function closeVerifyDialog() {
   showVerify.value = false
 }
 
-function applyRefund(order: Order) {
+function handleApplyRefund(order: Order) {
   refundOrderId.value = order.id
   refundReason.value = ''
   showRefund.value = true

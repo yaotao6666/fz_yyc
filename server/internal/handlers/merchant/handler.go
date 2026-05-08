@@ -1,14 +1,15 @@
 package merchant
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,26 +24,27 @@ type LoginRequest struct {
 func Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	var staff models.MerchantStaff
 	if err := database.DB.Preload("Merchant").Where("username = ? AND status = ?", req.Username, 1).First(&staff).Error; err != nil {
-		response.Fail(c, http.StatusUnauthorized, response.Unauthorized, "用户名或密码错误")
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户名或密码错误")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(staff.Password), []byte(req.Password)); err != nil {
-		response.Fail(c, http.StatusUnauthorized, response.Unauthorized, "用户名或密码错误")
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户名或密码错误")
 		return
 	}
 
 	now := time.Now()
 	database.DB.Model(&staff).Update("last_login_at", now)
 
+	token, _ := utils.GenerateToken(staff.ID, "merchant", staff.Username)
 	response.Success(c, gin.H{
-		"token":  utils.GenerateToken(staff.ID, "merchant", staff.Username),
+		"token":  token,
 		"merchant_id": staff.MerchantID,
 		"staff": staff,
 	})
@@ -53,7 +55,7 @@ func GetProfile(c *gin.Context) {
 
 	var merchant models.Merchant
 	if err := database.DB.First(&merchant, merchantID).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "商家不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
 		return
 	}
 
@@ -79,7 +81,7 @@ func UpdateProfile(c *gin.Context) {
 
 	var req UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
@@ -119,13 +121,35 @@ func UpdateProfile(c *gin.Context) {
 	}
 
 	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Updates(updates).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新商家信息失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新商家信息失败")
 		return
 	}
 
 	var merchant models.Merchant
 	database.DB.First(&merchant, merchantID)
 	response.Success(c, merchant)
+}
+
+func GetSettings(c *gin.Context) {
+	merchantID := middleware.GetMerchantID(c)
+
+	var merchant models.Merchant
+	if err := database.DB.First(&merchant, merchantID).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
+		return
+	}
+
+	var deliverySettings models.MerchantDeliverySettings
+	database.DB.Where("merchant_id = ?", merchantID).First(&deliverySettings)
+
+	response.Success(c, gin.H{
+		"announcement":      merchant.Announcement,
+		"business_hours":    merchant.BusinessHours,
+		"min_order_amount":  merchant.MinOrderAmount,
+		"takeout_enabled":   merchant.TakeoutEnabled,
+		"dine_in_enabled":   merchant.DineInEnabled,
+		"delivery_settings": deliverySettings,
+	})
 }
 
 type UpdateSettingsRequest struct {
@@ -138,7 +162,7 @@ func UpdateSettings(c *gin.Context) {
 
 	var req UpdateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
@@ -146,7 +170,7 @@ func UpdateSettings(c *gin.Context) {
 		"takeout_enabled": req.TakeoutEnabled,
 		"dine_in_enabled": req.DineInEnabled,
 	}).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新设置失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新设置失败")
 		return
 	}
 
@@ -170,7 +194,7 @@ func UpdateLicense(c *gin.Context) {
 
 	var req LicenseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
@@ -197,7 +221,7 @@ func UpdateLicense(c *gin.Context) {
 	}
 
 	if err := database.DB.Save(&license).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新证照信息失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新证照信息失败")
 		return
 	}
 
@@ -210,7 +234,7 @@ func UpdateBankAccount(c *gin.Context) {
 }
 
 type StatusRequest struct {
-	Status uint8 `json:"status" binding:"required,oneof=0 1"`
+	Status uint8 `json:"status" binding:"required"`
 }
 
 func UpdateStatus(c *gin.Context) {
@@ -218,12 +242,12 @@ func UpdateStatus(c *gin.Context) {
 
 	var req StatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Update("status", req.Status).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新状态失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新状态失败")
 		return
 	}
 
@@ -235,7 +259,7 @@ func GetApplicationStatus(c *gin.Context) {
 
 	var merchant models.Merchant
 	if err := database.DB.Select("applyment_status, audit_status, audit_remark, sub_mch_status").First(&merchant, merchantID).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "商家不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
 		return
 	}
 
@@ -246,19 +270,34 @@ func GetQRCode(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
 
 	var merchant models.Merchant
-	if err := database.DB.Select("id", "qrcode_url").First(&merchant, merchantID).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "商家不存在")
+	if err := database.DB.Select("id", "name").First(&merchant, merchantID).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
 		return
 	}
 
-	if merchant.QRCodeURL == "" {
-		// 生成二维码URL
-		qrcodeURL := "https://api.weixin.qq.com/cgi-bin/wxaapp/createwxaqrcode?access_token=TOKEN"
-		database.DB.Model(&merchant).Update("qrcode_url", qrcodeURL)
-		merchant.QRCodeURL = qrcodeURL
+	// 尝试生成微信小程序二维码
+	scene := fmt.Sprintf("id=%d", merchantID)
+
+	var qrCodeURL string
+	qrCodeBytes, err := utils.CreateWXACode(scene, "pages/index/index", 280)
+	if err != nil {
+		// 如果生成失败，返回占位符URL
+		// TODO: 小程序发布后需要配置正确的页面路径
+		qrCodeURL = fmt.Sprintf("/placeholder-qrcode/%d", merchantID)
+	} else {
+		qrCodeBase64 := base64.StdEncoding.EncodeToString(qrCodeBytes)
+		qrCodeURL = "data:image/png;base64," + qrCodeBase64
+		// 保存到数据库
+		database.DB.Model(&merchant).Update("qrcode_url", qrCodeURL)
 	}
 
-	response.Success(c, gin.H{"qrcode_url": merchant.QRCodeURL})
+	response.Success(c, gin.H{
+		"qrcode_url": qrCodeURL,
+		"scene":      scene,
+		"page":       "pages/index/index",
+		"placeholder": err != nil,
+		"message":    "小程序发布后可生成正式二维码",
+	})
 }
 
 func GetDeliverySettings(c *gin.Context) {
@@ -288,7 +327,7 @@ func UpdateDeliverySettings(c *gin.Context) {
 
 	var req DeliverySettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
@@ -308,7 +347,7 @@ func UpdateDeliverySettings(c *gin.Context) {
 	}
 
 	if err := database.DB.Save(&settings).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "保存配送设置失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "保存配送设置失败")
 		return
 	}
 

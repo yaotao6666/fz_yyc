@@ -158,21 +158,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onShow } from 'vue'
+import { ref, reactive } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import {
   getSalesOverview,
   getSalesTrend,
   getProductRanking,
   getHourlyAnalysis,
   getStockAlert
-} from '../../api'
+} from '../../../api'
 import type {
   SalesOverview,
   SalesTrend,
   ProductRanking,
   HourlyAnalysis,
   StockAlert
-} from '../../types/api'
+} from '../../../types/index'
 
 const periodTabs = [
   { label: '今日', value: 'today' },

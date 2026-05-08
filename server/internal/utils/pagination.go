@@ -5,6 +5,11 @@ import (
 	"math"
 	"strconv"
 	"time"
+
+	"fz_yyc_api/internal/config"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // Pagination 分页参数
@@ -98,4 +103,37 @@ func CalculateDeliveryFee(totalAmount, baseFee, freeDeliveryAmount float64, dist
 	}
 
 	return baseFee
+}
+
+type TokenClaims struct {
+	UserID   uint64 `json:"user_id"`
+	UserType string `json:"user_type"`
+	Username string `json:"username"`
+	jwt.RegisteredClaims
+}
+
+func GenerateToken(userID uint64, userType, username string) (string, error) {
+	claims := &TokenClaims{
+		UserID:   userID,
+		UserType: userType,
+		Username: username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(config.Config.JWT.Expire) * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(config.Config.JWT.Secret))
+}
+
+func GetUserID(c *gin.Context) uint64 {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		return 0
+	}
+	if id, ok := userID.(uint64); ok {
+		return id
+	}
+	return 0
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/spf13/viper"
 )
@@ -14,12 +15,13 @@ var Config *AppConfig
 
 // AppConfig 应用配置
 type AppConfig struct {
-	App      App      // 应用配置
-	Database Database // 数据库配置
-	Redis    Redis    // Redis配置
-	JWT      JWT      // JWT配置
+	App       App       // 应用配置
+	Database  Database  // 数据库配置
+	Redis     Redis     // Redis配置
+	JWT       JWT       // JWT配置
 	WechatPay WechatPay // 微信支付配置
-	Qiniu    Qiniu    // 七牛云配置
+	Wechat    Wechat    // 微信小程序配置
+	Qiniu     Qiniu     // 七牛云配置
 }
 
 // App 应用配置
@@ -73,77 +75,215 @@ type Qiniu struct {
 	Domain    string
 }
 
+// Wechat 微信小程序配置
+type Wechat struct {
+	AppID     string // 小程序AppID
+	AppSecret string // 小程序AppSecret
+}
+
 // InitConfig 初始化配置
 func InitConfig() error {
-	// 获取当前工作目录
+	// 先设置默认配置
+	Config = getDefaultConfig()
+
+	// 尝试从 .env 文件读取
 	workDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("获取工作目录失败: %w", err)
+	if err == nil {
+		configPath := filepath.Join(workDir, ".env")
+		if _, err := os.Stat(configPath); err == nil {
+			viper.SetConfigFile(configPath)
+			viper.SetConfigType("env")
+
+			if err := viper.ReadInConfig(); err == nil {
+				// 从 .env 文件覆盖配置
+				mergeConfig()
+				return nil
+			}
+		}
 	}
 
-	// 设置配置文件路径
-	configPath := filepath.Join(workDir, ".env")
-	
-	// 检查配置文件是否存在
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		log.Println("配置文件不存在，使用默认配置")
-		// 创建默认配置
-		Config = getDefaultConfig()
-		return nil
-	}
+	// 尝试从环境变量读取（优先级最高）
+	mergeEnvConfig()
 
-	// 读取配置文件
-	viper.SetConfigFile(configPath)
-	viper.SetConfigType("env")
-	
-	if err := viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("读取配置文件失败: %w", err)
-	}
-
-	// 解析配置
-	Config = &AppConfig{
-		App: App{
-			Name: viper.GetString("APP_NAME"),
-			Host: viper.GetString("APP_HOST"),
-			Port: viper.GetInt("APP_PORT"),
-			Env: viper.GetString("APP_ENV"),
-			Debug: viper.GetBool("APP_DEBUG"),
-		},
-		Database: Database{
-			Host:     viper.GetString("DB_HOST"),
-			Port:     viper.GetInt("DB_PORT"),
-			User:     viper.GetString("DB_USER"),
-			Password: viper.GetString("DB_PASSWORD"),
-			Name:     viper.GetString("DB_NAME"),
-			Charset:  viper.GetString("DB_CHARSET"),
-			MaxIdle:  viper.GetInt("DB_MAX_IDLE"),
-			MaxOpen:  viper.GetInt("DB_MAX_OPEN"),
-			LifeTime: viper.GetInt("DB_LIFE_TIME"),
-		},
-		Redis: Redis{
-			Host:     viper.GetString("REDIS_HOST"),
-			Port:     viper.GetInt("REDIS_PORT"),
-			Password: viper.GetString("REDIS_PASSWORD"),
-			DB:       viper.GetInt("REDIS_DB"),
-		},
-		JWT: JWT{
-			Secret: viper.GetString("JWT_SECRET"),
-			Expire: viper.GetInt("JWT_EXPIRE"),
-		},
-		WechatPay: WechatPay{
-			MchID:       viper.GetString("WECHAT_PAY_MCH_ID"),
-			APIKey:      viper.GetString("WECHAT_PAY_API_KEY"),
-			CallbackURL: viper.GetString("WECHAT_PAY_CALLBACK_URL"),
-		},
-		Qiniu: Qiniu{
-			AccessKey: viper.GetString("QINIU_ACCESS_KEY"),
-			SecretKey: viper.GetString("QINIU_SECRET_KEY"),
-			Bucket:    viper.GetString("QINIU_BUCKET"),
-			Domain:    viper.GetString("QINIU_DOMAIN"),
-		},
-	}
-
+	log.Println("配置初始化完成")
 	return nil
+}
+
+// mergeConfig 从 .env 文件合并配置
+func mergeConfig() {
+	if viper.IsSet("APP_NAME") {
+		Config.App.Name = viper.GetString("APP_NAME")
+	}
+	if viper.IsSet("APP_HOST") {
+		Config.App.Host = viper.GetString("APP_HOST")
+	}
+	if viper.IsSet("APP_PORT") {
+		Config.App.Port = viper.GetInt("APP_PORT")
+	}
+	if viper.IsSet("APP_ENV") {
+		Config.App.Env = viper.GetString("APP_ENV")
+	}
+	if viper.IsSet("APP_DEBUG") {
+		Config.App.Debug = viper.GetBool("APP_DEBUG")
+	}
+
+	if viper.IsSet("DB_HOST") {
+		Config.Database.Host = viper.GetString("DB_HOST")
+	}
+	if viper.IsSet("DB_PORT") {
+		Config.Database.Port = viper.GetInt("DB_PORT")
+	}
+	if viper.IsSet("DB_USER") {
+		Config.Database.User = viper.GetString("DB_USER")
+	}
+	if viper.IsSet("DB_PASSWORD") {
+		Config.Database.Password = viper.GetString("DB_PASSWORD")
+	}
+	if viper.IsSet("DB_NAME") {
+		Config.Database.Name = viper.GetString("DB_NAME")
+	}
+	if viper.IsSet("DB_CHARSET") {
+		Config.Database.Charset = viper.GetString("DB_CHARSET")
+	}
+	if viper.IsSet("DB_MAX_IDLE") {
+		Config.Database.MaxIdle = viper.GetInt("DB_MAX_IDLE")
+	}
+	if viper.IsSet("DB_MAX_OPEN") {
+		Config.Database.MaxOpen = viper.GetInt("DB_MAX_OPEN")
+	}
+	if viper.IsSet("DB_LIFE_TIME") {
+		Config.Database.LifeTime = viper.GetInt("DB_LIFE_TIME")
+	}
+
+	if viper.IsSet("REDIS_HOST") {
+		Config.Redis.Host = viper.GetString("REDIS_HOST")
+	}
+	if viper.IsSet("REDIS_PORT") {
+		Config.Redis.Port = viper.GetInt("REDIS_PORT")
+	}
+	if viper.IsSet("REDIS_PASSWORD") {
+		Config.Redis.Password = viper.GetString("REDIS_PASSWORD")
+	}
+	if viper.IsSet("REDIS_DB") {
+		Config.Redis.DB = viper.GetInt("REDIS_DB")
+	}
+
+	if viper.IsSet("JWT_SECRET") {
+		Config.JWT.Secret = viper.GetString("JWT_SECRET")
+	}
+	if viper.IsSet("JWT_EXPIRE") {
+		Config.JWT.Expire = viper.GetInt("JWT_EXPIRE")
+	}
+
+	if viper.IsSet("WECHAT_PAY_MCH_ID") {
+		Config.WechatPay.MchID = viper.GetString("WECHAT_PAY_MCH_ID")
+	}
+	if viper.IsSet("WECHAT_PAY_API_KEY") {
+		Config.WechatPay.APIKey = viper.GetString("WECHAT_PAY_API_KEY")
+	}
+	if viper.IsSet("WECHAT_PAY_CALLBACK_URL") {
+		Config.WechatPay.CallbackURL = viper.GetString("WECHAT_PAY_CALLBACK_URL")
+	}
+
+	if viper.IsSet("QINIU_ACCESS_KEY") {
+		Config.Qiniu.AccessKey = viper.GetString("QINIU_ACCESS_KEY")
+	}
+	if viper.IsSet("QINIU_SECRET_KEY") {
+		Config.Qiniu.SecretKey = viper.GetString("QINIU_SECRET_KEY")
+	}
+	if viper.IsSet("QINIU_BUCKET") {
+		Config.Qiniu.Bucket = viper.GetString("QINIU_BUCKET")
+	}
+	if viper.IsSet("QINIU_DOMAIN") {
+		Config.Qiniu.Domain = viper.GetString("QINIU_DOMAIN")
+	}
+}
+
+// mergeEnvConfig 从环境变量合并配置（优先级最高）
+func mergeEnvConfig() {
+	if env := os.Getenv("APP_HOST"); env != "" {
+		Config.App.Host = env
+	}
+	if env := os.Getenv("APP_PORT"); env != "" {
+		if port, err := strconv.Atoi(env); err == nil {
+			Config.App.Port = port
+		}
+	}
+	if env := os.Getenv("APP_ENV"); env != "" {
+		Config.App.Env = env
+	}
+	if env := os.Getenv("APP_DEBUG"); env != "" {
+		Config.App.Debug = env == "true" || env == "1"
+	}
+
+	if env := os.Getenv("DB_HOST"); env != "" {
+		Config.Database.Host = env
+	}
+	if env := os.Getenv("DB_PORT"); env != "" {
+		if port, err := strconv.Atoi(env); err == nil {
+			Config.Database.Port = port
+		}
+	}
+	if env := os.Getenv("DB_USER"); env != "" {
+		Config.Database.User = env
+	}
+	if env := os.Getenv("DB_PASSWORD"); env != "" {
+		Config.Database.Password = env
+	}
+	if env := os.Getenv("DB_NAME"); env != "" {
+		Config.Database.Name = env
+	}
+	if env := os.Getenv("DB_CHARSET"); env != "" {
+		Config.Database.Charset = env
+	}
+	if env := os.Getenv("DB_MAX_IDLE"); env != "" {
+		if val, err := strconv.Atoi(env); err == nil {
+			Config.Database.MaxIdle = val
+		}
+	}
+	if env := os.Getenv("DB_MAX_OPEN"); env != "" {
+		if val, err := strconv.Atoi(env); err == nil {
+			Config.Database.MaxOpen = val
+		}
+	}
+	if env := os.Getenv("DB_LIFE_TIME"); env != "" {
+		if val, err := strconv.Atoi(env); err == nil {
+			Config.Database.LifeTime = val
+		}
+	}
+
+	if env := os.Getenv("REDIS_HOST"); env != "" {
+		Config.Redis.Host = env
+	}
+	if env := os.Getenv("REDIS_PORT"); env != "" {
+		if port, err := strconv.Atoi(env); err == nil {
+			Config.Redis.Port = port
+		}
+	}
+	if env := os.Getenv("REDIS_PASSWORD"); env != "" {
+		Config.Redis.Password = env
+	}
+	if env := os.Getenv("REDIS_DB"); env != "" {
+		if db, err := strconv.Atoi(env); err == nil {
+			Config.Redis.DB = db
+		}
+	}
+
+	if env := os.Getenv("JWT_SECRET"); env != "" {
+		Config.JWT.Secret = env
+	}
+	if env := os.Getenv("JWT_EXPIRE"); env != "" {
+		if expire, err := strconv.Atoi(env); err == nil {
+			Config.JWT.Expire = expire
+		}
+	}
+
+	if env := os.Getenv("WECHAT_APP_ID"); env != "" {
+		Config.Wechat.AppID = env
+	}
+	if env := os.Getenv("WECHAT_APP_SECRET"); env != "" {
+		Config.Wechat.AppSecret = env
+	}
 }
 
 // getDefaultConfig 获取默认配置
@@ -176,6 +316,10 @@ func getDefaultConfig() *AppConfig {
 		JWT: JWT{
 			Secret: "default-secret-change-in-production",
 			Expire: 720,
+		},
+		Wechat: Wechat{
+			AppID:     "",
+			AppSecret: "",
 		},
 	}
 }

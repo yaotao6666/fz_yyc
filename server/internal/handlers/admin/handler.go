@@ -21,26 +21,27 @@ type LoginRequest struct {
 func Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	var admin models.ServiceProviderAdmin
 	if err := database.DB.Where("username = ? AND status = ?", req.Username, 1).First(&admin).Error; err != nil {
-		response.Fail(c, http.StatusUnauthorized, response.Unauthorized, "用户名或密码错误")
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户名或密码错误")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(req.Password)); err != nil {
-		response.Fail(c, http.StatusUnauthorized, response.Unauthorized, "用户名或密码错误")
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户名或密码错误")
 		return
 	}
 
 	now := time.Now()
 	database.DB.Model(&admin).Update("last_login_at", now)
 
+	token, _ := utils.GenerateToken(admin.ID, "admin", admin.Username)
 	response.Success(c, gin.H{
-		"token":  utils.GenerateToken(admin.ID, "admin", admin.Username),
+		"token":  token,
 		"admin": admin,
 	})
 }
@@ -48,7 +49,7 @@ func Login(c *gin.Context) {
 func GetServiceProvider(c *gin.Context) {
 	var sp models.ServiceProvider
 	if err := database.DB.First(&sp).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取服务商信息失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}
 	response.Success(c, sp)
@@ -64,13 +65,13 @@ type UpdateServiceProviderRequest struct {
 func UpdateServiceProvider(c *gin.Context) {
 	var req UpdateServiceProviderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	var sp models.ServiceProvider
 	if err := database.DB.First(&sp).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取服务商信息失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}
 
@@ -89,7 +90,7 @@ func UpdateServiceProvider(c *gin.Context) {
 	}
 
 	if err := database.DB.Model(&sp).Updates(updates).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新服务商信息失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新服务商信息失败")
 		return
 	}
 
@@ -122,7 +123,7 @@ func GetMerchantApplications(c *gin.Context) {
 	var applications []models.MerchantApplication
 	offset := (page - 1) * pageSize
 	if err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&applications).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取申请列表失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取申请列表失败")
 		return
 	}
 
@@ -141,7 +142,7 @@ func GetMerchantApplicationDetail(c *gin.Context) {
 
 	var application models.MerchantApplication
 	if err := database.DB.Preload("Merchant").First(&application, id).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "申请不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "申请不存在")
 		return
 	}
 
@@ -153,7 +154,7 @@ func SubmitMerchantApplication(c *gin.Context) {
 
 	var application models.MerchantApplication
 	if err := database.DB.First(&application, id).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "申请不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "申请不存在")
 		return
 	}
 
@@ -162,7 +163,7 @@ func SubmitMerchantApplication(c *gin.Context) {
 		"status":       1,
 		"submit_time":  now,
 	}).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "提交申请失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "提交申请失败")
 		return
 	}
 
@@ -174,7 +175,7 @@ func GetMerchantApplicationStatus(c *gin.Context) {
 
 	var application models.MerchantApplication
 	if err := database.DB.Select("id, status, audit_detail, audit_time").First(&application, id).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "申请不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "申请不存在")
 		return
 	}
 
@@ -198,7 +199,7 @@ func GetPendingMerchants(c *gin.Context) {
 	var merchants []models.Merchant
 	offset := (page - 1) * pageSize
 	if err := database.DB.Where("audit_status = ?", 0).Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&merchants).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取待审核商家失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取待审核商家失败")
 		return
 	}
 
@@ -223,13 +224,13 @@ func AuditMerchant(c *gin.Context) {
 
 	var req AuditMerchantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	var merchant models.Merchant
 	if err := database.DB.First(&merchant, id).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "商家不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeMerchantNotFound, "商家不存在")
 		return
 	}
 
@@ -240,7 +241,7 @@ func AuditMerchant(c *gin.Context) {
 	}
 
 	if err := database.DB.Model(&merchant).Updates(updates).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "审核失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "审核失败")
 		return
 	}
 

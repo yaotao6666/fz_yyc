@@ -4,7 +4,7 @@
 
 import { defineStore } from 'pinia'
 import { merchantLogin, getMerchantProfile } from '../api'
-import type { MerchantStaff, MerchantInfo } from '../types/api'
+import type { MerchantStaff, MerchantInfo } from '../types/index'
 
 interface AuthState {
   token: string

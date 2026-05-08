@@ -120,3 +120,13 @@ func NotFound(c *gin.Context, message string) {
 func ServerError(c *gin.Context, message string) {
 	Error(c, CodeServerError, message)
 }
+
+// Fail 通用错误响应（带HTTP状态码和错误码）
+func Fail(c *gin.Context, httpStatus int, code int, message string) {
+	ErrorWithStatus(c, httpStatus, code, message)
+}
+
+// InvalidParams 参数错误（简化调用）
+func InvalidParams(c *gin.Context, message string) {
+	ParamError(c, message)
+}

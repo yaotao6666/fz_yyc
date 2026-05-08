@@ -3,7 +3,7 @@
  */
 
 import { defineStore } from 'pinia'
-import type { Category, Product, ProductListResponse } from '../types/api'
+import type { Category, Product, ProductListResponse } from '../types/index'
 
 interface MerchantState {
   categories: Category[]

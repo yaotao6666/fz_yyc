@@ -51,8 +51,8 @@ func GetOrders(c *gin.Context) {
 
 	var orders []models.Order
 	offset := (page - 1) * pageSize
-	if err := query.Preload("User").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&orders).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取订单列表失败")
+	if err := query.Preload("User").Preload("Items").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&orders).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取订单列表失败")
 		return
 	}
 
@@ -73,7 +73,7 @@ func GetOrderDetail(c *gin.Context) {
 
 	var order models.Order
 	if err := database.DB.Preload("User").Preload("Items").Where("id = ? AND merchant_id = ?", id, merchantID).First(&order).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "订单不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
 		return
 	}
 
@@ -87,12 +87,12 @@ func CompleteOrder(c *gin.Context) {
 
 	var order models.Order
 	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&order).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "订单不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
 		return
 	}
 
 	if order.Status != 2 {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "订单状态不正确")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单状态不正确")
 		return
 	}
 
@@ -101,7 +101,7 @@ func CompleteOrder(c *gin.Context) {
 		"status":       3,
 		"completed_at": now,
 	}).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "完成订单失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "完成订单失败")
 		return
 	}
 
@@ -121,18 +121,18 @@ func RefundOrder(c *gin.Context) {
 
 	var req RefundRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	var order models.Order
 	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&order).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "订单不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
 		return
 	}
 
 	if order.Status != 2 && order.Status != 3 {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "订单状态不正确")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单状态不正确")
 		return
 	}
 
@@ -149,7 +149,7 @@ func RefundOrder(c *gin.Context) {
 	tx := database.DB.Begin()
 	if err := tx.Create(&refund).Error; err != nil {
 		tx.Rollback()
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "创建退款记录失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建退款记录失败")
 		return
 	}
 
@@ -158,7 +158,7 @@ func RefundOrder(c *gin.Context) {
 		"refunded_at": now,
 	}).Error; err != nil {
 		tx.Rollback()
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新订单状态失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新订单状态失败")
 		return
 	}
 
@@ -340,7 +340,7 @@ func GetStockAlert(c *gin.Context) {
 
 	var products []models.Product
 	if err := database.DB.Where("merchant_id = ? AND stock <= ? AND status = 1", merchantID, thresholdInt).Order("stock ASC").Find(&products).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取库存警告失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取库存警告失败")
 		return
 	}
 

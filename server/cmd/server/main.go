@@ -7,9 +7,11 @@ import (
 	"fz_yyc_api/internal/config"
 	"fz_yyc_api/internal/handlers/admin"
 	"fz_yyc_api/internal/handlers/merchant"
+	"fz_yyc_api/internal/handlers/upload"
 	"fz_yyc_api/internal/handlers/user"
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/pkg/database"
+	"fz_yyc_api/pkg/qiniu"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +27,11 @@ func main() {
 		log.Fatalf("数据库初始化失败: %v", err)
 	}
 	defer database.CloseDB()
+
+	// 初始化七牛云
+	if err := qiniu.InitQiniu(); err != nil {
+		log.Fatalf("七牛云初始化失败: %v", err)
+	}
 
 	// 设置Gin模式
 	if config.Config.App.Debug {
@@ -68,6 +75,14 @@ func setupRoutes(r *gin.Engine) {
 			authGroup.POST("/admin/login", admin.Login)
 			authGroup.POST("/merchant/login", merchant.Login)
 			authGroup.POST("/user/wechat-login", user.WechatLogin)
+		}
+
+		// 文件上传接口
+		uploadHandler := upload.NewUploadHandler()
+		uploadGroup := v1.Group("/upload")
+		uploadGroup.Use(middleware.JWTAuth())
+		{
+			uploadGroup.GET("/token", uploadHandler.GetToken)
 		}
 
 		// C端用户接口（无需特殊权限）
@@ -131,6 +146,7 @@ func setupRoutes(r *gin.Engine) {
 			// 商家信息
 			merchantGroup.GET("/profile", merchant.GetProfile)
 			merchantGroup.PUT("/profile", merchant.UpdateProfile)
+			merchantGroup.GET("/settings", merchant.GetSettings)
 			merchantGroup.PUT("/settings", merchant.UpdateSettings)
 			merchantGroup.PUT("/license", merchant.UpdateLicense)
 			merchantGroup.PUT("/bank-account", merchant.UpdateBankAccount)
@@ -153,6 +169,7 @@ func setupRoutes(r *gin.Engine) {
 
 			// 商品管理
 			merchantGroup.GET("/products", merchant.GetProducts)
+			merchantGroup.GET("/products/:product_id", merchant.GetProduct)
 			merchantGroup.POST("/products", merchant.CreateProduct)
 			merchantGroup.PUT("/products/:product_id", merchant.UpdateProduct)
 			merchantGroup.POST("/products/:product_id/on-sale", merchant.ProductOnSale)

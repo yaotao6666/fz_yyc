@@ -121,9 +121,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onShow } from 'vue'
+import { ref, reactive } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { getDeliverySettings, updateDeliverySettings } from '../../api'
-import type { DeliverySettings, DistanceRule } from '../../types/api'
+import type { DeliverySettings, DistanceRule } from '../../types/index'
 
 const saving = ref(false)
 

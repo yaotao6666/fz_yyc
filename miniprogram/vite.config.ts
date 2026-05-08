@@ -3,7 +3,9 @@ import uni from '@dcloudio/vite-plugin-uni'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [uni()],
+  plugins: [
+    uni()
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
@@ -22,6 +24,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }
+    }
+  },
+  uni: {
+    vueComponents: {
+      // 自动导入组件
+      // 不需要在这里配置，uni-app 会自动扫描
     }
   }
 })

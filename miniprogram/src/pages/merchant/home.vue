@@ -63,7 +63,7 @@
           </view>
           <text class="menu-text">分类管理</text>
         </view>
-        <view class="menu-item" @click="goOrders('paid')">
+        <view class="menu-item" @click.stop="goOrders('paid')">
           <view class="menu-icon" style="background: #f6ffed;">
             <image src="/static/icons/order.png" />
           </view>
@@ -123,13 +123,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onShow } from 'vue'
+import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
-import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getCategories } from '../../api'
+import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getCategories, getMerchantQrcode } from '../../api'
 
 const authStore = useAuthStore()
 
 const merchantInfo = ref(authStore.merchantInfo)
+const merchantQrcode = ref<string>('')
 const statistics = ref<any>({
   today_orders: 0,
   today_sales: 0,
@@ -152,8 +154,18 @@ async function loadData() {
   await Promise.all([
     loadMerchantInfo(),
     loadStatistics(),
-    loadLowStockCount()
+    loadLowStockCount(),
+    loadMerchantQrcode()
   ])
+}
+
+async function loadMerchantQrcode() {
+  try {
+    const res = await getMerchantQrcode()
+    merchantQrcode.value = res.qrcode_url
+  } catch (error) {
+    console.error('加载二维码失败:', error)
+  }
 }
 
 async function loadMerchantInfo() {
@@ -197,8 +209,8 @@ async function loadLowStockCount() {
 }
 
 async function toggleShopStatus() {
-  const newStatus = merchantInfo.value?.status === 1 ? 'inactive' : 'active'
-  const actionText = newStatus === 'active' ? '营业' : '暂停'
+  const newStatus = merchantInfo.value?.status === 1 ? 0 : 1
+  const actionText = newStatus === 1 ? '营业' : '暂停'
   
   uni.showModal({
     title: '提示',
@@ -207,7 +219,7 @@ async function toggleShopStatus() {
       if (res.confirm) {
         try {
           await updateMerchantStatus(newStatus)
-          merchantInfo.value!.status = newStatus === 'active' ? 1 : 0
+          merchantInfo.value!.status = newStatus
           uni.showToast({ title: `${actionText}成功`, icon: 'success' })
         } catch (error: any) {
           uni.showToast({ title: error.message || '操作失败', icon: 'none' })
@@ -218,8 +230,12 @@ async function toggleShopStatus() {
 }
 
 function showQrcode() {
+  if (!merchantQrcode.value) {
+    uni.showToast({ title: '二维码加载中，请稍后', icon: 'none' })
+    return
+  }
   uni.previewImage({
-    urls: [merchantInfo.value?.qrcode_url || ''],
+    urls: [merchantQrcode.value],
     current: 0
   })
 }
@@ -393,6 +409,15 @@ function goSettings() {
   display: flex;
   flex-direction: column;
   align-items: center;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  min-height: 160rpx;
+}
+
+.menu-item:active {
+  opacity: 0.7;
 }
 
 .menu-icon {

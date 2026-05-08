@@ -92,13 +92,6 @@
       }
     },
     {
-      "path": "pages/store/products",
-      "style": {
-        "navigationBarTitleText": "商品列表",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
       "path": "pages/store/product",
       "style": {
         "navigationBarTitleText": "商品详情",

@@ -25,7 +25,7 @@ func GetActivities(c *gin.Context) {
 		1, time.Now(), time.Now()).
 		Order("sort ASC, created_at DESC").
 		Find(&activities).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取活动列表失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取活动列表失败")
 		return
 	}
 
@@ -61,12 +61,12 @@ type ActivityRequest struct {
 func CreateActivity(c *gin.Context) {
 	var req ActivityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	if req.Type == "banner" && req.Title == "" {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "Banner标题不能为空")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "Banner标题不能为空")
 		return
 	}
 
@@ -88,7 +88,7 @@ func CreateActivity(c *gin.Context) {
 	}
 
 	if err := database.DB.Create(&activity).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "创建活动失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建活动失败")
 		return
 	}
 
@@ -101,13 +101,13 @@ func UpdateActivity(c *gin.Context) {
 
 	var req ActivityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
 	var activity models.Activity
 	if err := database.DB.First(&activity, activityID).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.NotFound, "活动不存在")
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "活动不存在")
 		return
 	}
 
@@ -133,7 +133,7 @@ func UpdateActivity(c *gin.Context) {
 	updates["end_time"] = req.EndTime
 
 	if err := database.DB.Model(&activity).Updates(updates).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "更新活动失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新活动失败")
 		return
 	}
 
@@ -146,7 +146,7 @@ func DeleteActivity(c *gin.Context) {
 	activityID, _ := strconv.ParseUint(id, 10, 64)
 
 	if err := database.DB.Delete(&models.Activity{}, activityID).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "删除活动失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "删除活动失败")
 		return
 	}
 
@@ -210,7 +210,7 @@ func GetInviteRecords(c *gin.Context) {
 	var records []models.InviteRecord
 	offset := (page - 1) * pageSize
 	if err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&records).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取邀请记录失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取邀请记录失败")
 		return
 	}
 
@@ -236,7 +236,7 @@ type InviteRewardRequest struct {
 func UpdateInviteRewards(c *gin.Context) {
 	var req InviteRewardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.InvalidParams, "参数错误")
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
@@ -253,7 +253,7 @@ func UpdateInviteRewards(c *gin.Context) {
 		}
 		if err := tx.Create(&inviteReward).Error; err != nil {
 			tx.Rollback()
-			response.Fail(c, http.StatusInternalServerError, response.ServerError, "保存奖励规则失败")
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "保存奖励规则失败")
 			return
 		}
 	}
@@ -272,7 +272,7 @@ func UpdateInviteRewards(c *gin.Context) {
 func GetInviteRewards(c *gin.Context) {
 	var rewards []models.InviteReward
 	if err := database.DB.Find(&rewards).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取奖励规则失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取奖励规则失败")
 		return
 	}
 

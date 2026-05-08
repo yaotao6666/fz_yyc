@@ -132,7 +132,7 @@ export function del<T = any>(url: string, data?: any, options?: Partial<RequestO
 /**
  * 上传文件
  */
-export function uploadFile<T = any>(
+export function upload<T = any>(
   url: string,
   filePath: string,
   name: string = 'file',
@@ -173,10 +173,12 @@ export function uploadFile<T = any>(
   })
 }
 
+export const uploadFile = upload
+
 export default {
   get,
   post,
   put,
   del,
-  upload: uploadFile
+  upload
 }

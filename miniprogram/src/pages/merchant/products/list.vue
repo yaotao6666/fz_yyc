@@ -110,9 +110,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onShow } from 'vue'
-import { getProducts, productOnSale, productOffSale, deleteProduct as deleteProductApi, batchUpdateProductStatus } from '../../api'
-import type { Product } from '../../types/api'
+import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import { getProducts, productOnSale, productOffSale, deleteProduct as deleteProductApi, batchUpdateProductStatus } from '../../../api'
+import type { Product } from '../../../types/index'
 
 const keyword = ref('')
 const filterStatus = ref('')
@@ -143,12 +144,20 @@ async function loadProducts(reset = false) {
   loading.value = true
 
   try {
-    const res = await getProducts({
+    const params: any = {
       page: page.value,
       page_size: pageSize,
-      status: filterStatus.value || undefined,
-      keyword: keyword.value || undefined
-    })
+    }
+    
+    if (filterStatus.value) {
+      params.status = filterStatus.value === 'on_sale' ? 1 : 2
+    }
+    
+    if (keyword.value) {
+      params.keyword = keyword.value
+    }
+
+    const res = await getProducts(params)
 
     if (reset) {
       products.value = res.list
@@ -197,7 +206,7 @@ async function toggleStatus(product: Product) {
   try {
     if (product.status === 1) {
       await productOffSale(product.id)
-      product.status = 0
+      product.status = 2
     } else {
       await productOnSale(product.id)
       product.status = 1
@@ -230,7 +239,8 @@ async function batchOnSale() {
   if (selectedIds.value.length === 0) return
 
   try {
-    await batchUpdateProductStatus(selectedIds.value, 'on_sale')
+    // on_sale 对应数字 1，off_sale 对应数字 2
+    await batchUpdateProductStatus(selectedIds.value, 1)
     products.value.forEach(p => {
       if (selectedIds.value.includes(p.id)) {
         p.status = 1
@@ -247,10 +257,10 @@ async function batchOffSale() {
   if (selectedIds.value.length === 0) return
 
   try {
-    await batchUpdateProductStatus(selectedIds.value, 'off_sale')
+    await batchUpdateProductStatus(selectedIds.value, 2)
     products.value.forEach(p => {
       if (selectedIds.value.includes(p.id)) {
-        p.status = 0
+        p.status = 2
       }
     })
     selectedIds.value = []

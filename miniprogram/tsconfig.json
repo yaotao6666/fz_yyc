@@ -1,17 +1,31 @@
 {
-  "extends": "@dcloudio/uni-app/types/tsconfig.json",
   "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
     "strict": true,
+    "jsx": "preserve",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["ESNext", "DOM"],
+    "skipLibCheck": true,
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
+      "@": ["src"],
       "@api/*": ["src/api/*"],
+      "@api": ["src/api"],
       "@components/*": ["src/components/*"],
       "@stores/*": ["src/stores/*"],
       "@utils/*": ["src/utils/*"],
-      "@types/*": ["src/types/*"]
+      "@types/*": ["src/types/*"],
+      "@types": ["src/types"]
     },
-    "types": ["@dcloudio/types", "miniprogram-api-typings"]
+    // 移除不存在的类型库 miniprogram-api-typings，仅保留 @dcloudio/types
+    "types": ["@dcloudio/types"]
   },
   "include": [
     "src/**/*.ts",

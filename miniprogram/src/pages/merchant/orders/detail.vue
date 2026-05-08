@@ -161,10 +161,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onLoad } from '@dcloudio/uni-app'
-import { getOrder, completeOrder } from '../../api'
-import { OrderStatus, OrderStatusText, DeliveryTypeText } from '../../types/api'
-import type { Order } from '../../types/api'
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+import { getOrder, completeOrder } from '../../../api'
+import { OrderStatus, OrderStatusText, DeliveryTypeText } from '../../../types/index'
+import type { Order } from '../../../types/index'
 
 const order = ref<Order | null>(null)
 const showVerify = ref(false)

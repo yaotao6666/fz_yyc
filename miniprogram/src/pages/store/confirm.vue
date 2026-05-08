@@ -120,10 +120,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onShow } from 'vue'
+import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { createOrder } from '../../api'
 import { useCartStore } from '../../stores/cart'
-import type { CreateOrderRequest } from '../../types/api'
+import type { CreateOrderRequest } from '../../types/index'
 
 const cartStore = useCartStore()
 

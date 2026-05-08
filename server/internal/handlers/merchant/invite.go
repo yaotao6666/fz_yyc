@@ -36,7 +36,7 @@ func GenerateInviteCode(c *gin.Context) {
 	}
 
 	if err := database.DB.Create(&record).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "生成邀请码失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "生成邀请码失败")
 		return
 	}
 
@@ -121,7 +121,7 @@ func GetInviteRecords(c *gin.Context) {
 	var records []models.InviteRecord
 	offset := (page - 1) * pageSize
 	if err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&records).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.ServerError, "获取邀请记录失败")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取邀请记录失败")
 		return
 	}
 
