@@ -85,6 +85,13 @@
       }
     },
     {
+      "path": "pages/store/test-entry",
+      "style": {
+        "navigationBarTitleText": "商家店铺测试",
+        "navigationBarBackgroundColor": "#667eea"
+      }
+    },
+    {
       "path": "pages/store/home",
       "style": {
         "navigationBarTitleText": "店铺首页",
