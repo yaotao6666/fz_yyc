@@ -161,6 +161,29 @@
   },
   "condition": {
     "current": 0,
-    "list": []
+    "list": [
+      {
+        "name": "商家登录",
+        "path": "pages/auth/login"
+      },
+      {
+        "name": "测试入口",
+        "path": "pages/store/test-entry"
+      },
+      {
+        "name": "店铺首页(商家1)",
+        "path": "pages/store/home",
+        "query": "merchant_id=1"
+      },
+      {
+        "name": "店铺首页(商家2)",
+        "path": "pages/store/home",
+        "query": "merchant_id=2"
+      },
+      {
+        "name": "商户中心",
+        "path": "pages/merchant/home"
+      }
+    ]
   }
 }
