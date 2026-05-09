@@ -190,18 +190,20 @@ func (MerchantLicense) TableName() string {
 // 商家员工表 (merchant_staffs)
 // ============================================
 type MerchantStaff struct {
-	ID           uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	MerchantID  uint64     `gorm:"not null;index" json:"merchant_id"`
-	Username    string     `gorm:"size:64;not null" json:"username"`
-	Password    string     `gorm:"size:128;not null" json:"-"`
-	Name        string     `gorm:"size:64" json:"name"`
-	Phone       string     `gorm:"size:20" json:"phone"`
-	Role        string     `gorm:"size:32;not null;default:staff" json:"role"`
-	Status      uint8      `gorm:"not null;default:1" json:"status"`
-	LastLoginAt *time.Time `json:"last_login_at"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
-	Merchant    *Merchant  `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
+	ID            uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	MerchantID    uint64     `gorm:"not null;index" json:"merchant_id"`
+	Username      string     `gorm:"size:64;not null" json:"username"`
+	Password      string     `gorm:"size:128;not null" json:"-"`
+	Name          string     `gorm:"size:64" json:"name"`
+	Phone         string     `gorm:"size:20" json:"phone"`
+	OpenID        string     `gorm:"size:64" json:"openid"`
+	Role          string     `gorm:"size:32;not null;default:staff" json:"role"`
+	NotifyEnabled bool       `gorm:"not null;default:true" json:"notify_enabled"`
+	Status        uint8      `gorm:"not null;default:1" json:"status"`
+	LastLoginAt   *time.Time `json:"last_login_at"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	Merchant      *Merchant  `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
 }
 
 func (MerchantStaff) TableName() string {
@@ -430,4 +432,183 @@ type InviteReward struct {
 
 func (InviteReward) TableName() string {
 	return "invite_rewards"
+}
+
+// ============================================
+// 系统公告表 (announcements)
+// ============================================
+type Announcement struct {
+	ID                 uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	ServiceProviderID  uint64    `gorm:"not null;index" json:"service_provider_id"`
+	Title              string    `gorm:"size:128;not null" json:"title"`
+	Content            string    `gorm:"type:text" json:"content"`
+	Status             uint8     `gorm:"not null;default:1" json:"status"`
+	CreatedAt          time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt          time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ServiceProvider    *ServiceProvider `gorm:"foreignKey:ServiceProviderID" json:"service_provider,omitempty"`
+}
+
+func (Announcement) TableName() string {
+	return "announcements"
+}
+
+// ============================================
+// 商家审核记录表 (merchant_audit_records)
+// ============================================
+type MerchantAuditRecord struct {
+	ID           uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	MerchantID   uint64     `gorm:"not null;index" json:"merchant_id"`
+	AuditorID    uint64     `gorm:"not null;index" json:"auditor_id"`
+	Action       string     `gorm:"size:32;not null" json:"action"`
+	BeforeStatus uint8      `gorm:"not null" json:"before_status"`
+	AfterStatus  uint8      `gorm:"not null" json:"after_status"`
+	Remark       string     `gorm:"size:256" json:"remark"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	Merchant     *Merchant  `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
+}
+
+func (MerchantAuditRecord) TableName() string {
+	return "merchant_audit_records"
+}
+
+// ============================================
+// 商家年费表 (merchant_fees)
+// ============================================
+type MerchantFee struct {
+	ID           uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	MerchantID   uint64     `gorm:"not null;index" json:"merchant_id"`
+	Year         uint       `gorm:"not null" json:"year"`
+	Amount       float64    `gorm:"type:decimal(10,2);not null;default:0" json:"amount"`
+	Status       string     `gorm:"size:16;not null" json:"status"`
+	PayTime      *time.Time `json:"pay_time"`
+	FreeReason   string     `gorm:"size:256" json:"free_reason"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt    time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (MerchantFee) TableName() string {
+	return "merchant_fees"
+}
+
+// ============================================
+// 商家手续费率表 (merchant_rates)
+// ============================================
+type MerchantRate struct {
+	ID             uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	MerchantID     uint64     `gorm:"not null;index" json:"merchant_id"`
+	RateType       string     `gorm:"size:32;not null" json:"rate_type"`
+	Rate           float64    `gorm:"type:decimal(5,4);not null" json:"rate"`
+	EffectiveTime  time.Time  `json:"effective_time"`
+	ExpireTime     *time.Time `json:"expire_time"`
+	Remark         string     `gorm:"size:256" json:"remark"`
+	Status         uint8      `gorm:"not null;default:1" json:"status"`
+	CreatedAt      time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt      time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (MerchantRate) TableName() string {
+	return "merchant_rates"
+}
+
+// ============================================
+// 用户收货地址表 (user_addresses)
+// ============================================
+type UserAddress struct {
+	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID    uint64    `gorm:"not null;index" json:"user_id"`
+	Name      string    `gorm:"size:64;not null" json:"name"`
+	Phone     string    `gorm:"size:20;not null" json:"phone"`
+	Province  string    `gorm:"size:32" json:"province"`
+	City      string    `gorm:"size:32" json:"city"`
+	District  string    `gorm:"size:32" json:"district"`
+	Address   string    `gorm:"size:256;not null" json:"address"`
+	Lat       float64   `gorm:"type:decimal(10,6)" json:"lat"`
+	Lng       float64   `gorm:"type:decimal(10,6)" json:"lng"`
+	IsDefault bool      `gorm:"not null;default:false" json:"is_default"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (UserAddress) TableName() string {
+	return "user_addresses"
+}
+
+// ============================================
+// 优惠券表 (coupons)
+// ============================================
+type Coupon struct {
+	ID                 uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	MerchantID         uint64     `gorm:"not null;index" json:"merchant_id"`
+	Name               string     `gorm:"size:64;not null" json:"name"`
+	Type               string     `gorm:"size:16;not null" json:"type"`
+	DiscountAmount     float64    `gorm:"type:decimal(10,2)" json:"discount_amount"`
+	MinOrderAmount      float64    `gorm:"type:decimal(10,2);not null;default:0" json:"min_order_amount"`
+	TotalCount         int        `gorm:"not null" json:"total_count"`
+	RemainingCount     int        `gorm:"not null" json:"remaining_count"`
+	PerUserLimit       int        `gorm:"not null;default:1" json:"per_user_limit"`
+	StartTime          time.Time  `json:"start_time"`
+	EndTime            time.Time  `json:"end_time"`
+	Status             uint8      `gorm:"not null;default:1" json:"status"`
+	CreatedAt          time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt          time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (Coupon) TableName() string {
+	return "coupons"
+}
+
+// ============================================
+// 优惠券领取记录表 (coupon_records)
+// ============================================
+type CouponRecord struct {
+	ID         uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID     uint64     `gorm:"not null;index" json:"user_id"`
+	CouponID   uint64     `gorm:"not null;index" json:"coupon_id"`
+	Status     uint8      `gorm:"not null;default:0" json:"status"`
+	UsedAt     *time.Time `json:"used_at"`
+	OrderID    uint64     `gorm:"index" json:"order_id"`
+	CreatedAt  time.Time  `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (CouponRecord) TableName() string {
+	return "coupon_records"
+}
+
+// ============================================
+// 云打印机表 (cloud_printers)
+// ============================================
+type CloudPrinter struct {
+	ID           uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	MerchantID   uint64    `gorm:"not null;index" json:"merchant_id"`
+	Name         string    `gorm:"size:64;not null" json:"name"`
+	Brand        string    `gorm:"size:32" json:"brand"`
+	DeviceNo     string    `gorm:"size:64;not null" json:"device_no"`
+	APIKey       string    `gorm:"size:64" json:"api_key"`
+	PrintTypes   JSON      `gorm:"type:json" json:"print_types"`
+	Status       uint8     `gorm:"not null;default:1" json:"status"`
+	LastPrintAt  *time.Time `json:"last_print_at"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (CloudPrinter) TableName() string {
+	return "cloud_printers"
+}
+
+// ============================================
+// 打印记录表 (print_logs)
+// ============================================
+type PrintLog struct {
+	ID           uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	MerchantID   uint64    `gorm:"not null;index" json:"merchant_id"`
+	PrinterID    uint64    `gorm:"not null;index" json:"printer_id"`
+	OrderID      uint64    `gorm:"index" json:"order_id"`
+	Type         string    `gorm:"size:16;not null" json:"type"`
+	Status       uint8     `gorm:"not null;default:0" json:"status"`
+	ErrorMessage string    `gorm:"size:256" json:"error_message"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (PrintLog) TableName() string {
+	return "print_logs"
 }

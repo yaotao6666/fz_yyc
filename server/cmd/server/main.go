@@ -7,6 +7,7 @@ import (
 	"fz_yyc_api/internal/config"
 	"fz_yyc_api/internal/handlers/admin"
 	"fz_yyc_api/internal/handlers/merchant"
+	"fz_yyc_api/internal/handlers/sp"
 	"fz_yyc_api/internal/handlers/upload"
 	"fz_yyc_api/internal/handlers/user"
 	"fz_yyc_api/internal/middleware"
@@ -132,11 +133,11 @@ func setupRoutes(r *gin.Engine) {
 			adminGroup.PUT("/activities/:id", admin.UpdateActivity)
 			adminGroup.DELETE("/activities/:id", admin.DeleteActivity)
 
-			// 邀请入驻管理
-			adminGroup.GET("/invites/stats", admin.GetInviteStats)
-			adminGroup.GET("/invites", admin.GetInviteRecords)
-			adminGroup.GET("/invite-rewards", admin.GetInviteRewards)
-			adminGroup.PUT("/invite-rewards", admin.UpdateInviteRewards)
+			// 系统公告管理
+			adminGroup.GET("/announcements", admin.GetAnnouncements)
+			adminGroup.POST("/announcements", admin.CreateAnnouncement)
+			adminGroup.PUT("/announcements/:id", admin.UpdateAnnouncement)
+			adminGroup.DELETE("/announcements/:id", admin.DeleteAnnouncement)
 		}
 
 		// 商家管理员接口
@@ -155,10 +156,15 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.GET("/qrcode", merchant.GetQRCode)
 			merchantGroup.GET("/delivery-settings", merchant.GetDeliverySettings)
 
-			// 邀请入驻
-			merchantGroup.POST("/invite/generate", merchant.GenerateInviteCode)
-			merchantGroup.GET("/invite/info", merchant.GetInviteInfo)
-			merchantGroup.GET("/invite/records", merchant.GetInviteRecords)
+			// 员工管理
+			merchantGroup.GET("/staff", merchant.GetStaffList)
+			merchantGroup.POST("/staff", merchant.CreateStaff)
+			merchantGroup.PUT("/staff/:id", merchant.UpdateStaff)
+			merchantGroup.DELETE("/staff/:id", merchant.DeleteStaff)
+
+			// 系统公告（商家查看）
+			merchantGroup.GET("/announcements", merchant.GetAnnouncements)
+			merchantGroup.GET("/announcements/:id", merchant.GetAnnouncementDetail)
 
 			// 商品分类
 			merchantGroup.GET("/categories", merchant.GetCategories)
@@ -193,6 +199,35 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.GET("/analytics/stock-alert", merchant.GetStockAlert)
 			merchantGroup.GET("/analytics/customers", merchant.GetCustomerAnalysis)
 			merchantGroup.GET("/analytics/customer-trend", merchant.GetCustomerTrend)
+		}
+
+		// 服务商小程序接口
+		spGroup := v1.Group("/sp")
+		spGroup.Use(middleware.JWTAuth())
+		{
+			spGroup.POST("/auth/login", sp.Login)
+			spGroup.POST("/auth/logout", sp.Logout)
+			spGroup.GET("/dashboard", sp.GetDashboard)
+			spGroup.GET("/merchants/pending", sp.GetPendingMerchants)
+			spGroup.GET("/merchants/:merchant_id", sp.GetMerchantDetail)
+			spGroup.POST("/merchants/:merchant_id/approve", sp.AuditMerchant)
+			spGroup.GET("/merchants/analytics/distribution", sp.GetMerchantDistribution)
+			spGroup.GET("/merchants/list", sp.GetMerchantList)
+			spGroup.GET("/merchants/audit-records", sp.GetAuditRecords)
+			spGroup.GET("/merchants/:id/fee", sp.GetMerchantFee)
+			spGroup.GET("/merchants/:id/rate", sp.GetMerchantRate)
+			spGroup.POST("/merchants/:id/rate", sp.SetMerchantRate)
+			spGroup.GET("/merchants/:id/qrcode", sp.GetMerchantQRCode)
+			spGroup.GET("/orders/analytics", sp.GetOrderAnalytics)
+			spGroup.GET("/amount/analytics", sp.GetAmountAnalytics)
+			spGroup.GET("/amount/top-merchants", sp.GetTopMerchants)
+			spGroup.GET("/orders/refunds", sp.GetRefunds)
+			spGroup.GET("/settings", sp.GetSettings)
+			spGroup.PUT("/settings", sp.UpdateSettings)
+			spGroup.GET("/announcements", sp.GetAnnouncements)
+			spGroup.POST("/announcements", sp.CreateAnnouncement)
+			spGroup.PUT("/announcements/:id", sp.UpdateAnnouncement)
+			spGroup.DELETE("/announcements/:id", sp.DeleteAnnouncement)
 		}
 
 		// 微信支付回调

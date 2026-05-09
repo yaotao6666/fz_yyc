@@ -1,0 +1,533 @@
+package sp
+
+import (
+	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/utils"
+	"fz_yyc_api/pkg/database"
+	"fz_yyc_api/pkg/response"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+func Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var admin models.ServiceProviderAdmin
+	if err := database.DB.Where("username = ? AND status = ?", req.Username, 1).First(&admin).Error; err != nil {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户名或密码错误")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(req.Password)); err != nil {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户名或密码错误")
+		return
+	}
+
+	now := time.Now()
+	database.DB.Model(&admin).Update("last_login_at", now)
+
+	token, _ := utils.GenerateToken(admin.ID, "sp", admin.Username)
+	response.Success(c, gin.H{
+		"token": token,
+		"service_provider": gin.H{
+			"id":   admin.ID,
+			"name": admin.Username,
+		},
+	})
+}
+
+func Logout(c *gin.Context) {
+	response.Success(c, gin.H{"message": "退出成功"})
+}
+
+func GetDashboard(c *gin.Context) {
+	var totalMerchants int64
+	var todayOrders int64
+	var todayRevenue float64
+	var pendingMerchants int64
+
+	database.DB.Model(&models.Merchant{}).Count(&totalMerchants)
+	database.DB.Model(&models.Merchant{}).Where("audit_status = ?", 0).Count(&pendingMerchants)
+	database.DB.Model(&models.Order{}).Where("DATE(created_at) = CURDATE()").Count(&todayOrders)
+	database.DB.Model(&models.Order{}).Where("DATE(created_at) = CURDATE() AND status >= 2").Select("COALESCE(SUM(pay_amount), 0)").Scan(&todayRevenue)
+
+	var distribution []struct {
+		Category string `json:"category"`
+		Count    int64  `json:"count"`
+	}
+	database.DB.Model(&models.Merchant{}).Select("business_category as category, count(*) as count").Group("business_category").Scan(&distribution)
+
+	var trend []struct {
+		Date   string `json:"date"`
+		Orders int64  `json:"orders"`
+	}
+	for i := 6; i >= 0; i-- {
+		date := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+		var orders int64
+		database.DB.Model(&models.Order{}).Where("DATE(created_at) = ?", date).Count(&orders)
+		trend = append(trend, struct {
+			Date   string `json:"date"`
+			Orders int64  `json:"orders"`
+		}{Date: date, Orders: orders})
+	}
+
+	response.Success(c, gin.H{
+		"total_merchants":   totalMerchants,
+		"pending_merchants": pendingMerchants,
+		"today_orders":      todayOrders,
+		"today_revenue":     todayRevenue,
+		"distribution":      distribution,
+		"trend":             trend,
+	})
+}
+
+func GetPendingMerchants(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	var total int64
+	database.DB.Model(&models.Merchant{}).Where("audit_status = ?", 0).Count(&total)
+
+	var merchants []models.Merchant
+	offset := (page - 1) * pageSize
+	if err := database.DB.Where("audit_status = ?", 0).Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&merchants).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取待审核商家失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"list": merchants,
+		"pagination": gin.H{
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
+	})
+}
+
+func GetMerchantDetail(c *gin.Context) {
+	merchantID := c.Param("merchant_id")
+	id, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	var merchant models.Merchant
+	if err := database.DB.First(&merchant, id).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
+		return
+	}
+
+	response.Success(c, merchant)
+}
+
+type AuditRequest struct {
+	AuditStatus uint8  `json:"audit_status" binding:"required,oneof=1 2"`
+	AuditRemark string `json:"audit_remark"`
+}
+
+func AuditMerchant(c *gin.Context) {
+	merchantID := c.Param("merchant_id")
+	id, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	var req AuditRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var merchant models.Merchant
+	if err := database.DB.First(&merchant, id).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeMerchantNotFound, "商家不存在")
+		return
+	}
+
+	updates := map[string]interface{}{
+		"audit_status": req.AuditStatus,
+		"audit_remark": req.AuditRemark,
+		"status":       req.AuditStatus,
+	}
+
+	if err := database.DB.Model(&merchant).Updates(updates).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "审核失败")
+		return
+	}
+
+	database.DB.First(&merchant, id)
+	response.Success(c, merchant)
+}
+
+func GetMerchantDistribution(c *gin.Context) {
+	var businessDistribution []struct {
+		Category string `json:"category"`
+		Count    int64  `json:"count"`
+	}
+	database.DB.Model(&models.Merchant{}).Select("business_category as category, count(*) as count").Group("business_category").Scan(&businessDistribution)
+
+	var statusDistribution []struct {
+		Status string `json:"status"`
+		Count  int64  `json:"count"`
+	}
+	database.DB.Model(&models.Merchant{}).Select("CASE WHEN status = 1 THEN 'active' ELSE 'inactive' END as status, count(*) as count").Group("status").Scan(&statusDistribution)
+
+	response.Success(c, gin.H{
+		"business": businessDistribution,
+		"status":   statusDistribution,
+	})
+}
+
+func GetMerchantList(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	keyword := c.Query("keyword")
+	status := c.Query("status")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	query := database.DB.Model(&models.Merchant{})
+
+	if keyword != "" {
+		query = query.Where("name LIKE ?", "%"+keyword+"%")
+	}
+	if status != "" {
+		statusInt, _ := strconv.Atoi(status)
+		query = query.Where("status = ?", statusInt)
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var merchants []models.Merchant
+	offset := (page - 1) * pageSize
+	if err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&merchants).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取商家列表失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"list": merchants,
+		"pagination": gin.H{
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
+	})
+}
+
+func GetOrderAnalytics(c *gin.Context) {
+	days := c.DefaultQuery("days", "7")
+	daysInt, _ := strconv.Atoi(days)
+
+	var trends []struct {
+		Date   string  `json:"date"`
+		Orders int64   `json:"orders"`
+		Amount float64 `json:"amount"`
+	}
+
+	for i := daysInt - 1; i >= 0; i-- {
+		date := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+		var orders int64
+		var amount float64
+
+		database.DB.Model(&models.Order{}).Where("DATE(created_at) = ?", date).Count(&orders)
+		database.DB.Model(&models.Order{}).Where("DATE(created_at) = ? AND status >= 2", date).Select("COALESCE(SUM(pay_amount), 0)").Scan(&amount)
+
+		trends = append(trends, struct {
+			Date   string  `json:"date"`
+			Orders int64   `json:"orders"`
+			Amount float64 `json:"amount"`
+		}{Date: date, Orders: orders, Amount: amount})
+	}
+
+	var totalOrders int64
+	var totalAmount float64
+	database.DB.Model(&models.Order{}).Count(&totalOrders)
+	database.DB.Model(&models.Order{}).Where("status >= 2").Select("COALESCE(SUM(pay_amount), 0)").Scan(&totalAmount)
+
+	response.Success(c, gin.H{
+		"trends":      trends,
+		"total_orders": totalOrders,
+		"total_amount": totalAmount,
+	})
+}
+
+func GetAmountAnalytics(c *gin.Context) {
+	days := c.DefaultQuery("days", "7")
+	daysInt, _ := strconv.Atoi(days)
+
+	var trends []struct {
+		Date   string  `json:"date"`
+		Amount float64 `json:"amount"`
+	}
+
+	for i := daysInt - 1; i >= 0; i-- {
+		date := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+		var amount float64
+		database.DB.Model(&models.Order{}).Where("DATE(created_at) = ? AND status >= 2", date).Select("COALESCE(SUM(pay_amount), 0)").Scan(&amount)
+		trends = append(trends, struct {
+			Date   string  `json:"date"`
+			Amount float64 `json:"amount"`
+		}{Date: date, Amount: amount})
+	}
+
+	response.Success(c, gin.H{
+		"trends": trends,
+	})
+}
+
+func GetTopMerchants(c *gin.Context) {
+	limit := c.DefaultQuery("limit", "10")
+	limitInt, _ := strconv.Atoi(limit)
+
+	var topMerchants []struct {
+		MerchantID   uint64  `json:"merchant_id"`
+		MerchantName string  `json:"merchant_name"`
+		TotalAmount  float64 `json:"total_amount"`
+		OrderCount   int64    `json:"order_count"`
+	}
+
+	database.DB.Table("orders").
+		Select("orders.merchant_id, merchants.name as merchant_name, SUM(orders.pay_amount) as total_amount, COUNT(*) as order_count").
+		Joins("JOIN merchants ON merchants.id = orders.merchant_id").
+		Where("orders.status >= 2").
+		Group("orders.merchant_id").
+		Order("total_amount DESC").
+		Limit(limitInt).
+		Scan(&topMerchants)
+
+	response.Success(c, topMerchants)
+}
+
+func GetAuditRecords(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	var total int64
+	database.DB.Model(&models.MerchantAuditRecord{}).Count(&total)
+
+	var records []models.MerchantAuditRecord
+	offset := (page - 1) * pageSize
+	if err := database.DB.Preload("Merchant").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&records).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取审核记录失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"list": records,
+		"pagination": gin.H{
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
+	})
+}
+
+func GetMerchantFee(c *gin.Context) {
+	merchantID := c.Param("id")
+	id, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	var merchant models.Merchant
+	if err := database.DB.First(&merchant, id).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
+		return
+	}
+
+	var fees []models.MerchantFee
+	database.DB.Where("merchant_id = ?", id).Order("year DESC").Find(&fees)
+
+	response.Success(c, gin.H{
+		"merchant_id": id,
+		"fees":        fees,
+	})
+}
+
+func GetMerchantRate(c *gin.Context) {
+	merchantID := c.Param("id")
+	id, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	var rates []models.MerchantRate
+	database.DB.Where("merchant_id = ?", id).Order("effective_time DESC").Find(&rates)
+
+	response.Success(c, gin.H{
+		"merchant_id": id,
+		"rates":       rates,
+	})
+}
+
+type SetRateRequest struct {
+	Rate           float64 `json:"rate" binding:"required"`
+	EffectiveTime  string  `json:"effective_time"`
+	ExpireTime     string  `json:"expire_time"`
+	Remark         string  `json:"remark"`
+}
+
+func SetMerchantRate(c *gin.Context) {
+	merchantID := c.Param("id")
+	id, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	var req SetRateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	effectiveTime, _ := time.Parse("2006-01-02 15:04:05", req.EffectiveTime)
+	var expireTime *time.Time
+	if req.ExpireTime != "" {
+		t, _ := time.Parse("2006-01-02 15:04:05", req.ExpireTime)
+		expireTime = &t
+	}
+
+	rate := models.MerchantRate{
+		MerchantID:    id,
+		RateType:      "promotion",
+		Rate:          req.Rate,
+		EffectiveTime: effectiveTime,
+		ExpireTime:    expireTime,
+		Remark:        req.Remark,
+	}
+
+	if err := database.DB.Create(&rate).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "设置费率失败")
+		return
+	}
+
+	response.Success(c, gin.H{"message": "设置成功"})
+}
+
+func GetMerchantQRCode(c *gin.Context) {
+	merchantID := c.Param("id")
+	id, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	var merchant models.Merchant
+	if err := database.DB.Select("id", "name").First(&merchant, id).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
+		return
+	}
+
+	qrCodeURL := "/qrcode/" + strconv.FormatUint(id, 10)
+
+	response.Success(c, gin.H{
+		"merchant_id":   id,
+		"merchant_name": merchant.Name,
+		"qrcode_url":    qrCodeURL,
+		"page_path":     "pages/shop/index?merchant_id=" + strconv.FormatUint(id, 10),
+	})
+}
+
+func GetRefunds(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	merchantID := c.Query("merchant_id")
+	status := c.Query("status")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	query := database.DB.Model(&models.Refund{}).Preload("Order")
+
+	if merchantID != "" {
+		id, _ := strconv.ParseUint(merchantID, 10, 64)
+		query = query.Joins("JOIN orders ON orders.id = refunds.order_id").Where("orders.merchant_id = ?", id)
+	}
+	if status != "" {
+		query = query.Where("refunds.status = ?", status)
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var refunds []models.Refund
+	offset := (page - 1) * pageSize
+	if err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&refunds).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取退款列表失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"list": refunds,
+		"pagination": gin.H{
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
+	})
+}
+
+func GetSettings(c *gin.Context) {
+	var sp models.ServiceProvider
+	if err := database.DB.First(&sp).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"service_provider_id": sp.ID,
+		"name":                sp.Name,
+		"contact_name":        sp.ContactName,
+		"contact_phone":       sp.ContactPhone,
+	})
+}
+
+func UpdateSettings(c *gin.Context) {
+	var sp models.ServiceProvider
+	if err := database.DB.First(&sp).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
+		return
+	}
+
+	var req struct {
+		ContactName  string `json:"contact_name"`
+		ContactPhone string `json:"contact_phone"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.ContactName != "" {
+		updates["contact_name"] = req.ContactName
+	}
+	if req.ContactPhone != "" {
+		updates["contact_phone"] = req.ContactPhone
+	}
+
+	if len(updates) > 0 {
+		database.DB.Model(&sp).Updates(updates)
+	}
+
+	response.Success(c, gin.H{"message": "设置成功"})
+}
