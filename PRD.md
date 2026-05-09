@@ -199,7 +199,46 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 └───────────┘  └───────────┘  └───────────┘
 ```
 
-#### 1.6.2 商家进件流程
+#### 1.6.2 服务商小程序端说明
+
+为方便服务商日常运营管理，开发独立的服务商管理小程序端，通过专用二维码访问，与商家管理小程序完全独立。
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      小程序访问架构                          │
+└─────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+          ▼                   ▼                   ▼
+   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+   │ 商家管理端   │     │ 服务商管理端  │     │ C端店铺购物  │
+   │ (默认入口)  │     │ (专用二维码) │     │ (商家二维码) │
+   │             │     │             │     │             │
+   │ • 商品管理   │     │ • 商家审核   │     │ • 浏览商品   │
+   │ • 订单管理   │     │ • 数据分析   │     │ • 下单支付   │
+   │ • 数据分析   │     │ • 商家管理   │     │             │
+   │ • 商家设置   │     │ • 订单统计   │     │             │
+   └─────────────┘     └─────────────┘     └─────────────┘
+```
+
+**服务商小程序端核心功能**：
+| 功能模块 | 描述 |
+|----------|------|
+| 服务商认证 | 管理员账号密码登录，独立权限体系 |
+| 首页数据看板 | 商家总数、订单量、交易额、商家饼图、订单趋势 |
+| 商家入驻审批 | 待审核列表、商家详情、审核操作 |
+| 商家数据分析 | 商家分布饼图、行业统计、商家列表 |
+| 订单数据分析 | 多时间维度统计、订单趋势、金额趋势 |
+| 金额数据分析 | 交易额统计、TOP商家排行、手续费预估 |
+
+**访问控制**：
+- 服务商小程序码独立生成
+- 商家小程序码默认进入商家管理端
+- 服务商二维码仅限服务商管理员访问
+- 服务商与商家数据完全隔离
+
+#### 1.6.3 商家进件流程
 商家进件是指服务商向微信支付申请为商家创建子商户号的过程：
 
 ```
@@ -224,7 +263,7 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 | 经营场景 | 是 | 线上/线下/两者都有 |
 | 店铺照片 | 是 | 门头照、内景照 |
 
-#### 1.6.3 支付与结算流程
+#### 1.6.4 支付与结算流程
 ```
 用户支付流程：
 ┌────────┐    ┌────────────┐    ┌────────────┐    ┌────────────┐
@@ -269,6 +308,19 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 | 数据看板 | 服务商级别的数据统计 | P1 |
 | 邀请入驻管理 | 管理邀请码、查看邀请记录、设置邀请奖励 | P1 |
 | 首页活动管理 | 管理首页Banner、活动板块 | P1 |
+
+### 2.1.5 服务商小程序模块
+| 功能 | 描述 | 优先级 |
+|------|------|--------|
+| 服务商登录 | 服务商管理员账号密码登录 | P0 |
+| 首页数据看板 | 商家总数、今日订单、交易额、商家饼图、订单趋势 | P0 |
+| 商家入驻审批 | 待审核列表、商家详情查看、审核通过/拒绝 | P0 |
+| 商家数据分析 | 商家分布饼图、行业统计、商家列表查看 | P0 |
+| 订单数据分析 | 多时间维度统计、订单趋势图 | P0 |
+| 金额数据分析 | 交易额统计、TOP商家排行、手续费预估 | P0 |
+| 商家列表 | 查看所有商家基本信息及运营状况 | P1 |
+| 商家详情 | 查看单个商家详细数据 | P1 |
+| 审核记录 | 查看历史审核操作记录 | P2 |
 
 ### 2.2 商家管理模块
 | 功能 | 描述 | 优先级 |
@@ -790,6 +842,341 @@ Authorization: Bearer {token}
       "condition": "merchant_joined",
       "description": "被邀请商家入驻后，邀请人可申请最低0.2%费率"
     }
+  ]
+}
+```
+
+### 3.2.15 服务商小程序接口
+
+#### 3.2.15.1 服务商管理员登录
+```
+POST /api/v1/sp/auth/login
+```
+
+**请求参数：**
+```json
+{
+  "username": "服务商账号",
+  "password": "密码"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "token": "JWT Token",
+    "service_provider": {
+      "id": 1,
+      "name": "服务商名称",
+      "admin_name": "管理员姓名"
+    }
+  }
+}
+```
+
+#### 3.2.15.2 服务商首页数据看板
+```
+GET /api/v1/sp/dashboard
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "summary": {
+      "total_merchants": 128,
+      "today_orders": 1256,
+      "today_amount": 58960.00,
+      "avg_order_amount": 46.95
+    },
+    "merchant_distribution": {
+      "categories": [
+        {"name": "餐饮", "count": 58, "percentage": 45.3},
+        {"name": "零售", "count": 38, "percentage": 29.7},
+        {"name": "服务", "count": 19, "percentage": 14.8},
+        {"name": "其他", "count": 13, "percentage": 10.2}
+      ]
+    },
+    "order_trend": {
+      "dates": ["2024-01-01", "2024-01-02", "..."],
+      "orders": [120, 145, "..."]
+    },
+    "pending_tasks": {
+      "merchant_approvals": 3,
+      "order_issues": 12
+    }
+  }
+}
+```
+
+#### 3.2.15.3 商家入驻审核列表
+```
+GET /api/v1/sp/merchants/pending
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| page | int | 否 | 页码 |
+| page_size | int | 否 | 每页数量 |
+| status | string | 否 | 状态：pending/approved/rejected |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "name": "美味餐厅",
+        "contact_name": "张三",
+        "contact_phone": "13800138000",
+        "business_category": "餐饮",
+        "address": "店铺地址",
+        "status": "pending",
+        "created_at": "2024-01-01T10:00:00Z"
+      }
+    ],
+    "total": 50,
+    "page": 1,
+    "page_size": 10
+  }
+}
+```
+
+#### 3.2.15.4 商家详情查看
+```
+GET /api/v1/sp/merchants/{merchant_id}
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "id": 1,
+    "name": "美味餐厅",
+    "contact_name": "张三",
+    "contact_phone": "13800138000",
+    "business_category": "餐饮",
+    "address": "店铺地址",
+    "license": {
+      "license_no": "营业执照号",
+      "license_name": "营业执照名称",
+      "license_image": "图片URL",
+      "legal_person": "法人姓名",
+      "legal_person_id": "身份证号",
+      "legal_person_id_front": "身份证正面",
+      "legal_person_id_back": "身份证反面",
+      "valid_from": "2020-01-01",
+      "valid_to": "2030-01-01"
+    },
+    "bank_account": {
+      "bank_name": "开户银行",
+      "bank_branch": "开户支行",
+      "account_no": "银行账号",
+      "account_name": "账户名称"
+    },
+    "store_info": {
+      "store_name": "门店名称",
+      "store_images": ["门头照", "内景照"]
+    },
+    "status": "pending",
+    "created_at": "2024-01-01T10:00:00Z"
+  }
+}
+```
+
+#### 3.2.15.5 商家审核操作
+```
+POST /api/v1/sp/merchants/{merchant_id}/approve
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "status": "approved",
+  "remark": "审核通过"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "审核成功"
+}
+```
+
+#### 3.2.15.6 商家数据分析
+```
+GET /api/v1/sp/merchants/analytics/distribution
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "by_category": [
+      {"name": "餐饮", "count": 58, "percentage": 45.3},
+      {"name": "零售", "count": 38, "percentage": 29.7},
+      {"name": "服务", "count": 19, "percentage": 14.8},
+      {"name": "其他", "count": 13, "percentage": 10.2}
+    ],
+    "by_status": [
+      {"name": "营业中", "count": 100, "percentage": 78.1},
+      {"name": "休息中", "count": 15, "percentage": 11.7},
+      {"name": "已关闭", "count": 13, "percentage": 10.2}
+    ],
+    "by_month": [
+      {"month": "2024-01", "count": 15},
+      {"month": "2024-02", "count": 22}
+    ]
+  }
+}
+```
+
+#### 3.2.15.7 商家列表
+```
+GET /api/v1/sp/merchants/list
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| page | int | 否 | 页码 |
+| page_size | int | 否 | 每页数量 |
+| keyword | string | 否 | 搜索关键词 |
+| category | string | 否 | 行业分类 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "name": "美味餐厅",
+        "business_category": "餐饮",
+        "status": "active",
+        "total_orders": 1256,
+        "total_amount": 58960.00,
+        "created_at": "2024-01-01"
+      }
+    ],
+    "total": 128,
+    "page": 1,
+    "page_size": 10
+  }
+}
+```
+
+#### 3.2.15.8 订单数据分析
+```
+GET /api/v1/sp/orders/analytics
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| period | string | 否 | 周期：today/week/month/year/custom |
+| start_date | string | 否 | 开始日期 |
+| end_date | string | 否 | 结束日期 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "summary": {
+      "total_orders": 125600,
+      "total_amount": 5896000.00,
+      "today_orders": 1256,
+      "today_amount": 58960.00,
+      "avg_order_amount": 46.95
+    },
+    "trend": [
+      {"date": "2024-01-01", "orders": 1200, "amount": 56400.00}
+    ],
+    "by_delivery_type": [
+      {"type": "配送", "count": 800, "percentage": 63.7},
+      {"type": "堂食", "count": 300, "percentage": 23.9},
+      {"type": "自提", "count": 156, "percentage": 12.4}
+    ]
+  }
+}
+```
+
+#### 3.2.15.9 金额数据分析
+```
+GET /api/v1/sp/amount/analytics
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| period | string | 否 | 周期：today/week/month/year |
+| start_date | string | 否 | 开始日期 |
+| end_date | string | 否 | 结束日期 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "summary": {
+      "total_amount": 5896000.00,
+      "today_amount": 58960.00,
+      "week_amount": 412720.00,
+      "month_amount": 1766400.00,
+      "growth_rate": 15.5
+    },
+    "trend": [
+      {"date": "2024-01-01", "amount": 56400.00}
+    ],
+    "by_merchant": [
+      {"merchant_id": 1, "merchant_name": "美味餐厅", "amount": 589600.00, "percentage": 10.0}
+    ],
+    "by_category": [
+      {"category": "餐饮", "amount": 2948000.00, "percentage": 50.0}
+    ]
+  }
+}
+```
+
+#### 3.2.15.10 TOP商家排行
+```
+GET /api/v1/sp/amount/top-merchants
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| period | string | 否 | 周期 |
+| limit | int | 否 | 返回数量，默认10 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": [
+    {"rank": 1, "merchant_id": 1, "merchant_name": "美味餐厅", "amount": 589600.00},
+    {"rank": 2, "merchant_id": 2, "merchant_name": "隔壁小馆", "amount": 412720.00}
   ]
 }
 ```
@@ -2456,6 +2843,21 @@ Authorization: Bearer {token}
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
+### 4.2.5 服务商小程序管理员表 (sp_admins)
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| id | BIGINT | 主键 |
+| service_provider_id | BIGINT | 服务商ID |
+| username | VARCHAR(64) | 用户名 |
+| password | VARCHAR(128) | 密码 |
+| name | VARCHAR(64) | 姓名 |
+| phone | VARCHAR(20) | 手机号 |
+| role | VARCHAR(32) | 角色：admin/operator |
+| status | TINYINT | 状态：0禁用 1正常 |
+| last_login_at | DATETIME | 最后登录时间 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
 ### 4.3 商家进件申请表 (merchant_applications)
 | 字段 | 类型 | 描述 |
 |------|------|------|
@@ -3164,10 +3566,196 @@ xm-mall/
 - [ ] 支付回调处理
 - [ ] 退款功能
 
+### 6.8 服务商小程序开发计划
+
+#### 技术选型
+- **开发框架**：uni-app（Vue3 + TypeScript）
+- **UI组件**：uView / Vant Weapp
+- **状态管理**：Pinia
+- **图表组件**：uCharts / ECharts（用于数据可视化）
+- **发布平台**：微信小程序（可扩展至H5/APP）
+
+#### 开发原则
+1. **数据分析优先** - 核心功能围绕数据展示与分析
+2. **独立访问控制** - 通过专用二维码访问，与商家端完全隔离
+3. **可视化呈现** - 使用图表直观展示商家分布、订单趋势、金额统计
+
+#### 页面优先级（按批次）
+
+**第一批次：认证与首页**
+| 页面 | 功能描述 | 对接API |
+|------|----------|---------|
+| sp/login | 服务商管理员登录 | POST /api/v1/sp/auth/login |
+| sp/home | 首页数据看板（卡片+饼图+趋势图） | GET /api/v1/sp/dashboard |
+
+**第二批次：商家入驻审批**
+| 页面 | 功能描述 | 对接API |
+|------|----------|---------|
+| sp/merchants/pending | 待审核商家列表 | GET /api/v1/sp/merchants/pending |
+| sp/merchants/{id} | 商家详情查看（资质证照） | GET /api/v1/sp/merchants/{merchant_id} |
+| sp/merchants/{id}/approve | 审核操作（通过/拒绝） | POST /api/v1/sp/merchants/{merchant_id}/approve |
+
+**第三批次：商家数据分析**
+| 页面 | 功能描述 | 对接API |
+|------|----------|---------|
+| sp/merchants/analytics | 商家分布饼图 | GET /api/v1/sp/merchants/analytics/distribution |
+| sp/merchants/list | 商家列表（基本信息） | GET /api/v1/sp/merchants/list |
+
+**第四批次：订单数据分析**
+| 页面 | 功能描述 | 对接API |
+|------|----------|---------|
+| sp/orders/analytics | 订单统计（多维度趋势图） | GET /api/v1/sp/orders/analytics |
+
+**第五批次：金额数据分析**
+| 页面 | 功能描述 | 对接API |
+|------|----------|---------|
+| sp/amount/analytics | 交易额统计（金额趋势图） | GET /api/v1/sp/amount/analytics |
+| sp/amount/top-merchants | TOP商家排行榜 | GET /api/v1/sp/amount/top-merchants |
+
 #### API对接表
 
 | 功能模块 | 接口路径 | 方法 | 状态 |
 |----------|----------|------|------|
+| 服务商登录 | /api/v1/sp/auth/login | POST | 🆕 待开发 |
+| 首页数据看板 | /api/v1/sp/dashboard | GET | 🆕 待开发 |
+| 商家入驻审核 | /api/v1/sp/merchants/pending | GET | 🆕 待开发 |
+| 商家详情查看 | /api/v1/sp/merchants/{id} | GET | 🆕 待开发 |
+| 商家审核操作 | /api/v1/sp/merchants/{id}/approve | POST | 🆕 待开发 |
+| 商家数据分析 | /api/v1/sp/merchants/analytics/distribution | GET | 🆕 待开发 |
+| 商家列表 | /api/v1/sp/merchants/list | GET | 🆕 待开发 |
+| 订单数据分析 | /api/v1/sp/orders/analytics | GET | 🆕 待开发 |
+| 金额数据分析 | /api/v1/sp/amount/analytics | GET | 🆕 待开发 |
+| TOP商家排行 | /api/v1/sp/amount/top-merchants | GET | 🆕 待开发 |
+
+#### 可视化图表规划
+
+| 图表类型 | 适用场景 | 优先级 |
+|----------|----------|--------|
+| 数据卡片 | 核心指标展示（商家总数、订单量、交易额） | P0 |
+| 饼图 | 商家行业分布、订单配送类型分布 | P0 |
+| 环形图 | 金额构成分析 | P1 |
+| 折线图 | 订单/金额时间趋势（近7天/30天） | P0 |
+| 柱状图 | 商家月度新增对比 | P1 |
+| 排行榜 | TOP商家交易额排行 | P1 |
+
+#### 服务商小程序项目结构
+```
+xm-sp/
+├── src/
+│   ├── App.vue
+│   ├── main.ts
+│   ├── pages.json
+│   ├── manifest.json
+│   │
+│   ├── api/                    # API接口封装
+│   │   ├── index.ts
+│   │   ├── auth.ts            # 认证接口
+│   │   ├── dashboard.ts        # 首页数据接口
+│   │   ├── merchant.ts         # 商家管理接口
+│   │   ├── analytics.ts        # 数据分析接口
+│   │   └── amount.ts           # 金额统计接口
+│   │
+│   ├── pages/                  # 主包页面
+│   │   ├── auth/
+│   │   │   └── login.vue       # 登录页
+│   │   │
+│   │   ├── home/
+│   │   │   └── index.vue       # 首页数据看板
+│   │   │
+│   │   ├── merchant/
+│   │   │   ├── pending.vue     # 待审核商家列表
+│   │   │   ├── detail.vue      # 商家详情
+│   │   │   ├── list.vue        # 商家列表
+│   │   │   └── analytics.vue   # 商家分析
+│   │   │
+│   │   ├── order/
+│   │   │   └── analytics.vue   # 订单分析
+│   │   │
+│   │   └── amount/
+│   │       ├── analytics.vue   # 金额分析
+│   │       └── top.vue         # TOP商家排行
+│   │
+│   ├── components/             # 公共组件
+│   │   ├── stats-card/         # 数据卡片
+│   │   ├── pie-chart/          # 饼图
+│   │   ├── line-chart/         # 折线图
+│   │   ├── bar-chart/          # 柱状图
+│   │   └── merchant-item/      # 商家列表项
+│   │
+│   ├── composables/            # 组合式函数
+│   │   ├── useAuth.ts
+│   │   ├── useDashboard.ts
+│   │   └── useAnalytics.ts
+│   │
+│   ├── stores/                 # Pinia状态管理
+│   │   ├── auth.ts
+│   │   └── dashboard.ts
+│   │
+│   ├── utils/                 # 工具函数
+│   │   ├── request.ts
+│   │   ├── auth.ts
+│   │   └── constants.ts
+│   │
+│   └── types/                 # TypeScript类型
+│       ├── api.d.ts
+│       ├── merchant.d.ts
+│       └── analytics.d.ts
+│
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
+```
+
+#### 开发任务清单
+
+**Phase 1：认证与首页**
+- [ ] uni-app 项目创建与配置
+- [ ] API请求封装（request.ts）
+- [ ] Pinia状态管理初始化
+- [ ] 登录页面（sp/login）
+- [ ] Token存储与自动登录
+- [ ] 首页数据看板（sp/home）
+- [ ] 数据卡片组件
+- [ ] 商家分布饼图
+- [ ] 订单趋势折线图
+
+**Phase 2：商家入驻审批**
+- [ ] 待审核商家列表页面
+- [ ] 商家详情页面（资质证照查看）
+- [ ] 审核操作功能（通过/拒绝）
+- [ ] 图片预览组件
+
+**Phase 3：商家数据分析**
+- [ ] 商家分布饼图（行业维度）
+- [ ] 商家分布饼图（状态维度）
+- [ ] 商家列表页面
+- [ ] 商家搜索与筛选
+
+**Phase 4：订单数据分析**
+- [ ] 订单统计概览
+- [ ] 订单趋势折线图（多周期）
+- [ ] 订单配送类型分布饼图
+
+**Phase 5：金额数据分析**
+- [ ] 金额统计概览
+- [ ] 金额趋势折线图
+- [ ] 商家维度金额占比
+- [ ] TOP商家排行榜
+
+#### API对接表
+
+| 功能模块 | 接口路径 | 方法 | 状态 |
+|----------|----------|------|------|
+| 服务商登录 | /api/v1/sp/auth/login | POST | 🆕 待开发 |
+| 首页数据看板 | /api/v1/sp/dashboard | GET | 🆕 待开发 |
+| 商家入驻审核 | /api/v1/sp/merchants/pending | GET | 🆕 待开发 |
+| 商家详情查看 | /api/v1/sp/merchants/{id} | GET | 🆕 待开发 |
+| 商家审核操作 | /api/v1/sp/merchants/{id}/approve | POST | 🆕 待开发 |
+| 商家数据分析 | /api/v1/sp/merchants/analytics/distribution | GET | 🆕 待开发 |
+| 商家列表 | /api/v1/sp/merchants/list | GET | 🆕 待开发 |
+| 订单数据分析 | /api/v1/sp/orders/analytics | GET | 🆕 待开发 |
+| 金额数据分析 | /api/v1/sp/amount/analytics | GET | 🆕 待开发 |
+| TOP商家排行 | /api/v1/sp/amount/top-merchants | GET | 🆕 待开发 |
 | 商家登录 | /api/v1/auth/merchant/login | POST | ✅ 已实现 |
 | 商家入驻 | /api/v1/merchant/register | POST | ⚠️ 待完善 |
 | 商家信息 | /api/v1/merchant/profile | GET | ✅ 已实现 |
