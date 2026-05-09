@@ -2102,7 +2102,106 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.3.13 商家入驻
+#### 3.3.13 获取员工列表
+```
+GET /api/v1/merchant/staff
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| page | int | 否 | 页码 |
+| page_size | int | 否 | 每页数量 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "name": "张三",
+        "phone": "13800138000",
+        "role": "staff",
+        "openid": "微信OpenID",
+        "notify_enabled": true,
+        "status": "active",
+        "created_at": "2024-01-01T10:00:00Z"
+      }
+    ],
+    "total": 5
+  }
+}
+```
+
+#### 3.3.14 添加员工
+```
+POST /api/v1/merchant/staff
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "name": "员工姓名",
+  "phone": "手机号",
+  "role": "staff",
+  "notify_enabled": true
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "添加成功",
+  "data": {
+    "id": 1
+  }
+}
+```
+
+#### 3.3.27 更新员工信息
+```
+PUT /api/v1/merchant/staff/{id}
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "name": "员工姓名",
+  "role": "staff",
+  "notify_enabled": true,
+  "status": "active"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "更新成功"
+}
+```
+
+#### 3.3.28 删除员工
+```
+DELETE /api/v1/merchant/staff/{id}
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "删除成功"
+}
+```
+
+#### 3.3.25 商家入驻
 ```
 POST /api/v1/merchant/register
 ```
@@ -2153,7 +2252,7 @@ POST /api/v1/merchant/register
 }
 ```
 
-### 3.3.15 服务号配置
+### 3.3.19 服务号配置
 ```
 GET /api/v1/admin/wechat-config
 Authorization: Bearer {token}
@@ -2175,7 +2274,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.16 更新服务号配置
+### 3.3.20 更新服务号配置
 ```
 PUT /api/v1/admin/wechat-config
 Authorization: Bearer {token}
@@ -2196,7 +2295,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.17 商家订阅配置
+### 3.3.21 商家订阅配置
 ```
 GET /api/v1/merchant/subscriptions
 Authorization: Bearer {token}
@@ -2217,7 +2316,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.18 更新商家订阅配置
+### 3.3.22 更新商家订阅配置
 ```
 PUT /api/v1/merchant/subscriptions
 Authorization: Bearer {token}
@@ -2241,7 +2340,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.19 获取云打印机列表
+### 3.3.23 获取云打印机列表
 ```
 GET /api/v1/merchant/printers
 Authorization: Bearer {token}
@@ -2266,7 +2365,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.20 添加云打印机
+### 3.3.24 添加云打印机
 ```
 POST /api/v1/merchant/printers
 Authorization: Bearer {token}
@@ -2285,7 +2384,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.21 更新云打印机
+### 3.3.25 更新云打印机
 ```
 PUT /api/v1/merchant/printers/{printer_id}
 Authorization: Bearer {token}
@@ -2300,13 +2399,13 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.22 删除云打印机
+### 3.3.26 删除云打印机
 ```
 DELETE /api/v1/merchant/printers/{printer_id}
 Authorization: Bearer {token}
 ```
 
-### 3.3.23 测试云打印机
+### 3.3.27 测试云打印机
 ```
 POST /api/v1/merchant/printers/{printer_id}/test
 Authorization: Bearer {token}
@@ -2323,7 +2422,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.24 获取打印记录
+### 3.3.28 获取打印记录
 ```
 GET /api/v1/merchant/print-logs
 Authorization: Bearer {token}
@@ -2544,6 +2643,102 @@ Authorization: Bearer {token}
 | set | 设置为指定值 |
 | add | 增加指定数量 |
 | subtract | 减少指定数量 |
+
+#### 3.5.9 获取商品规格
+```
+GET /api/v1/merchant/products/{product_id}/specs
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "specs": [
+      {
+        "id": 1,
+        "name": "颜色",
+        "values": ["红色", "蓝色", "绿色"]
+      },
+      {
+        "id": 2,
+        "name": "尺码",
+        "values": ["S", "M", "L", "XL"]
+      }
+    ],
+    "skus": [
+      {
+        "id": 1,
+        "specs": [{"spec_id": 1, "value": "红色"}, {"spec_id": 2, "value": "S"}],
+        "price": 29.90,
+        "stock": 100,
+        "sku_code": "RED-S-001",
+        "status": "active"
+      }
+    ]
+  }
+}
+```
+
+#### 3.5.10 创建/更新商品规格
+```
+PUT /api/v1/merchant/products/{product_id}/specs
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "specs": [
+    {"id": 1, "name": "颜色", "values": ["红色", "蓝色"]},
+    {"id": 2, "name": "尺码", "values": ["S", "M", "L"]}
+  ],
+  "skus": [
+    {
+      "specs": [{"spec_id": 1, "value": "红色"}, {"spec_id": 2, "value": "S"}],
+      "price": 29.90,
+      "stock": 100,
+      "sku_code": "RED-S-001"
+    },
+    {
+      "specs": [{"spec_id": 1, "value": "红色"}, {"spec_id": 2, "value": "M"}],
+      "price": 29.90,
+      "stock": 80,
+      "sku_code": "RED-M-001"
+    }
+  ]
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "保存成功"
+}
+```
+
+#### 3.5.11 删除商品规格
+```
+DELETE /api/v1/merchant/products/{product_id}/specs
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "spec_ids": [1, 2]
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "删除成功"
+}
+```
 
 ### 3.6 订单管理接口
 
