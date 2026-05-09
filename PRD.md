@@ -561,15 +561,19 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 ## 2. 功能模块
 
 ### 2.1 服务商管理模块
+
+#### 2.1.1 服务商PC端（管理后台）
 | 功能 | 描述 | 优先级 |
 |------|------|--------|
+| 服务商登录 | 服务商管理员账号密码登录 | P0 |
 | 商家进件管理 | 处理商家进件申请，提交微信支付审核 | P0 |
 | 进件状态查询 | 查询商家进件审核进度和结果 | P0 |
 | 商家审核 | 审核商家入驻申请（平台层面） | P0 |
 | 数据看板 | 服务商级别的数据统计 | P1 |
 | 首页活动管理 | 管理首页Banner、活动板块 | P1 |
+| 系统公告管理 | 发布、编辑、删除平台公告（商家可见） | P1 |
 
-### 2.1.5 服务商小程序模块
+#### 2.1.2 服务商小程序端
 | 功能 | 描述 | 优先级 |
 |------|------|--------|
 | 服务商登录 | 服务商管理员账号密码登录 | P0 |
@@ -581,6 +585,12 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 | 商家列表 | 查看所有商家基本信息及运营状况 | P1 |
 | 商家详情 | 查看单个商家详细数据 | P1 |
 | 审核记录 | 查看历史审核操作记录 | P2 |
+| 系统公告管理 | 发布、编辑、删除平台公告 | P1 |
+
+**系统公告功能说明**：
+- 服务商发布的公告所有商家均可查看
+- 支持公告标题、内容、发布时间管理
+- 商家端可在首页查看最新公告
 
 ### 2.2 商家管理模块
 | 功能 | 描述 | 优先级 |
@@ -592,6 +602,7 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 | 商家设置 | 营业执照、门店公告、营业时间等自定义设置 | P0 |
 | 商家二维码 | 生成商家专属小程序码 | P0 |
 | 商家状态 | 开启/关闭店铺 | P0 |
+| 系统公告查看 | 查看服务商发布的平台公告 | P0 |
 | 商家员工 | 员工账号管理 | P2 |
 
 ### 2.3 商品分类模块
@@ -743,35 +754,7 @@ POST /api/v1/user/auth/wechat-login
 
 ### 3.2 服务商管理接口
 
-#### 3.2.1 服务商信息
-```
-GET /api/v1/admin/service-provider
-Authorization: Bearer {token}
-```
-
-#### 3.2.2 更新服务商配置
-```
-PUT /api/v1/admin/service-provider
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-```json
-{
-  "name": "服务商名称",
-  "contact_name": "联系人",
-  "contact_phone": "联系电话",
-  "wechat_pay_config": {
-    "mch_id": "服务商商户号",
-    "api_v3_key": "APIv3密钥",
-    "cert_serial_no": "证书序列号",
-    "private_key": "商户私钥内容",
-    "public_key": "平台公钥内容"
-  }
-}
-```
-
-#### 3.2.3 商家进件申请列表
+#### 3.2.1 商家进件申请列表
 ```
 GET /api/v1/admin/merchant-applications
 Authorization: Bearer {token}
@@ -968,8 +951,8 @@ Authorization: Bearer {token}
         "id": 1,
         "title": "新商家入驻优惠",
         "image": "图片URL",
-        "link_type": "invite",
-        "link_value": ""
+        "link_type": "webview",
+        "link_value": "https://example.com/promo"
       }
     ],
     "announcements": [
@@ -996,7 +979,8 @@ Authorization: Bearer {token}
   "type": "banner",
   "title": "新商家入驻优惠",
   "image": "图片URL",
-  "link_type": "invite",
+  "link_type": "webview",
+  "link_value": "https://example.com/promo",
   "sort": 1,
   "status": 1
 }
@@ -1004,109 +988,13 @@ Authorization: Bearer {token}
 
 | link_type | 描述 |
 |-----------|------|
-| invite | 跳转邀请页面 |
 | merchant | 跳转商家详情 |
 | webview | 网页链接 |
 | none | 无跳转 |
 
-#### 3.2.12 邀请入驻统计
-```
-GET /api/v1/admin/invites/stats
-Authorization: Bearer {token}
-```
+### 3.2.12 服务商小程序接口
 
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "total_invites": 50,
-    "total_rewards_given": 25,
-    "total_reward_amount": 0,
-    "pending_invites": 5,
-    "invite_trend": [
-      {"month": "2024-01", "invites": 10},
-      {"month": "2024-02", "invites": 15}
-    ]
-  }
-}
-```
-
-#### 3.2.13 邀请记录列表
-```
-GET /api/v1/admin/invites
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| status | string | 否 | 状态：pending/completed/cancelled |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "list": [
-      {
-        "id": 1,
-        "inviter": {
-          "id": 1,
-          "name": "美味餐厅",
-          "phone": "138****8000"
-        },
-        "invitee": {
-          "id": 2,
-          "name": "隔壁小馆",
-          "phone": "139****8000"
-        },
-        "invite_code": "ABC123",
-        "reward_type": "free_year",
-        "reward_status": "completed",
-        "created_at": "2024-01-01T10:00:00Z",
-        "completed_at": "2024-01-15T10:00:00Z"
-      }
-    ],
-    "pagination": {
-      "total": 50,
-      "page": 1,
-      "page_size": 10
-    }
-  }
-}
-```
-
-#### 3.2.14 设置邀请奖励规则
-```
-PUT /api/v1/admin/invite-rewards
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-```json
-{
-  "enabled": true,
-  "rewards": [
-    {
-      "type": "free_year",
-      "condition": "merchant_joined",
-      "description": "被邀请商家入驻后，邀请人可获得免年费"
-    },
-    {
-      "type": "lowest_rate",
-      "condition": "merchant_joined",
-      "description": "被邀请商家入驻后，邀请人可申请最低0.2%手续费"
-    }
-  ]
-}
-```
-
-### 3.2.15 服务商小程序接口
-
-#### 3.2.15.1 服务商管理员登录
+#### 3.2.12.1 服务商管理员登录
 ```
 POST /api/v1/sp/auth/login
 ```
@@ -1134,7 +1022,7 @@ POST /api/v1/sp/auth/login
 }
 ```
 
-#### 3.2.15.2 服务商首页数据看板
+#### 3.2.12.2 服务商首页数据看板
 ```
 GET /api/v1/sp/dashboard
 Authorization: Bearer {token}
@@ -1171,7 +1059,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.3 商家入驻审核列表
+#### 3.2.12.3 商家入驻审核列表
 ```
 GET /api/v1/sp/merchants/pending
 Authorization: Bearer {token}
@@ -1208,7 +1096,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.4 商家详情查看
+#### 3.2.12.4 商家详情查看
 ```
 GET /api/v1/sp/merchants/{merchant_id}
 Authorization: Bearer {token}
@@ -1252,7 +1140,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.5 商家审核操作
+#### 3.2.12.5 商家审核操作
 ```
 POST /api/v1/sp/merchants/{merchant_id}/approve
 Authorization: Bearer {token}
@@ -1274,7 +1162,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.6 商家数据分析
+#### 3.2.12.6 商家数据分析
 ```
 GET /api/v1/sp/merchants/analytics/distribution
 Authorization: Bearer {token}
@@ -1304,7 +1192,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.7 商家列表
+#### 3.2.12.7 商家列表
 ```
 GET /api/v1/sp/merchants/list
 Authorization: Bearer {token}
@@ -1341,7 +1229,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.8 订单数据分析
+#### 3.2.12.8 订单数据分析
 ```
 GET /api/v1/sp/orders/analytics
 Authorization: Bearer {token}
@@ -1378,7 +1266,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.9 金额数据分析
+#### 3.2.12.9 金额数据分析
 ```
 GET /api/v1/sp/amount/analytics
 Authorization: Bearer {token}
@@ -1416,7 +1304,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.10 TOP商家排行
+#### 3.2.12.10 TOP商家排行
 ```
 GET /api/v1/sp/amount/top-merchants
 Authorization: Bearer {token}
@@ -1439,7 +1327,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.11 服务商审核记录查询
+#### 3.2.12.11 服务商审核记录查询
 ```
 GET /api/v1/sp/merchants/audit-records
 Authorization: Bearer {token}
@@ -1477,7 +1365,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.12 商家年费管理
+#### 3.2.12.12 商家年费管理
 ```
 GET /api/v1/sp/merchants/{id}/fee
 Authorization: Bearer {token}
@@ -1500,17 +1388,17 @@ Authorization: Bearer {token}
       },
       {
         "year": 2025,
-        "amount": 365.00,
+        "amount": 0.00,
         "status": "free",
         "pay_time": null,
-        "free_reason": "邀请奖励免年费"
+        "free_reason": "限时优惠免年费"
       }
     ]
   }
 }
 ```
 
-#### 3.2.15.13 商家手续费率管理
+#### 3.2.12.13 商家手续费率管理
 ```
 GET /api/v1/sp/merchants/{id}/rate
 Authorization: Bearer {token}
@@ -1539,7 +1427,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.14 设置商家手续费率
+#### 3.2.12.14 设置商家手续费率
 ```
 POST /api/v1/sp/merchants/{id}/rate
 Authorization: Bearer {token}
@@ -1551,7 +1439,7 @@ Authorization: Bearer {token}
   "rate": 0.002,
   "effective_time": "2024-02-01 00:00:00",
   "expire_time": "2024-12-31 23:59:59",
-  "remark": "邀请奖励最低费率"
+  "remark": "优惠活动最低费率"
 }
 ```
 
@@ -1563,7 +1451,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.15 服务商退出登录
+#### 3.2.12.15 服务商退出登录
 ```
 POST /api/v1/sp/auth/logout
 Authorization: Bearer {token}
@@ -1577,7 +1465,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.16 获取商家二维码
+#### 3.2.12.16 获取商家二维码
 ```
 GET /api/v1/sp/merchants/{id}/qrcode
 Authorization: Bearer {token}
@@ -1596,7 +1484,95 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.17 退款订单查询(服务商)
+#### 3.2.12.17 系统公告列表
+```
+GET /api/v1/sp/announcements
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| page | int | 否 | 页码 |
+| page_size | int | 否 | 每页数量 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "title": "系统升级通知",
+        "content": "平台将于本周六进行系统升级",
+        "create_time": "2024-01-15 10:30:00"
+      }
+    ],
+    "total": 10
+  }
+}
+```
+
+#### 3.2.12.18 创建系统公告
+```
+POST /api/v1/sp/announcements
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "title": "系统公告标题",
+  "content": "公告内容"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "创建成功"
+}
+```
+
+#### 3.2.12.19 更新系统公告
+```
+PUT /api/v1/sp/announcements/{id}
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "title": "更新后的标题",
+  "content": "更新后的内容"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "更新成功"
+}
+```
+
+#### 3.2.12.20 删除系统公告
+```
+DELETE /api/v1/sp/announcements/{id}
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "删除成功"
+}
+```
+
+#### 3.2.12.21 退款订单查询(服务商)
 ```
 GET /api/v1/sp/orders/refunds
 Authorization: Bearer {token}
@@ -1633,7 +1609,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.18 服务商设置
+#### 3.2.12.22 服务商设置
 ```
 GET /api/v1/sp/settings
 Authorization: Bearer {token}
@@ -1654,7 +1630,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.15.19 更新服务商设置
+#### 3.2.12.23 更新服务商设置
 ```
 PUT /api/v1/sp/settings
 Authorization: Bearer {token}
@@ -2088,54 +2064,9 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.3.11 生成邀请码
+#### 3.3.11 获取系统公告列表
 ```
-POST /api/v1/merchant/invite/generate
-Authorization: Bearer {token}
-```
-
-> 商家生成专属邀请码，用于邀请其他商家入驻
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "invite_code": "XM20240101ABCD",
-    "qrcode_url": "邀请二维码图片URL",
-    "share_link": "https://example.com/invite/XM20240101ABCD",
-    "poster_url": "邀请海报图片URL",
-    "expire_time": null
-  }
-}
-```
-
-#### 3.3.12 获取我的邀请信息
-```
-GET /api/v1/merchant/invite/info
-Authorization: Bearer {token}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "invite_code": "XM20240101ABCD",
-    "total_invites": 5,
-    "completed_invites": 3,
-    "pending_invites": 2,
-    "rewards": {
-      "free_year_count": 2,
-      "lowest_rate_qualified": true
-    }
-  }
-}
-```
-
-#### 3.3.13 获取我的邀请记录
-```
-GET /api/v1/merchant/invite/records
+GET /api/v1/merchant/announcements
 Authorization: Bearer {token}
 ```
 
@@ -2144,7 +2075,6 @@ Authorization: Bearer {token}
 |------|------|------|------|
 | page | int | 否 | 页码 |
 | page_size | int | 否 | 每页数量 |
-| status | string | 否 | 状态：pending/completed |
 
 **响应：**
 ```json
@@ -2154,25 +2084,36 @@ Authorization: Bearer {token}
     "list": [
       {
         "id": 1,
-        "invitee_name": "隔壁小馆",
-        "invitee_phone": "139****8000",
-        "invite_code": "XM20240101ABCD",
-        "status": "completed",
-        "reward_type": "free_year",
-        "created_at": "2024-01-01T10:00:00Z",
-        "completed_at": "2024-01-15T10:00:00Z"
+        "title": "系统升级通知",
+        "content": "平台将于本周六进行系统升级",
+        "create_time": "2024-01-15 10:30:00"
       }
     ],
-    "pagination": {
-      "total": 5,
-      "page": 1,
-      "page_size": 10
-    }
+    "total": 10
   }
 }
 ```
 
-#### 3.3.14 商家入驻（支持邀请码）
+#### 3.3.12 获取系统公告详情
+```
+GET /api/v1/merchant/announcements/{id}
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "id": 1,
+    "title": "系统升级通知",
+    "content": "平台将于本周六进行系统升级，请各位商家提前做好相关准备。",
+    "create_time": "2024-01-15 10:30:00"
+  }
+}
+```
+
+#### 3.3.13 商家入驻
 ```
 POST /api/v1/merchant/register
 ```
@@ -2186,7 +2127,6 @@ POST /api/v1/merchant/register
   "contact_email": "联系邮箱",
   "address": "店铺地址",
   "business_category": "餐饮",
-  "invite_code": "XM20240101ABCD",
   "license": {
     "license_no": "营业执照号",
     "license_name": "营业执照名称",
@@ -2219,11 +2159,7 @@ POST /api/v1/merchant/register
   "data": {
     "merchant_id": 1,
     "application_id": 1,
-    "status": "draft",
-    "invited_by": {
-      "name": "邀请商家名称",
-      "reward_eligible": true
-    }
+    "status": "draft"
   }
 }
 ```
@@ -3741,20 +3677,7 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
-### 4.14 邀请记录表 (invite_records)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| inviter_id | BIGINT | 邀请人ID（商家ID） |
-| invitee_id | BIGINT | 被邀请人ID（商家ID） |
-| invite_code | VARCHAR(32) | 邀请码 |
-| status | TINYINT | 状态：0待完成 1已完成 2已取消 |
-| reward_type | VARCHAR(32) | 奖励类型：free_year/lowest_rate |
-| reward_status | TINYINT | 奖励状态：0未发放 1已发放 |
-| created_at | DATETIME | 创建时间 |
-| completed_at | DATETIME | 完成时间 |
-
-### 4.15 平台活动表 (activities)
+### 4.14 平台活动表 (activities)
 | 字段 | 类型 | 描述 |
 |------|------|------|
 | id | BIGINT | 主键 |
@@ -3762,7 +3685,7 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 | title | VARCHAR(128) | 标题 |
 | content | TEXT | 内容 |
 | image | VARCHAR(512) | 图片URL |
-| link_type | VARCHAR(16) | 跳转类型：invite/merchant/webview/none |
+| link_type | VARCHAR(16) | 跳转类型：merchant/webview/none |
 | link_value | VARCHAR(256) | 跳转值 |
 | sort | INT | 排序 |
 | status | TINYINT | 状态：0禁用 1启用 |
@@ -3771,41 +3694,18 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
-### 4.16 邀请奖励规则表 (invite_rewards)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| type | VARCHAR(32) | 奖励类型 |
-| condition | VARCHAR(32) | 触发条件 |
-| description | VARCHAR(256) | 奖励描述 |
-| enabled | BOOLEAN | 是否启用 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
-
-### 4.17 服务号配置表 (wechat_config)
+### 4.15 系统公告表 (announcements)
 | 字段 | 类型 | 描述 |
 |------|------|------|
 | id | BIGINT | 主键 |
 | service_provider_id | BIGINT | 服务商ID |
-| app_id | VARCHAR(64) | 微信公众号AppID |
-| app_secret | VARCHAR(128) | 微信公众号AppSecret |
-| token | VARCHAR(64) | 验证Token |
-| encoding_aes_key | VARCHAR(128) | 消息加密密钥 |
-| template_ids | JSON | 模板消息ID集合 |
-| enabled | BOOLEAN | 是否启用 |
+| title | VARCHAR(128) | 公告标题 |
+| content | TEXT | 公告内容 |
+| status | TINYINT | 状态：0禁用 1启用 |
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
-**template_ids JSON结构**：
-```json
-{
-  "order_new": "模板消息ID_新订单通知",
-  "order_paid": "模板消息ID_订单支付通知",
-  "order_refund": "模板消息ID_退款通知"
-}
-```
-
-### 4.18 商家订阅配置表 (merchant_subscriptions)
+### 4.16 服务号配置表 (wechat_config)
 | 字段 | 类型 | 描述 |
 |------|------|------|
 | id | BIGINT | 主键 |
@@ -3816,7 +3716,7 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
-### 4.19 云打印机表 (cloud_printers)
+### 4.17 云打印机表 (cloud_printers)
 | 字段 | 类型 | 描述 |
 |------|------|------|
 | id | BIGINT | 主键 |
@@ -3833,7 +3733,7 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
-### 4.20 打印记录表 (print_logs)
+### 4.18 打印记录表 (print_logs)
 | 字段 | 类型 | 描述 |
 |------|------|------|
 | id | BIGINT | 主键 |
@@ -3845,7 +3745,7 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 | print_time | DATETIME | 打印时间 |
 | created_at | DATETIME | 创建时间 |
 
-### 4.17 服务商审核记录表 (merchant_audit_records)
+### 4.19 服务商审核记录表 (merchant_audit_records)
 | 字段 | 类型 | 描述 |
 |------|------|------|
 | id | BIGINT | 主键 |
@@ -3857,7 +3757,7 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 | remark | TEXT | 审核备注 |
 | created_at | DATETIME | 审核时间 |
 
-### 4.18 商家年费表 (merchant_fees)
+### 4.20 商家年费表 (merchant_fees)
 | 字段 | 类型 | 描述 |
 |------|------|------|
 | id | BIGINT | 主键 |
@@ -3866,11 +3766,11 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 | amount | DECIMAL(10,2) | 年费金额 |
 | status | VARCHAR(32) | 状态：unpaid/paid/free |
 | pay_time | DATETIME | 支付时间 |
-| free_reason | VARCHAR(256) | 免年费原因（如邀请奖励） |
+| free_reason | VARCHAR(256) | 免年费原因（如限时优惠） |
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
-### 4.19 商家手续费率表 (merchant_rates)
+### 4.21 商家手续费率表 (merchant_rates)
 | 字段 | 类型 | 描述 |
 |------|------|------|
 | id | BIGINT | 主键 |
@@ -4088,12 +3988,12 @@ miniprogram/                    # 微信小程序
 - [ ] 日志系统
 
 ### 6.2 第二阶段：服务商与商家管理 (P0)
-- [ ] 服务商注册与配置
-- [ ] 服务商管理员登录
+- [ ] 服务商管理员登录（服务端文件配置服务商信息）
 - [ ] 商家入驻申请
 - [ ] 商家审核流程
 - [ ] 商家信息管理
 - [ ] 商家自定义设置
+- [ ] 系统公告管理（服务商发布，商家查看）
 
 ### 6.3 第三阶段：商品管理 (P0)
 - [ ] 商品分类CRUD
@@ -4166,12 +4066,12 @@ miniprogram/                    # 微信小程序
 | merchant/orders/list | 订单列表、状态筛选 | GET /api/v1/merchant/orders |
 | merchant/orders/detail | 订单详情、核销操作 | GET /api/v1/merchant/orders/{id} |
 
-**第五批次：商家设置与邀请入驻**
+**第五批次：商家设置与系统公告**
 | 页面 | 功能描述 | 对接API |
 |------|----------|---------|
 | merchant/settings | 商家信息、营业设置 | PUT /api/v1/merchant/profile |
 | merchant/delivery-settings | 配送设置 | GET/PUT /api/v1/merchant/delivery-settings |
-| merchant/invite | 邀请码生成、邀请统计 | POST/GET /api/v1/merchant/invite/* |
+| merchant/announcements | 系统公告列表 | GET /api/v1/merchant/announcements |
 
 **第六批次：数据分析**
 | 页面 | 功能描述 | 对接API |
@@ -4223,7 +4123,7 @@ xm-mall/
 │   │   │   ├── products/
 │   │   │   ├── orders/
 │   │   │   ├── analytics/
-│   │   │   ├── invite/
+│   │   │   ├── announcements/  # 系统公告
 │   │   │   └── settings/
 │   │   │
 │   │   └── store/
@@ -4298,13 +4198,18 @@ xm-mall/
 - [ ] 订单核销功能
 - [ ] 订单统计
 
-**Phase 5：商家设置**
+**Phase 5：商家设置与系统公告**
 - [ ] 商家信息编辑
 - [ ] 配送设置
 - [ ] 营业执照上传
-- [ ] 邀请入驻功能
+- [ ] 系统公告查看（查看服务商发布的公告）
 
-**Phase 6：通知与打印**
+**Phase 6：服务商系统公告管理**
+- [ ] 系统公告列表
+- [ ] 创建/编辑公告
+- [ ] 删除公告
+
+**Phase 7：通知与打印**
 - [ ] 服务号订阅配置（接收订单通知）
 - [ ] 商家员工OpenID绑定
 - [ ] 云打印机配置（添加/编辑/删除）
@@ -4520,6 +4425,7 @@ xm-sp/
 | 订单数据分析 | /api/v1/sp/orders/analytics | GET | 🆕 待开发 |
 | 金额数据分析 | /api/v1/sp/amount/analytics | GET | 🆕 待开发 |
 | TOP商家排行 | /api/v1/sp/amount/top-merchants | GET | 🆕 待开发 |
+| 系统公告管理 | /api/v1/sp/announcements/* | CRUD | 🆕 待开发 |
 | 商家登录 | /api/v1/auth/merchant/login | POST | ✅ 已实现 |
 | 商家入驻 | /api/v1/merchant/register | POST | ⚠️ 待完善 |
 | 商家信息 | /api/v1/merchant/profile | GET | ✅ 已实现 |
@@ -4528,7 +4434,7 @@ xm-sp/
 | 分类管理 | /api/v1/merchant/categories/* | CRUD | ✅ 已实现 |
 | 订单管理 | /api/v1/merchant/orders/* | CRUD | ✅ 已实现 |
 | 数据分析 | /api/v1/merchant/analytics/* | GET | ✅ 已实现 |
-| 邀请入驻 | /api/v1/merchant/invite/* | CRUD | ✅ 已实现 |
+| 系统公告 | /api/v1/merchant/announcements/* | CRUD | 🆕 待开发 |
 | 店铺浏览 | /api/v1/store/{id}/* | GET | ✅ 已实现 |
 | 服务号配置 | /api/v1/admin/wechat-config | GET/PUT | ✅ 已实现 |
 | 订阅配置 | /api/v1/merchant/subscriptions | GET/PUT | ✅ 已实现 |
