@@ -262,6 +262,7 @@ async function handleWechatAction() {
             authStore.updateStaffInfo({
               ...authStore.staff,
               openid: '',
+              unionid: '',
               wechat_bound_at: ''
             })
           }
@@ -281,12 +282,14 @@ async function handleWechatAction() {
     settings.value = {
       ...(settings.value || {} as MerchantSettings),
       wechat_bound: true,
+      unionid: result.unionid,
       wechat_bound_at: result.wechat_bound_at
     }
     if (authStore.staff) {
       authStore.updateStaffInfo({
         ...authStore.staff,
         openid: result.openid,
+        unionid: result.unionid,
         wechat_bound_at: result.wechat_bound_at
       })
     }

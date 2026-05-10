@@ -2122,6 +2122,7 @@ Authorization: Bearer {token}
     "notify_enabled": true,
     "browse_notify_enabled": true,
     "wechat_bound": true,
+    "unionid": "微信UnionID",
     "wechat_bound_at": "2024-01-01T10:00:00Z",
     "delivery_settings": {
       "enabled": true,
@@ -2539,6 +2540,7 @@ Authorization: Bearer {token}
 **说明：**
 
 - 绑定时前端需先调用 `uni.login` 获取真实微信 `code`，后端通过微信 `code2session` 换取当前员工的真实 `openid` 后再完成绑定。
+- 若当前微信开放平台已打通，后端会同时获取并保存当前员工的 `unionid`。
 - 修改密码成功后，前端需强制当前员工退出并重新登录。
 - 新旧密码不能相同，新密码最少 6 位。
 
@@ -2564,6 +2566,7 @@ Authorization: Bearer {token}
   "code": 0,
   "data": {
     "openid": "mch_wx_xxx",
+    "unionid": "unionid_xxx",
     "wechat_bound_at": "2024-01-01T10:00:00Z",
     "message": "绑定成功"
   }
@@ -2605,7 +2608,7 @@ POST /api/v1/auth/merchant/wechat-login
 **说明：**
 
 - 绑定维度为当前商家员工。
-- 前端需先调用 `uni.login` 获取真实微信 `code`，后端通过微信 `code2session` 换取 `openid` 后匹配已绑定员工。
+- 前端需先调用 `uni.login` 获取真实微信 `code`，后端通过微信 `code2session` 换取 `openid`，并在可用时同步获取 `unionid` 后匹配已绑定员工。
 - 未绑定商家账号的微信快捷登录返回提示：“您还不是商家，请注册后使用”。
 
 #### 3.3.13 获取员工列表
@@ -2636,6 +2639,7 @@ Authorization: Bearer {token}
         "phone": "13800138000",
         "role": "staff",
         "openid": "微信OpenID",
+        "unionid": "微信UnionID",
         "notify_enabled": true,
         "browse_notify_enabled": true,
         "wechat_bound_at": "2024-01-01T10:00:00Z",
@@ -4514,6 +4518,7 @@ POST /api/v1/callback/wechat
 | name            | VARCHAR(64)  | 姓名                     |
 | phone           | VARCHAR(20)  | 手机号                    |
 | openid          | VARCHAR(64)  | 员工绑定的微信 OpenID         |
+| unionid         | VARCHAR(64)  | 员工绑定微信返回的 UnionID     |
 | wechat_bound_at | DATETIME     | 微信快捷登录绑定时间             |
 | role            | VARCHAR(32)  | 角色：owner/manager/staff |
 | notify\_enabled | TINYINT(1)   | 订单提示音开关，1开启 0关闭        |

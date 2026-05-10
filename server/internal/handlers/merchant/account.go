@@ -57,19 +57,26 @@ type wechatCode2SessionResponse struct {
 	ErrMsg     string `json:"errmsg"`
 }
 
-func resolveMerchantOpenID(code string) (string, error) {
+type merchantWechatIdentity struct {
+	OpenID  string
+	UnionID string
+}
+
+func resolveMerchantWechatIdentity(code string) (*merchantWechatIdentity, error) {
 	trimmedCode := strings.TrimSpace(code)
 	if trimmedCode == "" {
-		return "", fmt.Errorf("微信登录凭证不能为空")
+		return nil, fmt.Errorf("微信登录凭证不能为空")
 	}
 
 	// 兼容本地 mock 联调，避免已有回归脚本失效。
 	if strings.HasPrefix(trimmedCode, "mock_merchant_") || strings.HasPrefix(trimmedCode, "mock_") {
-		return buildMerchantOpenID(trimmedCode), nil
+		return &merchantWechatIdentity{
+			OpenID: buildMerchantOpenID(trimmedCode),
+		}, nil
 	}
 
 	if config.Config == nil || config.Config.Wechat.AppID == "" || config.Config.Wechat.AppSecret == "" {
-		return "", fmt.Errorf("微信小程序配置缺失")
+		return nil, fmt.Errorf("微信小程序配置缺失")
 	}
 
 	query := url.Values{}
@@ -81,23 +88,26 @@ func resolveMerchantOpenID(code string) (string, error) {
 	requestURL := "https://api.weixin.qq.com/sns/jscode2session?" + query.Encode()
 	response, err := http.Get(requestURL)
 	if err != nil {
-		return "", fmt.Errorf("请求微信登录服务失败")
+		return nil, fmt.Errorf("请求微信登录服务失败")
 	}
 	defer response.Body.Close()
 
 	var result wechatCode2SessionResponse
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("解析微信登录结果失败")
+		return nil, fmt.Errorf("解析微信登录结果失败")
 	}
 
 	if result.ErrCode != 0 {
-		return "", fmt.Errorf("微信登录失败: %s", result.ErrMsg)
+		return nil, fmt.Errorf("微信登录失败: %s", result.ErrMsg)
 	}
 	if strings.TrimSpace(result.OpenID) == "" {
-		return "", fmt.Errorf("未获取到微信用户标识")
+		return nil, fmt.Errorf("未获取到微信用户标识")
 	}
 
-	return result.OpenID, nil
+	return &merchantWechatIdentity{
+		OpenID:  strings.TrimSpace(result.OpenID),
+		UnionID: strings.TrimSpace(result.UnionID),
+	}, nil
 }
 
 func ChangePassword(c *gin.Context) {
@@ -152,32 +162,37 @@ func BindWechat(c *gin.Context) {
 		return
 	}
 
-	openID, err := resolveMerchantOpenID(req.Code)
+	wechatIdentity, err := resolveMerchantWechatIdentity(req.Code)
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
 		return
 	}
 
 	var existStaff models.MerchantStaff
-	if err := database.DB.Where("openid = ? AND id <> ?", openID, staff.ID).First(&existStaff).Error; err == nil {
+	if err := database.DB.Where("openid = ? AND id <> ?", wechatIdentity.OpenID, staff.ID).First(&existStaff).Error; err == nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "该微信已绑定其他商家账号")
 		return
 	}
 
 	now := time.Now()
+	bindUpdates := map[string]interface{}{
+		"openid":               wechatIdentity.OpenID,
+		"wechat_bound_at":      now,
+		"last_wechat_login_at": nil,
+	}
+	if wechatIdentity.UnionID != "" {
+		bindUpdates["unionid"] = wechatIdentity.UnionID
+	}
 	if err := database.DB.Model(&models.MerchantStaff{}).
 		Where("id = ?", staff.ID).
-		Updates(map[string]interface{}{
-			"openid":           openID,
-			"wechat_bound_at":  now,
-			"last_wechat_login_at": nil,
-		}).Error; err != nil {
+		Updates(bindUpdates).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "绑定微信失败")
 		return
 	}
 
 	response.Success(c, gin.H{
-		"openid":          openID,
+		"openid":          wechatIdentity.OpenID,
+		"unionid":         wechatIdentity.UnionID,
 		"wechat_bound_at": now,
 		"message":         "绑定成功",
 	})
@@ -193,9 +208,10 @@ func UnbindWechat(c *gin.Context) {
 	if err := database.DB.Model(&models.MerchantStaff{}).
 		Where("id = ?", staff.ID).
 		Updates(map[string]interface{}{
-			"openid":                "",
-			"wechat_bound_at":       nil,
-			"last_wechat_login_at":  nil,
+			"openid":               "",
+			"unionid":              "",
+			"wechat_bound_at":      nil,
+			"last_wechat_login_at": nil,
 		}).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "解绑微信失败")
 		return
@@ -211,14 +227,14 @@ func WechatQuickLogin(c *gin.Context) {
 		return
 	}
 
-	openID, err := resolveMerchantOpenID(req.Code)
+	wechatIdentity, err := resolveMerchantWechatIdentity(req.Code)
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
 		return
 	}
 
 	var staff models.MerchantStaff
-	if err := database.DB.Preload("Merchant").Where("openid = ?", openID).First(&staff).Error; err != nil {
+	if err := database.DB.Preload("Merchant").Where("openid = ?", wechatIdentity.OpenID).First(&staff).Error; err != nil {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "您还不是商家，请注册后使用")
 		return
 	}
@@ -229,10 +245,19 @@ func WechatQuickLogin(c *gin.Context) {
 	}
 
 	now := time.Now()
-	database.DB.Model(&staff).Updates(map[string]interface{}{
-		"last_login_at":         now,
-		"last_wechat_login_at":  now,
-	})
+	loginUpdates := map[string]interface{}{
+		"last_login_at":        now,
+		"last_wechat_login_at": now,
+	}
+	if wechatIdentity.UnionID != "" {
+		loginUpdates["unionid"] = wechatIdentity.UnionID
+	}
+	database.DB.Model(&staff).Updates(loginUpdates)
+	if wechatIdentity.UnionID != "" {
+		staff.UnionID = wechatIdentity.UnionID
+	}
+	staff.LastLoginAt = &now
+	staff.LastWechatLoginAt = &now
 
 	token, _ := utils.GenerateToken(staff.MerchantID, "merchant", staff.Username)
 	response.Success(c, gin.H{

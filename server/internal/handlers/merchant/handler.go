@@ -148,11 +148,13 @@ func GetSettings(c *gin.Context) {
 	notifyEnabled := true
 	browseNotifyEnabled := true
 	wechatBound := false
+	unionID := ""
 	var wechatBoundAt *time.Time
 	if staff, err := getCurrentMerchantStaff(c); err == nil {
 		notifyEnabled = staff.NotifyEnabled
 		browseNotifyEnabled = staff.BrowseNotifyEnabled
 		wechatBound = strings.TrimSpace(staff.OpenID) != ""
+		unionID = strings.TrimSpace(staff.UnionID)
 		wechatBoundAt = staff.WechatBoundAt
 	}
 
@@ -165,6 +167,7 @@ func GetSettings(c *gin.Context) {
 		"notify_enabled":        notifyEnabled,
 		"browse_notify_enabled": browseNotifyEnabled,
 		"wechat_bound":          wechatBound,
+		"unionid":               unionID,
 		"wechat_bound_at":       wechatBoundAt,
 		"delivery_settings":     deliverySettings,
 	})

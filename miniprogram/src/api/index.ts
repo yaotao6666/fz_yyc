@@ -188,7 +188,7 @@ export function changeMerchantPassword(data: ChangePasswordRequest) {
 }
 
 export function bindMerchantWechat(data: { code: string }) {
-  return post<{ openid: string; wechat_bound_at: string; message: string }>('/api/v1/merchant/account/wechat/bind', data)
+  return post<{ openid: string; unionid?: string; wechat_bound_at: string; message: string }>('/api/v1/merchant/account/wechat/bind', data)
 }
 
 export function unbindMerchantWechat() {

@@ -192,6 +192,7 @@ CREATE TABLE `merchant_staffs` (
     `name` VARCHAR(64) DEFAULT NULL,
     `phone` VARCHAR(20) DEFAULT NULL,
     `openid` VARCHAR(64) DEFAULT NULL,
+    `unionid` VARCHAR(64) DEFAULT NULL,
     `wechat_bound_at` DATETIME DEFAULT NULL,
     `role` VARCHAR(32) NOT NULL DEFAULT 'staff',
     `notify_enabled` TINYINT(1) NOT NULL DEFAULT 1,
@@ -643,11 +644,11 @@ INSERT INTO `merchants` (
 );
 
 INSERT INTO `merchant_staffs` (
-    `id`, `merchant_id`, `username`, `password`, `name`, `phone`, `openid`, `wechat_bound_at`, `role`,
+    `id`, `merchant_id`, `username`, `password`, `name`, `phone`, `openid`, `unionid`, `wechat_bound_at`, `role`,
     `notify_enabled`, `browse_notify_enabled`, `status`, `last_login_at`, `last_wechat_login_at`, `created_at`, `updated_at`
 ) VALUES (
     1, 1, 'merchant', '$2a$10$mP89UzDWaHy0LVxdDqWhheUJ/UN4tVkArcEhTqW7kqScW7lk.558W',
-    '商家管理员', '13900139000', NULL, NULL, 'owner', 1, 1, 1, NULL, NULL, NOW(), NOW()
+    '商家管理员', '13900139000', NULL, NULL, NULL, 'owner', 1, 1, 1, NULL, NULL, NOW(), NOW()
 );
 
 INSERT INTO `merchant_delivery_settings` (

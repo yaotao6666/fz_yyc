@@ -106,6 +106,7 @@ export interface MerchantStaff {
   name: string
   phone: string
   openid?: string
+  unionid?: string
   wechat_bound_at?: string
   role: string
   notify_enabled?: boolean
@@ -152,6 +153,7 @@ export interface MerchantSettings {
   notify_enabled?: boolean
   browse_notify_enabled?: boolean
   wechat_bound?: boolean
+  unionid?: string
   wechat_bound_at?: string
   delivery_settings?: DeliverySettings
 }

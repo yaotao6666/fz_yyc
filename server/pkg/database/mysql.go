@@ -72,6 +72,14 @@ func ensureMerchantStaffColumns(db *gorm.DB) error {
 
 	if err := ensureMerchantStaffColumn(
 		db,
+		"unionid",
+		"ADD COLUMN unionid VARCHAR(64) DEFAULT NULL COMMENT '微信UnionID' AFTER openid",
+	); err != nil {
+		return err
+	}
+
+	if err := ensureMerchantStaffColumn(
+		db,
 		"notify_enabled",
 		"ADD COLUMN notify_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '订单提示音开关' AFTER role",
 	); err != nil {

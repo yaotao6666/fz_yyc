@@ -218,6 +218,7 @@ type MerchantStaff struct {
 	Name                string     `gorm:"size:64" json:"name"`
 	Phone               string     `gorm:"size:20" json:"phone"`
 	OpenID              string     `gorm:"column:openid;size:64" json:"openid"`
+	UnionID             string     `gorm:"column:unionid;size:64" json:"unionid"`
 	WechatBoundAt       *time.Time `json:"wechat_bound_at"`
 	Role                string     `gorm:"size:32;not null;default:staff" json:"role"`
 	NotifyEnabled       bool       `gorm:"not null;default:true" json:"notify_enabled"`
