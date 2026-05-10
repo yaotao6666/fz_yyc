@@ -112,8 +112,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getProducts, productOnSale, productOffSale, deleteProduct as deleteProductApi, batchUpdateProductStatus } from '../../../api'
-import type { Product } from '../../../types/index'
+import { getProducts, productOnSale, productOffSale, deleteProduct as deleteProductApi, batchUpdateProductStatus } from '@api'
+import type { Product } from '@types'
 
 const keyword = ref('')
 const filterStatus = ref('')

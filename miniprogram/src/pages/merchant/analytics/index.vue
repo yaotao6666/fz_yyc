@@ -166,14 +166,14 @@ import {
   getProductRanking,
   getHourlyAnalysis,
   getStockAlert
-} from '../../../api'
+} from '@api'
 import type {
   SalesOverview,
   SalesTrend,
   ProductRanking,
   HourlyAnalysis,
   StockAlert
-} from '../../../types/index'
+} from '@types'
 
 const periodTabs = [
   { label: '今日', value: 'today' },

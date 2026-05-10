@@ -122,9 +122,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { createOrder } from '../../api'
+import { createOrder } from '@api'
 import { useCartStore } from '../../stores/cart'
-import type { CreateOrderRequest } from '../../types/index'
+import type { CreateOrderRequest } from '@types'
 
 const cartStore = useCartStore()
 

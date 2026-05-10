@@ -95,10 +95,14 @@ func CalculateDeliveryFee(totalAmount, baseFee, freeDeliveryAmount float64, dist
 	}
 
 	for _, rule := range rules {
-		minDist := rule["min_distance"].(float64)
-		maxDist := rule["max_distance"].(float64)
+		minDist, okMin := rule["min_distance"].(float64)
+		maxDist, okMax := rule["max_distance"].(float64)
+		fee, okFee := rule["fee"].(float64)
+		if !okMin || !okMax || !okFee {
+			continue
+		}
 		if distance >= minDist && distance < maxDist {
-			return rule["fee"].(float64)
+			return fee
 		}
 	}
 

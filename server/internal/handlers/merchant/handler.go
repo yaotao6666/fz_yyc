@@ -317,8 +317,9 @@ type DeliverySettingsRequest struct {
 	FreeDeliveryAmount float64 `json:"free_delivery_amount"`
 	MaxDistance        uint    `json:"max_distance"`
 	DistanceRules      []struct {
-		Distance float64 `json:"distance"`
-		Fee      float64 `json:"fee"`
+		MinDistance float64 `json:"min_distance"`
+		MaxDistance float64 `json:"max_distance"`
+		Fee         float64 `json:"fee"`
 	} `json:"distance_rules"`
 }
 
@@ -341,10 +342,16 @@ func UpdateDeliverySettings(c *gin.Context) {
 	settings.FreeDeliveryAmount = req.FreeDeliveryAmount
 	settings.MaxDistance = req.MaxDistance
 
-	if len(req.DistanceRules) > 0 {
-		rulesJSON, _ := json.Marshal(req.DistanceRules)
-		settings.DistanceRules = models.JSON(rulesJSON)
+	rules := req.DistanceRules
+	if rules == nil {
+		rules = []struct {
+			MinDistance float64 `json:"min_distance"`
+			MaxDistance float64 `json:"max_distance"`
+			Fee         float64 `json:"fee"`
+		}{}
 	}
+	rulesJSON, _ := json.Marshal(rules)
+	settings.DistanceRules = models.JSON(rulesJSON)
 
 	if err := database.DB.Save(&settings).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "保存配送设置失败")

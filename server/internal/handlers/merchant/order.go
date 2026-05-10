@@ -7,10 +7,15 @@ import (
 	"fz_yyc_api/pkg/response"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+type CompleteOrderRequest struct {
+	VerifyCode string `json:"verify_code" binding:"required"`
+}
 
 func GetOrders(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
@@ -85,9 +90,31 @@ func CompleteOrder(c *gin.Context) {
 	orderID := c.Param("order_id")
 	id, _ := strconv.ParseUint(orderID, 10, 64)
 
+	var req CompleteOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+	verifyCode := strings.TrimSpace(req.VerifyCode)
+	if len(verifyCode) != 6 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码应为6位数字")
+		return
+	}
+	for _, r := range verifyCode {
+		if r < '0' || r > '9' {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码应为6位数字")
+			return
+		}
+	}
+
 	var order models.Order
 	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&order).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
+		return
+	}
+
+	if order.VerifyCode != verifyCode {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码错误")
 		return
 	}
 

@@ -23,6 +23,25 @@ export interface ApiResponse<T = any> {
   data: T
 }
 
+export interface Announcement {
+  id: number
+  service_provider_id: number
+  title: string
+  content: string
+  status: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AnnouncementListResponse {
+  list: Announcement[]
+  pagination: {
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
 // ============ 认证相关 ============
 
 // 商家登录请求

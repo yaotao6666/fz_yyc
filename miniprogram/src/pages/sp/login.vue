@@ -3,7 +3,7 @@
     <view class="login-header">
       <image class="logo" src="../../static/logo.png" mode="aspectFit" />
       <text class="title">寻梦私域管家</text>
-      <text class="subtitle">商家管理平台</text>
+      <text class="subtitle">服务商管理平台</text>
     </view>
 
     <view class="login-form">
@@ -12,7 +12,7 @@
         <input
           v-model="formData.username"
           type="text"
-          placeholder="请输入商家账号"
+          placeholder="请输入服务商账号"
           class="input"
           @blur="validateUsername"
         />
@@ -40,9 +40,6 @@
         >
           {{ loading ? '登录中...' : '登录' }}
         </button>
-        <view class="link-group">
-          <text class="link" @click="goRegister">商家入驻</text>
-        </view>
       </view>
     </view>
   </view>
@@ -50,13 +47,13 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { useAuthStore } from '../../stores/auth'
+import { useSpStore } from '../../stores/sp'
 
-const authStore = useAuthStore()
+const spStore = useSpStore()
 
 const formData = reactive({
-  username: 'merchant',
-  password: 'merchant123'
+  username: '',
+  password: ''
 })
 
 const errors = reactive({
@@ -66,7 +63,6 @@ const errors = reactive({
 
 const loading = ref(false)
 
-// 表单验证
 function validateUsername() {
   if (!formData.username) {
     errors.username = '请输入账号'
@@ -89,7 +85,6 @@ function validatePassword() {
   return true
 }
 
-// 登录
 async function handleLogin() {
   if (!validateUsername() || !validatePassword()) {
     return
@@ -98,24 +93,18 @@ async function handleLogin() {
   loading.value = true
 
   try {
-    const success = await authStore.login(formData.username, formData.password)
+    const success = await spStore.login(formData.username, formData.password)
 
     if (success) {
       uni.showToast({ title: '登录成功', icon: 'success' })
-      
-      // 跳转到商户首页
+
       setTimeout(() => {
-        uni.switchTab({ url: '/pages/merchant/home' })
+        uni.switchTab({ url: '/pages/sp/home' })
       }, 500)
     }
   } finally {
     loading.value = false
   }
-}
-
-// 跳转注册
-function goRegister() {
-  uni.navigateTo({ url: '/pages/auth/register' })
 }
 </script>
 
@@ -212,17 +201,5 @@ function goRegister() {
 .btn-login[disabled] {
   background: #cccccc;
   color: #ffffff;
-}
-
-.link-group {
-  display: flex;
-  justify-content: center;
-  margin-top: 32rpx;
-}
-
-.link {
-  font-size: 28rpx;
-  color: #007AFF;
-  padding: 16rpx;
 }
 </style>

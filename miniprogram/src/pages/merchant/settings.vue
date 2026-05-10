@@ -29,19 +29,6 @@
         </view>
         <text class="arrow">›</text>
       </view>
-
-      <view class="setting-item" @click="goInvite">
-        <view class="setting-left">
-          <view class="setting-icon">
-            <text>🎁</text>
-          </view>
-          <view class="setting-info">
-            <view class="setting-label">邀请入驻</view>
-            <view class="setting-value">邀请好友入驻</view>
-          </view>
-        </view>
-        <text class="arrow">›</text>
-      </view>
     </view>
 
     <!-- 账号安全 -->
@@ -77,6 +64,19 @@
     <!-- 店铺运营 -->
     <view class="section">
       <view class="section-title">店铺运营</view>
+
+      <view class="setting-item">
+        <view class="setting-left">
+          <view class="setting-icon">
+            <text>🔔</text>
+          </view>
+          <view class="setting-info">
+            <view class="setting-label">订单提示音</view>
+            <view class="setting-value">{{ soundEnabled ? '已开启' : '未开启' }}</view>
+          </view>
+        </view>
+        <switch :checked="soundEnabled" color="#007AFF" @change="handleSoundToggle" />
+      </view>
       
       <view class="setting-item" @click="goQrcode">
         <view class="setting-left">
@@ -146,11 +146,12 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
-import { getMerchantSettings } from '../../api'
+import { getMerchantSettings } from '@api'
 
 const authStore = useAuthStore()
 
 const merchantInfo = computed(() => authStore.merchantInfo)
+const soundEnabled = computed(() => authStore.soundEnabled)
 const deliveryEnabled = ref(false)
 
 onShow(() => {
@@ -174,12 +175,12 @@ function goDeliverySettings() {
   uni.navigateTo({ url: '/pages/merchant/delivery-settings' })
 }
 
-function goInvite() {
-  uni.navigateTo({ url: '/pages/merchant/invite' })
-}
-
 function goQrcode() {
   uni.navigateTo({ url: '/pages/merchant/settings' })
+}
+
+function handleSoundToggle(e: any) {
+  authStore.setSoundEnabled(!!e.detail.value)
 }
 
 function handleLogout() {

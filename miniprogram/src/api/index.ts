@@ -31,6 +31,8 @@ import type {
   StoreProductGroup,
   CreateOrderRequest,
   CreateOrderResponse,
+  Announcement,
+  AnnouncementListResponse,
 } from '../types'
 import type { ApiResponse } from '../types'
 
@@ -142,6 +144,14 @@ export function updateMerchantStatus(status: number) {
  */
 export function getMerchantQrcode(params?: { page?: string; width?: number }) {
   return get<{ qrcode_url: string; expire_time?: string }>('/api/v1/merchant/qrcode', params)
+}
+
+export function getMerchantAnnouncements(params?: { page?: number; page_size?: number }) {
+  return get<AnnouncementListResponse>('/api/v1/merchant/announcements', params)
+}
+
+export function getMerchantAnnouncementDetail(announcementId: number) {
+  return get<Announcement>(`/api/v1/merchant/announcements/${announcementId}`)
 }
 
 // ============ 商品分类相关 ============
@@ -479,7 +489,7 @@ export function getStoreDeliveryRules(merchantId: number) {
     base_fee: number
     free_delivery_amount: number
     max_distance: number
-    rules: { min_distance: number; max_distance: number; fee: number }[]
+    distance_rules: { min_distance: number; max_distance: number; fee: number }[]
   }>(`/api/v1/store/${merchantId}/delivery-rules`)
 }
 

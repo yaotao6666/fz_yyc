@@ -141,9 +141,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getStoreHome, getStoreProducts } from '../../api'
+import { getStoreHome, getStoreProducts } from '@api'
 import { useCartStore } from '../../stores/cart'
-import type { StoreHomeInfo, Product } from '../../types/index'
+import type { StoreHomeInfo, Product } from '@types'
 
 const cartStore = useCartStore()
 

@@ -109,8 +109,8 @@
 import { ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
-import { generateInviteCode, getMyInviteInfo, getInviteRecords } from '../../api'
-import type { InviteInfo, MyInviteInfo, InviteRecord } from '../../types/index'
+import { generateInviteCode, getMyInviteInfo, getInviteRecords } from '@api'
+import type { InviteInfo, MyInviteInfo, InviteRecord } from '@types'
 
 const authStore = useAuthStore()
 const merchantInfo = authStore.merchantInfo

@@ -24,6 +24,21 @@
       </view>
     </view>
 
+    <view v-if="announcementVisible" class="announcement-bar" @click="viewAnnouncement">
+      <view class="announcement-left">
+        <text class="announcement-icon">📢</text>
+        <view class="announcement-marquee">
+          <view class="announcement-text" :style="{ animationDuration: marqueeDuration + 's' }">
+            {{ announcement?.title || '' }}
+          </view>
+        </view>
+      </view>
+      <view class="announcement-actions">
+        <text class="announcement-view" @click.stop="viewAnnouncement">查看</text>
+        <text class="announcement-close" @click.stop="closeAnnouncement">×</text>
+      </view>
+    </view>
+
     <!-- 今日数据概览 -->
     <view class="stats-section">
       <view class="section-title">今日概览</view>
@@ -63,29 +78,11 @@
           </view>
           <text class="menu-text">分类管理</text>
         </view>
-        <view class="menu-item" @click.stop="goOrders('paid')">
-          <view class="menu-icon" style="background: #f6ffed;">
-            <image src="/static/icons/order.png" />
-          </view>
-          <text class="menu-text">订单管理</text>
-        </view>
         <view class="menu-item" @click="goAnalytics">
           <view class="menu-icon" style="background: #fff1f0;">
             <image src="/static/icons/analytics.png" />
           </view>
           <text class="menu-text">数据分析</text>
-        </view>
-        <view class="menu-item" @click="goInvite">
-          <view class="menu-icon" style="background: #f9f0ff;">
-            <image src="/static/icons/invite.png" />
-          </view>
-          <text class="menu-text">邀请入驻</text>
-        </view>
-        <view class="menu-item" @click="goSettings">
-          <view class="menu-icon" style="background: #f0f5ff;">
-            <image src="/static/icons/settings.png" />
-          </view>
-          <text class="menu-text">店铺设置</text>
         </view>
       </view>
     </view>
@@ -126,7 +123,8 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
-import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getCategories, getMerchantQrcode } from '../../api'
+import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getMerchantQrcode, getMerchantAnnouncements } from '@api'
+import type { Announcement } from '../../types'
 
 const authStore = useAuthStore()
 
@@ -139,6 +137,13 @@ const statistics = ref<any>({
   total_products: 0
 })
 const lowStockCount = ref(0)
+
+const announcement = ref<Announcement | null>(null)
+const announcementVisible = ref(false)
+const marqueeDuration = computed(() => {
+  const titleLength = announcement.value?.title?.length || 0
+  return Math.max(8, Math.min(20, Math.ceil(titleLength / 6) * 4))
+})
 
 const hasPendingItems = computed(() => {
   return statistics.value.pending_orders > 0 || lowStockCount.value > 0
@@ -155,8 +160,48 @@ async function loadData() {
     loadMerchantInfo(),
     loadStatistics(),
     loadLowStockCount(),
-    loadMerchantQrcode()
+    loadMerchantQrcode(),
+    loadAnnouncement()
   ])
+}
+
+async function loadAnnouncement() {
+  try {
+    const res = await getMerchantAnnouncements({ page: 1, page_size: 1 })
+    const first = res?.list?.[0]
+    if (!first) {
+      announcement.value = null
+      announcementVisible.value = false
+      return
+    }
+    const merchantId = authStore.merchantId || 0
+    const dismissKey = `merchant_home_announcement_dismissed_${merchantId}`
+    const dismissedId = Number(uni.getStorageSync(dismissKey) || 0)
+
+    announcement.value = first
+    announcementVisible.value = Number(first.id) !== dismissedId
+  } catch (error) {
+    announcement.value = null
+    announcementVisible.value = false
+  }
+}
+
+function closeAnnouncement() {
+  if (!announcement.value) return
+  const merchantId = authStore.merchantId || 0
+  const dismissKey = `merchant_home_announcement_dismissed_${merchantId}`
+  uni.setStorageSync(dismissKey, announcement.value.id)
+  announcementVisible.value = false
+}
+
+function viewAnnouncement() {
+  if (!announcement.value) return
+  uni.showModal({
+    title: announcement.value.title,
+    content: announcement.value.content || '',
+    showCancel: false,
+    confirmText: '知道了'
+  })
 }
 
 async function loadMerchantQrcode() {
@@ -261,13 +306,6 @@ function goAnalytics() {
   uni.navigateTo({ url: '/pages/merchant/analytics/index' })
 }
 
-function goInvite() {
-  uni.navigateTo({ url: '/pages/merchant/invite' })
-}
-
-function goSettings() {
-  uni.switchTab({ url: '/pages/merchant/settings' })
-}
 </script>
 
 <style scoped>
@@ -275,6 +313,73 @@ function goSettings() {
   min-height: 100vh;
   background: #f5f5f5;
   padding-bottom: 120rpx;
+}
+
+.announcement-bar {
+  margin: 0 24rpx 24rpx;
+  padding: 18rpx 20rpx;
+  background: #ffffff;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.04);
+}
+
+.announcement-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.announcement-icon {
+  margin-right: 12rpx;
+  font-size: 28rpx;
+}
+
+.announcement-marquee {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.announcement-text {
+  display: inline-block;
+  padding-left: 100%;
+  animation-name: marquee;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  font-size: 26rpx;
+  color: #333333;
+}
+
+.announcement-actions {
+  display: flex;
+  align-items: center;
+  margin-left: 16rpx;
+}
+
+.announcement-view {
+  font-size: 26rpx;
+  color: #007AFF;
+  padding: 8rpx 12rpx;
+}
+
+.announcement-close {
+  font-size: 34rpx;
+  color: #999999;
+  padding: 0 8rpx;
+  line-height: 1;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 .merchant-card {

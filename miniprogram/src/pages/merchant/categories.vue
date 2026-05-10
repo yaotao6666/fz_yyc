@@ -51,8 +51,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getCategories, createCategory, updateCategory, deleteCategory } from '../../api'
-import type { Category } from '../../types/index'
+import { getCategories, createCategory, updateCategory, deleteCategory } from '@api'
+import type { Category } from '@types'
 
 const categories = ref<Category[]>([])
 const loading = ref(false)

@@ -163,9 +163,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getOrder, completeOrder } from '../../../api'
-import { OrderStatus, OrderStatusText, DeliveryTypeText } from '../../../types/index'
-import type { Order } from '../../../types/index'
+import { getOrder, completeOrder } from '@api'
+import { OrderStatus, OrderStatusText, DeliveryTypeText } from '@types'
+import type { Order } from '@types'
 
 const order = ref<Order | null>(null)
 const showVerify = ref(false)
@@ -255,8 +255,13 @@ function closeVerifyDialog() {
 }
 
 async function confirmVerify() {
-  if (!verifyCode.value) {
+  const code = verifyCode.value.trim()
+  if (!code) {
     return uni.showToast({ title: '请输入核销码', icon: 'none' })
+  }
+
+  if (!/^\d{6}$/.test(code)) {
+    return uni.showToast({ title: '核销码应为6位数字', icon: 'none' })
   }
 
   if (!order.value) return
@@ -264,7 +269,7 @@ async function confirmVerify() {
   verifying.value = true
 
   try {
-    await completeOrder(order.value.id, verifyCode.value)
+    await completeOrder(order.value.id, code)
     order.value.status = OrderStatus.COMPLETED
     uni.showToast({ title: '核销成功', icon: 'success' })
     closeVerifyDialog()

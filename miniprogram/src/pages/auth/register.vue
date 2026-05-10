@@ -275,8 +275,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
-import { merchantRegister } from '../../api'
-import { uploadImage } from '../../api'
+import { merchantRegister } from '@api'
+import { uploadImage } from '@api'
 
 const categories = [
   { name: '餐饮', value: 'catering' },

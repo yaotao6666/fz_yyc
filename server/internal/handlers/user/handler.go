@@ -158,8 +158,9 @@ func GetDeliveryRules(c *gin.Context) {
 	}
 
 	var distanceRules []struct {
-		Distance float64 `json:"distance"`
-		Fee      float64 `json:"fee"`
+		MinDistance float64 `json:"min_distance"`
+		MaxDistance float64 `json:"max_distance"`
+		Fee         float64 `json:"fee"`
 	}
 	if settings.DistanceRules != nil {
 		json.Unmarshal(settings.DistanceRules, &distanceRules)
@@ -272,11 +273,16 @@ func CreateOrder(c *gin.Context) {
 	if req.DeliveryType == 1 {
 		var settings models.MerchantDeliverySettings
 		if err := database.DB.Where("merchant_id = ?", req.MerchantID).First(&settings).Error; err == nil && settings.Enabled {
-			deliveryFee = settings.BaseFee
 			if req.DeliveryDistance > float64(settings.MaxDistance) {
 				response.Fail(c, http.StatusBadRequest, response.CodeOutOfRange, "超出配送范围")
 				return
 			}
+
+			var rules []map[string]interface{}
+			if settings.DistanceRules != nil {
+				_ = json.Unmarshal(settings.DistanceRules, &rules)
+			}
+			deliveryFee = utils.CalculateDeliveryFee(totalAmount, settings.BaseFee, settings.FreeDeliveryAmount, req.DeliveryDistance, rules)
 		}
 	}
 

@@ -111,9 +111,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getOrders, completeOrder } from '../../../api'
-import { OrderStatus, OrderStatusText } from '../../../types/index'
-import type { Order } from '../../../types/index'
+import { getOrders, completeOrder } from '@api'
+import { OrderStatus, OrderStatusText } from '@types'
+import type { Order } from '@types'
 
 const statusTabs = [
   { label: '全部', value: 0, count: 0 },
@@ -236,8 +236,13 @@ function closeVerifyDialog() {
 }
 
 async function confirmVerify() {
-  if (!verifyCode.value) {
+  const code = verifyCode.value.trim()
+  if (!code) {
     return uni.showToast({ title: '请输入核销码', icon: 'none' })
+  }
+
+  if (!/^\d{6}$/.test(code)) {
+    return uni.showToast({ title: '核销码应为6位数字', icon: 'none' })
   }
 
   if (!currentOrder.value) return
@@ -245,7 +250,7 @@ async function confirmVerify() {
   verifying.value = true
 
   try {
-    await completeOrder(currentOrder.value.id, verifyCode.value)
+    await completeOrder(currentOrder.value.id, code)
     
     // 更新订单状态
     const index = orders.value.findIndex(o => o.id === currentOrder.value!.id)
@@ -272,7 +277,7 @@ async function confirmVerify() {
 .status-tabs {
   display: flex;
   background: #ffffff;
-  padding: 24rpx 0;
+  padding: 24rpx 24rpx;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -318,7 +323,7 @@ async function confirmVerify() {
 }
 
 .order-list {
-  padding: 24rpx;
+  padding: 24rpx 32rpx;
 }
 
 .order-card {

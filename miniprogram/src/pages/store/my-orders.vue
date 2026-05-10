@@ -123,9 +123,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getMyOrders, cancelMyOrder, applyRefund } from '../../api'
-import { OrderStatus, OrderStatusText } from '../../types/index'
-import type { Order } from '../../types/index'
+import { getMyOrders, cancelMyOrder, applyRefund } from '@api'
+import { OrderStatus, OrderStatusText } from '@types'
+import type { Order } from '@types'
 
 const statusTabs = [
   { label: '全部', value: 0 },

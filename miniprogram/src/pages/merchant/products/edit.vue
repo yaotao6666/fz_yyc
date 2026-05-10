@@ -178,8 +178,8 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getProduct, createProduct, updateProduct, getCategories, uploadImage } from '../../../api'
-import type { Category, Product } from '../../../types/index'
+import { getProduct, createProduct, updateProduct, getCategories, uploadImage } from '@api'
+import type { Category, Product } from '@types'
 
 const productId = ref<number | null>(null)
 const categories = ref<Category[]>([])
