@@ -130,6 +130,7 @@ export interface MerchantSettings {
   min_order_amount: number
   takeout_enabled: boolean
   dine_in_enabled: boolean
+  notify_enabled?: boolean
   delivery_settings?: DeliverySettings
 }
 
@@ -464,7 +465,7 @@ export interface StoreHomeInfo {
   hot_products: {
     id: number
     name: string
-    image: string
+    images: string[]
     price: number
     original_price?: number
     sales: number

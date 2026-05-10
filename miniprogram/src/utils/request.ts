@@ -24,14 +24,21 @@ export interface ApiResponse<T = any> {
   data: T
 }
 
+export interface RequestError extends Error {
+  code?: number
+  statusCode?: number
+  response?: unknown
+}
+
 // 请求配置
-interface RequestOptions {
+export interface RequestOptions {
   url: string
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   data?: any
   header?: Record<string, string>
   loading?: boolean
   loadingText?: string
+  showErrorToast?: boolean
 }
 
 /**
@@ -41,11 +48,59 @@ function getToken(): string {
   return uni.getStorageSync('token') || ''
 }
 
+function getResponseMessage(response: unknown, fallbackMessage: string): string {
+  if (typeof response === 'string' && response.trim()) {
+    return response
+  }
+
+  if (response && typeof response === 'object' && 'message' in response) {
+    const message = (response as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) {
+      return message
+    }
+  }
+
+  return fallbackMessage
+}
+
+function getResponseCode(response: unknown): number | undefined {
+  if (response && typeof response === 'object' && 'code' in response) {
+    const code = (response as { code?: unknown }).code
+    if (typeof code === 'number') {
+      return code
+    }
+  }
+
+  return undefined
+}
+
+function createRequestError(params: {
+  message: string
+  code?: number
+  statusCode?: number
+  response?: unknown
+}): RequestError {
+  const { message, code, statusCode, response } = params
+  const error = new Error(message) as RequestError
+  error.code = code
+  error.statusCode = statusCode
+  error.response = response
+  return error
+}
+
 /**
  * 请求核心方法
  */
 function request<T = any>(options: RequestOptions): Promise<T> {
-  const { url, method = 'GET', data, header = {}, loading = true, loadingText = '加载中...' } = options
+  const {
+    url,
+    method = 'GET',
+    data,
+    header = {},
+    loading = true,
+    loadingText = '加载中...',
+    showErrorToast = true
+  } = options
 
   // 显示加载中
   if (loading) {
@@ -80,14 +135,36 @@ function request<T = any>(options: RequestOptions): Promise<T> {
             uni.removeStorageSync('userInfo')
             uni.showToast({ title: '请先登录', icon: 'none' })
             uni.reLaunch({ url: '/pages/auth/login' })
-            reject(new Error(apiResponse.message || '未授权'))
+            reject(createRequestError({
+              message: apiResponse.message || '未授权',
+              code: apiResponse.code,
+              statusCode
+            }))
           } else {
-            uni.showToast({ title: apiResponse.message || '请求失败', icon: 'none' })
-            reject(new Error(apiResponse.message))
+            const errorMessage = apiResponse.message || '请求失败'
+            if (showErrorToast) {
+              uni.showToast({ title: errorMessage, icon: 'none' })
+            }
+            reject(createRequestError({
+              message: errorMessage,
+              code: apiResponse.code,
+              statusCode,
+              response
+            }))
           }
         } else {
-          uni.showToast({ title: `请求失败(${statusCode})`, icon: 'none' })
-          reject(new Error(`请求失败: ${statusCode}`))
+          // 非 200 时优先透传后端给出的错误码与错误信息，避免丢失排查线索。
+          const errorMessage = getResponseMessage(response, `请求失败(${statusCode})`)
+          const errorCode = getResponseCode(response)
+          if (showErrorToast) {
+            uni.showToast({ title: errorMessage, icon: 'none' })
+          }
+          reject(createRequestError({
+            message: errorMessage,
+            code: errorCode,
+            statusCode,
+            response
+          }))
         }
       },
       fail: (err) => {

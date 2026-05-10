@@ -140,6 +140,8 @@ const loading = ref(false)
 const noMore = ref(false)
 const page = ref(1)
 const pageSize = 10
+const merchantId = ref<number>(0) // 当前商家ID
+const merchantName = ref<string>('') // 当前商家名称
 
 const showVerify = ref(false)
 const currentOrder = ref<Order | null>(null)
@@ -152,13 +154,20 @@ const refundOrderId = ref<number | null>(null)
 onShow(() => {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
+  const mid = currentPage?.options?.merchant_id
   const status = currentPage?.options?.status
-  
+
   if (status) {
     currentStatus.value = Number(status)
   }
-  
-  loadOrders(true)
+
+  if (mid) {
+    merchantId.value = Number(mid)
+    loadOrders(true)
+  } else {
+    merchantId.value = 0
+    loadOrders(true)
+  }
 })
 
 async function loadOrders(reset = false) {
@@ -182,12 +191,28 @@ async function loadOrders(reset = false) {
       params.status = currentStatus.value
     }
 
+    if (merchantId.value > 0) {
+      params.merchant_id = merchantId.value
+    }
+
     const res = await getMyOrders(params)
 
-    if (reset) {
-      orders.value = res.list
+    if (merchantId.value > 0) {
+      const filteredOrders = res.list.filter(order => order.merchant?.id === merchantId.value || order.merchant_id === merchantId.value)
+      if (reset) {
+        orders.value = filteredOrders
+      } else {
+        orders.value.push(...filteredOrders)
+      }
+      if (filteredOrders.length > 0 && filteredOrders[0].merchant) {
+        merchantName.value = filteredOrders[0].merchant.name || ''
+      }
     } else {
-      orders.value.push(...res.list)
+      if (reset) {
+        orders.value = res.list
+      } else {
+        orders.value.push(...res.list)
+      }
     }
 
     if (res.list.length < pageSize) {

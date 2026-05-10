@@ -75,7 +75,7 @@
             <view class="setting-value">{{ soundEnabled ? '已开启' : '未开启' }}</view>
           </view>
         </view>
-        <switch :checked="soundEnabled" color="#007AFF" @change="handleSoundToggle" />
+        <switch :checked="soundEnabled" :disabled="soundSaving" color="#007AFF" @change="handleSoundToggle" />
       </view>
       
       <view class="setting-item" @click="goQrcode">
@@ -146,13 +146,14 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
-import { getMerchantSettings } from '@api'
+import { getMerchantSettings, updateMerchantSettings } from '@api'
 
 const authStore = useAuthStore()
 
 const merchantInfo = computed(() => authStore.merchantInfo)
 const soundEnabled = computed(() => authStore.soundEnabled)
 const deliveryEnabled = ref(false)
+const soundSaving = ref(false)
 
 onShow(() => {
   loadDeliverySettings()
@@ -162,6 +163,7 @@ async function loadDeliverySettings() {
   try {
     const settings = await getMerchantSettings()
     deliveryEnabled.value = settings.delivery_settings?.enabled || false
+    authStore.setSoundEnabled(settings.notify_enabled ?? true)
   } catch (error) {
     console.error('加载配送设置失败:', error)
   }
@@ -179,8 +181,25 @@ function goQrcode() {
   uni.navigateTo({ url: '/pages/merchant/settings' })
 }
 
-function handleSoundToggle(e: any) {
-  authStore.setSoundEnabled(!!e.detail.value)
+async function handleSoundToggle(e: any) {
+  if (soundSaving.value) {
+    return
+  }
+
+  const nextValue = !!e.detail.value
+  const previousValue = soundEnabled.value
+  soundSaving.value = true
+
+  try {
+    await updateMerchantSettings({ notify_enabled: nextValue })
+    authStore.setSoundEnabled(nextValue)
+    uni.showToast({ title: '保存成功', icon: 'success' })
+  } catch (error: any) {
+    authStore.setSoundEnabled(previousValue)
+    uni.showToast({ title: error?.message || '保存失败', icon: 'none' })
+  } finally {
+    soundSaving.value = false
+  }
 }
 
 function handleLogout() {

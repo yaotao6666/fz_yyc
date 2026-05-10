@@ -352,7 +352,7 @@ func GetAuditRecords(c *gin.Context) {
 }
 
 func GetMerchantFee(c *gin.Context) {
-	merchantID := c.Param("id")
+	merchantID := c.Param("merchant_id")
 	id, _ := strconv.ParseUint(merchantID, 10, 64)
 
 	var merchant models.Merchant
@@ -371,7 +371,7 @@ func GetMerchantFee(c *gin.Context) {
 }
 
 func GetMerchantRate(c *gin.Context) {
-	merchantID := c.Param("id")
+	merchantID := c.Param("merchant_id")
 	id, _ := strconv.ParseUint(merchantID, 10, 64)
 
 	var rates []models.MerchantRate
@@ -391,7 +391,7 @@ type SetRateRequest struct {
 }
 
 func SetMerchantRate(c *gin.Context) {
-	merchantID := c.Param("id")
+	merchantID := c.Param("merchant_id")
 	id, _ := strconv.ParseUint(merchantID, 10, 64)
 
 	var req SetRateRequest
@@ -425,7 +425,7 @@ func SetMerchantRate(c *gin.Context) {
 }
 
 func GetMerchantQRCode(c *gin.Context) {
-	merchantID := c.Param("id")
+	merchantID := c.Param("merchant_id")
 	id, _ := strconv.ParseUint(merchantID, 10, 64)
 
 	var merchant models.Merchant

@@ -2,14 +2,29 @@
   <view class="product-list-container">
     <!-- 筛选栏 -->
     <view class="filter-bar">
-      <view class="search-box">
-        <input
-          v-model="keyword"
-          class="search-input"
-          placeholder="搜索商品名称"
-          @confirm="handleSearch"
-        />
-        <text class="search-btn" @click="handleSearch">搜索</text>
+      <view class="filter-row">
+        <picker
+          mode="selector"
+          :range="categoryOptions"
+          range-key="name"
+          :value="selectedCategoryIndex"
+          @change="onCategoryChange"
+          class="category-picker"
+        >
+          <view class="picker-value">
+            <text>{{ selectedCategoryLabel }}</text>
+            <text class="arrow">▼</text>
+          </view>
+        </picker>
+        <view class="search-box">
+          <input
+            v-model="keyword"
+            class="search-input"
+            placeholder="搜索商品名称"
+            @confirm="handleSearch"
+          />
+          <text class="search-btn" @click="handleSearch">搜索</text>
+        </view>
       </view>
       <view class="filter-tabs">
         <view
@@ -112,8 +127,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getProducts, productOnSale, productOffSale, deleteProduct as deleteProductApi, batchUpdateProductStatus } from '@api'
-import type { Product } from '@types'
+import { getProducts, getCategories, productOnSale, productOffSale, deleteProduct as deleteProductApi, batchUpdateProductStatus } from '@api'
+import type { Product, Category } from '@types'
 
 const keyword = ref('')
 const filterStatus = ref('')
@@ -124,13 +139,40 @@ const noMore = ref(false)
 const page = ref(1)
 const pageSize = 10
 
+// 分类相关
+const categories = ref<Category[]>([])
+const selectedCategoryId = ref<number | null>(null)
+const selectedCategoryIndex = ref(0)
+
+const categoryOptions = computed(() => {
+  return [
+    { id: null, name: '全部分类' },
+    ...categories.value.map(c => ({ id: c.id, name: c.name }))
+  ]
+})
+
+const selectedCategoryLabel = computed(() => {
+  return categoryOptions.value[selectedCategoryIndex.value]?.name || '全部分类'
+})
+
 const isAllSelected = computed(() => {
   return products.value.length > 0 && selectedIds.value.length === products.value.length
 })
 
 onShow(() => {
+  loadCategories()
   loadProducts(true)
 })
+
+async function loadCategories() {
+  try {
+    const data = await getCategories()
+    categories.value = data || []
+  } catch (error) {
+    console.error('加载分类失败:', error)
+    categories.value = []
+  }
+}
 
 async function loadProducts(reset = false) {
   if (reset) {
@@ -147,6 +189,10 @@ async function loadProducts(reset = false) {
     const params: any = {
       page: page.value,
       page_size: pageSize,
+    }
+    
+    if (selectedCategoryId.value !== null) {
+      params.category_id = selectedCategoryId.value
     }
     
     if (filterStatus.value) {
@@ -190,6 +236,13 @@ function changeFilter(status: string) {
   loadProducts(true)
 }
 
+function onCategoryChange(e: any) {
+  const index = e.detail.value
+  selectedCategoryIndex.value = index
+  selectedCategoryId.value = categoryOptions.value[index]?.id || null
+  loadProducts(true)
+}
+
 function onCheckboxChange(e: any) {
   selectedIds.value = e.detail.value.map((id: string) => Number(id))
 }
@@ -226,8 +279,12 @@ async function deleteProduct(product: Product) {
         try {
           await deleteProductApi(product.id)
           products.value = products.value.filter(p => p.id !== product.id)
+          selectedIds.value = selectedIds.value.filter(id => id !== product.id)
           uni.showToast({ title: '删除成功', icon: 'success' })
         } catch (error: any) {
+          if (error.message?.includes('不存在') || error.message?.includes('已删除')) {
+            loadProducts(true)
+          }
           uni.showToast({ title: error.message || '删除失败', icon: 'none' })
         }
       }
@@ -287,7 +344,6 @@ function goAdd() {
 .product-list-container {
   min-height: 100vh;
   background: #f5f5f5;
-  padding-bottom: 120rpx;
 }
 
 .filter-bar {
@@ -295,10 +351,41 @@ function goAdd() {
   padding: 24rpx;
 }
 
-.search-box {
+.filter-row {
   display: flex;
   gap: 16rpx;
   margin-bottom: 20rpx;
+}
+
+.category-picker {
+  width: 200rpx;
+  height: 72rpx;
+  background: #f8f9fa;
+  border-radius: 36rpx;
+  display: flex;
+  align-items: center;
+  padding: 0 24rpx;
+}
+
+.picker-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 28rpx;
+  color: #1a1a1a;
+}
+
+.picker-value .arrow {
+  font-size: 20rpx;
+  color: #999999;
+  margin-left: 8rpx;
+}
+
+.search-box {
+  flex: 1;
+  display: flex;
+  gap: 16rpx;
 }
 
 .search-input {

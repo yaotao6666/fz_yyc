@@ -35,8 +35,9 @@ func (h *UploadHandler) GetToken(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"token":  token,
-		"domain": qiniu.GetService().Domain,
-		"prefix": prefix,
+		"token":      token,
+		"domain":     qiniu.GetService().Domain,
+		"prefix":     prefix,
+		"upload_url": qiniu.GetService().UploadURL,
 	})
 }

@@ -45,12 +45,20 @@
         </view>
         <view class="form-item">
           <view class="form-label">配送距离</view>
-          <input
-            v-model.number="deliveryDistance"
-            class="form-input"
-            type="digit"
-            placeholder="请输入配送距离（公里）"
-          />
+          <picker
+            mode="selector"
+            :range="deliveryRules"
+            range-key="label"
+            :value="deliveryDistanceIndex"
+            @change="onDistanceChange"
+          >
+            <view class="picker-value">
+              {{ deliveryRules[deliveryDistanceIndex]?.label || '请选择距离' }}
+            </view>
+          </picker>
+          <view class="distance-tip" v-if="deliveryDistance > maxSafeDistance">
+            ⚠️ 超出建议配送距离，可能无法配送
+          </view>
         </view>
       </view>
 
@@ -122,7 +130,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { createOrder } from '@api'
+import { createOrder, getStoreDeliveryRules } from '@api'
 import { useCartStore } from '../../stores/cart'
 import type { CreateOrderRequest } from '@types'
 
@@ -139,17 +147,67 @@ const deliveryAddress = ref('')
 const contactName = ref('')
 const contactPhone = ref('')
 const deliveryDistance = ref(0)
+const deliveryDistanceIndex = ref(0)
 const remark = ref('')
 const merchantId = ref(1)
+
+// 配送距离选项
+const deliveryRules = ref<{ distance: number; label: string }[]>([])
+const maxSafeDistance = ref(3) // 建议配送距离
 
 onShow(() => {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
   merchantId.value = Number(currentPage?.options?.merchant_id) || 1
+
+  // 加载配送规则
+  loadDeliveryRules()
 })
+
+async function loadDeliveryRules() {
+  try {
+    const rules = await getStoreDeliveryRules(merchantId.value)
+
+    const maxDistance = rules.max_distance || 5
+    maxSafeDistance.value = Math.floor(maxDistance * 0.8 * 10) / 10
+
+    // 生成距离选项（0.5km递增）
+    for (let d = 0.5; d <= maxDistance; d += 0.5) {
+      const isWarning = d > maxSafeDistance.value
+      deliveryRules.value.push({
+        distance: d,
+        label: `${d.toFixed(1)}km${isWarning ? ' ⚠️' : ''}`
+      })
+    }
+
+    // 默认选择第一项
+    if (deliveryRules.value.length > 0) {
+      deliveryDistanceIndex.value = 0
+      deliveryDistance.value = deliveryRules.value[0].distance
+    }
+  } catch (error) {
+    console.error('获取配送规则失败:', error)
+    // 使用默认选项
+    for (let d = 0.5; d <= 5; d += 0.5) {
+      deliveryRules.value.push({
+        distance: d,
+        label: `${d.toFixed(1)}km`
+      })
+    }
+    if (deliveryRules.value.length > 0) {
+      deliveryDistanceIndex.value = 0
+      deliveryDistance.value = deliveryRules.value[0].distance
+    }
+  }
+}
 
 function selectDeliveryType(type: number) {
   deliveryType.value = type
+}
+
+function onDistanceChange(e: any) {
+  deliveryDistanceIndex.value = e.detail.value
+  deliveryDistance.value = deliveryRules.value[e.detail.value].distance
 }
 
 const deliveryFee = computed(() => {
@@ -326,6 +384,26 @@ async function submitOrder() {
   border-radius: 12rpx;
   padding: 0 24rpx;
   font-size: 30rpx;
+}
+
+.picker-value {
+  height: 80rpx;
+  background: #f8f9fa;
+  border-radius: 12rpx;
+  padding: 0 24rpx;
+  font-size: 30rpx;
+  display: flex;
+  align-items: center;
+  color: #1a1a1a;
+}
+
+.distance-tip {
+  font-size: 24rpx;
+  color: #ff4d4f;
+  margin-top: 12rpx;
+  padding: 8rpx 16rpx;
+  background: #fff2f0;
+  border-radius: 8rpx;
 }
 
 .remark-form {

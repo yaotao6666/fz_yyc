@@ -37,7 +37,7 @@
 
 ### 1.3 商家管理端（默认入口）
 
-**说明**：商家管理端是小程序的**默认入口**，商家通过手机号验证码登录后进入，专注于日常店铺经营管理。
+**说明**：商家管理端是小程序的**默认入口**，商家通过账号密码登录后进入，专注于日常店铺经营管理。
 
 **核心功能**：
 | 模块 | 功能描述 |
@@ -47,6 +47,12 @@
 | 订单管理 | 订单查看、处理发货、退款审核 |
 | 数据分析 | 今日订单、交易额、客单价、趋势分析 |
 | 商家入驻 | 商家资质提交、入驻状态查询 |
+
+**导航结构（商家端）**：
+- 底部 Tab：工作台、订单、数据分析、设置。
+- tabBar 仅在 Tab 页面展示；登录等非 Tab 页面不展示。
+- 工作台快捷入口当前已精简，不再重复提供“订单管理”“店铺设置”“邀请入驻”入口。
+- 工作台在“今日概览”上方展示系统公告滚动栏，支持点击查看详情与点击关闭，关闭状态本地记忆。
 
 **商家二维码**：
 - 每个商家拥有独立的店铺二维码
@@ -59,22 +65,49 @@
 
 **访问路径**：
 ```
-商家二维码 → 扫码 → 直接进入商家店铺详情页 → 商品浏览 → 下单支付
+商家二维码 → 扫码 → 直接进入商家店铺首页 → 操作指引弹窗 → 商品浏览 → 下单支付
 ```
 
 **核心功能**：
 | 模块 | 功能描述 |
 |------|----------|
-| 店铺首页 | 展示商家信息、店铺氛围、商品分类 |
+| 店铺首页 | 展示商家信息、店铺氛围、商品分类、操作指引弹窗 |
 | 商品详情 | 商品图片、价格、规格选择 |
 | 购物车 | 商品数量修改、结算 |
 | 下单支付 | 确认订单、微信支付 |
-| 我的订单 | 订单列表、订单详情、退款申请 |
+| 我的订单 | 订单列表、订单详情、退款申请（支持按商家筛选） |
 
 **用户订单记录**：
 - 用户登录后可查看历史订单记录
 - 订单记录按商家维度展示
 - 支持订单状态筛选（待支付/待发货/已完成/退款中）
+- 支持按商家筛选，仅显示当前商家的订单
+
+**店铺首页优化功能**：
+- **操作指引弹窗**：用户扫码进入店铺首页时，自动显示操作指引弹窗，包含四步购物流程说明，帮助用户快速了解如何使用小程序
+- **我的订单入口**：在底部购物栏左侧添加「我的订单」快速入口按钮，方便用户快速查看当前商家的订单记录
+- **底部TabBar切换**：店铺首页底部支持购物车和我的订单Tab切换，类似tabBar的切换体验
+- **自动授权登录**：用户进入店铺首页时自动完成微信授权登录，获取openid作为唯一身份标识，无需手动登录
+
+**用户授权登录流程**：
+1. 用户进入店铺首页
+2. 前端自动调用 `uni.login()` 获取微信授权码
+3. 调用后端微信登录接口，传入授权码
+4. 后端根据授权码获取openid
+5. 查询或创建用户记录（openid作为唯一标识）
+6. 返回JWT token和用户信息
+7. 前端保存token，后续请求携带token
+8. 用户二次访问时，直接通过openid识别用户，无需重新授权
+
+**openid管理**：
+- openid是用户在微信生态下的唯一标识
+- 不同小程序的openid不同，但同一小程序的openid不变
+- 用户二次访问时，直接通过openid识别用户，无需重新授权
+
+**隐私保护**：
+- 仅获取用户openid，不获取手机号等敏感信息
+- 用户昵称默认显示为"微信用户"
+- 后续可扩展用户主动完善个人信息
 
 ### 1.5 服务商管理端（独立二维码）
 
@@ -133,14 +166,14 @@
 ```
 
 **上传方式：**
-1. 客户端直传：前端获取七牛云上传凭证后直接上传，减少服务器压力
+1. 客户端直传：前端先调用 `/api/v1/upload/token` 获取上传凭证，再按接口返回的 `upload_url` 直接上传至七牛，减少服务器压力
 2. 服务端代理：敏感图片（如营业执照、身份证）通过服务端上传，便于审核
 
 **存储空间规划：**
 | 空间名称 | 用途 | 访问权限 |
 |----------|------|----------|
-| merchant-public | 商家Logo、店铺图片 | 公开 |
-| product-public | 商品图片 | 公开 |
+| merchant-public | 商家Logo、店铺图片 | 以当前接口返回策略为准，涉及私有资源时按签名地址访问 |
+| product-public | 商品图片 | 当前接口按私有签名地址返回，前端以接口返回的可访问地址为准 |
 | merchant-private | 营业执照、身份证照片 | 私有（带签名访问） |
 
 **相关接口：**
@@ -148,6 +181,18 @@
 GET /api/v1/upload/token      # 获取上传凭证
 POST /api/v1/upload/callback  # 上传回调（可选）
 ```
+
+**上传凭证返回字段：**
+- `token`：七牛上传凭证
+- `domain`：资源访问域名
+- `prefix`：当前业务建议使用的对象前缀
+- `upload_url`：本次上传应使用的七牛上传地址，前端不可写死
+
+**商品图片持久化与展示规则：**
+- 前端上传成功后，需要将 `domain + key` 拼接为完整稳定路径，用于页面回显与商品保存。
+- 数据库存储稳定路径，不存储带签名的临时访问地址。
+- 商品列表、商品详情、C 端店铺商品接口在返回图片时，由后端按当前七牛策略动态生成可直接访问的地址。
+- 当前商品图片实现已按私有访问处理；若前端拿到的是临时签名地址，更新商品时需去掉签名参数后再提交，避免把过期链接写回数据库。
 
 ### 1.7 商家入驻方式
 
@@ -653,6 +698,11 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 | 订单退款通知 | 退款申请/退款成功通知商家 | P1 |
 | 新订单声音提醒 | 支持商家端开启/关闭声音提醒 | P2 |
 
+**小程序端新订单提醒（补充）**：
+- 后端通过 WebSocket 向商家端推送新订单事件，用于前台接单场景的实时提醒。
+- 商家端支持“新订单声音提醒”开关，关闭后仍接收推送但不播放提示音。
+- WebSocket 推送用于增强实时体验，不替代服务号模板消息。
+
 **通知流程**：
 ```
 ┌────────┐    ┌────────────┐    ┌────────────┐    ┌────────────┐
@@ -687,7 +737,7 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 
 #### 3.1.1 商家管理员登录
 ```
-POST /api/v1/merchant/auth/login
+POST /api/v1/auth/merchant/login
 ```
 
 **请求参数：**
@@ -697,6 +747,33 @@ POST /api/v1/merchant/auth/login
   "password": "密码"
 }
 ```
+
+**开发环境测试账号：**
+- `username`: `merchant`
+- `password`: `merchant123`
+
+#### 3.1.1.1 获取上传凭证
+```
+GET /api/v1/upload/token
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "token": "七牛上传凭证",
+    "domain": "https://example-cdn.com",
+    "prefix": "uploads/merchant/1",
+    "upload_url": "https://up-z0.qiniup.com"
+  }
+}
+```
+
+**说明：**
+- 前端必须使用接口返回的 `upload_url` 作为上传地址，不再写死七牛默认上传域名。
+- 上传成功后，前端需将 `domain + key` 拼接为完整路径后用于商品图片回显与保存。
 
 #### 3.1.2 C端用户微信登录
 ```
@@ -1864,7 +1941,38 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.3.4 更新商家自定义设置
+#### 3.3.4 商家自定义设置（获取/更新）
+```
+GET /api/v1/merchant/settings
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "announcement": "门店公告内容",
+    "business_hours": "09:00-22:00",
+    "min_order_amount": 20.00,
+    "takeout_enabled": true,
+    "dine_in_enabled": true,
+    "notify_enabled": true,
+    "delivery_settings": {
+      "enabled": true,
+      "base_fee": 5.00,
+      "free_delivery_amount": 50.00,
+      "distance_rules": [
+        {"min_distance": 0, "max_distance": 2, "fee": 0},
+        {"min_distance": 2, "max_distance": 5, "fee": 3.00},
+        {"min_distance": 5, "max_distance": 10, "fee": 6.00}
+      ],
+      "max_distance": 10
+    }
+  }
+}
+```
+
 ```
 PUT /api/v1/merchant/settings
 Authorization: Bearer {token}
@@ -1873,24 +1981,16 @@ Authorization: Bearer {token}
 **请求参数：**
 ```json
 {
-  "announcement": "门店公告内容",
-  "business_hours": "09:00-22:00",
-  "min_order_amount": 20.00,
   "takeout_enabled": true,
   "dine_in_enabled": true,
-  "delivery_settings": {
-    "enabled": true,
-    "base_fee": 5.00,
-    "free_delivery_amount": 50.00,
-    "distance_rules": [
-      {"min_distance": 0, "max_distance": 2, "fee": 0},
-      {"min_distance": 2, "max_distance": 5, "fee": 3.00},
-      {"min_distance": 5, "max_distance": 10, "fee": 6.00}
-    ],
-    "max_distance": 10
-  }
+  "notify_enabled": true
 }
 ```
+
+**说明：**
+- `notify_enabled` 保存维度为“当前登录商家员工”，不是商家全局配置。
+- 订单提示音关闭后，商家端仍接收订单推送与 Toast，仅不播放本地提示音。
+- 设置页重新进入或重新登录后，前端应以 `/api/v1/merchant/settings` 返回的 `notify_enabled` 为准。
 
 **配送距离规则说明：**
 | 字段 | 类型 | 描述 |
@@ -1916,7 +2016,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.3.5 获取配送设置
+#### 3.3.5 配送设置（获取/更新）
 ```
 GET /api/v1/merchant/delivery-settings
 Authorization: Bearer {token}
@@ -1937,6 +2037,37 @@ Authorization: Bearer {token}
     ],
     "max_distance": 10
   }
+}
+```
+
+```
+PUT /api/v1/merchant/delivery-settings
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "enabled": true,
+  "base_fee": 5.00,
+  "free_delivery_amount": 50.00,
+  "distance_rules": [
+    {"min_distance": 0, "max_distance": 2, "fee": 0},
+    {"min_distance": 2, "max_distance": 5, "fee": 3.00},
+    {"min_distance": 5, "max_distance": 10, "fee": 6.00}
+  ],
+  "max_distance": 10
+}
+```
+
+**说明：**
+- distance_rules 允许传空数组，用于清空“按距离收费”的所有规则。
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "更新成功"
 }
 ```
 
@@ -2088,6 +2219,53 @@ Authorization: Bearer {token}
   }
 }
 ```
+
+#### 3.3.12.1 商家 WebSocket 连接（新订单提醒）
+```
+GET /api/v1/ws/merchant
+Authorization: Bearer {token}
+```
+
+**说明：**
+- 仅服务端推送消息；客户端保持连接即可。
+- 连接鉴权使用与商家端接口一致的 JWT Token（Authorization Header）。
+
+**消息格式（示例）：**
+```json
+{
+  "type": "order_notify",
+  "payload": {
+    "merchant_id": 1,
+    "order_no": "202401010001"
+  }
+}
+```
+
+#### 3.3.12.2 开发测试：推送新订单提醒
+```
+POST /api/v1/dev/order-notify
+```
+
+**请求参数：**
+```json
+{
+  "merchant_id": 1,
+  "order_no": "202401010001"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "delivered": 1
+  }
+}
+```
+
+**说明：**
+- 仅非生产环境可用；生产环境会返回 403。
 
 #### 3.3.13 获取员工列表
 ```
@@ -2500,6 +2678,22 @@ Authorization: Bearer {token}
 }
 ```
 
+#### 3.5.1.1 商品详情
+```
+GET /api/v1/merchant/products/{product_id}
+Authorization: Bearer {token}
+```
+
+**响应特点：**
+- 商品详情返回结构与创建商品、更新商品成功后的回读结构保持一致。
+- 图片字段统一为 `images` 数组；若底层使用七牛私有访问，接口返回值为可直接显示的签名地址。
+- 规格字段统一为结构化 `specs` 数组，便于商家端详情页、编辑页直接复用。
+
+**错误语义：**
+- 当商品不存在、不属于当前商家或已删除时，接口返回 `404`
+- 当分类、规格等关系预加载失败，或服务端在详情查询/回读阶段发生内部异常时，接口返回 `500`
+- 创建商品、更新商品在写入成功后的详情回读阶段，如果回读失败，同样返回 `500`
+
 #### 3.5.2 创建商品
 ```
 POST /api/v1/merchant/products
@@ -2567,6 +2761,9 @@ Authorization: Bearer {token}
 DELETE /api/v1/merchant/products/{product_id}
 Authorization: Bearer {token}
 ```
+
+**说明：**
+- 删除商品采用软删除语义，已删除商品不会继续出现在商家商品列表与 C 端可售商品列表中。
 
 #### 3.5.8 更新库存
 ```
@@ -2807,6 +3004,9 @@ Authorization: Bearer {token}
   "verify_code": "核销码"
 }
 ```
+
+**核销码规则：**
+- verify_code 必须为 6 位数字字符串（示例：`123456`）。
 
 **响应：**
 ```json
@@ -3178,15 +3378,26 @@ GET /api/v1/store/{merchant_id}/home
       {
         "id": 1,
         "name": "招牌红烧肉",
-        "image": "图片URL",
+        "images": ["可直接显示的图片地址"],
         "price": 58.00,
         "original_price": 68.00,
-        "sales": 256
+        "sales": 256,
+        "stock": 100
       }
-    ]
+    ],
+    "delivery_settings": {
+      "enabled": true,
+      "base_fee": 5.00,
+      "free_delivery_amount": 50.00,
+      "max_distance": 10
+    }
   }
 }
 ```
+
+**说明：**
+- `hot_products` 当前返回商品结构化对象，图片字段为 `images` 数组。
+- 当商品图片使用七牛私有访问策略时，接口返回的图片地址已可直接显示。
 
 #### 3.8.3 商家商品列表
 ```
@@ -3197,36 +3408,54 @@ GET /api/v1/store/{merchant_id}/products
 | 参数 | 类型 | 必填 | 描述 |
 |------|------|------|------|
 | category_id | int | 否 | 分类ID，不传则返回全部分类商品 |
+| keyword | string | 否 | 商品名称关键词 |
+| page | int | 否 | 页码，默认 1 |
+| page_size | int | 否 | 每页数量，默认 20，最大 50 |
 
 **响应：**
 ```json
 {
   "code": 0,
-  "data": [
-    {
-      "category": {
+  "data": {
+    "list": [
+      {
         "id": 1,
-        "name": "热销推荐"
-      },
-      "products": [
-        {
-          "id": 1,
-          "name": "招牌红烧肉",
-          "image": "图片URL",
-          "price": 58.00,
-          "original_price": 68.00,
-          "sales": 256,
-          "stock": 100,
-          "specs": [
-            {"name": "小份", "price": 48.00},
-            {"name": "大份", "price": 68.00}
-          ]
-        }
-      ]
+        "name": "招牌红烧肉",
+        "images": ["可直接显示的图片地址"],
+        "price": 58.00,
+        "original_price": 68.00,
+        "sales": 256,
+        "stock": 100,
+        "specs": [
+          {
+            "id": 1,
+            "name": "规格",
+            "options": [
+              {"name": "小份", "price": 48.00, "stock": 50},
+              {"name": "大份", "price": 68.00, "stock": 50}
+            ]
+          }
+        ]
+      }
+    ],
+    "merchant": {
+      "min_order_amount": 20.00,
+      "takeout_enabled": true,
+      "dine_in_enabled": true
+    },
+    "pagination": {
+      "total": 1,
+      "page": 1,
+      "page_size": 20
     }
-  ]
+  }
 }
 ```
+
+**说明：**
+- 当前 C 端商品列表接口返回扁平商品列表与分页信息，不再按分类分组返回。
+- 图片字段统一为 `images` 数组，前端直接取第一张图作为缩略图即可。
+- 若商品图片来自七牛私有空间，接口返回值已完成签名，可直接用于页面展示。
 
 #### 3.8.4 商品详情
 ```
@@ -3240,7 +3469,7 @@ GET /api/v1/store/{merchant_id}/products/{product_id}
   "data": {
     "id": 1,
     "name": "招牌红烧肉",
-    "images": ["图片URL1", "图片URL2"],
+    "images": ["可直接显示的图片地址1", "可直接显示的图片地址2"],
     "description": "商品描述",
     "price": 58.00,
     "original_price": 68.00,
@@ -3261,12 +3490,15 @@ GET /api/v1/store/{merchant_id}/products/{product_id}
 }
 ```
 
+**说明：**
+- 商品详情图片为可直接展示的访问地址；若底层使用七牛私有访问，接口会返回动态签名后的图片地址。
+
 #### 3.8.5 获取配送费规则
 ```
 GET /api/v1/store/{merchant_id}/delivery-rules
 ```
 
-> **说明**：获取商家的配送费规则，用户选择配送距离后前端计算配送费
+> **说明**：获取商家的配送费规则，前端可基于规则做展示或预估，实际配送费以服务端创建订单时按规则计算结果为准
 
 **响应：**
 ```json
@@ -3288,8 +3520,9 @@ GET /api/v1/store/{merchant_id}/delivery-rules
 
 **说明**：
 - 用户选择配送距离（如：3公里）
-- 前端根据 `rules` 匹配对应区间的配送费
-- 如果订单金额 >= `free_delivery_amount`，配送费为 0
+- 前端可根据 `rules` 展示预计配送费区间
+- 如果订单金额 >= `free_delivery_amount`，预计配送费可展示为 0
+- 创建订单时，服务端会根据 `delivery_distance`、`distance_rules` 和满免门槛重新计算并校验最终配送费
 
 #### 3.8.6 创建订单
 ```
@@ -3357,10 +3590,14 @@ Authorization: Bearer {token}
 **请求参数：**
 | 参数 | 类型 | 必填 | 描述 |
 |------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| merchant_id | int | 否 | 商家ID，筛选指定商家的订单 |
-| status | string | 否 | 订单状态 |
+| page | int | 否 | 页码，默认1 |
+| page_size | int | 否 | 每页数量，默认10 |
+| merchant_id | int | 否 | 商家ID，用于筛选特定商家的订单（配合「我的订单」按钮使用） |
+| status | int | 否 | 订单状态：0全部 1待支付 2已支付 3已完成 4已取消 5退款中 6已退款 |
+
+**使用场景**：
+- **全部订单**：不传 merchant_id 参数，获取用户所有订单
+- **商家订单**：传入 merchant_id 参数，获取用户在特定商家的订单（用于店铺首页「我的订单」按钮跳转）
 
 **响应：**
 ```json
@@ -3384,8 +3621,11 @@ Authorization: Bearer {token}
           }
         ],
         "total_amount": 116.00,
-        "status": "paid",
+        "pay_amount": 120.00,
+        "delivery_fee": 4.00,
+        "status": 2,
         "status_text": "已支付",
+        "verify_code": "123456",
         "created_at": "2024-01-01T12:00:00Z"
       }
     ],
@@ -3484,6 +3724,93 @@ Authorization: Bearer {token}
     "refund_no": "RF202401010001",
     "status": "processing"
   }
+}
+```
+
+---
+
+### 3.9 微信支付接口（服务商模式）
+
+#### 3.9.1 创建支付订单
+```
+POST /api/v1/store/{merchant_id}/orders
+```
+
+> **说明**：用户在确认订单页面提交订单时调用此接口，系统自动创建微信支付订单。
+
+**请求参数：**
+```json
+{
+  "merchant_id": 1,
+  "delivery_type": 1,
+  "delivery_distance": 2.5,
+  "delivery_address": "XX市XX区XX路XX号",
+  "contact_name": "张三",
+  "contact_phone": "13800138000",
+  "remark": "少辣",
+  "items": [
+    {
+      "product_id": 1,
+      "quantity": 2,
+      "spec_option": "大杯/加冰",
+      "price": 28.00
+    }
+  ]
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "order": {
+      "id": 1,
+      "order_no": "2024010112000001",
+      "total_amount": 56.00,
+      "pay_amount": 56.00,
+      "status": 1,
+      "status_text": "待支付"
+    },
+    "pay_params": {
+      "appId": "wx_appid",
+      "timeStamp": "1704067200",
+      "nonceStr": "random_string",
+      "package": "prepay_id=wx1234567890",
+      "signType": "MD5",
+      "paySign": "signature"
+    }
+  }
+}
+```
+
+**服务商模式说明**：
+- 服务商拥有微信支付商户号（mch_id）
+- 每个商家是服务商的子商户（sub_mch_id）
+- 支付资金直接结算到商家的子商户账户
+- 服务商收取手续费，商家收到税后金额
+- 不同商家下单，收款主体为对应商家
+
+#### 3.9.2 支付回调通知
+```
+POST /api/v1/callback/wechat
+```
+
+> **说明**：微信支付成功后，微信服务器回调此接口，通知订单支付成功。
+
+**回调参数：**
+```json
+{
+  "return_code": "SUCCESS",
+  "return_msg": "OK",
+  "result_code": "SUCCESS",
+  "mch_id": "服务商商户号",
+  "sub_mch_id": "子商户号",
+  "out_trade_no": "2024010112000001",
+  "transaction_id": "微信交易号",
+  "total_fee": 5600,
+  "cash_fee": 5600,
+  "time_end": "20240101120000"
 }
 ```
 
@@ -3683,6 +4010,7 @@ Authorization: Bearer {token}
 | name | VARCHAR(64) | 姓名 |
 | phone | VARCHAR(20) | 手机号 |
 | role | VARCHAR(32) | 角色：owner/manager/staff |
+| notify_enabled | TINYINT(1) | 订单提示音开关，1开启 0关闭 |
 | status | TINYINT | 状态 |
 | last_login_at | DATETIME | 最后登录时间 |
 | created_at | DATETIME | 创建时间 |
@@ -4553,7 +4881,7 @@ xm-sp/
 | 订单数据分析 | /api/v1/sp/orders/analytics | GET | 🆕 待开发 |
 | 金额数据分析 | /api/v1/sp/amount/analytics | GET | 🆕 待开发 |
 | TOP商家排行 | /api/v1/sp/amount/top-merchants | GET | 🆕 待开发 |
-| 系统公告管理 | /api/v1/sp/announcements/* | CRUD | 🆕 待开发 |
+| 系统公告管理 | /api/v1/sp/announcements/* | CRUD | ✅ 已实现 |
 | 商家登录 | /api/v1/auth/merchant/login | POST | ✅ 已实现 |
 | 商家入驻 | /api/v1/merchant/register | POST | ⚠️ 待完善 |
 | 商家信息 | /api/v1/merchant/profile | GET | ✅ 已实现 |
@@ -4562,7 +4890,7 @@ xm-sp/
 | 分类管理 | /api/v1/merchant/categories/* | CRUD | ✅ 已实现 |
 | 订单管理 | /api/v1/merchant/orders/* | CRUD | ✅ 已实现 |
 | 数据分析 | /api/v1/merchant/analytics/* | GET | ✅ 已实现 |
-| 系统公告 | /api/v1/merchant/announcements/* | CRUD | 🆕 待开发 |
+| 系统公告 | /api/v1/merchant/announcements/* | GET | ✅ 已实现 |
 | 店铺浏览 | /api/v1/store/{id}/* | GET | ✅ 已实现 |
 | 服务号配置 | /api/v1/sp/wechat-config | GET/PUT | ✅ 已实现 |
 | 订阅配置 | /api/v1/merchant/subscriptions | GET/PUT | ✅ 已实现 |
@@ -4586,6 +4914,10 @@ xm-sp/
 3. 商家在后台绑定员工的OpenID
 4. 订单状态变化时，系统推送模板消息
 ```
+
+**小程序端实时提醒（补充）**：
+- 商家端可通过 WebSocket 接收新订单事件，用于更及时的前台接单提醒（参见 `/api/v1/ws/merchant`）。
+- “新订单声音提醒”开关仅影响本地提示音播放，不影响订单数据与服务号通知。
 
 #### 云打印集成说明
 
@@ -4734,6 +5066,14 @@ xm-sp/
 
 在小程序正式发布前，由于微信小程序的限制，无法通过扫码直接进入特定商家的店铺页面进行测试。为此，我们提供了两种替代测试方法：
 
+### 9.1.1 商家端测试账号（开发环境）
+用于快速验证商家端页面与接口联调。
+
+| 字段 | 值 |
+|------|----|
+| username | merchant |
+| password | merchant123 |
+
 ### 9.2 测试方法一：测试入口页面（推荐）
 
 #### 功能说明
@@ -4815,6 +5155,18 @@ xm-sp/
 | 支付功能 | 微信支付（需开启调试） | ✅ | ✅ |
 | 订单管理 | 查看订单列表、订单详情 | ✅ | ✅ |
 | 退款申请 | 申请退款、查看退款状态 | ✅ | ✅ |
+
+#### 商家端自测清单
+| 模块 | 功能点 | 说明 |
+|------|--------|------|
+| 工作台 | 系统公告滚动栏 | 可查看公告详情、可关闭（本地记忆） |
+| 商品管理 | 商品详情/编辑/删除 | 列表进入详情页正常，编辑保存成功，删除后列表隐藏 |
+| 商品管理 | 商品图片上传 | 调用 `/api/v1/upload/token` 获取 `upload_url` 后直传七牛，上传成功后页面立即回显 |
+| 商品管理 | 私有图片显示 | 商品列表、商品详情、编辑页回显使用接口返回的可访问图片地址 |
+| 订单 | 核销码校验 | 输入 6 位数字核销码，核销成功/失败提示正确 |
+| 设置 | 配送设置-按距离收费 | 支持新增/删除规则，保存后重新进入仍生效 |
+| 设置 | 新订单声音提醒 | 开关切换后调用 `/api/v1/merchant/settings` 保存；重新进入页面与重新登录后状态保持 |
+| 开发联调 | WebSocket 新订单推送 | 可用 /api/v1/dev/order-notify 触发推送进行验证 |
 
 ### 9.5 支付配置说明
 

@@ -73,6 +73,7 @@ type Qiniu struct {
 	SecretKey string
 	Bucket    string
 	Domain    string
+	UploadURL string
 }
 
 // Wechat 微信小程序配置
@@ -197,6 +198,9 @@ func mergeConfig() {
 	if viper.IsSet("QINIU_DOMAIN") {
 		Config.Qiniu.Domain = viper.GetString("QINIU_DOMAIN")
 	}
+	if viper.IsSet("QINIU_UPLOAD_URL") {
+		Config.Qiniu.UploadURL = viper.GetString("QINIU_UPLOAD_URL")
+	}
 }
 
 // mergeEnvConfig 从环境变量合并配置（优先级最高）
@@ -284,6 +288,21 @@ func mergeEnvConfig() {
 	if env := os.Getenv("WECHAT_APP_SECRET"); env != "" {
 		Config.Wechat.AppSecret = env
 	}
+	if env := os.Getenv("QINIU_ACCESS_KEY"); env != "" {
+		Config.Qiniu.AccessKey = env
+	}
+	if env := os.Getenv("QINIU_SECRET_KEY"); env != "" {
+		Config.Qiniu.SecretKey = env
+	}
+	if env := os.Getenv("QINIU_BUCKET"); env != "" {
+		Config.Qiniu.Bucket = env
+	}
+	if env := os.Getenv("QINIU_DOMAIN"); env != "" {
+		Config.Qiniu.Domain = env
+	}
+	if env := os.Getenv("QINIU_UPLOAD_URL"); env != "" {
+		Config.Qiniu.UploadURL = env
+	}
 }
 
 // getDefaultConfig 获取默认配置
@@ -320,6 +339,13 @@ func getDefaultConfig() *AppConfig {
 		Wechat: Wechat{
 			AppID:     "",
 			AppSecret: "",
+		},
+		Qiniu: Qiniu{
+			AccessKey: "",
+			SecretKey: "",
+			Bucket:    "",
+			Domain:    "",
+			UploadURL: "",
 		},
 	}
 }

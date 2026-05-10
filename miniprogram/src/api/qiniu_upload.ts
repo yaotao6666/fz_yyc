@@ -7,9 +7,11 @@ export function uploadImage(filePath: string) {
       
       const ext = filePath.split('.').pop() || 'jpg'
       const key = `${uploadData.prefix}/${Date.now()}.${ext}`
+      const normalizedDomain = (uploadData.domain || '').replace(/\/+$/, '')
       
       uni.uploadFile({
-        url: `https://upload.qiniup.com`,
+        url: uploadData.upload_url || 'https://up.qiniup.com',
+        method: 'POST',
         filePath,
         name: 'file',
         formData: {
@@ -22,7 +24,7 @@ export function uploadImage(filePath: string) {
             const data = JSON.parse(res.data)
             if (data.key) {
               resolve({
-                url: `${uploadData.domain}/${data.key}`,
+                url: `${normalizedDomain}/${String(data.key).replace(/^\/+/, '')}`,
                 key: data.key
               })
             } else {

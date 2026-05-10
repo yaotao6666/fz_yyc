@@ -178,13 +178,19 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getProduct, createProduct, updateProduct, getCategories, uploadImage } from '@api'
-import type { Category, Product } from '@types'
+import { getProduct, createProduct, updateProduct, getCategories, uploadImage, ResponseCode } from '@api'
+import type { Category } from '@types'
 
 const productId = ref<number | null>(null)
 const categories = ref<Category[]>([])
 const categoryIndex = ref(-1)
 const submitting = ref(false)
+
+type ProductLoadError = {
+  message?: string
+  code?: number
+  statusCode?: number
+}
 
 const formData = reactive({
   name: '',
@@ -207,30 +213,71 @@ const selectedCategoryName = computed(() => {
 })
 
 onLoad((options: any) => {
-  loadCategories()
-  
-  if (options.id) {
-    productId.value = Number(options.id)
-    loadProduct(productId.value)
-  }
-  
+  initializePage(options)
+})
+
+async function initializePage(options: any) {
   if (options.category_id) {
     formData.category_id = Number(options.category_id)
   }
-})
+
+  await loadCategories()
+
+  if (options.id) {
+    productId.value = Number(options.id)
+    await loadProduct(productId.value)
+  } else {
+    syncCategoryIndex()
+  }
+}
+
+function syncCategoryIndex() {
+  const index = categories.value.findIndex(c => c.id === formData.category_id)
+  categoryIndex.value = index
+}
 
 async function loadCategories() {
   try {
     const res = await getCategories()
-    categories.value = res
+    categories.value = res || []
+    syncCategoryIndex()
   } catch (error) {
     console.error('加载分类失败:', error)
+    categories.value = []
+    categoryIndex.value = -1
+  }
+}
+
+function getProductLoadErrorDialog(error: ProductLoadError) {
+  if (
+    error.statusCode === 404
+    || error.code === ResponseCode.NOT_FOUND
+    || error.code === ResponseCode.PRODUCT_NOT_FOUND
+  ) {
+    return {
+      title: '商品不存在',
+      content: '该商品可能已删除，或当前账号已无权访问。'
+    }
+  }
+
+  if (error.statusCode === 500 || error.code === ResponseCode.SERVER_ERROR) {
+    return {
+      title: '服务异常',
+      content: error.message
+        ? `商品详情读取失败：${error.message}`
+        : '商品详情读取失败，请稍后重试。'
+    }
+  }
+
+  return {
+    title: '加载失败',
+    content: error.message || '商品详情加载失败，请稍后重试。'
   }
 }
 
 async function loadProduct(id: number) {
   try {
-    const product = await getProduct(id)
+    const product = await getProduct(id, { showErrorToast: false })
     
     formData.name = product.name
     formData.category_id = product.category_id
@@ -242,14 +289,20 @@ async function loadProduct(id: number) {
     formData.images = product.images || []
     formData.specs = product.specs || []
     formData.sort = product.sort || 0
-    
-    // 设置分类索引
-    const index = categories.value.findIndex(c => c.id === product.category_id)
-    if (index !== -1) {
-      categoryIndex.value = index
-    }
+
+    syncCategoryIndex()
   } catch (error) {
-    console.error('加载商品失败:', error)
+    const productLoadError = error as ProductLoadError
+    const errorDialog = getProductLoadErrorDialog(productLoadError)
+    console.error('加载商品失败:', productLoadError)
+    uni.showModal({
+      title: errorDialog.title,
+      content: errorDialog.content,
+      showCancel: false,
+      success: () => {
+        uni.navigateBack()
+      }
+    })
   }
 }
 

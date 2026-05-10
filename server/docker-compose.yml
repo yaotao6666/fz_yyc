@@ -70,12 +70,13 @@ services:
       APP_PORT: 8080
       APP_ENV: development
       APP_DEBUG: "true"
-      WECHAT_APP_ID: wx684960f1efea2738
-      WECHAT_APP_SECRET: 6f6b3ad2f1fe3f5129bd1b320993d51a
+      WECHAT_APP_ID: wx71a54b66552dc9e8
+      WECHAT_APP_SECRET: 81fc6e0836839b5a8ce6b7fbc990b883
       QINIU_ACCESS_KEY: 1FctZeFOq4pUyZ55WhkfyzU9rI31anReup9lHbkF
       QINIU_SECRET_KEY: 9jzDbPHC06UvA0HyXnNkZiHy_yEZjdUbKChQeBHY
       QINIU_BUCKET: xm-lexiang
       QINIU_DOMAIN: https://lexiang-oss.jxxme.cn
+      QINIU_UPLOAD_URL: https://up-z0.qiniup.com
     depends_on:
       mysql:
         condition: service_healthy

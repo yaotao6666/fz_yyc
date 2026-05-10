@@ -4,6 +4,7 @@
  */
 
 import { get, post, put, del } from '../utils/request'
+import type { RequestOptions } from '../utils/request'
 import type {
   MerchantLoginRequest,
   MerchantLoginResponse,
@@ -193,30 +194,125 @@ export function sortCategories(orders: { id: number; sort: number }[]) {
 
 // ============ 商品管理相关 ============
 
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string')
+  }
+
+  if (typeof value === 'string' && value) {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is string => typeof item === 'string')
+      }
+    } catch (error) {
+      console.warn('解析商品图片失败:', error)
+    }
+  }
+
+  return []
+}
+
+function joinQiniuFileUrl(domain: string, keyOrUrl: string): string {
+  if (!keyOrUrl) {
+    return ''
+  }
+
+  if (/^https?:\/\//i.test(keyOrUrl)) {
+    return keyOrUrl
+  }
+
+  const normalizedDomain = domain.replace(/\/+$/, '')
+  const normalizedKey = keyOrUrl.replace(/^\/+/, '')
+  return `${normalizedDomain}/${normalizedKey}`
+}
+
+function normalizeImageUrl(keyOrUrl: string): string {
+  const domain = uni.getStorageSync('qiniu_domain') || ''
+  if (!domain) {
+    return keyOrUrl
+  }
+
+  return joinQiniuFileUrl(domain, keyOrUrl)
+}
+
+function getPersistedImageUrl(keyOrUrl: string): string {
+  if (!keyOrUrl) {
+    return ''
+  }
+
+  const normalizedUrl = normalizeImageUrl(keyOrUrl)
+  const queryIndex = normalizedUrl.indexOf('?')
+  if (queryIndex === -1) {
+    return normalizedUrl
+  }
+
+  return normalizedUrl.slice(0, queryIndex)
+}
+
+function normalizeSpecs(value: unknown): Product['specs'] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.map((spec: any) => ({
+    id: typeof spec?.id === 'number' ? spec.id : undefined,
+    name: spec?.name || '',
+    options: Array.isArray(spec?.options)
+      ? spec.options.map((option: any) => ({
+          id: typeof option?.id === 'number' ? option.id : undefined,
+          name: option?.name || '',
+          price: Number(option?.price || 0),
+          stock: typeof option?.stock === 'number' ? option.stock : undefined
+        }))
+      : []
+  }))
+}
+
+function normalizeProduct(product: any): Product {
+  return {
+    ...product,
+    id: Number(product?.id || 0),
+    category_id: Number(product?.category_id || 0),
+    price: Number(product?.price || 0),
+    original_price: product?.original_price !== undefined ? Number(product.original_price || 0) : undefined,
+    stock: Number(product?.stock || 0),
+    sales: product?.sales !== undefined ? Number(product.sales || 0) : undefined,
+    sort: product?.sort !== undefined ? Number(product.sort || 0) : undefined,
+    images: normalizeStringArray(product?.images).map(normalizeImageUrl),
+    specs: normalizeSpecs(product?.specs)
+  } as Product
+}
+
 /**
  * 获取商品列表
  */
-export function getProducts(params?: {
+export async function getProducts(params?: {
   page?: number
   page_size?: number
   category_id?: number
   status?: string
   keyword?: string
 }) {
-  return get<ProductListResponse>('/api/v1/merchant/products', params)
+  const res = await get<ProductListResponse>('/api/v1/merchant/products', params)
+  return {
+    ...res,
+    list: Array.isArray(res?.list) ? res.list.map(normalizeProduct) : []
+  }
 }
 
 /**
  * 获取商品详情
  */
-export function getProduct(productId: number) {
-  return get<Product>(`/api/v1/merchant/products/${productId}`)
+export async function getProduct(productId: number, options?: Partial<RequestOptions>) {
+  const res = await get<Product>(`/api/v1/merchant/products/${productId}`, undefined, options)
+  return normalizeProduct(res)
 }
 
 /**
  * 创建商品
  */
-export function createProduct(data: {
+export async function createProduct(data: {
   name: string
   description?: string
   images: string[]
@@ -228,14 +324,24 @@ export function createProduct(data: {
   sort?: number
   specs?: { name: string; options: { name: string; price: number; stock?: number }[] }[]
 }) {
-  return post<Product>('/api/v1/merchant/products', data)
+  const payload = {
+    ...data,
+    images: Array.isArray(data.images) ? data.images.map(getPersistedImageUrl) : []
+  }
+  const res = await post<Product>('/api/v1/merchant/products', payload)
+  return normalizeProduct(res)
 }
 
 /**
  * 更新商品
  */
-export function updateProduct(productId: number, data: Partial<Product>) {
-  return put<Product>(`/api/v1/merchant/products/${productId}`, data)
+export async function updateProduct(productId: number, data: Partial<Product>) {
+  const payload = {
+    ...data,
+    images: Array.isArray(data.images) ? data.images.map(getPersistedImageUrl) : data.images
+  }
+  const res = await put<Product>(`/api/v1/merchant/products/${productId}`, payload)
+  return normalizeProduct(res)
 }
 
 /**
@@ -400,7 +506,10 @@ export function getInviteRecords(params?: { page?: number; page_size?: number })
  * 获取上传凭证
  */
 export async function getUploadToken() {
-  const res = await get<{ token: string; domain: string; prefix: string }>('/api/v1/upload/token')
+  const res = await get<{ token: string; domain: string; prefix: string; upload_url: string }>('/api/v1/upload/token')
+  if (res?.domain) {
+    uni.setStorageSync('qiniu_domain', res.domain)
+  }
   return res
 }
 
@@ -418,7 +527,8 @@ export async function uploadImage(filePath: string): Promise<{ url: string; key:
     
     return new Promise((resolve, reject) => {
       uni.uploadFile({
-        url: 'https://upload.qiniup.com',
+        url: uploadData.upload_url || 'https://up.qiniup.com',
+        method: 'POST',
         filePath,
         name: 'file',
         formData: {
@@ -431,7 +541,7 @@ export async function uploadImage(filePath: string): Promise<{ url: string; key:
             const data = JSON.parse(res.data)
             if (data.key) {
               resolve({
-                url: `${uploadData.domain}/${data.key}`,
+                url: joinQiniuFileUrl(uploadData.domain, data.key),
                 key: data.key
               })
             } else {
@@ -504,8 +614,17 @@ export function createOrder(merchantId: number, data: CreateOrderRequest) {
 
 /**
  * 获取我的订单列表
+ * @param params.page 页码
+ * @param params.page_size 每页数量
+ * @param params.status 订单状态
+ * @param params.merchant_id 商家ID（可选，用于筛选特定商家的订单）
  */
-export function getMyOrders(params?: { page?: number; page_size?: number; status?: number }) {
+export function getMyOrders(params?: {
+  page?: number
+  page_size?: number
+  status?: number
+  merchant_id?: number
+}) {
   return get<OrderListResponse>('/api/v1/user/orders', params)
 }
 

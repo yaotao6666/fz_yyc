@@ -42,11 +42,12 @@ func Login(c *gin.Context) {
 	now := time.Now()
 	database.DB.Model(&staff).Update("last_login_at", now)
 
-	token, _ := utils.GenerateToken(staff.ID, "merchant", staff.Username)
+	// 使用商家ID而不是员工ID生成token
+	token, _ := utils.GenerateToken(staff.MerchantID, "merchant", staff.Username)
 	response.Success(c, gin.H{
-		"token":  token,
+		"token":       token,
 		"merchant_id": staff.MerchantID,
-		"staff": staff,
+		"staff":       staff,
 	})
 }
 
@@ -132,6 +133,7 @@ func UpdateProfile(c *gin.Context) {
 
 func GetSettings(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
+	username, _ := c.Get("username")
 
 	var merchant models.Merchant
 	if err := database.DB.First(&merchant, merchantID).Error; err != nil {
@@ -142,23 +144,34 @@ func GetSettings(c *gin.Context) {
 	var deliverySettings models.MerchantDeliverySettings
 	database.DB.Where("merchant_id = ?", merchantID).First(&deliverySettings)
 
+	notifyEnabled := true
+	if usernameStr, ok := username.(string); ok && usernameStr != "" {
+		var staff models.MerchantStaff
+		if err := database.DB.Where("merchant_id = ? AND username = ?", merchantID, usernameStr).First(&staff).Error; err == nil {
+			notifyEnabled = staff.NotifyEnabled
+		}
+	}
+
 	response.Success(c, gin.H{
 		"announcement":      merchant.Announcement,
 		"business_hours":    merchant.BusinessHours,
 		"min_order_amount":  merchant.MinOrderAmount,
 		"takeout_enabled":   merchant.TakeoutEnabled,
 		"dine_in_enabled":   merchant.DineInEnabled,
+		"notify_enabled":    notifyEnabled,
 		"delivery_settings": deliverySettings,
 	})
 }
 
 type UpdateSettingsRequest struct {
-	TakeoutEnabled  bool `json:"takeout_enabled"`
-	DineInEnabled   bool `json:"dine_in_enabled"`
+	TakeoutEnabled *bool `json:"takeout_enabled"`
+	DineInEnabled  *bool `json:"dine_in_enabled"`
+	NotifyEnabled  *bool `json:"notify_enabled"`
 }
 
 func UpdateSettings(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
+	username, _ := c.Get("username")
 
 	var req UpdateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -166,12 +179,34 @@ func UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Updates(map[string]interface{}{
-		"takeout_enabled": req.TakeoutEnabled,
-		"dine_in_enabled": req.DineInEnabled,
-	}).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新设置失败")
-		return
+	merchantUpdates := map[string]interface{}{}
+	if req.TakeoutEnabled != nil {
+		merchantUpdates["takeout_enabled"] = *req.TakeoutEnabled
+	}
+	if req.DineInEnabled != nil {
+		merchantUpdates["dine_in_enabled"] = *req.DineInEnabled
+	}
+
+	if len(merchantUpdates) > 0 {
+		if err := database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Updates(merchantUpdates).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新设置失败")
+			return
+		}
+	}
+
+	if req.NotifyEnabled != nil {
+		usernameStr, ok := username.(string)
+		if !ok || usernameStr == "" {
+			response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "获取员工身份失败")
+			return
+		}
+
+		if err := database.DB.Model(&models.MerchantStaff{}).
+			Where("merchant_id = ? AND username = ?", merchantID, usernameStr).
+			Update("notify_enabled", *req.NotifyEnabled).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新提示音设置失败")
+			return
+		}
 	}
 
 	response.Success(c, gin.H{"message": "设置更新成功"})

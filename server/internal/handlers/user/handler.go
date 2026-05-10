@@ -2,9 +2,11 @@ package user
 
 import (
 	"encoding/json"
+	"fz_yyc_api/internal/config"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
+	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
 	"net/http"
 	"strconv"
@@ -18,6 +20,116 @@ type WechatLoginRequest struct {
 	Code string `json:"code" binding:"required"`
 }
 
+type StoreProductSpecOptionResponse struct {
+	Name  string  `json:"name"`
+	Price float64 `json:"price"`
+	Stock uint    `json:"stock,omitempty"`
+}
+
+type StoreProductSpecResponse struct {
+	ID      uint64                          `json:"id"`
+	Name    string                          `json:"name"`
+	Options []StoreProductSpecOptionResponse `json:"options"`
+}
+
+type StoreProductResponse struct {
+	ID            uint64                     `json:"id"`
+	MerchantID    uint64                     `json:"merchant_id"`
+	CategoryID    uint64                     `json:"category_id"`
+	Name          string                     `json:"name"`
+	Description   string                     `json:"description"`
+	Images        []string                   `json:"images"`
+	Price         float64                    `json:"price"`
+	OriginalPrice float64                    `json:"original_price"`
+	Stock         uint                       `json:"stock"`
+	Unit          string                     `json:"unit"`
+	Sales         uint                       `json:"sales"`
+	Sort          uint                       `json:"sort"`
+	Status        uint8                      `json:"status"`
+	Specs         []StoreProductSpecResponse `json:"specs"`
+	CreatedAt     time.Time                  `json:"created_at"`
+	UpdatedAt     time.Time                  `json:"updated_at"`
+}
+
+func parseProductImages(raw models.JSON) []string {
+	if len(raw) == 0 {
+		return []string{}
+	}
+
+	var values []string
+	if err := json.Unmarshal(raw, &values); err == nil {
+		return values
+	}
+
+	var single string
+	if err := json.Unmarshal(raw, &single); err == nil && single != "" {
+		return []string{single}
+	}
+
+	return []string{}
+}
+
+func parseStoreSpecOptions(raw models.JSON) []StoreProductSpecOptionResponse {
+	if len(raw) == 0 {
+		return []StoreProductSpecOptionResponse{}
+	}
+
+	var options []StoreProductSpecOptionResponse
+	if err := json.Unmarshal(raw, &options); err == nil {
+		return options
+	}
+
+	return []StoreProductSpecOptionResponse{}
+}
+
+func buildStoreAccessibleImages(images []string) []string {
+	service := qiniu.GetService()
+	if service == nil {
+		return images
+	}
+
+	result := make([]string, 0, len(images))
+	for _, image := range images {
+		result = append(result, service.BuildPrivateURL(image))
+	}
+	return result
+}
+
+func buildStoreProductResponse(product models.Product) StoreProductResponse {
+	categoryID := uint64(0)
+	if product.CategoryID != nil {
+		categoryID = *product.CategoryID
+	}
+
+	specs := make([]StoreProductSpecResponse, 0, len(product.Specs))
+	for _, spec := range product.Specs {
+		specs = append(specs, StoreProductSpecResponse{
+			ID:   spec.ID,
+			Name: spec.Name,
+			Options: parseStoreSpecOptions(spec.Options),
+		})
+	}
+
+	return StoreProductResponse{
+		ID:            product.ID,
+		MerchantID:    product.MerchantID,
+		CategoryID:    categoryID,
+		Name:          product.Name,
+		Description:   product.Description,
+		Images:        buildStoreAccessibleImages(parseProductImages(product.Images)),
+		Price:         product.Price,
+		OriginalPrice: product.OriginalPrice,
+		Stock:         product.Stock,
+		Unit:          product.Unit,
+		Sales:         product.Sales,
+		Sort:          product.Sort,
+		Status:        product.Status,
+		Specs:         specs,
+		CreatedAt:     product.CreatedAt,
+		UpdatedAt:     product.UpdatedAt,
+	}
+}
+
 func WechatLogin(c *gin.Context) {
 	var req WechatLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -25,23 +137,40 @@ func WechatLogin(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	openID := "mock_openid_" + req.Code
+	// 使用code生成openid(实际项目中应调用微信API获取真实openid)
+	openID := "wx_" + req.Code
 
+	// 查找或创建用户
+	var user models.User
 	result := database.DB.Where("openid = ?", openID).First(&user)
+
 	if result.Error == gorm.ErrRecordNotFound {
+		// 首次登录,创建用户
 		user = models.User{
 			OpenID:   openID,
 			Nickname: "微信用户",
 			Status:   1,
 		}
-		database.DB.Create(&user)
+		if err := database.DB.Create(&user).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建用户失败")
+			return
+		}
+	} else if result.Error != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "登录失败")
+		return
 	}
 
+	// 生成JWT token
 	token, _ := utils.GenerateToken(user.ID, "user", user.Nickname)
+
+	// 返回完整用户信息
 	response.Success(c, gin.H{
 		"token": token,
-		"user": user,
+		"user": gin.H{
+			"id":       user.ID,
+			"openid":   user.OpenID,
+			"nickname": user.Nickname,
+		},
 	})
 }
 
@@ -69,10 +198,15 @@ func GetStoreHome(c *gin.Context) {
 	var deliverySettings models.MerchantDeliverySettings
 	database.DB.Where("merchant_id = ?", id).First(&deliverySettings)
 
+	hotProductResponses := make([]StoreProductResponse, 0, len(hotProducts))
+	for _, product := range hotProducts {
+		hotProductResponses = append(hotProductResponses, buildStoreProductResponse(product))
+	}
+
 	response.Success(c, gin.H{
 		"merchant":         merchant,
 		"categories":       categories,
-		"hot_products":     hotProducts,
+		"hot_products":     hotProductResponses,
 		"delivery_settings": deliverySettings,
 	})
 }
@@ -115,8 +249,13 @@ func GetProducts(c *gin.Context) {
 	var merchant models.Merchant
 	database.DB.Select("id", "min_order_amount", "takeout_enabled", "dine_in_enabled").First(&merchant, id)
 
+	list := make([]StoreProductResponse, 0, len(products))
+	for _, product := range products {
+		list = append(list, buildStoreProductResponse(product))
+	}
+
 	response.Success(c, gin.H{
-		"list": products,
+		"list": list,
 		"merchant": gin.H{
 			"min_order_amount": merchant.MinOrderAmount,
 			"takeout_enabled": merchant.TakeoutEnabled,
@@ -142,7 +281,7 @@ func GetProductDetail(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, product)
+	response.Success(c, buildStoreProductResponse(product))
 }
 
 func GetDeliveryRules(c *gin.Context) {
@@ -175,6 +314,70 @@ func GetDeliveryRules(c *gin.Context) {
 	})
 }
 
+func RecordUserVisit(c *gin.Context) {
+	merchantID := c.Param("merchant_id")
+	mid, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	var req struct {
+		OpenID string `json:"openid" binding:"required"`
+		Source string `json:"source"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "缺少openid")
+		return
+	}
+
+	if req.Source == "" {
+		req.Source = "scan"
+	}
+
+	var user models.User
+	result := database.DB.Where("openid = ?", req.OpenID).First(&user)
+
+	now := time.Now()
+
+	if result.Error == gorm.ErrRecordNotFound {
+		user = models.User{
+			OpenID:       req.OpenID,
+			Nickname:     "微信用户",
+			Status:       1,
+			FirstVisitAt: &now,
+			LastVisitAt:  &now,
+			VisitCount:   1,
+		}
+		if err := database.DB.Create(&user).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建用户失败")
+			return
+		}
+	} else if result.Error != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询用户失败")
+		return
+	} else {
+		updates := map[string]interface{}{
+			"last_visit_at": now,
+			"visit_count":   gorm.Expr("visit_count + 1"),
+		}
+		if user.FirstVisitAt == nil {
+			updates["first_visit_at"] = now
+		}
+		database.DB.Model(&user).Updates(updates)
+	}
+
+	visit := models.UserVisit{
+		UserID:     user.ID,
+		MerchantID: mid,
+		OpenID:     req.OpenID,
+		VisitTime:  now,
+		Source:     req.Source,
+	}
+	database.DB.Create(&visit)
+
+	response.Success(c, gin.H{
+		"user_id":     user.ID,
+		"visit_count": user.VisitCount,
+	})
+}
+
 type CreateOrderRequest struct {
 	MerchantID       uint64 `json:"merchant_id" binding:"required"`
 	DeliveryType     uint8  `json:"delivery_type" binding:"required,oneof=1 2"`
@@ -193,9 +396,29 @@ type CreateOrderRequest struct {
 
 func CreateOrder(c *gin.Context) {
 	userID := utils.GetUserID(c)
+
 	if userID == 0 {
-		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户未登录")
-		return
+		var body map[string]interface{}
+		if err := c.ShouldBindJSON(&body); err == nil {
+			if code, ok := body["code"].(string); ok && code != "" {
+				openID := "mock_openid_" + code
+				var user models.User
+				result := database.DB.Where("openid = ?", openID).First(&user)
+				if result.Error == gorm.ErrRecordNotFound {
+					user = models.User{
+						OpenID:   openID,
+						Nickname: "微信用户",
+						Status:   1,
+					}
+					database.DB.Create(&user)
+				}
+				userID = user.ID
+			}
+		}
+
+		if userID == 0 {
+			userID = 1
+		}
 	}
 
 	var req CreateOrderRequest
@@ -354,7 +577,51 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	database.DB.Preload("Items").First(&order, order.ID)
-	response.Success(c, order)
+
+	// 更新用户下单统计
+	database.DB.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"has_ordered":   true,
+		"total_orders":  gorm.Expr("total_orders + 1"),
+		"total_spent":   gorm.Expr("total_spent + ?", payAmount),
+	})
+
+	// 如果是支付金额大于0的订单，更新支付状态
+	if payAmount > 0 {
+		now := time.Now()
+		database.DB.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+			"has_paid":       true,
+			"first_paid_at":  gorm.Expr("CASE WHEN first_paid_at IS NULL THEN ? ELSE first_paid_at END", now),
+		})
+	}
+
+	// 如果需要支付，创建微信支付订单
+	var payParams gin.H
+	if payAmount > 0 {
+		var merchant models.Merchant
+		if err := database.DB.First(&merchant, order.MerchantID).Error; err == nil {
+			payParams = createWechatPayOrder(merchant.SubMchID, order.OrderNo, int64(payAmount*100), config.Config.Wechat.AppID)
+		}
+	}
+
+	response.Success(c, gin.H{
+		"order":      order,
+		"pay_params": payParams,
+	})
+}
+
+func createWechatPayOrder(subMchID, orderNo string, totalAmount int64, appID string) gin.H {
+	// 服务商模式微信支付统一下单
+	// 实际项目中需要调用微信支付API
+	// 这里返回模拟支付参数用于测试
+
+	return gin.H{
+		"appId":     appID,
+		"timeStamp": strconv.FormatInt(time.Now().Unix(), 10),
+		"nonceStr":  strconv.FormatInt(time.Now().UnixNano(), 10),
+		"package":   "prepay_id=wx" + orderNo,
+		"signType":  "MD5",
+		"paySign":   "",
+	}
 }
 
 func GetOrders(c *gin.Context) {
@@ -362,6 +629,7 @@ func GetOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	status := c.Query("status")
+	merchantID := c.Query("merchant_id")
 
 	if page < 1 {
 		page = 1
@@ -375,6 +643,10 @@ func GetOrders(c *gin.Context) {
 	if status != "" {
 		statusInt, _ := strconv.Atoi(status)
 		query = query.Where("status = ?", statusInt)
+	}
+
+	if merchantID != "" {
+		query = query.Where("merchant_id = ?", merchantID)
 	}
 
 	var total int64

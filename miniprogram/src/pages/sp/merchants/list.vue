@@ -57,6 +57,10 @@
 
         <view class="merchant-stats">
           <view class="stat-item">
+            <view class="stat-value">{{ merchant.total_users || 0 }}</view>
+            <view class="stat-label">用户数</view>
+          </view>
+          <view class="stat-item">
             <view class="stat-value">{{ merchant.total_orders || 0 }}</view>
             <view class="stat-label">累计订单</view>
           </view>

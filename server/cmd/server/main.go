@@ -98,20 +98,21 @@ func setupRoutes(r *gin.Engine) {
 			uploadGroup.GET("/token", uploadHandler.GetToken)
 		}
 
-		// C端用户接口（无需特殊权限）
+		// C端店铺公开接口（无需登录即可访问）
 		storeGroup := v1.Group("/store/:merchant_id")
 		{
 			storeGroup.GET("/home", user.GetStoreHome)
 			storeGroup.GET("/products", user.GetProducts)
 			storeGroup.GET("/products/:product_id", user.GetProductDetail)
 			storeGroup.GET("/delivery-rules", user.GetDeliveryRules)
+			storeGroup.POST("/orders", user.CreateOrder)
+			storeGroup.POST("/visit", user.RecordUserVisit)
 		}
 
 		// C端用户接口（需要登录）
 		userGroup := v1.Group("/user")
 		userGroup.Use(middleware.JWTAuth())
 		{
-			userGroup.POST("/orders", user.CreateOrder)
 			userGroup.GET("/orders", user.GetOrders)
 			userGroup.GET("/orders/:order_id", user.GetOrderDetail)
 			userGroup.POST("/orders/:order_id/cancel", user.CancelOrder)
@@ -231,10 +232,10 @@ func setupRoutes(r *gin.Engine) {
 			spGroup.GET("/merchants/analytics/distribution", sp.GetMerchantDistribution)
 			spGroup.GET("/merchants/list", sp.GetMerchantList)
 			spGroup.GET("/merchants/audit-records", sp.GetAuditRecords)
-			spGroup.GET("/merchants/:id/fee", sp.GetMerchantFee)
-			spGroup.GET("/merchants/:id/rate", sp.GetMerchantRate)
-			spGroup.POST("/merchants/:id/rate", sp.SetMerchantRate)
-			spGroup.GET("/merchants/:id/qrcode", sp.GetMerchantQRCode)
+			spGroup.GET("/merchants/:merchant_id/fee", sp.GetMerchantFee)
+			spGroup.GET("/merchants/:merchant_id/rate", sp.GetMerchantRate)
+			spGroup.POST("/merchants/:merchant_id/rate", sp.SetMerchantRate)
+			spGroup.GET("/merchants/:merchant_id/qrcode", sp.GetMerchantQRCode)
 			spGroup.GET("/orders/analytics", sp.GetOrderAnalytics)
 			spGroup.GET("/amount/analytics", sp.GetAmountAnalytics)
 			spGroup.GET("/amount/top-merchants", sp.GetTopMerchants)

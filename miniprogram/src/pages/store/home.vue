@@ -69,7 +69,7 @@
             >
               <image
                 class="product-image"
-                :src="product.image || '/static/default-product.png'"
+                :src="getHotProductImage(product)"
                 mode="aspectFill"
               />
               <view class="product-info">
@@ -122,15 +122,36 @@
       </scroll-view>
     </view>
 
-    <!-- 底部购物栏 -->
-    <view class="cart-bar" v-if="cartStore.totalCount > 0" @click="goCart">
-      <view class="cart-icon">
-        <text class="cart-badge">{{ cartStore.totalCount }}</text>
+    <!-- 底部TabBar -->
+    <StoreTabBar v-model:activeTab="activeTab" />
+
+    <!-- 操作指引弹窗 -->
+    <view v-if="showGuide" class="guide-dialog" @click="closeGuide">
+      <view class="guide-content" @click.stop>
+        <view class="guide-title">🛒 购物指南</view>
+        <view class="guide-list">
+          <view class="guide-item">
+            <view class="guide-step">1️⃣</view>
+            <view class="guide-text">选择心仪的商品，点击「+」加入购物车</view>
+          </view>
+          <view class="guide-item">
+            <view class="guide-step">2️⃣</view>
+            <view class="guide-text">点击「去购物车」查看已选商品</view>
+          </view>
+          <view class="guide-item">
+            <view class="guide-step">3️⃣</view>
+            <view class="guide-text">确认订单并完成支付</view>
+          </view>
+          <view class="guide-item">
+            <view class="guide-step">4️⃣</view>
+            <view class="guide-text">到店出示核销码或等待配送</view>
+          </view>
+        </view>
+        <view class="guide-footer">
+          <view class="guide-tip">💡 有任何问题？点击「我的订单」联系商家</view>
+          <view class="guide-close" @click="closeGuide">知道了</view>
+        </view>
       </view>
-      <view class="cart-info">
-        <text class="cart-amount">¥{{ cartStore.totalAmount.toFixed(2) }}</text>
-      </view>
-      <view class="cart-btn">去购物车</view>
     </view>
 
     <!-- 底部占位 -->
@@ -139,29 +160,58 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { getStoreHome, getStoreProducts } from '@api'
 import { useCartStore } from '../../stores/cart'
+import { useAuth } from '@utils/useAuth'
+import { useAnalytics } from '@utils/analytics'
 import type { StoreHomeInfo, Product } from '@types'
 
 const cartStore = useCartStore()
+const { ensureAuth, isLoggedIn } = useAuth()
+const { trackVisit } = useAnalytics()
 
 const storeInfo = ref<StoreHomeInfo | null>(null)
 const currentCategoryIndex = ref(0)
 const currentProducts = ref<Product[]>([])
 const loadingProducts = ref(false)
+const showGuide = ref(true) // 控制操作指引弹窗显示
+const authLoading = ref(false) // 授权加载状态
+const activeTab = ref<'products' | 'cart' | 'orders'>('products') // 当前Tab
 
 const currentCategory = computed(() => {
   return storeInfo.value?.categories?.[currentCategoryIndex.value] || null
 })
 
-onShow(() => {
+// 监听Tab切换
+watch(activeTab, (newTab) => {
+  console.log('Tab切换到:', newTab)
+  if (newTab === 'orders') {
+    // 跳转到订单页面
+    goMyOrders()
+  }
+})
+
+onShow(async () => {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
-  const merchantId = currentPage?.options?.merchant_id || 1
+  const merchantId = Number(currentPage?.options?.merchant_id) || 1
+  const source = currentPage?.options?.scene || 'scan'
+
+  // 自动授权登录
+  if (!isLoggedIn.value && !authLoading.value) {
+    authLoading.value = true
+    await ensureAuth()
+    authLoading.value = false
+  }
+
+  // 记录用户访问埋点
+  await trackVisit({ merchant_id: merchantId, source })
 
   loadStoreHome(merchantId)
+  // 每次进入都显示指引弹窗
+  showGuide.value = true
 })
 
 async function loadStoreHome(merchantId: number) {
@@ -206,6 +256,14 @@ function loadMoreProducts() {
   // 加载更多逻辑
 }
 
+function getHotProductImage(product: any) {
+  if (Array.isArray(product?.images) && product.images.length > 0) {
+    return product.images[0]
+  }
+
+  return product?.image || '/static/default-product.png'
+}
+
 function goProductDetail(productId: number) {
   const merchantId = storeInfo.value?.merchant?.id || 1
   uni.navigateTo({
@@ -233,6 +291,17 @@ function goCart() {
   const merchantId = storeInfo.value?.merchant?.id || 1
   uni.navigateTo({
     url: `/pages/store/cart?merchant_id=${merchantId}`
+  })
+}
+
+function closeGuide() {
+  showGuide.value = false
+}
+
+function goMyOrders() {
+  const merchantId = storeInfo.value?.merchant?.id || 1
+  uni.navigateTo({
+    url: `/pages/store/my-orders?merchant_id=${merchantId}`
   })
 }
 </script>
@@ -537,9 +606,41 @@ function goCart() {
   background: #1a1a1a;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 32rpx;
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 100;
+}
+
+.order-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx 24rpx;
+  border-radius: 12rpx;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.order-icon {
+  font-size: 32rpx;
+  margin-bottom: 4rpx;
+}
+
+.order-text {
+  font-size: 22rpx;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.cart-area {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.cart-area.disabled {
+  opacity: 0.6;
 }
 
 .cart-icon {
@@ -552,6 +653,18 @@ function goCart() {
   justify-content: center;
   margin-top: -40rpx;
   position: relative;
+}
+
+.cart-icon-empty {
+  font-size: 48rpx;
+  width: 100rpx;
+  height: 100rpx;
+  background: #333333;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -40rpx;
 }
 
 .cart-badge {
@@ -571,8 +684,7 @@ function goCart() {
 }
 
 .cart-info {
-  flex: 1;
-  margin-left: 24rpx;
+  margin-left: 8rpx;
 }
 
 .cart-amount {
@@ -587,6 +699,96 @@ function goCart() {
   border-radius: 40rpx;
   font-size: 28rpx;
   color: #ffffff;
+  margin-left: 16rpx;
+}
+
+/* 操作指引弹窗样式 */
+.guide-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.guide-content {
+  width: 600rpx;
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 40rpx;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(50rpx); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.guide-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-align: center;
+  margin-bottom: 32rpx;
+}
+
+.guide-list {
+  margin-bottom: 32rpx;
+}
+
+.guide-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 24rpx;
+  padding: 20rpx;
+  background: #f8f9fa;
+  border-radius: 12rpx;
+}
+
+.guide-step {
+  font-size: 40rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.guide-text {
+  font-size: 28rpx;
+  color: #333333;
+  line-height: 1.6;
+  flex: 1;
+}
+
+.guide-footer {
+  border-top: 1rpx solid #f0f0f0;
+  padding-top: 24rpx;
+}
+
+.guide-tip {
+  font-size: 24rpx;
+  color: #666666;
+  text-align: center;
+  margin-bottom: 24rpx;
+}
+
+.guide-close {
+  padding: 24rpx;
+  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  color: #ffffff;
+  border-radius: 12rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+  text-align: center;
 }
 
 .bottom-placeholder {

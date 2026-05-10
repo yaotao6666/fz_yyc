@@ -2,15 +2,173 @@ package merchant
 
 import (
 	"encoding/json"
+	"errors"
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/pkg/database"
+	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+type ProductSpecOptionResponse struct {
+	Name  string  `json:"name"`
+	Price float64 `json:"price"`
+	Stock uint    `json:"stock,omitempty"`
+}
+
+type ProductSpecResponse struct {
+	ID      uint64                      `json:"id"`
+	Name    string                      `json:"name"`
+	Options []ProductSpecOptionResponse `json:"options"`
+}
+
+type ProductResponse struct {
+	ID            uint64                `json:"id"`
+	MerchantID    uint64                `json:"merchant_id"`
+	CategoryID    uint64                `json:"category_id"`
+	Name          string                `json:"name"`
+	Description   string                `json:"description"`
+	Images        []string              `json:"images"`
+	Price         float64               `json:"price"`
+	OriginalPrice float64               `json:"original_price"`
+	Stock         uint                  `json:"stock"`
+	Unit          string                `json:"unit"`
+	Sales         uint                  `json:"sales"`
+	Sort          uint                  `json:"sort"`
+	Status        uint8                 `json:"status"`
+	CategoryName  string                `json:"category_name,omitempty"`
+	Specs         []ProductSpecResponse `json:"specs"`
+	CreatedAt     time.Time             `json:"created_at"`
+	UpdatedAt     time.Time             `json:"updated_at"`
+}
+
+func parseStringArray(raw models.JSON) []string {
+	if len(raw) == 0 {
+		return []string{}
+	}
+
+	var values []string
+	if err := json.Unmarshal(raw, &values); err == nil {
+		return values
+	}
+
+	var single string
+	if err := json.Unmarshal(raw, &single); err == nil && single != "" {
+		return []string{single}
+	}
+
+	return []string{}
+}
+
+func buildAccessibleImages(images []string) []string {
+	service := qiniu.GetService()
+	if service == nil {
+		return images
+	}
+
+	result := make([]string, 0, len(images))
+	for _, image := range images {
+		result = append(result, service.BuildPrivateURL(image))
+	}
+	return result
+}
+
+func parseSpecOptions(raw models.JSON) []ProductSpecOptionResponse {
+	if len(raw) == 0 {
+		return []ProductSpecOptionResponse{}
+	}
+
+	var options []ProductSpecOptionResponse
+	if err := json.Unmarshal(raw, &options); err == nil {
+		return options
+	}
+
+	return []ProductSpecOptionResponse{}
+}
+
+func buildProductResponse(product models.Product) ProductResponse {
+	categoryID := uint64(0)
+	if product.CategoryID != nil {
+		categoryID = *product.CategoryID
+	}
+
+	categoryName := ""
+	if product.Category != nil {
+		categoryName = product.Category.Name
+	}
+
+	specs := make([]ProductSpecResponse, 0, len(product.Specs))
+	for _, spec := range product.Specs {
+		specs = append(specs, ProductSpecResponse{
+			ID:      spec.ID,
+			Name:    spec.Name,
+			Options: parseSpecOptions(spec.Options),
+		})
+	}
+
+	return ProductResponse{
+		ID:            product.ID,
+		MerchantID:    product.MerchantID,
+		CategoryID:    categoryID,
+		Name:          product.Name,
+		Description:   product.Description,
+		Images:        buildAccessibleImages(parseStringArray(product.Images)),
+		Price:         product.Price,
+		OriginalPrice: product.OriginalPrice,
+		Stock:         product.Stock,
+		Unit:          product.Unit,
+		Sales:         product.Sales,
+		Sort:          product.Sort,
+		Status:        product.Status,
+		CategoryName:  categoryName,
+		Specs:         specs,
+		CreatedAt:     product.CreatedAt,
+		UpdatedAt:     product.UpdatedAt,
+	}
+}
+
+func isRecordNotFoundError(err error) bool {
+	return errors.Is(err, gorm.ErrRecordNotFound)
+}
+
+func respondProductQueryError(c *gin.Context, err error, notFoundMessage string, serverErrorMessage string) {
+	if isRecordNotFoundError(err) {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, notFoundMessage)
+		return
+	}
+
+	response.Fail(c, http.StatusInternalServerError, response.CodeServerError, serverErrorMessage)
+}
+
+func loadProductWithRelations(id uint64, merchantID uint64) (*models.Product, error) {
+	var product models.Product
+	err := database.DB.
+		Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).
+		Preload("Category").
+		First(&product).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 这里不用 GORM 的 Preload("Specs")，直接按 product_id 查询规格，避免运行时出现
+	// “unsupported relations for schema Product” 并把内部错误误判成商品不存在。
+	var specs []models.ProductSpec
+	if err := database.DB.
+		Where("product_id = ?", product.ID).
+		Order("id ASC").
+		Find(&specs).Error; err != nil {
+		return nil, err
+	}
+
+	product.Specs = specs
+	return &product, nil
+}
 
 func GetCategories(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
@@ -24,17 +182,17 @@ func GetCategories(c *gin.Context) {
 	var result []map[string]interface{}
 	for _, cat := range categories {
 		var count int64
-		database.DB.Model(&models.Product{}).Where("category_id = ? AND merchant_id = ?", cat.ID, merchantID).Count(&count)
-		
+		database.DB.Model(&models.Product{}).Where("category_id = ? AND merchant_id = ? AND deleted_at IS NULL", cat.ID, merchantID).Count(&count)
+
 		catMap := map[string]interface{}{
-			"id":             cat.ID,
-			"merchant_id":    cat.MerchantID,
-			"name":           cat.Name,
-			"sort":           cat.Sort,
-			"status":         cat.Status,
-			"created_at":     cat.CreatedAt,
-			"updated_at":     cat.UpdatedAt,
-			"product_count":  count,
+			"id":            cat.ID,
+			"merchant_id":   cat.MerchantID,
+			"name":          cat.Name,
+			"sort":          cat.Sort,
+			"status":        cat.Status,
+			"created_at":    cat.CreatedAt,
+			"updated_at":    cat.UpdatedAt,
+			"product_count": count,
 		}
 		result = append(result, catMap)
 	}
@@ -162,13 +320,13 @@ func GetProduct(c *gin.Context) {
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
-	var product models.Product
-	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).Preload("Category").Preload("Specs").First(&product).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
+	product, err := loadProductWithRelations(id, merchantID)
+	if err != nil {
+		respondProductQueryError(c, err, "商品不存在", "获取商品详情失败")
 		return
 	}
 
-	response.Success(c, product)
+	response.Success(c, buildProductResponse(*product))
 }
 
 func GetProducts(c *gin.Context) {
@@ -186,7 +344,7 @@ func GetProducts(c *gin.Context) {
 		pageSize = 10
 	}
 
-	query := database.DB.Model(&models.Product{}).Where("merchant_id = ?", merchantID)
+	query := database.DB.Model(&models.Product{}).Where("merchant_id = ? AND deleted_at IS NULL", merchantID)
 
 	if categoryID != "" {
 		id, _ := strconv.ParseUint(categoryID, 10, 64)
@@ -210,11 +368,16 @@ func GetProducts(c *gin.Context) {
 		return
 	}
 
+	result := make([]ProductResponse, 0, len(products))
+	for _, product := range products {
+		result = append(result, buildProductResponse(product))
+	}
+
 	response.Success(c, gin.H{
-		"list": products,
+		"list": result,
 		"pagination": gin.H{
-			"total":    total,
-			"page":     page,
+			"total":     total,
+			"page":      page,
 			"page_size": pageSize,
 		},
 	})
@@ -285,10 +448,18 @@ func CreateProduct(c *gin.Context) {
 		}
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建商品失败")
+		return
+	}
 
-	database.DB.Preload("Category").Preload("Specs").First(&product, product.ID)
-	response.Success(c, product)
+	productWithRelations, err := loadProductWithRelations(product.ID, merchantID)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "读取商品详情失败")
+		return
+	}
+
+	response.Success(c, buildProductResponse(*productWithRelations))
 }
 
 func UpdateProduct(c *gin.Context) {
@@ -303,23 +474,23 @@ func UpdateProduct(c *gin.Context) {
 	}
 
 	var product models.Product
-	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&product).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
+	if err := database.DB.Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).First(&product).Error; err != nil {
+		respondProductQueryError(c, err, "商品不存在", "查询商品失败")
 		return
 	}
 
 	imagesJSON, _ := json.Marshal(req.Images)
 
 	updates := map[string]interface{}{
-		"category_id":     req.CategoryID,
-		"name":            req.Name,
-		"description":     req.Description,
-		"images":          models.JSON(imagesJSON),
-		"price":           req.Price,
-		"original_price":  req.OriginalPrice,
-		"stock":           req.Stock,
-		"unit":            req.Unit,
-		"sort":            req.Sort,
+		"category_id":    req.CategoryID,
+		"name":           req.Name,
+		"description":    req.Description,
+		"images":         models.JSON(imagesJSON),
+		"price":          req.Price,
+		"original_price": req.OriginalPrice,
+		"stock":          req.Stock,
+		"unit":           req.Unit,
+		"sort":           req.Sort,
 	}
 
 	tx := database.DB.Begin()
@@ -329,27 +500,38 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	if len(req.Specs) > 0 {
-		tx.Model(&models.ProductSpec{}).Where("product_id = ?", id).Delete("")
-		for _, spec := range req.Specs {
-			optionsJSON, _ := json.Marshal(spec.Options)
-			productSpec := models.ProductSpec{
-				ProductID: id,
-				Name:      spec.Name,
-				Options:   models.JSON(optionsJSON),
-			}
-			if err := tx.Create(&productSpec).Error; err != nil {
-				tx.Rollback()
-				response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新规格失败")
-				return
-			}
+	if err := tx.Where("product_id = ?", id).Delete(&models.ProductSpec{}).Error; err != nil {
+		tx.Rollback()
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "清理旧规格失败")
+		return
+	}
+
+	for _, spec := range req.Specs {
+		optionsJSON, _ := json.Marshal(spec.Options)
+		productSpec := models.ProductSpec{
+			ProductID: id,
+			Name:      spec.Name,
+			Options:   models.JSON(optionsJSON),
+		}
+		if err := tx.Create(&productSpec).Error; err != nil {
+			tx.Rollback()
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新规格失败")
+			return
 		}
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新商品失败")
+		return
+	}
 
-	database.DB.Preload("Category").Preload("Specs").First(&product, id)
-	response.Success(c, product)
+	productWithRelations, err := loadProductWithRelations(id, merchantID)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "读取商品详情失败")
+		return
+	}
+
+	response.Success(c, buildProductResponse(*productWithRelations))
 }
 
 func ProductOnSale(c *gin.Context) {
@@ -357,7 +539,7 @@ func ProductOnSale(c *gin.Context) {
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
-	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ?", id, merchantID).Update("status", 1)
+	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).Update("status", 1)
 	if result.RowsAffected == 0 {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
@@ -371,7 +553,7 @@ func ProductOffSale(c *gin.Context) {
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
-	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ?", id, merchantID).Update("status", 2)
+	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).Update("status", 2)
 	if result.RowsAffected == 0 {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
@@ -394,7 +576,7 @@ func BatchUpdateProductStatus(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&models.Product{}).Where("id IN ? AND merchant_id = ?", req.ProductIDs, merchantID).Update("status", req.Status).Error; err != nil {
+	if err := database.DB.Model(&models.Product{}).Where("id IN ? AND merchant_id = ? AND deleted_at IS NULL", req.ProductIDs, merchantID).Update("status", req.Status).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "批量更新状态失败")
 		return
 	}
@@ -407,15 +589,21 @@ func DeleteProduct(c *gin.Context) {
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
-	tx := database.DB.Begin()
-	if err := tx.Where("id = ? AND merchant_id = ?", id, merchantID).Delete(&models.Product{}).Error; err != nil {
-		tx.Rollback()
+	now := time.Now()
+	result := database.DB.Model(&models.Product{}).
+		Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).
+		Updates(map[string]interface{}{
+			"deleted_at": now,
+			"status":     2,
+		})
+	if result.Error != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "删除商品失败")
 		return
 	}
-
-	tx.Where("product_id = ?", id).Delete(&models.ProductSpec{})
-	tx.Commit()
+	if result.RowsAffected == 0 {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
+		return
+	}
 
 	response.Success(c, gin.H{"message": "删除成功"})
 }
@@ -435,7 +623,7 @@ func UpdateStock(c *gin.Context) {
 		return
 	}
 
-	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ?", id, merchantID).Update("stock", req.Stock)
+	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).Update("stock", req.Stock)
 	if result.RowsAffected == 0 {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return

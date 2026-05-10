@@ -176,6 +176,7 @@ CREATE TABLE `merchant_staffs` (
     `name` VARCHAR(64) DEFAULT NULL COMMENT '姓名',
     `phone` VARCHAR(20) DEFAULT NULL COMMENT '手机号',
     `role` VARCHAR(32) NOT NULL DEFAULT 'staff' COMMENT '角色：owner/manager/staff',
+    `notify_enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '订单提示音开关',
     `status` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '状态：0禁用 1正常',
     `last_login_at` DATETIME DEFAULT NULL COMMENT '最后登录时间',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

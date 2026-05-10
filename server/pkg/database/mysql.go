@@ -29,6 +29,10 @@ func InitDB(cfg *config.Database) error {
 		return fmt.Errorf("数据库连接失败: %w", err)
 	}
 
+	if err := ensureMerchantStaffNotifyEnabledColumn(DB); err != nil {
+		return fmt.Errorf("初始化商家员工提示音字段失败: %w", err)
+	}
+
 	// 获取底层 sql.DB
 	sqlDB, err := DB.DB()
 	if err != nil {
@@ -42,6 +46,29 @@ func InitDB(cfg *config.Database) error {
 
 	log.Println("数据库连接成功")
 	return nil
+}
+
+func ensureMerchantStaffNotifyEnabledColumn(db *gorm.DB) error {
+	var count int64
+	queryErr := db.Raw(`
+		SELECT COUNT(*)
+		FROM INFORMATION_SCHEMA.COLUMNS
+		WHERE TABLE_SCHEMA = DATABASE()
+		  AND TABLE_NAME = 'merchant_staffs'
+		  AND COLUMN_NAME = 'notify_enabled'
+	`).Scan(&count).Error
+	if queryErr != nil {
+		return queryErr
+	}
+
+	if count > 0 {
+		return nil
+	}
+
+	return db.Exec(`
+		ALTER TABLE merchant_staffs
+		ADD COLUMN notify_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '订单提示音开关' AFTER role
+	`).Error
 }
 
 // GetDB 获取数据库实例

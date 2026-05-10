@@ -4,6 +4,9 @@ FROM golang:1.21-alpine AS builder
 # 设置工作目录
 WORKDIR /app
 
+# 使用更稳定的 Go 模块代理，避免 Docker 构建阶段偶发拉取失败。
+ENV GOPROXY=https://goproxy.cn,direct
+
 # 安装构建依赖
 RUN apk add --no-cache git
 
