@@ -531,3 +531,274 @@ func UpdateSettings(c *gin.Context) {
 
 	response.Success(c, gin.H{"message": "设置成功"})
 }
+
+func GetMerchantApplications(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	status := c.Query("status")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	query := database.DB.Model(&models.MerchantApplication{}).Preload("Merchant")
+
+	if status != "" {
+		statusInt, _ := strconv.Atoi(status)
+		query = query.Where("status = ?", statusInt)
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var applications []models.MerchantApplication
+	offset := (page - 1) * pageSize
+	if err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&applications).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取申请列表失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"list": applications,
+		"pagination": gin.H{
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
+	})
+}
+
+func GetMerchantApplicationDetail(c *gin.Context) {
+	id := c.Param("id")
+
+	var application models.MerchantApplication
+	if err := database.DB.Preload("Merchant").First(&application, id).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "申请不存在")
+		return
+	}
+
+	response.Success(c, application)
+}
+
+func SubmitMerchantApplication(c *gin.Context) {
+	id := c.Param("id")
+
+	var application models.MerchantApplication
+	if err := database.DB.First(&application, id).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "申请不存在")
+		return
+	}
+
+	now := time.Now()
+	if err := database.DB.Model(&application).Updates(map[string]interface{}{
+		"status":      1,
+		"submit_time": now,
+	}).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "提交申请失败")
+		return
+	}
+
+	response.Success(c, gin.H{"message": "提交成功"})
+}
+
+func GetMerchantApplicationStatus(c *gin.Context) {
+	id := c.Param("id")
+
+	var application models.MerchantApplication
+	if err := database.DB.Select("id, status, audit_detail, audit_time").First(&application, id).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "申请不存在")
+		return
+	}
+
+	response.Success(c, application)
+}
+
+func GetActivities(c *gin.Context) {
+	var banners []models.Activity
+	var announcements []models.Activity
+
+	database.DB.Where("type = ? AND status = ?", "banner", 1).Order("sort ASC, created_at DESC").Find(&banners)
+	database.DB.Where("type = ? AND status = ?", "announcement", 1).Order("sort ASC, created_at DESC").Find(&announcements)
+
+	response.Success(c, gin.H{
+		"banners":      banners,
+		"announcements": announcements,
+	})
+}
+
+type CreateActivityRequest struct {
+	Type      string `json:"type" binding:"required,oneof=banner announcement"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Image     string `json:"image"`
+	LinkType  string `json:"link_type" binding:"omitempty,oneof=merchant webview none"`
+	LinkValue string `json:"link_value"`
+	Sort      uint   `json:"sort"`
+	Status    uint8  `json:"status" binding:"omitempty,oneof=0 1"`
+}
+
+func CreateActivity(c *gin.Context) {
+	var req CreateActivityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	activity := models.Activity{
+		Type:      req.Type,
+		Title:     req.Title,
+		Content:   req.Content,
+		Image:     req.Image,
+		LinkType:  req.LinkType,
+		LinkValue: req.LinkValue,
+		Sort:      req.Sort,
+		Status:    1,
+	}
+	if req.Status > 0 {
+		activity.Status = req.Status
+	}
+
+	if err := database.DB.Create(&activity).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建活动失败")
+		return
+	}
+
+	response.Success(c, gin.H{"id": activity.ID, "message": "创建成功"})
+}
+
+func UpdateActivity(c *gin.Context) {
+	id := c.Param("id")
+	activityID, _ := strconv.ParseUint(id, 10, 64)
+
+	var req CreateActivityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var activity models.Activity
+	if err := database.DB.First(&activity, activityID).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "活动不存在")
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.Type != "" {
+		updates["type"] = req.Type
+	}
+	if req.Title != "" {
+		updates["title"] = req.Title
+	}
+	if req.Content != "" {
+		updates["content"] = req.Content
+	}
+	if req.Image != "" {
+		updates["image"] = req.Image
+	}
+	if req.LinkType != "" {
+		updates["link_type"] = req.LinkType
+	}
+	if req.LinkValue != "" {
+		updates["link_value"] = req.LinkValue
+	}
+	if req.Sort > 0 {
+		updates["sort"] = req.Sort
+	}
+	if req.Status > 0 {
+		updates["status"] = req.Status
+	}
+
+	if err := database.DB.Model(&activity).Updates(updates).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新活动失败")
+		return
+	}
+
+	database.DB.First(&activity, activityID)
+	response.Success(c, activity)
+}
+
+func DeleteActivity(c *gin.Context) {
+	id := c.Param("id")
+	activityID, _ := strconv.ParseUint(id, 10, 64)
+
+	var activity models.Activity
+	if err := database.DB.First(&activity, activityID).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "活动不存在")
+		return
+	}
+
+	if err := database.DB.Model(&activity).Update("status", 0).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "删除活动失败")
+		return
+	}
+
+	response.Success(c, gin.H{"message": "删除成功"})
+}
+
+type WechatConfig struct {
+	AppID         string                 `json:"app_id"`
+	AppSecret     string                 `json:"app_secret"`
+	Token         string                 `json:"token"`
+	EncodingAESKey string               `json:"encoding_aes_key"`
+	TemplateIDs   map[string]string      `json:"template_ids"`
+	Enabled       bool                   `json:"enabled"`
+}
+
+func GetWechatConfig(c *gin.Context) {
+	var sp models.ServiceProvider
+	if err := database.DB.First(&sp).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
+		return
+	}
+
+	config := WechatConfig{
+		AppID:   sp.MchID,
+		Enabled: true,
+		TemplateIDs: map[string]string{
+			"order_new":  "",
+			"order_paid": "",
+			"order_refund": "",
+		},
+	}
+	response.Success(c, config)
+}
+
+type UpdateWechatConfigRequest struct {
+	AppID          string            `json:"app_id"`
+	AppSecret      string            `json:"app_secret"`
+	Token          string            `json:"token"`
+	EncodingAESKey string            `json:"encoding_aes_key"`
+	TemplateIDs    map[string]string `json:"template_ids"`
+}
+
+func UpdateWechatConfig(c *gin.Context) {
+	var req UpdateWechatConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var sp models.ServiceProvider
+	if err := database.DB.First(&sp).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.AppID != "" {
+		updates["mch_id"] = req.AppID
+	}
+	if req.AppSecret != "" {
+		updates["api_key"] = req.AppSecret
+	}
+
+	if err := database.DB.Model(&sp).Updates(updates).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新配置失败")
+		return
+	}
+
+	response.Success(c, gin.H{"message": "更新成功"})
+}

@@ -10,6 +10,7 @@ import (
 	"fz_yyc_api/internal/handlers/sp"
 	"fz_yyc_api/internal/handlers/upload"
 	"fz_yyc_api/internal/handlers/user"
+	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
@@ -70,6 +71,17 @@ func setupRoutes(r *gin.Engine) {
 	// API v1 路由组
 	v1 := r.Group("/api/v1")
 	{
+		wsGroup := v1.Group("/ws")
+		wsGroup.Use(middleware.JWTAuth())
+		{
+			wsGroup.GET("/merchant", wsHandler.MerchantWS)
+		}
+
+		devGroup := v1.Group("/dev")
+		{
+			devGroup.POST("/order-notify", wsHandler.DevOrderNotify)
+		}
+
 		// 认证相关
 		authGroup := v1.Group("/auth")
 		{
@@ -106,38 +118,42 @@ func setupRoutes(r *gin.Engine) {
 			userGroup.POST("/orders/:order_id/refund", user.ApplyRefund)
 		}
 
-		// 服务商管理员接口
+		// 服务商管理员接口 - 向后兼容性保留，重定向到 /sp
 		adminGroup := v1.Group("/admin")
 		adminGroup.Use(middleware.JWTAuth())
 		{
-			// 服务商配置
-			adminGroup.GET("/service-provider", admin.GetServiceProvider)
-			adminGroup.PUT("/service-provider", admin.UpdateServiceProvider)
+			// 服务商配置 - 重定向到 /sp/settings
+			adminGroup.GET("/service-provider", sp.GetSettings)
+			adminGroup.PUT("/service-provider", sp.UpdateSettings)
 
 			// 商家进件管理
-			adminGroup.GET("/merchant-applications", admin.GetMerchantApplications)
-			adminGroup.GET("/merchant-applications/:id", admin.GetMerchantApplicationDetail)
-			adminGroup.POST("/merchant-applications/:id/submit", admin.SubmitMerchantApplication)
-			adminGroup.GET("/merchant-applications/:id/status", admin.GetMerchantApplicationStatus)
+			adminGroup.GET("/merchant-applications", sp.GetMerchantApplications)
+			adminGroup.GET("/merchant-applications/:id", sp.GetMerchantApplicationDetail)
+			adminGroup.POST("/merchant-applications/:id/submit", sp.SubmitMerchantApplication)
+			adminGroup.GET("/merchant-applications/:id/status", sp.GetMerchantApplicationStatus)
 
 			// 商家审核
-			adminGroup.GET("/merchants/pending", admin.GetPendingMerchants)
-			adminGroup.POST("/merchants/:merchant_id/audit", admin.AuditMerchant)
+			adminGroup.GET("/merchants/pending", sp.GetPendingMerchants)
+			adminGroup.POST("/merchants/:merchant_id/audit", sp.AuditMerchant)
 
 			// 数据看板
-			adminGroup.GET("/dashboard", admin.GetDashboard)
+			adminGroup.GET("/dashboard", sp.GetDashboard)
 
 			// 活动管理
-			adminGroup.GET("/activities", admin.GetActivities)
-			adminGroup.POST("/activities", admin.CreateActivity)
-			adminGroup.PUT("/activities/:id", admin.UpdateActivity)
-			adminGroup.DELETE("/activities/:id", admin.DeleteActivity)
+			adminGroup.GET("/activities", sp.GetActivities)
+			adminGroup.POST("/activities", sp.CreateActivity)
+			adminGroup.PUT("/activities/:id", sp.UpdateActivity)
+			adminGroup.DELETE("/activities/:id", sp.DeleteActivity)
 
 			// 系统公告管理
-			adminGroup.GET("/announcements", admin.GetAnnouncements)
-			adminGroup.POST("/announcements", admin.CreateAnnouncement)
-			adminGroup.PUT("/announcements/:id", admin.UpdateAnnouncement)
-			adminGroup.DELETE("/announcements/:id", admin.DeleteAnnouncement)
+			adminGroup.GET("/announcements", sp.GetAnnouncements)
+			adminGroup.POST("/announcements", sp.CreateAnnouncement)
+			adminGroup.PUT("/announcements/:id", sp.UpdateAnnouncement)
+			adminGroup.DELETE("/announcements/:id", sp.DeleteAnnouncement)
+
+			// 服务号配置
+			adminGroup.GET("/wechat-config", sp.GetWechatConfig)
+			adminGroup.PUT("/wechat-config", sp.UpdateWechatConfig)
 		}
 
 		// 商家管理员接口
@@ -155,6 +171,7 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.GET("/application/status", merchant.GetApplicationStatus)
 			merchantGroup.GET("/qrcode", merchant.GetQRCode)
 			merchantGroup.GET("/delivery-settings", merchant.GetDeliverySettings)
+			merchantGroup.PUT("/delivery-settings", merchant.UpdateDeliverySettings)
 
 			// 员工管理
 			merchantGroup.GET("/staff", merchant.GetStaffList)
@@ -228,6 +245,22 @@ func setupRoutes(r *gin.Engine) {
 			spGroup.POST("/announcements", sp.CreateAnnouncement)
 			spGroup.PUT("/announcements/:id", sp.UpdateAnnouncement)
 			spGroup.DELETE("/announcements/:id", sp.DeleteAnnouncement)
+
+			// 商家进件管理
+			spGroup.GET("/merchant-applications", sp.GetMerchantApplications)
+			spGroup.GET("/merchant-applications/:id", sp.GetMerchantApplicationDetail)
+			spGroup.POST("/merchant-applications/:id/submit", sp.SubmitMerchantApplication)
+			spGroup.GET("/merchant-applications/:id/status", sp.GetMerchantApplicationStatus)
+
+			// 活动管理
+			spGroup.GET("/activities", sp.GetActivities)
+			spGroup.POST("/activities", sp.CreateActivity)
+			spGroup.PUT("/activities/:id", sp.UpdateActivity)
+			spGroup.DELETE("/activities/:id", sp.DeleteActivity)
+
+			// 服务号配置
+			spGroup.GET("/wechat-config", sp.GetWechatConfig)
+			spGroup.PUT("/wechat-config", sp.UpdateWechatConfig)
 		}
 
 		// 微信支付回调

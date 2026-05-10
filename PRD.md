@@ -685,36 +685,7 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 
 ### 3.1 认证相关接口
 
-#### 3.1.1 服务商管理员登录
-```
-POST /api/v1/admin/auth/login
-```
-
-**请求参数：**
-```json
-{
-  "username": "管理员账号",
-  "password": "密码"
-}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "token": "JWT Token",
-    "admin": {
-      "id": 1,
-      "username": "admin",
-      "name": "管理员名称",
-      "role": "service_provider"
-    }
-  }
-}
-```
-
-#### 3.1.2 商家管理员登录
+#### 3.1.1 商家管理员登录
 ```
 POST /api/v1/merchant/auth/login
 ```
@@ -727,7 +698,7 @@ POST /api/v1/merchant/auth/login
 }
 ```
 
-#### 3.1.3 C端用户微信登录
+#### 3.1.2 C端用户微信登录
 ```
 POST /api/v1/user/auth/wechat-login
 ```
@@ -741,11 +712,671 @@ POST /api/v1/user/auth/wechat-login
 }
 ```
 
-### 3.2 服务商管理接口
+### 3.2 服务商小程序接口
 
-#### 3.2.1 商家进件申请列表
+#### 3.2.1 服务商管理员登录
 ```
-GET /api/v1/admin/merchant-applications
+POST /api/v1/sp/auth/login
+```
+
+**请求参数：**
+```json
+{
+  "username": "服务商账号",
+  "password": "密码"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "token": "JWT Token",
+    "service_provider": {
+      "id": 1,
+      "name": "服务商名称",
+      "admin_name": "管理员姓名"
+    }
+  }
+}
+```
+
+#### 3.2.2 服务商首页数据看板
+```
+GET /api/v1/sp/dashboard
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "summary": {
+      "total_merchants": 128,
+      "today_orders": 1256,
+      "today_amount": 58960.00,
+      "avg_order_amount": 46.95
+    },
+    "merchant_distribution": {
+      "categories": [
+        {"name": "餐饮", "count": 58, "percentage": 45.3},
+        {"name": "零售", "count": 38, "percentage": 29.7},
+        {"name": "服务", "count": 19, "percentage": 14.8},
+        {"name": "其他", "count": 13, "percentage": 10.2}
+      ]
+    },
+    "order_trend": {
+      "dates": ["2024-01-01", "2024-01-02", "..."],
+      "orders": [120, 145, "..."]
+    },
+    "pending_tasks": {
+      "merchant_approvals": 3,
+      "order_issues": 12
+    }
+  }
+}
+```
+
+#### 3.2.3 商家入驻审核列表
+```
+GET /api/v1/sp/merchants/pending
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| page | int | 否 | 页码 |
+| page_size | int | 否 | 每页数量 |
+| status | string | 否 | 状态：pending/approved/rejected |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "name": "美味餐厅",
+        "contact_name": "张三",
+        "contact_phone": "13800138000",
+        "business_category": "餐饮",
+        "address": "店铺地址",
+        "status": "pending",
+        "created_at": "2024-01-01T10:00:00Z"
+      }
+    ],
+    "total": 50,
+    "page": 1,
+    "page_size": 10
+  }
+}
+```
+
+#### 3.2.4 商家详情查看
+```
+GET /api/v1/sp/merchants/{merchant_id}
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "id": 1,
+    "name": "美味餐厅",
+    "contact_name": "张三",
+    "contact_phone": "13800138000",
+    "business_category": "餐饮",
+    "address": "店铺地址",
+    "license": {
+      "license_no": "营业执照号",
+      "license_name": "营业执照名称",
+      "license_image": "图片URL",
+      "legal_person": "法人姓名",
+      "legal_person_id": "身份证号",
+      "legal_person_id_front": "身份证正面",
+      "legal_person_id_back": "身份证反面",
+      "valid_from": "2020-01-01",
+      "valid_to": "2030-01-01"
+    },
+    "bank_account": {
+      "bank_name": "开户银行",
+      "bank_branch": "开户支行",
+      "account_no": "银行账号",
+      "account_name": "账户名称"
+    },
+    "store_info": {
+      "store_name": "门店名称",
+      "store_images": ["门头照", "内景照"]
+    },
+    "status": "pending",
+    "created_at": "2024-01-01T10:00:00Z"
+  }
+}
+```
+
+#### 3.2.5 商家审核操作
+```
+POST /api/v1/sp/merchants/{merchant_id}/approve
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "status": "approved",
+  "remark": "审核通过"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "审核成功"
+}
+```
+
+#### 3.2.6 商家数据分析
+```
+GET /api/v1/sp/merchants/analytics/distribution
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "by_category": [
+      {"name": "餐饮", "count": 58, "percentage": 45.3},
+      {"name": "零售", "count": 38, "percentage": 29.7},
+      {"name": "服务", "count": 19, "percentage": 14.8},
+      {"name": "其他", "count": 13, "percentage": 10.2}
+    ],
+    "by_status": [
+      {"name": "营业中", "count": 100, "percentage": 78.1},
+      {"name": "休息中", "count": 15, "percentage": 11.7},
+      {"name": "已关闭", "count": 13, "percentage": 10.2}
+    ],
+    "by_month": [
+      {"month": "2024-01", "count": 15},
+      {"month": "2024-02", "count": 22}
+    ]
+  }
+}
+```
+
+#### 3.2.7 商家列表
+```
+GET /api/v1/sp/merchants/list
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| page | int | 否 | 页码 |
+| page_size | int | 否 | 每页数量 |
+| keyword | string | 否 | 搜索关键词 |
+| category | string | 否 | 行业分类 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "name": "美味餐厅",
+        "business_category": "餐饮",
+        "status": "active",
+        "total_orders": 1256,
+        "total_amount": 58960.00,
+        "created_at": "2024-01-01"
+      }
+    ],
+    "total": 128,
+    "page": 1,
+    "page_size": 10
+  }
+}
+```
+
+#### 3.2.8 订单数据分析
+```
+GET /api/v1/sp/orders/analytics
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| period | string | 否 | 周期：today/week/month/year/custom |
+| start_date | string | 否 | 开始日期 |
+| end_date | string | 否 | 结束日期 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "summary": {
+      "total_orders": 125600,
+      "total_amount": 5896000.00,
+      "today_orders": 1256,
+      "today_amount": 58960.00,
+      "avg_order_amount": 46.95
+    },
+    "trend": [
+      {"date": "2024-01-01", "orders": 1200, "amount": 56400.00}
+    ],
+    "by_delivery_type": [
+      {"type": "配送", "count": 800, "percentage": 63.7},
+      {"type": "堂食", "count": 300, "percentage": 23.9},
+      {"type": "自提", "count": 156, "percentage": 12.4}
+    ]
+  }
+}
+```
+
+#### 3.2.9 金额数据分析
+```
+GET /api/v1/sp/amount/analytics
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| period | string | 否 | 周期：today/week/month/year |
+| start_date | string | 否 | 开始日期 |
+| end_date | string | 否 | 结束日期 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "summary": {
+      "total_amount": 5896000.00,
+      "today_amount": 58960.00,
+      "week_amount": 412720.00,
+      "month_amount": 1766400.00,
+      "growth_rate": 15.5
+    },
+    "trend": [
+      {"date": "2024-01-01", "amount": 56400.00}
+    ],
+    "by_merchant": [
+      {"merchant_id": 1, "merchant_name": "美味餐厅", "amount": 589600.00, "percentage": 10.0}
+    ],
+    "by_category": [
+      {"category": "餐饮", "amount": 2948000.00, "percentage": 50.0}
+    ]
+  }
+}
+```
+
+#### 3.2.10 TOP商家排行
+```
+GET /api/v1/sp/amount/top-merchants
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| period | string | 否 | 周期 |
+| limit | int | 否 | 返回数量，默认10 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": [
+    {"rank": 1, "merchant_id": 1, "merchant_name": "美味餐厅", "amount": 589600.00},
+    {"rank": 2, "merchant_id": 2, "merchant_name": "隔壁小馆", "amount": 412720.00}
+  ]
+}
+```
+
+#### 3.2.11 服务商审核记录查询
+```
+GET /api/v1/sp/merchants/audit-records
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| page | int | 否 | 页码 |
+| page_size | int | 否 | 每页数量 |
+| merchant_id | int | 否 | 商家ID |
+| start_time | string | 否 | 开始时间 |
+| end_time | string | 否 | 结束时间 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "merchant_id": 123,
+        "merchant_name": "美味餐厅",
+        "audit_type": "entry",
+        "old_status": "pending",
+        "new_status": "approved",
+        "admin_name": "管理员",
+        "remark": "审核通过",
+        "created_at": "2024-01-15 10:30:00"
+      }
+    ],
+    "total": 50
+  }
+}
+```
+
+#### 3.2.12 商家年费管理
+```
+GET /api/v1/sp/merchants/{id}/fee
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "merchant_id": 123,
+    "merchant_name": "美味餐厅",
+    "fees": [
+      {
+        "year": 2024,
+        "amount": 365.00,
+        "status": "paid",
+        "pay_time": "2024-01-01 00:00:00",
+        "free_reason": ""
+      },
+      {
+        "year": 2025,
+        "amount": 0.00,
+        "status": "free",
+        "pay_time": null,
+        "free_reason": "限时优惠免年费"
+      }
+    ]
+  }
+}
+```
+
+#### 3.2.13 商家手续费率管理
+```
+GET /api/v1/sp/merchants/{id}/rate
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "merchant_id": 123,
+    "merchant_name": "美味餐厅",
+    "current_rate": 0.0038,
+    "min_rate": 0.002,
+    "max_rate": 0.006,
+    "rates": [
+      {
+        "rate_type": "default",
+        "rate": 0.0038,
+        "effective_time": "2024-01-01 00:00:00",
+        "expire_time": null,
+        "status": 1
+      }
+    ]
+  }
+}
+```
+
+#### 3.2.14 设置商家手续费率
+```
+POST /api/v1/sp/merchants/{id}/rate
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "rate": 0.002,
+  "effective_time": "2024-02-01 00:00:00",
+  "expire_time": "2024-12-31 23:59:59",
+  "remark": "优惠活动最低费率"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "设置成功"
+}
+```
+
+#### 3.2.15 服务商退出登录
+```
+POST /api/v1/sp/auth/logout
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "退出成功"
+}
+```
+
+#### 3.2.16 获取商家二维码
+```
+GET /api/v1/sp/merchants/{id}/qrcode
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "merchant_id": 123,
+    "merchant_name": "美味餐厅",
+    "qrcode_url": "https://example.com/qrcode/123.png",
+    "page_path": "pages/shop/index?merchant_id=123"
+  }
+}
+```
+
+#### 3.2.17 系统公告列表
+```
+GET /api/v1/sp/announcements
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| page | int | 否 | 页码 |
+| page_size | int | 否 | 每页数量 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "title": "系统升级通知",
+        "content": "平台将于本周六进行系统升级",
+        "create_time": "2024-01-15 10:30:00"
+      }
+    ],
+    "total": 10
+  }
+}
+```
+
+#### 3.2.18 创建系统公告
+```
+POST /api/v1/sp/announcements
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "title": "系统公告标题",
+  "content": "公告内容"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "创建成功"
+}
+```
+
+#### 3.2.19 更新系统公告
+```
+PUT /api/v1/sp/announcements/{id}
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "title": "更新后的标题",
+  "content": "更新后的内容"
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "更新成功"
+}
+```
+
+#### 3.2.20 删除系统公告
+```
+DELETE /api/v1/sp/announcements/{id}
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "删除成功"
+}
+```
+
+#### 3.2.21 退款订单查询(服务商)
+```
+GET /api/v1/sp/orders/refunds
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| page | int | 否 | 页码 |
+| page_size | int | 否 | 每页数量 |
+| merchant_id | int | 否 | 商家ID |
+| status | string | 否 | 退款状态 |
+| start_time | string | 否 | 开始时间 |
+| end_time | string | 否 | 结束时间 |
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "order_id": "ORD202401150001",
+        "merchant_name": "美味餐厅",
+        "amount": 100.00,
+        "refund_amount": 100.00,
+        "status": "success",
+        "create_time": "2024-01-15 10:30:00",
+        "complete_time": "2024-01-15 10:35:00"
+      }
+    ],
+    "total": 20
+  }
+}
+```
+
+#### 3.2.22 服务商设置
+```
+GET /api/v1/sp/settings
+Authorization: Bearer {token}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "data": {
+    "service_provider_id": 1,
+    "name": "服务商名称",
+    "contact_name": "联系人",
+    "contact_phone": "13800138000",
+    "notify_enabled": true,
+    "notify_types": ["approval", "refund", "order"]
+  }
+}
+```
+
+#### 3.2.23 更新服务商设置
+```
+PUT /api/v1/sp/settings
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+```json
+{
+  "contact_name": "新联系人",
+  "contact_phone": "13900139000",
+  "notify_enabled": true,
+  "notify_types": ["approval", "refund"]
+}
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "更新成功"
+}
+```
+
+#### 3.2.24 商家进件申请列表
+```
+GET /api/v1/sp/merchant-applications
 Authorization: Bearer {token}
 ```
 
@@ -781,9 +1412,9 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.4 商家进件详情
+#### 3.2.25 商家进件详情
 ```
-GET /api/v1/admin/merchant-applications/{application_id}
+GET /api/v1/sp/merchant-applications/{application_id}
 Authorization: Bearer {token}
 ```
 
@@ -830,9 +1461,9 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.5 提交商家进件（向微信支付申请）
+#### 3.2.26 提交商家进件（向微信支付申请）
 ```
-POST /api/v1/admin/merchant-applications/{application_id}/submit
+POST /api/v1/sp/merchant-applications/{application_id}/submit
 Authorization: Bearer {token}
 ```
 
@@ -847,9 +1478,9 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.6 查询进件状态
+#### 3.2.27 查询进件状态
 ```
-GET /api/v1/admin/merchant-applications/{application_id}/status
+GET /api/v1/sp/merchant-applications/{application_id}/status
 Authorization: Bearer {token}
 ```
 
@@ -866,67 +1497,9 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.7 商家审核列表（平台审核）
+#### 3.2.28 首页活动管理 - 获取活动列表
 ```
-GET /api/v1/admin/merchants/pending
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| status | string | 否 | 审核状态：pending/approved/rejected |
-
-#### 3.2.8 审核商家（平台审核）
-```
-POST /api/v1/admin/merchants/{merchant_id}/audit
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-```json
-{
-  "status": "approved",
-  "remark": "审核备注"
-}
-```
-
-#### 3.2.9 服务商数据看板
-```
-GET /api/v1/admin/dashboard
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "total_merchants": 100,
-    "active_merchants": 80,
-    "pending_applications": 5,
-    "total_orders": 10000,
-    "total_sales": 500000.00,
-    "today_orders": 150,
-    "today_sales": 7500.00,
-    "order_trend": [
-      {"date": "2024-01-01", "orders": 120, "sales": 6000.00}
-    ]
-  }
-}
-```
-
-#### 3.2.10 首页活动管理 - 获取活动列表
-```
-GET /api/v1/admin/activities
+GET /api/v1/sp/activities
 Authorization: Bearer {token}
 ```
 
@@ -956,9 +1529,9 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.11 首页活动管理 - 创建/更新活动
+#### 3.2.29 首页活动管理 - 创建活动
 ```
-POST /api/v1/admin/activities
+POST /api/v1/sp/activities
 Authorization: Bearer {token}
 ```
 
@@ -981,575 +1554,28 @@ Authorization: Bearer {token}
 | webview | 网页链接 |
 | none | 无跳转 |
 
-### 3.2.12 服务商小程序接口
-
-#### 3.2.12.1 服务商管理员登录
+#### 3.2.30 首页活动管理 - 更新活动
 ```
-POST /api/v1/sp/auth/login
-```
-
-**请求参数：**
-```json
-{
-  "username": "服务商账号",
-  "password": "密码"
-}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "token": "JWT Token",
-    "service_provider": {
-      "id": 1,
-      "name": "服务商名称",
-      "admin_name": "管理员姓名"
-    }
-  }
-}
-```
-
-#### 3.2.12.2 服务商首页数据看板
-```
-GET /api/v1/sp/dashboard
-Authorization: Bearer {token}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "summary": {
-      "total_merchants": 128,
-      "today_orders": 1256,
-      "today_amount": 58960.00,
-      "avg_order_amount": 46.95
-    },
-    "merchant_distribution": {
-      "categories": [
-        {"name": "餐饮", "count": 58, "percentage": 45.3},
-        {"name": "零售", "count": 38, "percentage": 29.7},
-        {"name": "服务", "count": 19, "percentage": 14.8},
-        {"name": "其他", "count": 13, "percentage": 10.2}
-      ]
-    },
-    "order_trend": {
-      "dates": ["2024-01-01", "2024-01-02", "..."],
-      "orders": [120, 145, "..."]
-    },
-    "pending_tasks": {
-      "merchant_approvals": 3,
-      "order_issues": 12
-    }
-  }
-}
-```
-
-#### 3.2.12.3 商家入驻审核列表
-```
-GET /api/v1/sp/merchants/pending
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| status | string | 否 | 状态：pending/approved/rejected |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "list": [
-      {
-        "id": 1,
-        "name": "美味餐厅",
-        "contact_name": "张三",
-        "contact_phone": "13800138000",
-        "business_category": "餐饮",
-        "address": "店铺地址",
-        "status": "pending",
-        "created_at": "2024-01-01T10:00:00Z"
-      }
-    ],
-    "total": 50,
-    "page": 1,
-    "page_size": 10
-  }
-}
-```
-
-#### 3.2.12.4 商家详情查看
-```
-GET /api/v1/sp/merchants/{merchant_id}
-Authorization: Bearer {token}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "id": 1,
-    "name": "美味餐厅",
-    "contact_name": "张三",
-    "contact_phone": "13800138000",
-    "business_category": "餐饮",
-    "address": "店铺地址",
-    "license": {
-      "license_no": "营业执照号",
-      "license_name": "营业执照名称",
-      "license_image": "图片URL",
-      "legal_person": "法人姓名",
-      "legal_person_id": "身份证号",
-      "legal_person_id_front": "身份证正面",
-      "legal_person_id_back": "身份证反面",
-      "valid_from": "2020-01-01",
-      "valid_to": "2030-01-01"
-    },
-    "bank_account": {
-      "bank_name": "开户银行",
-      "bank_branch": "开户支行",
-      "account_no": "银行账号",
-      "account_name": "账户名称"
-    },
-    "store_info": {
-      "store_name": "门店名称",
-      "store_images": ["门头照", "内景照"]
-    },
-    "status": "pending",
-    "created_at": "2024-01-01T10:00:00Z"
-  }
-}
-```
-
-#### 3.2.12.5 商家审核操作
-```
-POST /api/v1/sp/merchants/{merchant_id}/approve
+PUT /api/v1/sp/activities/{id}
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
 ```json
 {
-  "status": "approved",
-  "remark": "审核通过"
+  "type": "banner",
+  "title": "新商家入驻优惠",
+  "image": "图片URL",
+  "link_type": "webview",
+  "link_value": "https://example.com/promo",
+  "sort": 1,
+  "status": 1
 }
 ```
 
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "审核成功"
-}
+#### 3.2.31 首页活动管理 - 删除活动
 ```
-
-#### 3.2.12.6 商家数据分析
-```
-GET /api/v1/sp/merchants/analytics/distribution
-Authorization: Bearer {token}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "by_category": [
-      {"name": "餐饮", "count": 58, "percentage": 45.3},
-      {"name": "零售", "count": 38, "percentage": 29.7},
-      {"name": "服务", "count": 19, "percentage": 14.8},
-      {"name": "其他", "count": 13, "percentage": 10.2}
-    ],
-    "by_status": [
-      {"name": "营业中", "count": 100, "percentage": 78.1},
-      {"name": "休息中", "count": 15, "percentage": 11.7},
-      {"name": "已关闭", "count": 13, "percentage": 10.2}
-    ],
-    "by_month": [
-      {"month": "2024-01", "count": 15},
-      {"month": "2024-02", "count": 22}
-    ]
-  }
-}
-```
-
-#### 3.2.12.7 商家列表
-```
-GET /api/v1/sp/merchants/list
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| keyword | string | 否 | 搜索关键词 |
-| category | string | 否 | 行业分类 |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "list": [
-      {
-        "id": 1,
-        "name": "美味餐厅",
-        "business_category": "餐饮",
-        "status": "active",
-        "total_orders": 1256,
-        "total_amount": 58960.00,
-        "created_at": "2024-01-01"
-      }
-    ],
-    "total": 128,
-    "page": 1,
-    "page_size": 10
-  }
-}
-```
-
-#### 3.2.12.8 订单数据分析
-```
-GET /api/v1/sp/orders/analytics
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| period | string | 否 | 周期：today/week/month/year/custom |
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "summary": {
-      "total_orders": 125600,
-      "total_amount": 5896000.00,
-      "today_orders": 1256,
-      "today_amount": 58960.00,
-      "avg_order_amount": 46.95
-    },
-    "trend": [
-      {"date": "2024-01-01", "orders": 1200, "amount": 56400.00}
-    ],
-    "by_delivery_type": [
-      {"type": "配送", "count": 800, "percentage": 63.7},
-      {"type": "堂食", "count": 300, "percentage": 23.9},
-      {"type": "自提", "count": 156, "percentage": 12.4}
-    ]
-  }
-}
-```
-
-#### 3.2.12.9 金额数据分析
-```
-GET /api/v1/sp/amount/analytics
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| period | string | 否 | 周期：today/week/month/year |
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "summary": {
-      "total_amount": 5896000.00,
-      "today_amount": 58960.00,
-      "week_amount": 412720.00,
-      "month_amount": 1766400.00,
-      "growth_rate": 15.5
-    },
-    "trend": [
-      {"date": "2024-01-01", "amount": 56400.00}
-    ],
-    "by_merchant": [
-      {"merchant_id": 1, "merchant_name": "美味餐厅", "amount": 589600.00, "percentage": 10.0}
-    ],
-    "by_category": [
-      {"category": "餐饮", "amount": 2948000.00, "percentage": 50.0}
-    ]
-  }
-}
-```
-
-#### 3.2.12.10 TOP商家排行
-```
-GET /api/v1/sp/amount/top-merchants
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| period | string | 否 | 周期 |
-| limit | int | 否 | 返回数量，默认10 |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": [
-    {"rank": 1, "merchant_id": 1, "merchant_name": "美味餐厅", "amount": 589600.00},
-    {"rank": 2, "merchant_id": 2, "merchant_name": "隔壁小馆", "amount": 412720.00}
-  ]
-}
-```
-
-#### 3.2.12.11 服务商审核记录查询
-```
-GET /api/v1/sp/merchants/audit-records
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| merchant_id | int | 否 | 商家ID |
-| start_time | string | 否 | 开始时间 |
-| end_time | string | 否 | 结束时间 |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "list": [
-      {
-        "id": 1,
-        "merchant_id": 123,
-        "merchant_name": "美味餐厅",
-        "audit_type": "entry",
-        "old_status": "pending",
-        "new_status": "approved",
-        "admin_name": "管理员",
-        "remark": "审核通过",
-        "created_at": "2024-01-15 10:30:00"
-      }
-    ],
-    "total": 50
-  }
-}
-```
-
-#### 3.2.12.12 商家年费管理
-```
-GET /api/v1/sp/merchants/{id}/fee
-Authorization: Bearer {token}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "merchant_id": 123,
-    "merchant_name": "美味餐厅",
-    "fees": [
-      {
-        "year": 2024,
-        "amount": 365.00,
-        "status": "paid",
-        "pay_time": "2024-01-01 00:00:00",
-        "free_reason": ""
-      },
-      {
-        "year": 2025,
-        "amount": 0.00,
-        "status": "free",
-        "pay_time": null,
-        "free_reason": "限时优惠免年费"
-      }
-    ]
-  }
-}
-```
-
-#### 3.2.12.13 商家手续费率管理
-```
-GET /api/v1/sp/merchants/{id}/rate
-Authorization: Bearer {token}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "merchant_id": 123,
-    "merchant_name": "美味餐厅",
-    "current_rate": 0.0038,
-    "min_rate": 0.002,
-    "max_rate": 0.006,
-    "rates": [
-      {
-        "rate_type": "default",
-        "rate": 0.0038,
-        "effective_time": "2024-01-01 00:00:00",
-        "expire_time": null,
-        "status": 1
-      }
-    ]
-  }
-}
-```
-
-#### 3.2.12.14 设置商家手续费率
-```
-POST /api/v1/sp/merchants/{id}/rate
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-```json
-{
-  "rate": 0.002,
-  "effective_time": "2024-02-01 00:00:00",
-  "expire_time": "2024-12-31 23:59:59",
-  "remark": "优惠活动最低费率"
-}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "设置成功"
-}
-```
-
-#### 3.2.12.15 服务商退出登录
-```
-POST /api/v1/sp/auth/logout
-Authorization: Bearer {token}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "退出成功"
-}
-```
-
-#### 3.2.12.16 获取商家二维码
-```
-GET /api/v1/sp/merchants/{id}/qrcode
-Authorization: Bearer {token}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "merchant_id": 123,
-    "merchant_name": "美味餐厅",
-    "qrcode_url": "https://example.com/qrcode/123.png",
-    "page_path": "pages/shop/index?merchant_id=123"
-  }
-}
-```
-
-#### 3.2.12.17 系统公告列表
-```
-GET /api/v1/sp/announcements
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "list": [
-      {
-        "id": 1,
-        "title": "系统升级通知",
-        "content": "平台将于本周六进行系统升级",
-        "create_time": "2024-01-15 10:30:00"
-      }
-    ],
-    "total": 10
-  }
-}
-```
-
-#### 3.2.12.18 创建系统公告
-```
-POST /api/v1/sp/announcements
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-```json
-{
-  "title": "系统公告标题",
-  "content": "公告内容"
-}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "创建成功"
-}
-```
-
-#### 3.2.12.19 更新系统公告
-```
-PUT /api/v1/sp/announcements/{id}
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-```json
-{
-  "title": "更新后的标题",
-  "content": "更新后的内容"
-}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "更新成功"
-}
-```
-
-#### 3.2.12.20 删除系统公告
-```
-DELETE /api/v1/sp/announcements/{id}
+DELETE /api/v1/sp/activities/{id}
 Authorization: Bearer {token}
 ```
 
@@ -1561,46 +1587,9 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.2.12.21 退款订单查询(服务商)
+#### 3.2.32 服务号配置
 ```
-GET /api/v1/sp/orders/refunds
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| merchant_id | int | 否 | 商家ID |
-| status | string | 否 | 退款状态 |
-| start_time | string | 否 | 开始时间 |
-| end_time | string | 否 | 结束时间 |
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "list": [
-      {
-        "order_id": "ORD202401150001",
-        "merchant_name": "美味餐厅",
-        "amount": 100.00,
-        "refund_amount": 100.00,
-        "status": "success",
-        "create_time": "2024-01-15 10:30:00",
-        "complete_time": "2024-01-15 10:35:00"
-      }
-    ],
-    "total": 20
-  }
-}
-```
-
-#### 3.2.12.22 服务商设置
-```
-GET /api/v1/sp/settings
+GET /api/v1/sp/wechat-config
 Authorization: Bearer {token}
 ```
 
@@ -1609,37 +1598,35 @@ Authorization: Bearer {token}
 {
   "code": 0,
   "data": {
-    "service_provider_id": 1,
-    "name": "服务商名称",
-    "contact_name": "联系人",
-    "contact_phone": "13800138000",
-    "notify_enabled": true,
-    "notify_types": ["approval", "refund", "order"]
+    "app_id": "wx1234567890",
+    "enabled": true,
+    "template_ids": {
+      "order_new": "模板消息ID",
+      "order_paid": "模板消息ID",
+      "order_refund": "模板消息ID"
+    }
   }
 }
 ```
 
-#### 3.2.12.23 更新服务商设置
+#### 3.2.33 更新服务号配置
 ```
-PUT /api/v1/sp/settings
+PUT /api/v1/sp/wechat-config
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
 ```json
 {
-  "contact_name": "新联系人",
-  "contact_phone": "13900139000",
-  "notify_enabled": true,
-  "notify_types": ["approval", "refund"]
-}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "更新成功"
+  "app_id": "wx1234567890",
+  "app_secret": "AppSecret",
+  "token": "自定义Token",
+  "encoding_aes_key": "43位加密密钥",
+  "template_ids": {
+    "order_new": "模板消息ID",
+    "order_paid": "模板消息ID",
+    "order_refund": "模板消息ID"
+  }
 }
 ```
 
@@ -2163,7 +2150,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.3.27 更新员工信息
+#### 3.3.15 更新员工信息
 ```
 PUT /api/v1/merchant/staff/{id}
 Authorization: Bearer {token}
@@ -2187,7 +2174,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.3.28 删除员工
+#### 3.3.16 删除员工
 ```
 DELETE /api/v1/merchant/staff/{id}
 Authorization: Bearer {token}
@@ -2201,7 +2188,7 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.3.25 商家入驻
+#### 3.3.17 商家入驻
 ```
 POST /api/v1/merchant/register
 ```
@@ -2252,50 +2239,7 @@ POST /api/v1/merchant/register
 }
 ```
 
-### 3.3.19 服务号配置
-```
-GET /api/v1/admin/wechat-config
-Authorization: Bearer {token}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "data": {
-    "app_id": "wx1234567890",
-    "enabled": true,
-    "template_ids": {
-      "order_new": "模板消息ID",
-      "order_paid": "模板消息ID",
-      "order_refund": "模板消息ID"
-    }
-  }
-}
-```
-
-### 3.3.20 更新服务号配置
-```
-PUT /api/v1/admin/wechat-config
-Authorization: Bearer {token}
-```
-
-**请求参数：**
-```json
-{
-  "app_id": "wx1234567890",
-  "app_secret": "AppSecret",
-  "token": "自定义Token",
-  "encoding_aes_key": "43位加密密钥",
-  "template_ids": {
-    "order_new": "模板消息ID",
-    "order_paid": "模板消息ID",
-    "order_refund": "模板消息ID"
-  }
-}
-```
-
-### 3.3.21 商家订阅配置
+#### 3.3.18 商家订阅配置
 ```
 GET /api/v1/merchant/subscriptions
 Authorization: Bearer {token}
@@ -2316,7 +2260,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.22 更新商家订阅配置
+#### 3.3.19 更新商家订阅配置
 ```
 PUT /api/v1/merchant/subscriptions
 Authorization: Bearer {token}
@@ -2340,7 +2284,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.23 获取云打印机列表
+#### 3.3.20 获取云打印机列表
 ```
 GET /api/v1/merchant/printers
 Authorization: Bearer {token}
@@ -2365,7 +2309,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.24 添加云打印机
+#### 3.3.21 添加云打印机
 ```
 POST /api/v1/merchant/printers
 Authorization: Bearer {token}
@@ -2384,7 +2328,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.25 更新云打印机
+#### 3.3.22 更新云打印机
 ```
 PUT /api/v1/merchant/printers/{printer_id}
 Authorization: Bearer {token}
@@ -2399,13 +2343,13 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.26 删除云打印机
+#### 3.3.23 删除云打印机
 ```
 DELETE /api/v1/merchant/printers/{printer_id}
 Authorization: Bearer {token}
 ```
 
-### 3.3.27 测试云打印机
+#### 3.3.24 测试云打印机
 ```
 POST /api/v1/merchant/printers/{printer_id}/test
 Authorization: Bearer {token}
@@ -2422,7 +2366,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.3.28 获取打印记录
+#### 3.3.25 获取打印记录
 ```
 GET /api/v1/merchant/print-logs
 Authorization: Bearer {token}
@@ -4620,7 +4564,7 @@ xm-sp/
 | 数据分析 | /api/v1/merchant/analytics/* | GET | ✅ 已实现 |
 | 系统公告 | /api/v1/merchant/announcements/* | CRUD | 🆕 待开发 |
 | 店铺浏览 | /api/v1/store/{id}/* | GET | ✅ 已实现 |
-| 服务号配置 | /api/v1/admin/wechat-config | GET/PUT | ✅ 已实现 |
+| 服务号配置 | /api/v1/sp/wechat-config | GET/PUT | ✅ 已实现 |
 | 订阅配置 | /api/v1/merchant/subscriptions | GET/PUT | ✅ 已实现 |
 | 云打印机 | /api/v1/merchant/printers/* | CRUD | ✅ 已实现 |
 | 打印记录 | /api/v1/merchant/print-logs | GET | ✅ 已实现 |
