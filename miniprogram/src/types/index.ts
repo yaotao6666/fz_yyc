@@ -57,6 +57,19 @@ export interface MerchantLoginResponse {
   staff: MerchantStaff
 }
 
+export interface ServiceProviderLoginRequest {
+  username: string
+  password: string
+}
+
+export interface ServiceProviderLoginResponse {
+  token: string
+  service_provider: {
+    id: number
+    name: string
+  }
+}
+
 // C端用户登录请求
 export interface WechatLoginRequest {
   code: string
@@ -92,8 +105,14 @@ export interface MerchantStaff {
   username: string
   name: string
   phone: string
+  openid?: string
+  wechat_bound_at?: string
   role: string
+  notify_enabled?: boolean
+  browse_notify_enabled?: boolean
   status: number
+  last_login_at?: string
+  last_wechat_login_at?: string
 }
 
 // 商家信息
@@ -131,6 +150,9 @@ export interface MerchantSettings {
   takeout_enabled: boolean
   dine_in_enabled: boolean
   notify_enabled?: boolean
+  browse_notify_enabled?: boolean
+  wechat_bound?: boolean
+  wechat_bound_at?: string
   delivery_settings?: DeliverySettings
 }
 
@@ -394,26 +416,20 @@ export interface OrderStatistics {
 export interface CreateOrderRequest {
   items: {
     product_id: number
-    spec_option?: string
+    spec_info?: string
     quantity: number
   }[]
   delivery_type: number
   delivery_distance?: number
+  delivery_address?: string
+  contact_name?: string
+  contact_phone?: string
   remark?: string
 }
 
 // 创建订单响应
 export interface CreateOrderResponse {
-  order_id: number
-  order_no: string
-  total_amount: number
-  delivery_fee: number
-  discount_amount: number
-  pay_amount: number
-  delivery_info?: {
-    distance: number
-    address: string
-  }
+  order: Order
   pay_params?: WechatPayParams
 }
 
@@ -449,10 +465,10 @@ export interface StoreHomeInfo {
     logo: string
     images: string[]
     address: string
-    phone: string
+    contact_phone?: string
     business_hours: string
     announcement: string
-    status: string
+    status: number
     rating: number
     sales_count: number
   }
@@ -492,6 +508,9 @@ export interface SalesOverview {
   sales_growth: number
   orders_growth: number
   customers_growth: number
+  visit_count?: number
+  visit_users?: number
+  pay_success_users?: number
 }
 
 // 销售趋势
@@ -500,11 +519,12 @@ export interface SalesTrend {
   sales: number
   orders: number
   customers?: number
+  visit_users?: number
+  submit_order_users?: number
 }
 
 // 商品排行
 export interface ProductRanking {
-  rank: number
   product_id: number
   product_name: string
   image: string
@@ -521,10 +541,80 @@ export interface HourlyAnalysis {
 
 // 库存预警
 export interface StockAlert {
+  id?: number
   product_id: number
   product_name: string
   stock: number
-  status: string
+  status?: string | number
+}
+
+export interface CustomerAnalysis {
+  total_customers: number
+  new_customers: number
+  repeat_rate: number
+  visit_users?: number
+  visit_count?: number
+  submit_order_users?: number
+  pay_success_users?: number
+}
+
+export interface CustomerTrend {
+  date: string
+  total_users: number
+  new_users: number
+  order_count: number
+}
+
+export interface MerchantStaffListResponse {
+  list: MerchantStaff[]
+  pagination: {
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
+export interface CreateMerchantStaffRequest {
+  name: string
+  phone: string
+  username: string
+  password: string
+  role?: string
+}
+
+export interface UpdateMerchantStaffRequest {
+  name?: string
+  phone?: string
+  role?: string
+  notify_enabled?: boolean
+  browse_notify_enabled?: boolean
+  status?: number
+}
+
+export interface ChangePasswordRequest {
+  old_password: string
+  new_password: string
+}
+
+export interface UploadTokenResponse {
+  token: string
+  domain: string
+  prefix: string
+  upload_url: string
+}
+
+export interface MerchantWechatLoginRequest {
+  code: string
+}
+
+export interface MerchantBehaviorEventRequest {
+  openid: string
+  event_type: 'page_view' | 'product_view' | 'submit_order' | 'pay_success'
+  page?: string
+  product_id?: number
+  order_id?: number
+  source?: string
+  payload?: Record<string, any>
 }
 
 // ============ 邀请入驻相关 ============

@@ -67,7 +67,7 @@ export function useAuth() {
         header: {
           'Content-Type': 'application/json'
         }
-      }) as { data: LoginResponse }
+      }) as unknown as { data: LoginResponse }
 
       if (res.data?.token) {
         token.value = res.data.token
@@ -91,28 +91,28 @@ export function useAuth() {
     } catch (error: any) {
       console.error('useAuth: 登录异常', error)
 
-      // 开发环境下,如果请求失败使用默认token
-      if (process.env.NODE_ENV === 'development') {
-        const mockToken = 'dev_token_' + Date.now()
-        const mockUser = {
-          id: 1,
-          openid: 'mock_openid_dev',
-          nickname: '测试用户'
-        }
-
-        token.value = mockToken
-        userInfo.value = mockUser
-        openid.value = mockUser.openid
-        isLoggedIn.value = true
-
-        uni.setStorageSync('token', mockToken)
-        uni.setStorageSync('userInfo', mockUser)
-        uni.setStorageSync('openid', mockUser.openid)
-
-        console.log('useAuth: 开发环境模拟登录成功')
-
-        return { success: true, token: mockToken, user: mockUser }
+      // #ifndef MP-WEIXIN
+      // 非微信环境联调时，后端不可用则退回到模拟登录，保证店铺页可继续验证链路。
+      const mockToken = 'dev_token_' + Date.now()
+      const mockUser = {
+        id: 1,
+        openid: 'mock_openid_dev',
+        nickname: '测试用户'
       }
+
+      token.value = mockToken
+      userInfo.value = mockUser
+      openid.value = mockUser.openid
+      isLoggedIn.value = true
+
+      uni.setStorageSync('token', mockToken)
+      uni.setStorageSync('userInfo', mockUser)
+      uni.setStorageSync('openid', mockUser.openid)
+
+      console.log('useAuth: 开发环境模拟登录成功')
+
+      return { success: true, token: mockToken, user: mockUser }
+      // #endif
 
       return { success: false, error: error.message || '登录异常' }
     }

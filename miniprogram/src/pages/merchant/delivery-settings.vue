@@ -57,6 +57,7 @@
           />
           <text class="input-suffix">公里</text>
         </view>
+        <view class="form-hint">仅用于用户选择配送档位，不进行真实定位计算</view>
       </view>
     </view>
 
@@ -66,6 +67,7 @@
         <view class="section-title">按距离收费</view>
         <view class="add-rule-btn" @click="addRule">添加规则</view>
       </view>
+      <view class="form-hint">用户下单时手动选择商家支持的距离档位，超出范围仅提示不可下单</view>
 
       <view
         v-for="(rule, index) in formData.distance_rules"
@@ -136,6 +138,22 @@ const formData = reactive<DeliverySettings>({
   distance_rules: []
 })
 
+function fillFormData(settings: DeliverySettings) {
+  formData.enabled = !!settings.enabled
+  formData.base_fee = Number(settings.base_fee || 0)
+  formData.free_delivery_amount = Number(settings.free_delivery_amount || 0)
+  formData.max_distance = Number(settings.max_distance || 10)
+  formData.distance_rules.splice(
+    0,
+    formData.distance_rules.length,
+    ...(settings.distance_rules || []).map((rule) => ({
+      min_distance: Number(rule.min_distance || 0),
+      max_distance: Number(rule.max_distance || 0),
+      fee: Number(rule.fee || 0)
+    }))
+  )
+}
+
 onShow(() => {
   loadSettings()
 })
@@ -143,7 +161,7 @@ onShow(() => {
 async function loadSettings() {
   try {
     const settings = await getDeliverySettings()
-    Object.assign(formData, settings)
+    fillFormData(settings)
   } catch (error) {
     console.error('加载配送设置失败:', error)
   }
@@ -165,11 +183,63 @@ function deleteRule(index: number) {
   formData.distance_rules.splice(index, 1)
 }
 
+function normalizeDistanceRules(rules: DistanceRule[]) {
+  return rules
+    .map((rule) => ({
+      min_distance: Number(rule.min_distance || 0),
+      max_distance: Number(rule.max_distance || 0),
+      fee: Number(rule.fee || 0)
+    }))
+    .sort((prev, next) => prev.min_distance - next.min_distance)
+}
+
+function validateFormData() {
+  if (formData.base_fee < 0) {
+    return '基础配送费不能小于 0'
+  }
+  if (formData.free_delivery_amount < 0) {
+    return '满额免配送费不能小于 0'
+  }
+  if (formData.max_distance <= 0) {
+    return '最大配送距离必须大于 0'
+  }
+
+  const normalizedRules = normalizeDistanceRules(formData.distance_rules)
+  for (let index = 0; index < normalizedRules.length; index += 1) {
+    const rule = normalizedRules[index]
+    if (rule.min_distance < 0) {
+      return `第 ${index + 1} 条规则的起始距离不能小于 0`
+    }
+    if (rule.max_distance <= rule.min_distance) {
+      return `第 ${index + 1} 条规则的结束距离必须大于起始距离`
+    }
+    if (rule.fee < 0) {
+      return `第 ${index + 1} 条规则的配送费不能小于 0`
+    }
+    if (rule.max_distance > formData.max_distance) {
+      return `第 ${index + 1} 条规则超出最大配送距离`
+    }
+    if (index > 0 && rule.min_distance < normalizedRules[index - 1].max_distance) {
+      return `第 ${index + 1} 条规则与前一条规则区间重叠`
+    }
+  }
+
+  formData.distance_rules.splice(0, formData.distance_rules.length, ...normalizedRules)
+  return ''
+}
+
 async function handleSave() {
+  const validationMessage = validateFormData()
+  if (validationMessage) {
+    uni.showToast({ title: validationMessage, icon: 'none' })
+    return
+  }
+
   saving.value = true
 
   try {
-    await updateDeliverySettings(formData)
+    const latestSettings = await updateDeliverySettings(formData)
+    fillFormData(latestSettings)
     uni.showToast({ title: '保存成功', icon: 'success' })
     
     setTimeout(() => {

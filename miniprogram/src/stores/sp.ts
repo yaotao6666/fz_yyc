@@ -26,13 +26,13 @@ export const useSpStore = defineStore('sp', {
       try {
         const res = await spLogin({ username, password })
 
-        this.token = res.data.token
-        this.spId = res.data.service_provider?.id
-        this.spInfo = res.data.service_provider
+        this.token = res.token
+        this.spId = res.service_provider?.id
+        this.spInfo = res.service_provider
 
-        uni.setStorageSync('sp_token', res.data.token)
-        uni.setStorageSync('sp_id', res.data.service_provider?.id)
-        uni.setStorageSync('sp_info', JSON.stringify(res.data.service_provider))
+        uni.setStorageSync('sp_token', res.token)
+        uni.setStorageSync('sp_id', res.service_provider?.id)
+        uni.setStorageSync('sp_info', JSON.stringify(res.service_provider))
 
         this.isLoggedIn = true
 

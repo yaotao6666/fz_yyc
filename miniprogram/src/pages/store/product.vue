@@ -104,12 +104,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
-import { onShow, onLoad } from '@dcloudio/uni-app'
+import { onShow } from '@dcloudio/uni-app'
 import { getStoreProduct } from '@api'
 import { useCartStore } from '../../stores/cart'
+import { useAnalytics } from '@utils/analytics'
 import type { Product, SpecOption } from '@types'
 
 const cartStore = useCartStore()
+const { trackProductView } = useAnalytics()
 
 const product = ref<Product | null>(null)
 const quantity = ref(1)
@@ -164,6 +166,7 @@ onShow(() => {
 async function loadProduct() {
   try {
     product.value = await getStoreProduct(merchantId.value, productId.value)
+    await trackProductView(merchantId.value, productId.value)
     
     // 默认选中第一个规格
     if (product.value.specs?.length) {
@@ -240,7 +243,7 @@ function buyNow() {
 }
 
 function goHome() {
-  uni.switchTab({ url: '/pages/merchant/home' })
+  uni.redirectTo({ url: `/pages/store/home?merchant_id=${merchantId.value}` })
 }
 
 function goCart() {

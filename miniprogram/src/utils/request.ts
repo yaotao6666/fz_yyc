@@ -4,9 +4,7 @@
  */
 
 // API 基础配置
-const BASE_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:8080' 
-  : 'https://api.example.com'
+const BASE_URL = 'http://localhost:8080'
 
 // 响应码
 export const ResponseCode = {

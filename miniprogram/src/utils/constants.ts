@@ -2,10 +2,8 @@
  * 常量定义
  */
 
-// API 基础路径
-export const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:8080' 
-  : 'https://api.example.com'
+// 当前项目以前后端本地联调为主，统一使用本地 API 地址。
+export const API_BASE_URL = 'http://localhost:8080'
 
 // 存储 Key
 export const StorageKey = {

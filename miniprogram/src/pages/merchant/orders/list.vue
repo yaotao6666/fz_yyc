@@ -323,7 +323,7 @@ async function confirmVerify() {
 }
 
 .order-list {
-  padding: 24rpx 32rpx;
+  padding: 24rpx 0rpx;
 }
 
 .order-card {

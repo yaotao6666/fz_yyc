@@ -10,6 +10,27 @@ import (
 // JSON JSON类型，用于处理数据库JSON字段
 type JSON json.RawMessage
 
+// MarshalJSON 保持 JSON 字段按原始 JSON 输出，避免被编码成字节数组字符串。
+func (j JSON) MarshalJSON() ([]byte, error) {
+	if j == nil {
+		return []byte("null"), nil
+	}
+	return json.RawMessage(j).MarshalJSON()
+}
+
+// UnmarshalJSON 允许请求体直接反序列化到 JSON 字段。
+func (j *JSON) UnmarshalJSON(data []byte) error {
+	if j == nil {
+		return errors.New("json target is nil")
+	}
+	if data == nil {
+		*j = nil
+		return nil
+	}
+	*j = append((*j)[0:0], data...)
+	return nil
+}
+
 // Scan 实现 sql.Scanner 接口
 func (j *JSON) Scan(value interface{}) error {
 	if value == nil {
@@ -190,20 +211,23 @@ func (MerchantLicense) TableName() string {
 // 商家员工表 (merchant_staffs)
 // ============================================
 type MerchantStaff struct {
-	ID            uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	MerchantID    uint64     `gorm:"not null;index" json:"merchant_id"`
-	Username      string     `gorm:"size:64;not null" json:"username"`
-	Password      string     `gorm:"size:128;not null" json:"-"`
-	Name          string     `gorm:"size:64" json:"name"`
-	Phone         string     `gorm:"size:20" json:"phone"`
-	OpenID        string     `gorm:"size:64" json:"openid"`
-	Role          string     `gorm:"size:32;not null;default:staff" json:"role"`
-	NotifyEnabled bool       `gorm:"not null;default:true" json:"notify_enabled"`
-	Status        uint8      `gorm:"not null;default:1" json:"status"`
-	LastLoginAt   *time.Time `json:"last_login_at"`
-	CreatedAt     time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt     time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
-	Merchant      *Merchant  `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
+	ID                  uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	MerchantID          uint64     `gorm:"not null;index" json:"merchant_id"`
+	Username            string     `gorm:"size:64;not null" json:"username"`
+	Password            string     `gorm:"size:128;not null" json:"-"`
+	Name                string     `gorm:"size:64" json:"name"`
+	Phone               string     `gorm:"size:20" json:"phone"`
+	OpenID              string     `gorm:"column:openid;size:64" json:"openid"`
+	WechatBoundAt       *time.Time `json:"wechat_bound_at"`
+	Role                string     `gorm:"size:32;not null;default:staff" json:"role"`
+	NotifyEnabled       bool       `gorm:"not null;default:true" json:"notify_enabled"`
+	BrowseNotifyEnabled bool       `gorm:"not null;default:true" json:"browse_notify_enabled"`
+	Status              uint8      `gorm:"not null;default:1" json:"status"`
+	LastLoginAt         *time.Time `json:"last_login_at"`
+	LastWechatLoginAt   *time.Time `json:"last_wechat_login_at"`
+	CreatedAt           time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt           time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	Merchant            *Merchant  `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
 }
 
 func (MerchantStaff) TableName() string {
@@ -315,6 +339,27 @@ type UserVisit struct {
 
 func (UserVisit) TableName() string {
 	return "user_visits"
+}
+
+// ============================================
+// 用户行为事件表 (user_behavior_events)
+// ============================================
+type UserBehaviorEvent struct {
+	ID         uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	MerchantID uint64    `gorm:"not null;index" json:"merchant_id"`
+	UserID     uint64    `gorm:"not null;index" json:"user_id"`
+	OpenID     string    `gorm:"size:64;index" json:"openid"`
+	EventType  string    `gorm:"size:32;not null;index" json:"event_type"`
+	Page       string    `gorm:"size:64" json:"page"`
+	ProductID  uint64    `gorm:"index" json:"product_id"`
+	OrderID    uint64    `gorm:"index" json:"order_id"`
+	Source     string    `gorm:"size:32" json:"source"`
+	Payload    JSON      `gorm:"type:json" json:"payload"`
+	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (UserBehaviorEvent) TableName() string {
+	return "user_behavior_events"
 }
 
 // ============================================

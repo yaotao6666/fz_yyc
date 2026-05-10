@@ -3,9 +3,11 @@
 ## 1. 项目概述
 
 ### 1.1 项目背景
+
 开发一套基于微信支付服务商模式的商家管理系统后端 API，支持服务商统一管理多个商家，为每个商家提供商品管理、订单管理、数据分析等完整的经营工具。
 
 ### 1.2 小程序产品定位
+
 **产品名称**：寻梦私域管家
 
 **产品定位**：专为中小商家打造的统一私域经营平台
@@ -13,6 +15,7 @@
 **核心原则**：小程序围绕**商家运营管理**为中心，默认服务于商家日常经营
 
 **小程序整体架构**：
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            寻梦私域管家                                      │
@@ -40,21 +43,24 @@
 **说明**：商家管理端是小程序的**默认入口**，商家通过账号密码登录后进入，专注于日常店铺经营管理。
 
 **核心功能**：
-| 模块 | 功能描述 |
-|------|----------|
+
+| 模块   | 功能描述                  |
+| ---- | --------------------- |
 | 店铺管理 | 商家信息编辑、营业状态设置、店铺二维码生成 |
-| 商品管理 | 商品上架/下架、库存管理、价格调整 |
-| 订单管理 | 订单查看、处理发货、退款审核 |
-| 数据分析 | 今日订单、交易额、客单价、趋势分析 |
-| 商家入驻 | 商家资质提交、入驻状态查询 |
+| 商品管理 | 商品上架/下架、库存管理、价格调整     |
+| 订单管理 | 订单查看、处理发货、退款审核        |
+| 数据分析 | 今日订单、交易额、客单价、趋势分析     |
+| 商家入驻 | 商家资质提交、入驻状态查询         |
 
 **导航结构（商家端）**：
+
 - 底部 Tab：工作台、订单、数据分析、设置。
 - tabBar 仅在 Tab 页面展示；登录等非 Tab 页面不展示。
 - 工作台快捷入口当前已精简，不再重复提供“订单管理”“店铺设置”“邀请入驻”入口。
 - 工作台在“今日概览”上方展示系统公告滚动栏，支持点击查看详情与点击关闭，关闭状态本地记忆。
 
 **商家二维码**：
+
 - 每个商家拥有独立的店铺二维码
 - 二维码用于C端用户扫码访问商家店铺
 - 二维码携带商家ID参数，实现店铺隔离
@@ -64,32 +70,37 @@
 **说明**：用户通过扫描商家二维码直接进入指定商家的店铺页面，进行商品浏览、下单购买等操作。
 
 **访问路径**：
+
 ```
 商家二维码 → 扫码 → 直接进入商家店铺首页 → 操作指引弹窗 → 商品浏览 → 下单支付
 ```
 
 **核心功能**：
-| 模块 | 功能描述 |
-|------|----------|
+
+| 模块   | 功能描述                    |
+| ---- | ----------------------- |
 | 店铺首页 | 展示商家信息、店铺氛围、商品分类、操作指引弹窗 |
-| 商品详情 | 商品图片、价格、规格选择 |
-| 购物车 | 商品数量修改、结算 |
-| 下单支付 | 确认订单、微信支付 |
+| 商品详情 | 商品图片、价格、规格选择            |
+| 购物车  | 商品数量修改、结算               |
+| 下单支付 | 确认订单、微信支付               |
 | 我的订单 | 订单列表、订单详情、退款申请（支持按商家筛选） |
 
 **用户订单记录**：
+
 - 用户登录后可查看历史订单记录
 - 订单记录按商家维度展示
 - 支持订单状态筛选（待支付/待发货/已完成/退款中）
 - 支持按商家筛选，仅显示当前商家的订单
 
 **店铺首页优化功能**：
+
 - **操作指引弹窗**：用户扫码进入店铺首页时，自动显示操作指引弹窗，包含四步购物流程说明，帮助用户快速了解如何使用小程序
 - **我的订单入口**：在底部购物栏左侧添加「我的订单」快速入口按钮，方便用户快速查看当前商家的订单记录
 - **底部TabBar切换**：店铺首页底部支持购物车和我的订单Tab切换，类似tabBar的切换体验
 - **自动授权登录**：用户进入店铺首页时自动完成微信授权登录，获取openid作为唯一身份标识，无需手动登录
 
 **用户授权登录流程**：
+
 1. 用户进入店铺首页
 2. 前端自动调用 `uni.login()` 获取微信授权码
 3. 调用后端微信登录接口，传入授权码
@@ -100,11 +111,13 @@
 8. 用户二次访问时，直接通过openid识别用户，无需重新授权
 
 **openid管理**：
+
 - openid是用户在微信生态下的唯一标识
 - 不同小程序的openid不同，但同一小程序的openid不变
 - 用户二次访问时，直接通过openid识别用户，无需重新授权
 
 **隐私保护**：
+
 - 仅获取用户openid，不获取手机号等敏感信息
 - 用户昵称默认显示为"微信用户"
 - 后续可扩展用户主动完善个人信息
@@ -114,27 +127,31 @@
 **说明**：服务商通过扫描独立二维码进入小程序，登录后进入管理后台，与商家管理端完全隔离。
 
 **访问控制**：
+
 - 服务商扫描独立二维码访问
 - 需要服务商账户登录验证
 - 登录成功后进入服务商管理后台
 
 **核心功能**：
-| 模块 | 功能描述 |
-|------|----------|
-| 数据看板 | 商家总数、今日订单、交易额、客单价 |
-| 商家管理 | 商家入驻审核、商家信息查看、商家状态管理 |
-| 商家统计 | 商家行业分布、状态分布、趋势分析 |
-| 订单统计 | 订单量统计、订单趋势、退款统计 |
-| 金额统计 | 交易额统计、TOP商家排行、行业分析 |
-| 系统公告 | 发布公告后所有商家可见 |
-| 商家二维码 | 查看/生成商家小程序码 |
+
+| 模块    | 功能描述                 |
+| ----- | -------------------- |
+| 数据看板  | 商家总数、今日订单、交易额、客单价    |
+| 商家管理  | 商家入驻审核、商家信息查看、商家状态管理 |
+| 商家统计  | 商家行业分布、状态分布、趋势分析     |
+| 订单统计  | 订单量统计、订单趋势、退款统计      |
+| 金额统计  | 交易额统计、TOP商家排行、行业分析   |
+| 系统公告  | 发布公告后所有商家可见          |
+| 商家二维码 | 查看/生成商家小程序码          |
 
 **系统公告功能**：
+
 - 服务商可发布平台公告
 - 公告发布后所有商家均可查看
 - 支持公告标题、内容、发布时间管理
 
 **数据权限**：
+
 - 服务商可查看所有商家的汇总数据
 - 支持按商家筛选查看单个商家详情
 - 数据实时更新，支持多维度分析
@@ -166,29 +183,34 @@
 ```
 
 **上传方式：**
+
 1. 客户端直传：前端先调用 `/api/v1/upload/token` 获取上传凭证，再按接口返回的 `upload_url` 直接上传至七牛，减少服务器压力
 2. 服务端代理：敏感图片（如营业执照、身份证）通过服务端上传，便于审核
 
 **存储空间规划：**
-| 空间名称 | 用途 | 访问权限 |
-|----------|------|----------|
-| merchant-public | 商家Logo、店铺图片 | 以当前接口返回策略为准，涉及私有资源时按签名地址访问 |
-| product-public | 商品图片 | 当前接口按私有签名地址返回，前端以接口返回的可访问地址为准 |
-| merchant-private | 营业执照、身份证照片 | 私有（带签名访问） |
+
+| 空间名称             | 用途          | 访问权限                          |
+| ---------------- | ----------- | ----------------------------- |
+| merchant-public  | 商家Logo、店铺图片 | 以当前接口返回策略为准，涉及私有资源时按签名地址访问    |
+| product-public   | 商品图片        | 当前接口按私有签名地址返回，前端以接口返回的可访问地址为准 |
+| merchant-private | 营业执照、身份证照片  | 私有（带签名访问）                     |
 
 **相关接口：**
+
 ```
 GET /api/v1/upload/token      # 获取上传凭证
 POST /api/v1/upload/callback  # 上传回调（可选）
 ```
 
 **上传凭证返回字段：**
+
 - `token`：七牛上传凭证
 - `domain`：资源访问域名
 - `prefix`：当前业务建议使用的对象前缀
 - `upload_url`：本次上传应使用的七牛上传地址，前端不可写死
 
 **商品图片持久化与展示规则：**
+
 - 前端上传成功后，需要将 `domain + key` 拼接为完整稳定路径，用于页面回显与商品保存。
 - 数据库存储稳定路径，不存储带签名的临时访问地址。
 - 商品列表、商品详情、C 端店铺商品接口在返回图片时，由后端按当前七牛策略动态生成可直接访问的地址。
@@ -199,20 +221,23 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 商家入驻采用**线下对接或资源合作**的方式，不通过线上裂变：
 
 **入驻方式**：
+
 - **线下对接**：服务商商务人员线下拓展商家，收集资质材料
 - **资源合作**：与第三方平台、渠道商等合作引流商家入驻
 
 **服务商核心任务**：
-| 任务 | 描述 |
-|------|------|
-| 商家拓展 | 线下拜访、洽谈合作 |
+
+| 任务   | 描述              |
+| ---- | --------------- |
+| 商家拓展 | 线下拜访、洽谈合作       |
 | 资质收集 | 收集商家营业执照、身份证等资质 |
-| 审核录入 | 审核商家资质，录入系统 |
-| 微信进件 | 代商家完成微信支付进件 |
+| 审核录入 | 审核商家资质，录入系统     |
+| 微信进件 | 代商家完成微信支付进件     |
 
 ### 1.8 微信支付服务商模式说明
 
 #### 1.8.1 服务商模式架构
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    服务商商户号                       │
@@ -263,16 +288,18 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 ```
 
 **服务商小程序端核心功能**：
-| 功能模块 | 描述 |
-|----------|------|
-| 服务商认证 | 管理员账号密码登录，独立权限体系 |
+
+| 功能模块   | 描述                     |
+| ------ | ---------------------- |
+| 服务商认证  | 管理员账号密码登录，独立权限体系       |
 | 首页数据看板 | 商家总数、订单量、交易额、商家饼图、订单趋势 |
-| 商家入驻审批 | 待审核列表、商家详情、审核操作 |
-| 商家数据分析 | 商家分布饼图、行业统计、商家列表 |
-| 订单数据分析 | 多时间维度统计、订单趋势、金额趋势 |
-| 金额数据分析 | 交易额统计、TOP商家排行、手续费预估 |
+| 商家入驻审批 | 待审核列表、商家详情、审核操作        |
+| 商家数据分析 | 商家分布饼图、行业统计、商家列表       |
+| 订单数据分析 | 多时间维度统计、订单趋势、金额趋势      |
+| 金额数据分析 | 交易额统计、TOP商家排行、手续费预估    |
 
 **访问控制**：
+
 - 服务商小程序码独立生成
 - 商家小程序码默认进入商家管理端
 - 服务商二维码仅限服务商管理员访问
@@ -333,16 +360,18 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 ```
 
 **审核状态说明**：
-| 状态 | 说明 | 操作 |
-|------|------|------|
-| pending | 待审核 | 服务商可审核 |
-| approved | 审核通过 | 自动触发微信进件 |
-| rejected | 审核拒绝 | 商家可修改后重新提交 |
-| wechat_pending | 微信审核中 | 等待微信支付审核结果 |
-| wechat_approved | 进件成功 | 商家可正常使用服务 |
-| wechat_rejected | 进件失败 | 查看失败原因，可重新进件 |
+
+| 状态               | 说明    | 操作           |
+| ---------------- | ----- | ------------ |
+| pending          | 待审核   | 服务商可审核       |
+| approved         | 审核通过  | 自动触发微信进件     |
+| rejected         | 审核拒绝  | 商家可修改后重新提交   |
+| wechat\_pending  | 微信审核中 | 等待微信支付审核结果   |
+| wechat\_approved | 进件成功  | 商家可正常使用服务    |
+| wechat\_rejected | 进件失败  | 查看失败原因，可重新进件 |
 
 #### 1.7.4 商家进件流程
+
 商家进件是指服务商向微信支付申请为商家创建子商户号的过程：
 
 ```
@@ -353,21 +382,23 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 ```
 
 **进件所需资料：**
-| 资料类型 | 必填 | 说明 |
-|----------|------|------|
-| 商户名称 | 是 | 营业执照上的名称 |
-| 统一社会信用代码 | 是 | 营业执照编号 |
-| 法人姓名 | 是 | 法定代表人姓名 |
-| 法人身份证号 | 是 | 法人身份证号码 |
-| 法人身份证照片 | 是 | 正反面照片 |
-| 营业执照照片 | 是 | 营业执照图片 |
-| 结算银行卡号 | 是 | 用于收款结算 |
-| 开户银行 | 是 | 银行名称及支行 |
-| 联系人信息 | 是 | 手机号、邮箱 |
-| 经营场景 | 是 | 线上/线下/两者都有 |
-| 店铺照片 | 是 | 门头照、内景照 |
+
+| 资料类型     | 必填 | 说明         |
+| -------- | -- | ---------- |
+| 商户名称     | 是  | 营业执照上的名称   |
+| 统一社会信用代码 | 是  | 营业执照编号     |
+| 法人姓名     | 是  | 法定代表人姓名    |
+| 法人身份证号   | 是  | 法人身份证号码    |
+| 法人身份证照片  | 是  | 正反面照片      |
+| 营业执照照片   | 是  | 营业执照图片     |
+| 结算银行卡号   | 是  | 用于收款结算     |
+| 开户银行     | 是  | 银行名称及支行    |
+| 联系人信息    | 是  | 手机号、邮箱     |
+| 经营场景     | 是  | 线上/线下/两者都有 |
+| 店铺照片     | 是  | 门头照、内景照    |
 
 #### 1.8.5 支付与结算流程
+
 ```
 用户支付流程：
 ┌────────┐    ┌────────────┐    ┌────────────┐    ┌────────────┐
@@ -448,15 +479,16 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 ```
 
 **订单状态流转**：
-| 状态 | 说明 |
-|------|------|
-| pending | 待支付 |
-| paid | 已支付 |
-| shipped | 已发货 |
+
+| 状态        | 说明  |
+| --------- | --- |
+| pending   | 待支付 |
+| paid      | 已支付 |
+| shipped   | 已发货 |
 | completed | 已完成 |
 | cancelled | 已取消 |
 | refunding | 退款中 |
-| refunded | 已退款 |
+| refunded  | 已退款 |
 
 #### 1.8.7 退款流程
 
@@ -510,15 +542,16 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 ```
 
 **退款状态流转**：
-| 状态 | 说明 |
-|------|------|
-| none | 无退款 |
-| applying | 退款申请中 |
-| approved | 商家同意退款 |
-| rejected | 商家拒绝退款 |
-| processing | 微信处理中 |
-| success | 退款成功 |
-| failed | 退款失败 |
+
+| 状态         | 说明     |
+| ---------- | ------ |
+| none       | 无退款    |
+| applying   | 退款申请中  |
+| approved   | 商家同意退款 |
+| rejected   | 商家拒绝退款 |
+| processing | 微信处理中  |
+| success    | 退款成功   |
+| failed     | 退款失败   |
 
 #### 1.7.8 微信登录静默授权流程
 
@@ -566,14 +599,16 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 ```
 
 **登录状态管理**：
-| 存储项 | 说明 | 有效期 |
-|--------|------|--------|
-| access_token | JWT访问令牌 | 2小时 |
-| refresh_token | 刷新令牌 | 7天 |
-| openid | 用户唯一标识 | 永久 |
-| session_key | 微信会话密钥 | 30天 |
+
+| 存储项            | 说明      | 有效期 |
+| -------------- | ------- | --- |
+| access\_token  | JWT访问令牌 | 2小时 |
+| refresh\_token | 刷新令牌    | 7天  |
+| openid         | 用户唯一标识  | 永久  |
+| session\_key   | 微信会话密钥  | 30天 |
 
 **Token刷新机制**：
+
 ```
 access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新的access_token
 ```
@@ -583,8 +618,8 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 **支付签名算法**：
 
 1. **参数准备**：将所有请求参数（除sign外）按ASCII码从小到大排序
-2. **拼接字符串**：key1=value1&key2=value2&...&keyN=valueN
-3. **追加密钥**：在拼接字符串后追加 &key=商户密钥
+2. **拼接字符串**：key1=value1\&key2=value2&...\&keyN=valueN
+3. **追加密钥**：在拼接字符串后追加 \&key=商户密钥
 4. **MD5加密**：对拼接后的字符串进行MD5加密，得到签名
 
 **回调验签逻辑**：
@@ -596,114 +631,128 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 5. **比对验证**：比较计算签名与接收到的签名是否一致
 
 **安全注意事项**：
+
 - 使用HTTPS协议传输
 - 定期更换API密钥
 - 验证回调来源IP（微信支付服务器IP段）
 - 对关键参数进行防重放攻击校验
 
----
+***
 
 ## 2. 功能模块
 
 ### 2.1 服务商管理模块（小程序）
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| 服务商登录 | 服务商管理员账号密码登录 | P0 |
-| 首页数据看板 | 商家总数、今日订单、交易额、商家饼图、订单趋势 | P0 |
-| 商家入驻审批 | 待审核列表、商家详情查看、审核通过/拒绝 | P0 |
-| 商家数据分析 | 商家分布饼图、行业统计、商家列表查看 | P0 |
-| 订单数据分析 | 多时间维度统计、订单趋势图 | P0 |
-| 金额数据分析 | 交易额统计、TOP商家排行、手续费预估 | P0 |
-| 商家列表 | 查看所有商家基本信息及运营状况 | P1 |
-| 商家详情 | 查看单个商家详细数据 | P1 |
-| 审核记录 | 查看历史审核操作记录 | P2 |
-| 系统公告管理 | 发布、编辑、删除平台公告 | P1 |
-| 商家进件管理 | 处理商家进件申请，提交微信支付审核 | P0 |
-| 进件状态查询 | 查询商家进件审核进度和结果 | P0 |
+
+| 功能     | 描述                      | 优先级 |
+| ------ | ----------------------- | --- |
+| 服务商登录  | 服务商管理员账号密码登录            | P0  |
+| 首页数据看板 | 商家总数、今日订单、交易额、商家饼图、订单趋势 | P0  |
+| 商家入驻审批 | 待审核列表、商家详情查看、审核通过/拒绝    | P0  |
+| 商家数据分析 | 商家分布饼图、行业统计、商家列表查看      | P0  |
+| 订单数据分析 | 多时间维度统计、订单趋势图           | P0  |
+| 金额数据分析 | 交易额统计、TOP商家排行、手续费预估     | P0  |
+| 商家列表   | 查看所有商家基本信息及运营状况         | P1  |
+| 商家详情   | 查看单个商家详细数据              | P1  |
+| 审核记录   | 查看历史审核操作记录              | P2  |
+| 系统公告管理 | 发布、编辑、删除平台公告            | P1  |
+| 商家进件管理 | 处理商家进件申请，提交微信支付审核       | P0  |
+| 进件状态查询 | 查询商家进件审核进度和结果           | P0  |
 
 **系统公告功能说明**：
+
 - 服务商发布的公告所有商家均可查看
 - 支持公告标题、内容、发布时间管理
 - 商家端可在首页查看最新公告
 
 ### 2.2 商家管理模块
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| 商家入驻 | 商家注册、提交资质资料 | P0 |
-| 商家进件申请 | 提交微信支付进件所需资料 | P0 |
-| 进件状态跟踪 | 查看进件审核进度 | P0 |
-| 商家信息 | 商家基本信息管理 | P0 |
-| 商家设置 | 营业执照、门店公告、营业时间等自定义设置 | P0 |
-| 商家二维码 | 生成商家专属小程序码 | P0 |
-| 商家状态 | 开启/关闭店铺 | P0 |
-| 系统公告查看 | 查看服务商发布的平台公告 | P0 |
-| 商家员工 | 员工账号管理 | P2 |
+
+| 功能     | 描述                   | 优先级 |
+| ------ | -------------------- | --- |
+| 商家入驻   | 商家注册、提交资质资料          | P0  |
+| 商家进件申请 | 提交微信支付进件所需资料         | P0  |
+| 进件状态跟踪 | 查看进件审核进度             | P0  |
+| 商家信息   | 商家基本信息管理             | P0  |
+| 商家设置   | 营业执照、门店公告、营业时间等自定义设置 | P0  |
+| 商家二维码  | 生成商家专属小程序码           | P0  |
+| 商家状态   | 开启/关闭店铺              | P0  |
+| 系统公告查看 | 查看服务商发布的平台公告         | P0  |
+| 商家员工   | 员工账号管理               | P2  |
 
 ### 2.3 商品分类模块
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| 分类创建 | 商家创建自己的商品分类 | P0 |
-| 分类编辑 | 修改分类名称、排序 | P0 |
-| 分类删除 | 删除分类（需检查关联商品） | P0 |
-| 分类排序 | 调整分类显示顺序 | P1 |
+
+| 功能   | 描述            | 优先级 |
+| ---- | ------------- | --- |
+| 分类创建 | 商家创建自己的商品分类   | P0  |
+| 分类编辑 | 修改分类名称、排序     | P0  |
+| 分类删除 | 删除分类（需检查关联商品） | P0  |
+| 分类排序 | 调整分类显示顺序      | P1  |
 
 ### 2.4 商品管理模块
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| 商品创建 | 创建商品信息 | P0 |
-| 商品编辑 | 修改商品信息 | P0 |
-| 商品上下架 | 控制商品是否可售 | P0 |
-| 商品删除 | 删除商品（软删除） | P0 |
-| 库存管理 | 商品库存数量管理 | P1 |
-| 规格管理 | 商品多规格支持 | P2 |
+
+| 功能    | 描述        | 优先级 |
+| ----- | --------- | --- |
+| 商品创建  | 创建商品信息    | P0  |
+| 商品编辑  | 修改商品信息    | P0  |
+| 商品上下架 | 控制商品是否可售  | P0  |
+| 商品删除  | 删除商品（软删除） | P0  |
+| 库存管理  | 商品库存数量管理  | P1  |
+| 规格管理  | 商品多规格支持   | P2  |
 
 ### 2.5 订单管理模块
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| 创建订单 | 用户下单 | P0 |
-| 支付订单 | 微信支付集成（服务商模式） | P0 |
-| 订单列表 | 商家查看订单列表 | P0 |
-| 订单详情 | 查看订单详细信息 | P0 |
-| 订单状态 | 待支付/已支付/已完成/已取消/已退款 | P0 |
-| 订单核销 | 线下核销订单 | P1 |
-| 订单退款 | 处理退款申请 | P1 |
+
+| 功能   | 描述                  | 优先级 |
+| ---- | ------------------- | --- |
+| 创建订单 | 用户下单                | P0  |
+| 支付订单 | 微信支付集成（服务商模式）       | P0  |
+| 订单列表 | 商家查看订单列表            | P0  |
+| 订单详情 | 查看订单详细信息            | P0  |
+| 订单状态 | 待支付/已支付/已完成/已取消/已退款 | P0  |
+| 订单核销 | 线下核销订单              | P1  |
+| 订单退款 | 处理退款申请              | P1  |
 
 ### 2.6 数据分析模块
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| 销售统计 | 销售额、订单量统计 | P0 |
-| 商品分析 | 商品销量排行、库存预警 | P1 |
-| 时段分析 | 分时段销售趋势 | P1 |
-| 用户分析 | 用户消费行为分析 | P2 |
+
+| 功能   | 描述          | 优先级 |
+| ---- | ----------- | --- |
+| 销售统计 | 销售额、订单量统计   | P0  |
+| 商品分析 | 商品销量排行、库存预警 | P1  |
+| 时段分析 | 分时段销售趋势     | P1  |
+| 用户分析 | 用户消费行为分析    | P2  |
 
 ### 2.7 C端用户模块（扫码进入商家店铺）
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| 微信登录 | 用户授权登录 | P0 |
-| 扫码进店 | 扫描商家二维码进入店铺首页 | P0 |
-| 店铺首页 | 展示商家信息、公告、商品分类 | P0 |
-| 商品浏览 | 浏览当前商家的商品列表 | P0 |
-| 商品详情 | 查看商品详细信息、规格选择 | P0 |
-| 购物车 | 加入购物车、修改数量 | P1 |
-| 下单支付 | 确认订单、微信支付 | P0 |
-| 我的订单 | 查看个人订单（按商家分组） | P0 |
-| 订单详情 | 查看订单详情、申请退款 | P0 |
+
+| 功能   | 描述             | 优先级 |
+| ---- | -------------- | --- |
+| 微信登录 | 用户授权登录         | P0  |
+| 扫码进店 | 扫描商家二维码进入店铺首页  | P0  |
+| 店铺首页 | 展示商家信息、公告、商品分类 | P0  |
+| 商品浏览 | 浏览当前商家的商品列表    | P0  |
+| 商品详情 | 查看商品详细信息、规格选择  | P0  |
+| 购物车  | 加入购物车、修改数量     | P1  |
+| 下单支付 | 确认订单、微信支付      | P0  |
+| 我的订单 | 查看个人订单（按商家分组）  | P0  |
+| 订单详情 | 查看订单详情、申请退款    | P0  |
 
 ### 2.8 服务号通知模块
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| 商家订阅配置 | 商家配置需要接收的通知类型 | P1 |
-| 订单下单通知 | 用户下单后推送给商家 | P0 |
-| 订单支付通知 | 订单支付成功推送给商家 | P0 |
-| 订单退款通知 | 退款申请/退款成功通知商家 | P1 |
-| 新订单声音提醒 | 支持商家端开启/关闭声音提醒 | P2 |
 
-**小程序端新订单提醒（补充）**：
-- 后端通过 WebSocket 向商家端推送新订单事件，用于前台接单场景的实时提醒。
-- 商家端支持“新订单声音提醒”开关，关闭后仍接收推送但不播放提示音。
+| 功能      | 描述             | 优先级 |
+| ------- | -------------- | --- |
+| 商家订阅配置  | 商家配置需要接收的通知类型  | P1  |
+| 订单下单通知  | 用户下单后推送给商家     | P0  |
+| 订单支付通知  | 订单支付成功推送给商家    | P0  |
+| 订单退款通知  | 退款申请/退款成功通知商家  | P1  |
+| 声音提醒管理 | 支持商家端分别配置下单提醒、浏览提醒与测试播放 | P2  |
+
+**小程序端实时提醒（补充）**：
+
+- 商家登录成功后即保持 WebSocket 在线，退出登录后断开连接。
+- 商家休息时仅关闭新下单，不断开 WebSocket，仍接收顾客浏览提醒。
+- 后端通过 WebSocket 向商家端推送新订单事件和顾客浏览事件，用于前台接单与在线感知场景。
+- 商家端支持“下单提醒”“浏览提醒”两个独立开关，关闭后仍接收推送但不播放本地 `mp3` 提示音。
 - WebSocket 推送用于增强实时体验，不替代服务号模板消息。
 
 **通知流程**：
+
 ```
 ┌────────┐    ┌────────────┐    ┌────────────┐    ┌────────────┐
 │ 用户下单 │ ──▶│  后端处理   │ ──▶│  微信模板  │ ──▶│  商家服务号 │
@@ -712,16 +761,18 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 ```
 
 ### 2.9 云打印模块
-| 功能 | 描述 | 优先级 |
-|------|------|--------|
-| 打印机配置 | 添加/编辑/删除云打印机 | P1 |
-| 打印机管理 | 查看打印机列表、状态 | P1 |
-| 自动打印开关 | 商家开启/关闭自动打印 | P1 |
-| 打印模板设置 | 设置小票打印格式 | P2 |
-| 打印记录 | 查看历史打印记录 | P2 |
-| 打印测试 | 测试打印机连接 | P1 |
+
+| 功能     | 描述           | 优先级 |
+| ------ | ------------ | --- |
+| 打印机配置  | 添加/编辑/删除云打印机 | P1  |
+| 打印机管理  | 查看打印机列表、状态   | P1  |
+| 自动打印开关 | 商家开启/关闭自动打印  | P1  |
+| 打印模板设置 | 设置小票打印格式     | P2  |
+| 打印记录   | 查看历史打印记录     | P2  |
+| 打印测试   | 测试打印机连接      | P1  |
 
 **云打印流程**：
+
 ```
 ┌────────┐    ┌────────────┐    ┌────────────┐    ┌────────────┐
 │ 订单创建 │ ──▶│  触发打印  │ ──▶│ 云打印API  │ ──▶│  打印机   │
@@ -729,18 +780,20 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 └────────┘    └────────────┘    └────────────┘    └────────────┘
 ```
 
----
+***
 
 ## 3. API 接口设计
 
 ### 3.1 认证相关接口
 
 #### 3.1.1 商家管理员登录
+
 ```
 POST /api/v1/auth/merchant/login
 ```
 
 **请求参数：**
+
 ```json
 {
   "username": "商家账号",
@@ -749,16 +802,19 @@ POST /api/v1/auth/merchant/login
 ```
 
 **开发环境测试账号：**
+
 - `username`: `merchant`
 - `password`: `merchant123`
 
 #### 3.1.1.1 获取上传凭证
+
 ```
 GET /api/v1/upload/token
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -772,15 +828,18 @@ Authorization: Bearer {token}
 ```
 
 **说明：**
+
 - 前端必须使用接口返回的 `upload_url` 作为上传地址，不再写死七牛默认上传域名。
 - 上传成功后，前端需将 `domain + key` 拼接为完整路径后用于商品图片回显与保存。
 
 #### 3.1.2 C端用户微信登录
+
 ```
 POST /api/v1/user/auth/wechat-login
 ```
 
 **请求参数：**
+
 ```json
 {
   "code": "微信登录凭证",
@@ -792,11 +851,13 @@ POST /api/v1/user/auth/wechat-login
 ### 3.2 服务商小程序接口
 
 #### 3.2.1 服务商管理员登录
+
 ```
-POST /api/v1/sp/auth/login
+POST /api/v1/auth/admin/login
 ```
 
 **请求参数：**
+
 ```json
 {
   "username": "服务商账号",
@@ -805,6 +866,7 @@ POST /api/v1/sp/auth/login
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -820,12 +882,14 @@ POST /api/v1/sp/auth/login
 ```
 
 #### 3.2.2 服务商首页数据看板
+
 ```
 GET /api/v1/sp/dashboard
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -857,19 +921,22 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.3 商家入驻审核列表
+
 ```
 GET /api/v1/sp/merchants/pending
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| status | string | 否 | 状态：pending/approved/rejected |
+
+| 参数         | 类型     | 必填 | 描述                           |
+| ---------- | ------ | -- | ---------------------------- |
+| page       | int    | 否  | 页码                           |
+| page\_size | int    | 否  | 每页数量                         |
+| status     | string | 否  | 状态：pending/approved/rejected |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -894,12 +961,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.4 商家详情查看
+
 ```
 GET /api/v1/sp/merchants/{merchant_id}
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -938,12 +1007,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.5 商家审核操作
+
 ```
 POST /api/v1/sp/merchants/{merchant_id}/approve
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "status": "approved",
@@ -952,6 +1023,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -960,12 +1032,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.6 商家数据分析
+
 ```
 GET /api/v1/sp/merchants/analytics/distribution
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -990,20 +1064,23 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.7 商家列表
+
 ```
 GET /api/v1/sp/merchants/list
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| keyword | string | 否 | 搜索关键词 |
-| category | string | 否 | 行业分类 |
+
+| 参数         | 类型     | 必填 | 描述    |
+| ---------- | ------ | -- | ----- |
+| page       | int    | 否  | 页码    |
+| page\_size | int    | 否  | 每页数量  |
+| keyword    | string | 否  | 搜索关键词 |
+| category   | string | 否  | 行业分类  |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1027,19 +1104,22 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.8 订单数据分析
+
 ```
 GET /api/v1/sp/orders/analytics
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| period | string | 否 | 周期：today/week/month/year/custom |
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
+
+| 参数          | 类型     | 必填 | 描述                              |
+| ----------- | ------ | -- | ------------------------------- |
+| period      | string | 否  | 周期：today/week/month/year/custom |
+| start\_date | string | 否  | 开始日期                            |
+| end\_date   | string | 否  | 结束日期                            |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1064,19 +1144,22 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.9 金额数据分析
+
 ```
 GET /api/v1/sp/amount/analytics
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| period | string | 否 | 周期：today/week/month/year |
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
+
+| 参数          | 类型     | 必填 | 描述                       |
+| ----------- | ------ | -- | ------------------------ |
+| period      | string | 否  | 周期：today/week/month/year |
+| start\_date | string | 否  | 开始日期                     |
+| end\_date   | string | 否  | 结束日期                     |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1102,18 +1185,21 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.10 TOP商家排行
+
 ```
 GET /api/v1/sp/amount/top-merchants
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| period | string | 否 | 周期 |
-| limit | int | 否 | 返回数量，默认10 |
+
+| 参数     | 类型     | 必填 | 描述        |
+| ------ | ------ | -- | --------- |
+| period | string | 否  | 周期        |
+| limit  | int    | 否  | 返回数量，默认10 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1125,21 +1211,24 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.11 服务商审核记录查询
+
 ```
 GET /api/v1/sp/merchants/audit-records
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| merchant_id | int | 否 | 商家ID |
-| start_time | string | 否 | 开始时间 |
-| end_time | string | 否 | 结束时间 |
+
+| 参数           | 类型     | 必填 | 描述   |
+| ------------ | ------ | -- | ---- |
+| page         | int    | 否  | 页码   |
+| page\_size   | int    | 否  | 每页数量 |
+| merchant\_id | int    | 否  | 商家ID |
+| start\_time  | string | 否  | 开始时间 |
+| end\_time    | string | 否  | 结束时间 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1163,12 +1252,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.12 商家年费管理
+
 ```
 GET /api/v1/sp/merchants/{id}/fee
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1196,12 +1287,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.13 商家手续费率管理
+
 ```
 GET /api/v1/sp/merchants/{id}/rate
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1225,12 +1318,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.14 设置商家手续费率
+
 ```
 POST /api/v1/sp/merchants/{id}/rate
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "rate": 0.002,
@@ -1241,6 +1336,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1249,12 +1345,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.15 服务商退出登录
+
 ```
 POST /api/v1/sp/auth/logout
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1263,12 +1361,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.16 获取商家二维码
+
 ```
 GET /api/v1/sp/merchants/{id}/qrcode
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1282,18 +1382,21 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.17 系统公告列表
+
 ```
 GET /api/v1/sp/announcements
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
+
+| 参数         | 类型  | 必填 | 描述   |
+| ---------- | --- | -- | ---- |
+| page       | int | 否  | 页码   |
+| page\_size | int | 否  | 每页数量 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1312,12 +1415,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.18 创建系统公告
+
 ```
 POST /api/v1/sp/announcements
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "title": "系统公告标题",
@@ -1326,6 +1431,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1334,12 +1440,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.19 更新系统公告
+
 ```
 PUT /api/v1/sp/announcements/{id}
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "title": "更新后的标题",
@@ -1348,6 +1456,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1356,12 +1465,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.20 删除系统公告
+
 ```
 DELETE /api/v1/sp/announcements/{id}
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1370,22 +1481,25 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.21 退款订单查询(服务商)
+
 ```
 GET /api/v1/sp/orders/refunds
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| merchant_id | int | 否 | 商家ID |
-| status | string | 否 | 退款状态 |
-| start_time | string | 否 | 开始时间 |
-| end_time | string | 否 | 结束时间 |
+
+| 参数           | 类型     | 必填 | 描述   |
+| ------------ | ------ | -- | ---- |
+| page         | int    | 否  | 页码   |
+| page\_size   | int    | 否  | 每页数量 |
+| merchant\_id | int    | 否  | 商家ID |
+| status       | string | 否  | 退款状态 |
+| start\_time  | string | 否  | 开始时间 |
+| end\_time    | string | 否  | 结束时间 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1407,12 +1521,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.22 服务商设置
+
 ```
 GET /api/v1/sp/settings
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1428,12 +1544,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.23 更新服务商设置
+
 ```
 PUT /api/v1/sp/settings
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "contact_name": "新联系人",
@@ -1444,6 +1562,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1452,19 +1571,22 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.24 商家进件申请列表
+
 ```
 GET /api/v1/sp/merchant-applications
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| status | string | 否 | 状态：draft/submitted/auditing/approved/rejected |
+
+| 参数         | 类型     | 必填 | 描述                                            |
+| ---------- | ------ | -- | --------------------------------------------- |
+| page       | int    | 否  | 页码                                            |
+| page\_size | int    | 否  | 每页数量                                          |
+| status     | string | 否  | 状态：draft/submitted/auditing/approved/rejected |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1490,12 +1612,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.25 商家进件详情
+
 ```
 GET /api/v1/sp/merchant-applications/{application_id}
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1539,12 +1663,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.26 提交商家进件（向微信支付申请）
+
 ```
 POST /api/v1/sp/merchant-applications/{application_id}/submit
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1556,12 +1682,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.27 查询进件状态
+
 ```
 GET /api/v1/sp/merchant-applications/{application_id}/status
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1575,12 +1703,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.28 首页活动管理 - 获取活动列表
+
 ```
 GET /api/v1/sp/activities
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1607,12 +1737,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.29 首页活动管理 - 创建活动
+
 ```
 POST /api/v1/sp/activities
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "type": "banner",
@@ -1625,19 +1757,21 @@ Authorization: Bearer {token}
 }
 ```
 
-| link_type | 描述 |
-|-----------|------|
-| merchant | 跳转商家详情 |
-| webview | 网页链接 |
-| none | 无跳转 |
+| link\_type | 描述     |
+| ---------- | ------ |
+| merchant   | 跳转商家详情 |
+| webview    | 网页链接   |
+| none       | 无跳转    |
 
 #### 3.2.30 首页活动管理 - 更新活动
+
 ```
 PUT /api/v1/sp/activities/{id}
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "type": "banner",
@@ -1651,12 +1785,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.31 首页活动管理 - 删除活动
+
 ```
 DELETE /api/v1/sp/activities/{id}
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1665,12 +1801,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.32 服务号配置
+
 ```
 GET /api/v1/sp/wechat-config
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1687,12 +1825,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.33 更新服务号配置
+
 ```
 PUT /api/v1/sp/wechat-config
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "app_id": "wx1234567890",
@@ -1710,16 +1850,19 @@ Authorization: Bearer {token}
 ### 3.2.16 C端用户接口
 
 #### 3.2.16.1 商家入驻状态查询
+
 ```
 GET /api/v1/user/merchant/status
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| phone | string | 是 | 商家联系人手机号 |
+
+| 参数    | 类型     | 必填 | 描述       |
+| ----- | ------ | -- | -------- |
+| phone | string | 是  | 商家联系人手机号 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1735,12 +1878,14 @@ GET /api/v1/user/merchant/status
 ```
 
 #### 3.2.16.2 用户收货地址列表
+
 ```
 GET /api/v1/user/addresses
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1760,12 +1905,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.16.3 添加收货地址
+
 ```
 POST /api/v1/user/addresses
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "李四",
@@ -1779,6 +1926,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1787,12 +1935,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.16.4 更新收货地址
+
 ```
 PUT /api/v1/user/addresses/{id}
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "李四",
@@ -1806,6 +1956,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1814,12 +1965,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.2.16.5 删除收货地址
+
 ```
 DELETE /api/v1/user/addresses/{id}
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1830,11 +1983,13 @@ Authorization: Bearer {token}
 ### 3.3 商家管理接口
 
 #### 3.3.1 商家入驻申请
+
 ```
 POST /api/v1/merchant/register
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "商家名称",
@@ -1869,6 +2024,7 @@ POST /api/v1/merchant/register
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1881,12 +2037,14 @@ POST /api/v1/merchant/register
 ```
 
 #### 3.3.2 获取商家信息
+
 ```
 GET /api/v1/merchant/profile
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1925,12 +2083,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.3 更新商家基本信息
+
 ```
 PUT /api/v1/merchant/profile
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "商家名称",
@@ -1942,12 +2102,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.4 商家自定义设置（获取/更新）
+
 ```
 GET /api/v1/merchant/settings
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -1958,6 +2120,9 @@ Authorization: Bearer {token}
     "takeout_enabled": true,
     "dine_in_enabled": true,
     "notify_enabled": true,
+    "browse_notify_enabled": true,
+    "wechat_bound": true,
+    "wechat_bound_at": "2024-01-01T10:00:00Z",
     "delivery_settings": {
       "enabled": true,
       "base_fee": 5.00,
@@ -1979,36 +2144,48 @@ Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "takeout_enabled": true,
   "dine_in_enabled": true,
-  "notify_enabled": true
+  "notify_enabled": true,
+  "browse_notify_enabled": true
 }
 ```
 
 **说明：**
-- `notify_enabled` 保存维度为“当前登录商家员工”，不是商家全局配置。
-- 订单提示音关闭后，商家端仍接收订单推送与 Toast，仅不播放本地提示音。
-- 设置页重新进入或重新登录后，前端应以 `/api/v1/merchant/settings` 返回的 `notify_enabled` 为准。
+
+- `notify_enabled` 与 `browse_notify_enabled` 的保存维度均为“当前登录商家员工”，不是商家全局配置。
+- 声音提醒只影响本地 `mp3` 播放，不影响 WebSocket 在线状态。
+- 设置页包含“声音提醒管理”子页面、“修改密码”弹窗、“微信快捷登录绑定/解绑”和“员工管理”入口（仅店主可见）。
+- 设置页重新进入或重新登录后，前端应以 `/api/v1/merchant/settings` 返回的员工维度开关与绑定状态为准。
+- `mp3` 提醒音使用静态资源文件，本轮不在后端或前端生成音频。
+- 本轮不包含优惠券、发券和营销配置。
 
 **配送距离规则说明：**
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| enabled | boolean | 是否开启配送 |
-| base_fee | decimal | 基础配送费 |
-| free_delivery_amount | decimal | 满额免配送费金额 |
-| distance_rules | array | 按距离收费规则 |
-| max_distance | int | 最大配送距离（公里） |
 
-**distance_rules 结构：**
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| min_distance | int | 最小距离（公里），包含 |
-| max_distance | int | 最大距离（公里），不包含 |
-| fee | decimal | 该距离范围内的配送费 |
+| 字段                     | 类型      | 描述         |
+| ---------------------- | ------- | ---------- |
+| enabled                | boolean | 是否开启配送     |
+| base\_fee              | decimal | 基础配送费      |
+| free\_delivery\_amount | decimal | 满额免配送费金额   |
+| distance\_rules        | array   | 按距离收费规则    |
+| max\_distance          | int     | 最大配送距离（公里） |
+
+**distance\_rules 结构：**
+
+| 字段            | 类型      | 描述           |
+| ------------- | ------- | ------------ |
+| min\_distance | int     | 最小距离（公里），包含  |
+| max\_distance | int     | 最大距离（公里），不包含 |
+| fee           | decimal | 该距离范围内的配送费   |
+
+- 配送距离是“商家提供给用户选择的服务范围档位”，不是地图定位距离。
+- C 端用户下单时手动选择距离档位；超出商家支持范围时仅提示，且不接入第三方地图。
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2017,12 +2194,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.5 配送设置（获取/更新）
+
 ```
 GET /api/v1/merchant/delivery-settings
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2046,6 +2225,7 @@ Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "enabled": true,
@@ -2061,9 +2241,14 @@ Authorization: Bearer {token}
 ```
 
 **说明：**
-- distance_rules 允许传空数组，用于清空“按距离收费”的所有规则。
+
+- distance\_rules 允许传空数组，用于清空“按距离收费”的所有规则。
+- 所有规则必须满足 `max_distance > min_distance`、`fee >= 0`，且规则之间不能重叠。
+- 每条规则的 `max_distance` 不能超过 `max_distance` 字段本身。
+- 商家端保存时需要前后端双重校验；C 端仅消费商家保存后的档位结果。
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2072,12 +2257,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.6 更新营业执照
+
 ```
 PUT /api/v1/merchant/license
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "license_no": "营业执照号",
@@ -2093,12 +2280,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.7 更新结算银行卡
+
 ```
 PUT /api/v1/merchant/bank-account
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "bank_name": "开户银行",
@@ -2110,25 +2299,36 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.8 开启/关闭店铺
+
 ```
 POST /api/v1/merchant/status
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
-  "status": "active"
+  "status": 1
 }
 ```
 
+**说明：**
+
+- `status = 1` 表示营业中，`status = 0` 表示休息中。
+- 商家切换为休息后，用户无法再创建新订单。
+- 商家切换为休息后仍保持在线连接，可继续接收顾客浏览提醒。
+- 已进入支付流程的订单不因商家切换休息而支付失败，支付成功后仍提示下单成功。
+
 #### 3.3.9 获取商家进件状态
+
 ```
 GET /api/v1/merchant/application/status
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2149,18 +2349,21 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.10 获取商家小程序码
+
 ```
 GET /api/v1/merchant/qrcode
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | string | 否 | 小程序页面路径，默认首页 |
-| width | int | 否 | 二维码宽度，默认430 |
+
+| 参数    | 类型     | 必填 | 描述           |
+| ----- | ------ | -- | ------------ |
+| page  | string | 否  | 小程序页面路径，默认首页 |
+| width | int    | 否  | 二维码宽度，默认430  |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2172,18 +2375,21 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.11 获取系统公告列表
+
 ```
 GET /api/v1/merchant/announcements
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
+
+| 参数         | 类型  | 必填 | 描述   |
+| ---------- | --- | -- | ---- |
+| page       | int | 否  | 页码   |
+| page\_size | int | 否  | 每页数量 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2202,12 +2408,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.12 获取系统公告详情
+
 ```
 GET /api/v1/merchant/announcements/{id}
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2220,17 +2428,22 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.3.12.1 商家 WebSocket 连接（新订单提醒）
+#### 3.3.12.1 商家 WebSocket 连接（下单提醒 / 浏览提醒）
+
 ```
 GET /api/v1/ws/merchant
 Authorization: Bearer {token}
 ```
 
 **说明：**
+
 - 仅服务端推送消息；客户端保持连接即可。
 - 连接鉴权使用与商家端接口一致的 JWT Token（Authorization Header）。
+- 商家登录成功后即保持在线；只有退出登录时才主动断开连接。
+- 商家切换休息状态时不关闭连接，仍接收顾客浏览提醒。
 
 **消息格式（示例）：**
+
 ```json
 {
   "type": "order_notify",
@@ -2241,12 +2454,25 @@ Authorization: Bearer {token}
 }
 ```
 
-#### 3.3.12.2 开发测试：推送新订单提醒
+```json
+{
+  "type": "store_visit_notify",
+  "payload": {
+    "merchant_id": 1,
+    "visitor_openid": "wx_xxx",
+    "source": "scan"
+  }
+}
+```
+
+#### 3.3.12.2 开发测试：推送实时提醒
+
 ```
 POST /api/v1/dev/order-notify
 ```
 
 **请求参数：**
+
 ```json
 {
   "merchant_id": 1,
@@ -2255,6 +2481,7 @@ POST /api/v1/dev/order-notify
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2265,21 +2492,138 @@ POST /api/v1/dev/order-notify
 ```
 
 **说明：**
+
 - 仅非生产环境可用；生产环境会返回 403。
 
+```
+POST /api/v1/dev/store-visit-notify
+```
+
+**请求参数：**
+
+```json
+{
+  "merchant_id": 1,
+  "visitor_openid": "wx_test_visitor",
+  "source": "dev"
+}
+```
+
+**响应：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "delivered": 1
+  }
+}
+```
+
+#### 3.3.12.3 修改当前员工密码
+
+```
+POST /api/v1/merchant/account/change-password
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+
+```json
+{
+  "old_password": "merchant123",
+  "new_password": "merchant456"
+}
+```
+
+**说明：**
+
+- 绑定时前端需先调用 `uni.login` 获取真实微信 `code`，后端通过微信 `code2session` 换取当前员工的真实 `openid` 后再完成绑定。
+- 修改密码成功后，前端需强制当前员工退出并重新登录。
+- 新旧密码不能相同，新密码最少 6 位。
+
+#### 3.3.12.4 绑定微信快捷登录
+
+```
+POST /api/v1/merchant/account/wechat/bind
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+
+```json
+{
+  "code": "微信登录凭证"
+}
+```
+
+**响应：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "openid": "mch_wx_xxx",
+    "wechat_bound_at": "2024-01-01T10:00:00Z",
+    "message": "绑定成功"
+  }
+}
+```
+
+#### 3.3.12.5 解绑微信快捷登录
+
+```
+DELETE /api/v1/merchant/account/wechat/bind
+Authorization: Bearer {token}
+```
+
+**响应：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "message": "解绑成功"
+  }
+}
+```
+
+#### 3.3.12.6 商家员工微信快捷登录
+
+```
+POST /api/v1/auth/merchant/wechat-login
+```
+
+**请求参数：**
+
+```json
+{
+  "code": "微信登录凭证"
+}
+```
+
+**说明：**
+
+- 绑定维度为当前商家员工。
+- 前端需先调用 `uni.login` 获取真实微信 `code`，后端通过微信 `code2session` 换取 `openid` 后匹配已绑定员工。
+- 未绑定商家账号的微信快捷登录返回提示：“您还不是商家，请注册后使用”。
+
 #### 3.3.13 获取员工列表
+
 ```
 GET /api/v1/merchant/staff
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
+
+| 参数         | 类型  | 必填 | 描述   |
+| ---------- | --- | -- | ---- |
+| page       | int | 否  | 页码   |
+| page\_size | int | 否  | 每页数量 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2287,12 +2631,17 @@ Authorization: Bearer {token}
     "list": [
       {
         "id": 1,
+        "username": "zhangsan",
         "name": "张三",
         "phone": "13800138000",
         "role": "staff",
         "openid": "微信OpenID",
         "notify_enabled": true,
-        "status": "active",
+        "browse_notify_enabled": true,
+        "wechat_bound_at": "2024-01-01T10:00:00Z",
+        "last_login_at": "2024-01-02T10:00:00Z",
+        "last_wechat_login_at": "2024-01-03T10:00:00Z",
+        "status": 1,
         "created_at": "2024-01-01T10:00:00Z"
       }
     ],
@@ -2302,22 +2651,26 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.14 添加员工
+
 ```
 POST /api/v1/merchant/staff
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "员工姓名",
   "phone": "手机号",
-  "role": "staff",
-  "notify_enabled": true
+  "username": "登录账号",
+  "password": "初始密码",
+  "role": "staff"
 }
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2329,22 +2682,27 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.15 更新员工信息
+
 ```
 PUT /api/v1/merchant/staff/{id}
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "员工姓名",
+  "phone": "手机号",
   "role": "staff",
   "notify_enabled": true,
-  "status": "active"
+  "browse_notify_enabled": true,
+  "status": 1
 }
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2353,12 +2711,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.16 删除员工
+
 ```
 DELETE /api/v1/merchant/staff/{id}
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2366,12 +2726,34 @@ Authorization: Bearer {token}
 }
 ```
 
+**说明：**
+
+- 员工管理首版仅 `owner` 可见和可操作。
+- 不允许删除当前登录账号，也不允许删除最后一个 `owner`。
+
+#### 3.3.16.1 重置员工密码
+
+```
+POST /api/v1/merchant/staff/{id}/reset-password
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+
+```json
+{
+  "new_password": "merchant456"
+}
+```
+
 #### 3.3.17 商家入驻
+
 ```
 POST /api/v1/merchant/register
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "商家名称",
@@ -2406,6 +2788,7 @@ POST /api/v1/merchant/register
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2418,12 +2801,14 @@ POST /api/v1/merchant/register
 ```
 
 #### 3.3.18 商家订阅配置
+
 ```
 GET /api/v1/merchant/subscriptions
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2439,12 +2824,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.19 更新商家订阅配置
+
 ```
 PUT /api/v1/merchant/subscriptions
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "subscriptions": [
@@ -2463,12 +2850,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.20 获取云打印机列表
+
 ```
 GET /api/v1/merchant/printers
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2488,12 +2877,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.21 添加云打印机
+
 ```
 POST /api/v1/merchant/printers
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "前台打印机",
@@ -2507,12 +2898,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.22 更新云打印机
+
 ```
 PUT /api/v1/merchant/printers/{printer_id}
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "打印机名称",
@@ -2522,18 +2915,21 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.23 删除云打印机
+
 ```
 DELETE /api/v1/merchant/printers/{printer_id}
 Authorization: Bearer {token}
 ```
 
 #### 3.3.24 测试云打印机
+
 ```
 POST /api/v1/merchant/printers/{printer_id}/test
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2545,28 +2941,32 @@ Authorization: Bearer {token}
 ```
 
 #### 3.3.25 获取打印记录
+
 ```
 GET /api/v1/merchant/print-logs
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
+
+| 参数          | 类型     | 必填 | 描述   |
+| ----------- | ------ | -- | ---- |
+| page        | int    | 否  | 页码   |
+| page\_size  | int    | 否  | 每页数量 |
+| start\_date | string | 否  | 开始日期 |
+| end\_date   | string | 否  | 结束日期 |
 
 ### 3.4 商品分类接口
 
 #### 3.4.1 获取分类列表
+
 ```
 GET /api/v1/merchant/categories
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2584,12 +2984,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.4.2 创建分类
+
 ```
 POST /api/v1/merchant/categories
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "分类名称",
@@ -2598,12 +3000,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.4.3 更新分类
+
 ```
 PUT /api/v1/merchant/categories/{category_id}
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "新分类名称",
@@ -2612,18 +3016,21 @@ Authorization: Bearer {token}
 ```
 
 #### 3.4.4 删除分类
+
 ```
 DELETE /api/v1/merchant/categories/{category_id}
 Authorization: Bearer {token}
 ```
 
 #### 3.4.5 批量排序分类
+
 ```
 POST /api/v1/merchant/categories/sort
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "orders": [
@@ -2636,21 +3043,24 @@ Authorization: Bearer {token}
 ### 3.5 商品管理接口
 
 #### 3.5.1 商品列表
+
 ```
 GET /api/v1/merchant/products
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| category_id | int | 否 | 分类ID |
-| status | string | 否 | 状态：on_sale/off_sale |
-| keyword | string | 否 | 搜索关键词 |
+
+| 参数           | 类型     | 必填 | 描述                    |
+| ------------ | ------ | -- | --------------------- |
+| page         | int    | 否  | 页码                    |
+| page\_size   | int    | 否  | 每页数量                  |
+| category\_id | int    | 否  | 分类ID                  |
+| status       | string | 否  | 状态：on\_sale/off\_sale |
+| keyword      | string | 否  | 搜索关键词                 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2679,28 +3089,33 @@ Authorization: Bearer {token}
 ```
 
 #### 3.5.1.1 商品详情
+
 ```
 GET /api/v1/merchant/products/{product_id}
 Authorization: Bearer {token}
 ```
 
 **响应特点：**
+
 - 商品详情返回结构与创建商品、更新商品成功后的回读结构保持一致。
 - 图片字段统一为 `images` 数组；若底层使用七牛私有访问，接口返回值为可直接显示的签名地址。
 - 规格字段统一为结构化 `specs` 数组，便于商家端详情页、编辑页直接复用。
 
 **错误语义：**
+
 - 当商品不存在、不属于当前商家或已删除时，接口返回 `404`
 - 当分类、规格等关系预加载失败，或服务端在详情查询/回读阶段发生内部异常时，接口返回 `500`
 - 创建商品、更新商品在写入成功后的详情回读阶段，如果回读失败，同样返回 `500`
 
 #### 3.5.2 创建商品
+
 ```
 POST /api/v1/merchant/products
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "name": "商品名称",
@@ -2725,30 +3140,35 @@ Authorization: Bearer {token}
 ```
 
 #### 3.5.3 更新商品
+
 ```
 PUT /api/v1/merchant/products/{product_id}
 Authorization: Bearer {token}
 ```
 
 #### 3.5.4 商品上架
+
 ```
 POST /api/v1/merchant/products/{product_id}/on-sale
 Authorization: Bearer {token}
 ```
 
 #### 3.5.5 商品下架
+
 ```
 POST /api/v1/merchant/products/{product_id}/off-sale
 Authorization: Bearer {token}
 ```
 
 #### 3.5.6 批量上下架
+
 ```
 POST /api/v1/merchant/products/batch-status
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "product_ids": [1, 2, 3],
@@ -2757,21 +3177,25 @@ Authorization: Bearer {token}
 ```
 
 #### 3.5.7 删除商品
+
 ```
 DELETE /api/v1/merchant/products/{product_id}
 Authorization: Bearer {token}
 ```
 
 **说明：**
+
 - 删除商品采用软删除语义，已删除商品不会继续出现在商家商品列表与 C 端可售商品列表中。
 
 #### 3.5.8 更新库存
+
 ```
 PUT /api/v1/merchant/products/{product_id}/stock
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "stock": 100,
@@ -2779,19 +3203,21 @@ Authorization: Bearer {token}
 }
 ```
 
-| action | 描述 |
-|--------|------|
-| set | 设置为指定值 |
-| add | 增加指定数量 |
+| action   | 描述     |
+| -------- | ------ |
+| set      | 设置为指定值 |
+| add      | 增加指定数量 |
 | subtract | 减少指定数量 |
 
 #### 3.5.9 获取商品规格
+
 ```
 GET /api/v1/merchant/products/{product_id}/specs
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2823,12 +3249,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.5.10 创建/更新商品规格
+
 ```
 PUT /api/v1/merchant/products/{product_id}/specs
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "specs": [
@@ -2853,6 +3281,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2861,12 +3290,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.5.11 删除商品规格
+
 ```
 DELETE /api/v1/merchant/products/{product_id}/specs
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "spec_ids": [1, 2]
@@ -2874,6 +3305,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2884,22 +3316,25 @@ Authorization: Bearer {token}
 ### 3.6 订单管理接口
 
 #### 3.6.1 订单列表
+
 ```
 GET /api/v1/merchant/orders
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| page_size | int | 否 | 每页数量 |
-| status | string | 否 | 订单状态 |
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
-| order_no | string | 否 | 订单号搜索 |
+
+| 参数          | 类型     | 必填 | 描述    |
+| ----------- | ------ | -- | ----- |
+| page        | int    | 否  | 页码    |
+| page\_size  | int    | 否  | 每页数量  |
+| status      | string | 否  | 订单状态  |
+| start\_date | string | 否  | 开始日期  |
+| end\_date   | string | 否  | 结束日期  |
+| order\_no   | string | 否  | 订单号搜索 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2940,12 +3375,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.6.2 订单详情
+
 ```
 GET /api/v1/merchant/orders/{order_id}
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -2991,14 +3428,16 @@ Authorization: Bearer {token}
 ```
 
 #### 3.6.3 订单核销
+
 ```
 POST /api/v1/merchant/orders/{order_id}/complete
 Authorization: Bearer {token}
 ```
 
-> **重要说明**：商家只能核销**属于自己店铺**的订单，不能跨商家核销。系统会验证订单的 merchant_id 是否与当前登录商家一致。
+> **重要说明**：商家只能核销**属于自己店铺**的订单，不能跨商家核销。系统会验证订单的 merchant\_id 是否与当前登录商家一致。
 
 **请求参数：**
+
 ```json
 {
   "verify_code": "核销码"
@@ -3006,9 +3445,11 @@ Authorization: Bearer {token}
 ```
 
 **核销码规则：**
-- verify_code 必须为 6 位数字字符串（示例：`123456`）。
+
+- verify\_code 必须为 6 位数字字符串（示例：`123456`）。
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3022,20 +3463,23 @@ Authorization: Bearer {token}
 ```
 
 **错误情况：**
-| 错误码 | 描述 |
-|--------|------|
-| 5001 | 订单不存在 |
+
+| 错误码  | 描述             |
+| ---- | -------------- |
+| 5001 | 订单不存在          |
 | 5002 | 订单状态错误（非已支付状态） |
 | 5005 | 无权操作此订单（跨商家核销） |
-| 5006 | 核销码错误 |
+| 5006 | 核销码错误          |
 
 #### 3.6.4 订单退款
+
 ```
 POST /api/v1/merchant/orders/{order_id}/refund
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "refund_amount": 106.00,
@@ -3044,18 +3488,21 @@ Authorization: Bearer {token}
 ```
 
 #### 3.6.5 订单统计
+
 ```
 GET /api/v1/merchant/orders/statistics
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
+
+| 参数          | 类型     | 必填 | 描述   |
+| ----------- | ------ | -- | ---- |
+| start\_date | string | 否  | 开始日期 |
+| end\_date   | string | 否  | 结束日期 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3073,18 +3520,23 @@ Authorization: Bearer {token}
 
 ### 3.7 数据分析接口
 
+> **说明**：当前商家数据看板以订单数据和 `user_behavior_events` 最小行为事件表为基础，重点覆盖访客、浏览、下单、支付成功等核心经营指标，不扩展复杂 BI 分析能力。
+
 #### 3.7.1 销售概览
+
 ```
 GET /api/v1/merchant/analytics/overview
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| period | string | 否 | 周期：today/week/month/year |
+
+| 参数     | 类型     | 必填 | 描述                       |
+| ------ | ------ | -- | ------------------------ |
+| period | string | 否  | 周期：today/week/month/year |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3095,25 +3547,31 @@ Authorization: Bearer {token}
     "avg_order_amount": 50.00,
     "sales_growth": 15.5,
     "orders_growth": 10.2,
-    "customers_growth": 8.3
+    "customers_growth": 8.3,
+    "visit_count": 1800,
+    "visit_users": 900,
+    "pay_success_users": 320
   }
 }
 ```
 
 #### 3.7.2 销售趋势
+
 ```
 GET /api/v1/merchant/analytics/sales-trend
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| start_date | string | 是 | 开始日期 |
-| end_date | string | 是 | 结束日期 |
-| granularity | string | 否 | 粒度：day/week/month |
+
+| 参数          | 类型     | 必填 | 描述                |
+| ----------- | ------ | -- | ----------------- |
+| start\_date | string | 是  | 开始日期              |
+| end\_date   | string | 是  | 结束日期              |
+| granularity | string | 否  | 粒度：day/week/month |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3122,27 +3580,32 @@ Authorization: Bearer {token}
       "date": "2024-01-01",
       "sales": 5000.00,
       "orders": 100,
-      "customers": 80
+      "customers": 80,
+      "visit_users": 80,
+      "submit_order_users": 45
     }
   ]
 }
 ```
 
 #### 3.7.3 商品销量排行
+
 ```
 GET /api/v1/merchant/analytics/product-ranking
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
-| limit | int | 否 | 返回数量，默认10 |
-| sort_by | string | 否 | 排序字段：sales/amount |
+
+| 参数          | 类型     | 必填 | 描述                |
+| ----------- | ------ | -- | ----------------- |
+| start\_date | string | 否  | 开始日期              |
+| end\_date   | string | 否  | 结束日期              |
+| limit       | int    | 否  | 返回数量，默认10         |
+| sort\_by    | string | 否  | 排序字段：sales/amount |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3160,17 +3623,20 @@ Authorization: Bearer {token}
 ```
 
 #### 3.7.4 时段分析
+
 ```
 GET /api/v1/merchant/analytics/hourly
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| date | string | 否 | 日期，默认今天 |
+
+| 参数   | 类型     | 必填 | 描述      |
+| ---- | ------ | -- | ------- |
+| date | string | 否  | 日期，默认今天 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3190,17 +3656,20 @@ Authorization: Bearer {token}
 ```
 
 #### 3.7.5 库存预警
+
 ```
 GET /api/v1/merchant/analytics/stock-alert
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| threshold | int | 否 | 库存阈值，默认10 |
+
+| 参数        | 类型  | 必填 | 描述        |
+| --------- | --- | -- | --------- |
+| threshold | int | 否  | 库存阈值，默认10 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3216,84 +3685,55 @@ Authorization: Bearer {token}
 ```
 
 #### 3.7.6 商家用户分析（商家维度）
+
 ```
 GET /api/v1/merchant/analytics/customers
 Authorization: Bearer {token}
 ```
 
-> **说明**：此接口从商家维度分析用户消费行为，仅统计在当前商家店铺消费的用户数据。
+> **说明**：此接口从商家维度统计顾客与访客行为，当前版本以最小闭环为主，返回可直接用于商家数据看板页面的核心指标。
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| start_date | string | 否 | 开始日期 |
-| end_date | string | 否 | 结束日期 |
+
+| 参数          | 类型     | 必填 | 描述   |
+| ----------- | ------ | -- | ---- |
+| start\_date | string | 否  | 开始日期 |
+| end\_date   | string | 否  | 结束日期 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
   "data": {
     "total_customers": 500,
     "new_customers": 50,
-    "returning_customers": 450,
-    "return_rate": 90.0,
-    "customer_stats": {
-      "avg_order_count": 3.2,
-      "avg_order_amount": 156.00,
-      "max_order_amount": 500.00,
-      "min_order_amount": 20.00
-    },
-    "customer_distribution": [
-      {
-        "range": "1次",
-        "count": 150,
-        "percentage": 30.0
-      },
-      {
-        "range": "2-5次",
-        "count": 250,
-        "percentage": 50.0
-      },
-      {
-        "range": "6-10次",
-        "count": 70,
-        "percentage": 14.0
-      },
-      {
-        "range": "10次以上",
-        "count": 30,
-        "percentage": 6.0
-      }
-    ],
-    "top_customers": [
-      {
-        "user_id": 1,
-        "nickname": "用户昵称",
-        "avatar": "头像URL",
-        "order_count": 25,
-        "total_amount": 2500.00,
-        "last_order_time": "2024-01-01T12:00:00Z"
-      }
-    ]
+    "repeat_rate": 38.0,
+    "visit_users": 900,
+    "visit_count": 1800,
+    "submit_order_users": 420,
+    "pay_success_users": 320
   }
 }
 ```
 
 #### 3.7.7 用户消费趋势
+
 ```
 GET /api/v1/merchant/analytics/customer-trend
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| start_date | string | 是 | 开始日期 |
-| end_date | string | 是 | 结束日期 |
-| granularity | string | 否 | 粒度：day/week/month |
+
+| 参数          | 类型     | 必填 | 描述                |
+| ----------- | ------ | -- | ----------------- |
+| start\_date | string | 是  | 开始日期              |
+| end\_date   | string | 是  | 结束日期              |
+| granularity | string | 否  | 粒度：day/week/month |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3313,11 +3753,13 @@ Authorization: Bearer {token}
 > **说明**：用户通过扫描商家二维码进入统一小程序，小程序携带商家ID参数，所有操作都在当前商家店铺上下文中进行。
 
 #### 3.8.1 微信登录
+
 ```
 POST /api/v1/user/auth/wechat-login
 ```
 
 **请求参数：**
+
 ```json
 {
   "code": "微信登录凭证",
@@ -3327,6 +3769,7 @@ POST /api/v1/user/auth/wechat-login
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3342,6 +3785,7 @@ POST /api/v1/user/auth/wechat-login
 ```
 
 #### 3.8.2 店铺首页（扫码进入）
+
 ```
 GET /api/v1/store/{merchant_id}/home
 ```
@@ -3349,6 +3793,7 @@ GET /api/v1/store/{merchant_id}/home
 > 用户扫描商家二维码后，小程序调用此接口获取店铺首页数据
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3396,23 +3841,27 @@ GET /api/v1/store/{merchant_id}/home
 ```
 
 **说明：**
+
 - `hot_products` 当前返回商品结构化对象，图片字段为 `images` 数组。
 - 当商品图片使用七牛私有访问策略时，接口返回的图片地址已可直接显示。
 
 #### 3.8.3 商家商品列表
+
 ```
 GET /api/v1/store/{merchant_id}/products
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| category_id | int | 否 | 分类ID，不传则返回全部分类商品 |
-| keyword | string | 否 | 商品名称关键词 |
-| page | int | 否 | 页码，默认 1 |
-| page_size | int | 否 | 每页数量，默认 20，最大 50 |
+
+| 参数           | 类型     | 必填 | 描述               |
+| ------------ | ------ | -- | ---------------- |
+| category\_id | int    | 否  | 分类ID，不传则返回全部分类商品 |
+| keyword      | string | 否  | 商品名称关键词          |
+| page         | int    | 否  | 页码，默认 1          |
+| page\_size   | int    | 否  | 每页数量，默认 20，最大 50 |
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3453,16 +3902,19 @@ GET /api/v1/store/{merchant_id}/products
 ```
 
 **说明：**
+
 - 当前 C 端商品列表接口返回扁平商品列表与分页信息，不再按分类分组返回。
 - 图片字段统一为 `images` 数组，前端直接取第一张图作为缩略图即可。
 - 若商品图片来自七牛私有空间，接口返回值已完成签名，可直接用于页面展示。
 
 #### 3.8.4 商品详情
+
 ```
 GET /api/v1/store/{merchant_id}/products/{product_id}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3491,16 +3943,19 @@ GET /api/v1/store/{merchant_id}/products/{product_id}
 ```
 
 **说明：**
+
 - 商品详情图片为可直接展示的访问地址；若底层使用七牛私有访问，接口会返回动态签名后的图片地址。
 
 #### 3.8.5 获取配送费规则
+
 ```
 GET /api/v1/store/{merchant_id}/delivery-rules
 ```
 
-> **说明**：获取商家的配送费规则，前端可基于规则做展示或预估，实际配送费以服务端创建订单时按规则计算结果为准
+> **说明**：获取商家的配送费规则，前端基于商家返回的配送档位供用户手动选择，实际配送费仍以后端创建订单时的校验和计算结果为准。
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3509,7 +3964,7 @@ GET /api/v1/store/{merchant_id}/delivery-rules
     "base_fee": 5.00,
     "free_delivery_amount": 50.00,
     "max_distance": 10,
-    "rules": [
+    "distance_rules": [
       {"min_distance": 0, "max_distance": 2, "fee": 0},
       {"min_distance": 2, "max_distance": 5, "fee": 3.00},
       {"min_distance": 5, "max_distance": 10, "fee": 6.00}
@@ -3519,54 +3974,65 @@ GET /api/v1/store/{merchant_id}/delivery-rules
 ```
 
 **说明**：
-- 用户选择配送距离（如：3公里）
-- 前端可根据 `rules` 展示预计配送费区间
+
+- 用户选择的是商家配置的配送距离档位，不是实时定位距离。
+- 前端可根据 `distance_rules` 展示预计配送费区间
 - 如果订单金额 >= `free_delivery_amount`，预计配送费可展示为 0
+- 超出商家支持范围时，前端仅提示不可提交，不接入第三方地图。
 - 创建订单时，服务端会根据 `delivery_distance`、`distance_rules` 和满免门槛重新计算并校验最终配送费
 
 #### 3.8.6 创建订单
+
 ```
 POST /api/v1/store/{merchant_id}/orders
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "items": [
     {
       "product_id": 1,
-      "spec_option": "大份",
+      "spec_info": "大份",
       "quantity": 2
     }
   ],
   "delivery_type": 1,
   "delivery_distance": 3,
+  "delivery_address": "XX市XX区XX路XX号",
+  "contact_name": "张三",
+  "contact_phone": "13800138000",
   "remark": "少放辣"
 }
 ```
 
-**delivery_type 说明：**
-| 值 | 描述 |
-|------|------|
-| 1 | 配送（需要填写配送距离） |
-| 2 | 堂食（不需要配送费） |
-| 3 | 自提（不需要配送费） |
+**delivery\_type 说明：**
+
+| 值 | 描述           |
+| - | ------------ |
+| 1 | 配送（需要填写配送距离、配送地址、联系人、联系电话） |
+| 2 | 堂食（不需要配送费）   |
+| 3 | 自提（不需要配送费）   |
 
 **响应：**
+
 ```json
 {
   "code": 0,
   "data": {
-    "order_id": 1,
-    "order_no": "202401010001",
-    "total_amount": 116.00,
-    "delivery_fee": 3.00,
-    "discount_amount": 0,
-    "pay_amount": 119.00,
-    "delivery_info": {
-      "distance": 3.5,
-      "address": "收货地址"
+    "order": {
+      "id": 1,
+      "order_no": "202401010001",
+      "total_amount": 116.00,
+      "delivery_fee": 3.00,
+      "pay_amount": 119.00,
+      "delivery_type": 1,
+      "delivery_distance": 3,
+      "delivery_address": "收货地址",
+      "status": 1,
+      "remark": "少放辣"
     },
     "pay_params": {
       "timeStamp": "时间戳",
@@ -3582,24 +4048,28 @@ Authorization: Bearer {token}
 > **说明**：支付参数中的 `paySign` 由服务商模式下的服务商商户号签名，支付资金直接结算到商家的子商户账户。
 
 #### 3.8.7 我的订单列表
+
 ```
 GET /api/v1/user/orders
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
-| 参数 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| page | int | 否 | 页码，默认1 |
-| page_size | int | 否 | 每页数量，默认10 |
-| merchant_id | int | 否 | 商家ID，用于筛选特定商家的订单（配合「我的订单」按钮使用） |
-| status | int | 否 | 订单状态：0全部 1待支付 2已支付 3已完成 4已取消 5退款中 6已退款 |
+
+| 参数           | 类型  | 必填 | 描述                                     |
+| ------------ | --- | -- | -------------------------------------- |
+| page         | int | 否  | 页码，默认1                                 |
+| page\_size   | int | 否  | 每页数量，默认10                              |
+| merchant\_id | int | 否  | 商家ID，用于筛选特定商家的订单（配合「我的订单」按钮使用）         |
+| status       | int | 否  | 订单状态：0全部 1待支付 2已支付 3已完成 4已取消 5退款中 6已退款 |
 
 **使用场景**：
-- **全部订单**：不传 merchant_id 参数，获取用户所有订单
-- **商家订单**：传入 merchant_id 参数，获取用户在特定商家的订单（用于店铺首页「我的订单」按钮跳转）
+
+- **全部订单**：不传 merchant\_id 参数，获取用户所有订单
+- **商家订单**：传入 merchant\_id 参数，获取用户在特定商家的订单（用于店铺首页「我的订单」按钮跳转）
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3637,12 +4107,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.8.8 订单详情
+
 ```
 GET /api/v1/user/orders/{order_id}
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3689,12 +4161,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.8.9 取消订单
+
 ```
 POST /api/v1/user/orders/{order_id}/cancel
 Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3703,12 +4177,14 @@ Authorization: Bearer {token}
 ```
 
 #### 3.8.10 申请退款
+
 ```
 POST /api/v1/user/orders/{order_id}/refund
 Authorization: Bearer {token}
 ```
 
 **请求参数：**
+
 ```json
 {
   "refund_reason": "退款原因"
@@ -3716,6 +4192,7 @@ Authorization: Bearer {token}
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3727,18 +4204,25 @@ Authorization: Bearer {token}
 }
 ```
 
----
+***
 
 ### 3.9 微信支付接口（服务商模式）
 
 #### 3.9.1 创建支付订单
+
 ```
 POST /api/v1/store/{merchant_id}/orders
 ```
 
 > **说明**：用户在确认订单页面提交订单时调用此接口，系统自动创建微信支付订单。
 
+- `merchant_id` 以后端路由参数为准。
+- `delivery_type = 1` 时必须填写配送地址、联系人、联系电话和配送距离档位。
+- `delivery_type = 2/3` 时无需传配送信息。
+- 商家休息时会拒绝新的下单请求；已进入支付流程的订单不受营业状态切换影响。
+
 **请求参数：**
+
 ```json
 {
   "merchant_id": 1,
@@ -3752,7 +4236,7 @@ POST /api/v1/store/{merchant_id}/orders
     {
       "product_id": 1,
       "quantity": 2,
-      "spec_option": "大杯/加冰",
+      "spec_info": "大杯/加冰",
       "price": 28.00
     }
   ]
@@ -3760,6 +4244,7 @@ POST /api/v1/store/{merchant_id}/orders
 ```
 
 **响应：**
+
 ```json
 {
   "code": 0,
@@ -3785,13 +4270,15 @@ POST /api/v1/store/{merchant_id}/orders
 ```
 
 **服务商模式说明**：
-- 服务商拥有微信支付商户号（mch_id）
-- 每个商家是服务商的子商户（sub_mch_id）
+
+- 服务商拥有微信支付商户号（mch\_id）
+- 每个商家是服务商的子商户（sub\_mch\_id）
 - 支付资金直接结算到商家的子商户账户
 - 服务商收取手续费，商家收到税后金额
 - 不同商家下单，收款主体为对应商家
 
 #### 3.9.2 支付回调通知
+
 ```
 POST /api/v1/callback/wechat
 ```
@@ -3799,6 +4286,7 @@ POST /api/v1/callback/wechat
 > **说明**：微信支付成功后，微信服务器回调此接口，通知订单支付成功。
 
 **回调参数：**
+
 ```json
 {
   "return_code": "SUCCESS",
@@ -3814,79 +4302,84 @@ POST /api/v1/callback/wechat
 }
 ```
 
----
+***
 
 ## 4. 数据模型设计
 
-### 4.1 服务商表 (service_providers)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| name | VARCHAR(128) | 服务商名称 |
-| contact_name | VARCHAR(64) | 联系人 |
-| contact_phone | VARCHAR(20) | 联系电话 |
-| mch_id | VARCHAR(32) | 服务商商户号 |
-| api_key | VARCHAR(128) | API密钥（加密存储） |
-| api_v3_key | VARCHAR(128) | APIv3密钥（加密存储） |
-| cert_serial_no | VARCHAR(64) | 证书序列号 |
-| private_key | TEXT | 商户私钥（加密存储） |
-| public_key | TEXT | 平台公钥 |
-| callback_url | VARCHAR(256) | 回调地址 |
-| status | TINYINT | 状态：0禁用 1正常 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+### 4.1 服务商表 (service\_providers)
 
-### 4.2 服务商管理员表 (service_provider_admins)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| service_provider_id | BIGINT | 服务商ID |
-| username | VARCHAR(64) | 用户名 |
-| password | VARCHAR(128) | 密码（加密存储） |
-| name | VARCHAR(64) | 姓名 |
-| phone | VARCHAR(20) | 手机号 |
-| role | VARCHAR(32) | 角色：admin/operator |
-| status | TINYINT | 状态 |
-| last_login_at | DATETIME | 最后登录时间 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| 字段               | 类型           | 描述            |
+| ---------------- | ------------ | ------------- |
+| id               | BIGINT       | 主键            |
+| name             | VARCHAR(128) | 服务商名称         |
+| contact\_name    | VARCHAR(64)  | 联系人           |
+| contact\_phone   | VARCHAR(20)  | 联系电话          |
+| mch\_id          | VARCHAR(32)  | 服务商商户号        |
+| api\_key         | VARCHAR(128) | API密钥（加密存储）   |
+| api\_v3\_key     | VARCHAR(128) | APIv3密钥（加密存储） |
+| cert\_serial\_no | VARCHAR(64)  | 证书序列号         |
+| private\_key     | TEXT         | 商户私钥（加密存储）    |
+| public\_key      | TEXT         | 平台公钥          |
+| callback\_url    | VARCHAR(256) | 回调地址          |
+| status           | TINYINT      | 状态：0禁用 1正常    |
+| created\_at      | DATETIME     | 创建时间          |
+| updated\_at      | DATETIME     | 更新时间          |
 
-### 4.2.5 服务商小程序管理员表 (sp_admins)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| service_provider_id | BIGINT | 服务商ID |
-| username | VARCHAR(64) | 用户名 |
-| password | VARCHAR(128) | 密码 |
-| name | VARCHAR(64) | 姓名 |
-| phone | VARCHAR(20) | 手机号 |
-| role | VARCHAR(32) | 角色：admin/operator |
-| status | TINYINT | 状态：0禁用 1正常 |
-| last_login_at | DATETIME | 最后登录时间 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+### 4.2 服务商管理员表 (service\_provider\_admins)
 
-### 4.3 商家进件申请表 (merchant_applications)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| merchant_name | VARCHAR(128) | 商户名称 |
-| business_license_info | JSON | 营业执照信息 |
-| legal_person_info | JSON | 法人信息 |
-| bank_account_info | JSON | 结算银行卡信息 |
-| store_info | JSON | 门店信息 |
-| contact_info | JSON | 联系人信息 |
-| applyment_id | VARCHAR(64) | 微信支付申请单号 |
-| sub_mch_id | VARCHAR(32) | 子商户号 |
-| status | TINYINT | 状态：0草稿 1已提交 2审核中 3通过 4拒绝 |
-| audit_detail | JSON | 审核详情 |
-| submit_time | DATETIME | 提交时间 |
-| audit_time | DATETIME | 审核时间 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| 字段                    | 类型           | 描述                |
+| --------------------- | ------------ | ----------------- |
+| id                    | BIGINT       | 主键                |
+| service\_provider\_id | BIGINT       | 服务商ID             |
+| username              | VARCHAR(64)  | 用户名               |
+| password              | VARCHAR(128) | 密码（加密存储）          |
+| name                  | VARCHAR(64)  | 姓名                |
+| phone                 | VARCHAR(20)  | 手机号               |
+| role                  | VARCHAR(32)  | 角色：admin/operator |
+| status                | TINYINT      | 状态                |
+| last\_login\_at       | DATETIME     | 最后登录时间            |
+| created\_at           | DATETIME     | 创建时间              |
+| updated\_at           | DATETIME     | 更新时间              |
 
-**business_license_info JSON 结构：**
+### 4.2.5 服务商小程序管理员表 (sp\_admins)
+
+| 字段                    | 类型           | 描述                |
+| --------------------- | ------------ | ----------------- |
+| id                    | BIGINT       | 主键                |
+| service\_provider\_id | BIGINT       | 服务商ID             |
+| username              | VARCHAR(64)  | 用户名               |
+| password              | VARCHAR(128) | 密码                |
+| name                  | VARCHAR(64)  | 姓名                |
+| phone                 | VARCHAR(20)  | 手机号               |
+| role                  | VARCHAR(32)  | 角色：admin/operator |
+| status                | TINYINT      | 状态：0禁用 1正常        |
+| last\_login\_at       | DATETIME     | 最后登录时间            |
+| created\_at           | DATETIME     | 创建时间              |
+| updated\_at           | DATETIME     | 更新时间              |
+
+### 4.3 商家进件申请表 (merchant\_applications)
+
+| 字段                      | 类型           | 描述                       |
+| ----------------------- | ------------ | ------------------------ |
+| id                      | BIGINT       | 主键                       |
+| merchant\_id            | BIGINT       | 商家ID                     |
+| merchant\_name          | VARCHAR(128) | 商户名称                     |
+| business\_license\_info | JSON         | 营业执照信息                   |
+| legal\_person\_info     | JSON         | 法人信息                     |
+| bank\_account\_info     | JSON         | 结算银行卡信息                  |
+| store\_info             | JSON         | 门店信息                     |
+| contact\_info           | JSON         | 联系人信息                    |
+| applyment\_id           | VARCHAR(64)  | 微信支付申请单号                 |
+| sub\_mch\_id            | VARCHAR(32)  | 子商户号                     |
+| status                  | TINYINT      | 状态：0草稿 1已提交 2审核中 3通过 4拒绝 |
+| audit\_detail           | JSON         | 审核详情                     |
+| submit\_time            | DATETIME     | 提交时间                     |
+| audit\_time             | DATETIME     | 审核时间                     |
+| created\_at             | DATETIME     | 创建时间                     |
+| updated\_at             | DATETIME     | 更新时间                     |
+
+**business\_license\_info JSON 结构：**
+
 ```json
 {
   "license_no": "营业执照号",
@@ -3897,7 +4390,8 @@ POST /api/v1/callback/wechat
 }
 ```
 
-**legal_person_info JSON 结构：**
+**legal\_person\_info JSON 结构：**
+
 ```json
 {
   "name": "法人姓名",
@@ -3908,7 +4402,8 @@ POST /api/v1/callback/wechat
 }
 ```
 
-**bank_account_info JSON 结构：**
+**bank\_account\_info JSON 结构：**
+
 ```json
 {
   "bank_name": "开户银行",
@@ -3920,7 +4415,8 @@ POST /api/v1/callback/wechat
 }
 ```
 
-**store_info JSON 结构：**
+**store\_info JSON 结构：**
+
 ```json
 {
   "store_name": "门店名称",
@@ -3930,50 +4426,53 @@ POST /api/v1/callback/wechat
 ```
 
 ### 4.4 商家表 (merchants)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| service_provider_id | BIGINT | 服务商ID |
-| name | VARCHAR(128) | 商家名称 |
-| logo | VARCHAR(512) | 店铺Logo |
-| contact_name | VARCHAR(64) | 联系人 |
-| contact_phone | VARCHAR(20) | 联系电话 |
-| contact_email | VARCHAR(128) | 联系邮箱 |
-| address | VARCHAR(256) | 店铺地址 |
-| lat | DECIMAL(10,6) | 纬度 |
-| lng | DECIMAL(10,6) | 经度 |
-| business_category | VARCHAR(64) | 经营类目 |
-| business_hours | VARCHAR(64) | 营业时间 |
-| announcement | TEXT | 门店公告 |
-| min_order_amount | DECIMAL(10,2) | 最低起送金额 |
-| takeout_enabled | BOOLEAN | 是否支持外卖 |
-| dine_in_enabled | BOOLEAN | 是否支持堂食 |
-| sub_mch_id | VARCHAR(32) | 微信支付子商户号 |
-| sub_mch_status | TINYINT | 子商户绑定状态：0未绑定 1绑定中 2已绑定 3绑定失败 |
-| applyment_status | TINYINT | 进件状态：0未进件 1进件中 2已通过 3已拒绝 |
-| audit_status | TINYINT | 平台审核状态：0待审核 1通过 2拒绝 |
-| audit_remark | VARCHAR(256) | 审核备注 |
-| status | TINYINT | 状态：0关闭 1营业中 |
-| rating | DECIMAL(2,1) | 评分 |
-| sales_count | INT | 销量 |
-| qrcode_url | VARCHAR(512) | 商家小程序码URL |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
 
-### 4.5 商家配送设置表 (merchant_delivery_settings)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| enabled | BOOLEAN | 是否开启配送 |
-| base_fee | DECIMAL(10,2) | 基础配送费 |
-| free_delivery_amount | DECIMAL(10,2) | 满额免配送费金额 |
-| max_distance | INT | 最大配送距离（公里） |
-| distance_rules | JSON | 按距离收费规则 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| 字段                    | 类型            | 描述                           |
+| --------------------- | ------------- | ---------------------------- |
+| id                    | BIGINT        | 主键                           |
+| service\_provider\_id | BIGINT        | 服务商ID                        |
+| name                  | VARCHAR(128)  | 商家名称                         |
+| logo                  | VARCHAR(512)  | 店铺Logo                       |
+| contact\_name         | VARCHAR(64)   | 联系人                          |
+| contact\_phone        | VARCHAR(20)   | 联系电话                         |
+| contact\_email        | VARCHAR(128)  | 联系邮箱                         |
+| address               | VARCHAR(256)  | 店铺地址                         |
+| lat                   | DECIMAL(10,6) | 纬度                           |
+| lng                   | DECIMAL(10,6) | 经度                           |
+| business\_category    | VARCHAR(64)   | 经营类目                         |
+| business\_hours       | VARCHAR(64)   | 营业时间                         |
+| announcement          | TEXT          | 门店公告                         |
+| min\_order\_amount    | DECIMAL(10,2) | 最低起送金额                       |
+| takeout\_enabled      | BOOLEAN       | 是否支持外卖                       |
+| dine\_in\_enabled     | BOOLEAN       | 是否支持堂食                       |
+| sub\_mch\_id          | VARCHAR(32)   | 微信支付子商户号                     |
+| sub\_mch\_status      | TINYINT       | 子商户绑定状态：0未绑定 1绑定中 2已绑定 3绑定失败 |
+| applyment\_status     | TINYINT       | 进件状态：0未进件 1进件中 2已通过 3已拒绝     |
+| audit\_status         | TINYINT       | 平台审核状态：0待审核 1通过 2拒绝          |
+| audit\_remark         | VARCHAR(256)  | 审核备注                         |
+| status                | TINYINT       | 状态：0关闭 1营业中                  |
+| rating                | DECIMAL(2,1)  | 评分                           |
+| sales\_count          | INT           | 销量                           |
+| qrcode\_url           | VARCHAR(512)  | 商家小程序码URL                    |
+| created\_at           | DATETIME      | 创建时间                         |
+| updated\_at           | DATETIME      | 更新时间                         |
 
-**distance_rules JSON 结构：**
+### 4.5 商家配送设置表 (merchant\_delivery\_settings)
+
+| 字段                     | 类型            | 描述         |
+| ---------------------- | ------------- | ---------- |
+| id                     | BIGINT        | 主键         |
+| merchant\_id           | BIGINT        | 商家ID       |
+| enabled                | BOOLEAN       | 是否开启配送     |
+| base\_fee              | DECIMAL(10,2) | 基础配送费      |
+| free\_delivery\_amount | DECIMAL(10,2) | 满额免配送费金额   |
+| max\_distance          | INT           | 最大配送距离（公里，作为用户可选档位上限） |
+| distance\_rules        | JSON          | 按距离收费规则    |
+| created\_at            | DATETIME      | 创建时间       |
+| updated\_at            | DATETIME      | 更新时间       |
+
+**distance\_rules JSON 结构：**
+
 ```json
 [
   {"min_distance": 0, "max_distance": 2, "fee": 0},
@@ -3982,329 +4481,387 @@ POST /api/v1/callback/wechat
 ]
 ```
 
-### 4.6 商家营业执照表 (merchant_licenses)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| license_no | VARCHAR(64) | 营业执照号 |
-| license_name | VARCHAR(128) | 营业执照名称 |
-| license_image | VARCHAR(512) | 营业执照图片 |
-| legal_person | VARCHAR(64) | 法人姓名 |
-| legal_person_id | VARCHAR(32) | 法人身份证号 |
-| legal_person_id_front | VARCHAR(512) | 法人身份证正面图片 |
-| legal_person_id_back | VARCHAR(512) | 法人身份证反面图片 |
-| valid_from | DATE | 有效期开始 |
-| valid_to | DATE | 有效期结束 |
-| status | TINYINT | 状态 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+- 该表只描述商家允许用户手动选择的配送档位，不参与真实地图定位。
+- `distance_rules` 需满足区间不重叠、结束距离大于起始距离、且不超过 `max_distance`。
 
-### 4.7 商家员工表 (merchant_staffs)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| username | VARCHAR(64) | 用户名 |
-| password | VARCHAR(128) | 密码 |
-| name | VARCHAR(64) | 姓名 |
-| phone | VARCHAR(20) | 手机号 |
-| role | VARCHAR(32) | 角色：owner/manager/staff |
-| notify_enabled | TINYINT(1) | 订单提示音开关，1开启 0关闭 |
-| status | TINYINT | 状态 |
-| last_login_at | DATETIME | 最后登录时间 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+### 4.6 商家营业执照表 (merchant\_licenses)
+
+| 字段                       | 类型           | 描述        |
+| ------------------------ | ------------ | --------- |
+| id                       | BIGINT       | 主键        |
+| merchant\_id             | BIGINT       | 商家ID      |
+| license\_no              | VARCHAR(64)  | 营业执照号     |
+| license\_name            | VARCHAR(128) | 营业执照名称    |
+| license\_image           | VARCHAR(512) | 营业执照图片    |
+| legal\_person            | VARCHAR(64)  | 法人姓名      |
+| legal\_person\_id        | VARCHAR(32)  | 法人身份证号    |
+| legal\_person\_id\_front | VARCHAR(512) | 法人身份证正面图片 |
+| legal\_person\_id\_back  | VARCHAR(512) | 法人身份证反面图片 |
+| valid\_from              | DATE         | 有效期开始     |
+| valid\_to                | DATE         | 有效期结束     |
+| status                   | TINYINT      | 状态        |
+| created\_at              | DATETIME     | 创建时间      |
+| updated\_at              | DATETIME     | 更新时间      |
+
+### 4.7 商家员工表 (merchant\_staffs)
+
+| 字段              | 类型           | 描述                     |
+| --------------- | ------------ | ---------------------- |
+| id              | BIGINT       | 主键                     |
+| merchant\_id    | BIGINT       | 商家ID                   |
+| username        | VARCHAR(64)  | 用户名                    |
+| password        | VARCHAR(128) | 密码                     |
+| name            | VARCHAR(64)  | 姓名                     |
+| phone           | VARCHAR(20)  | 手机号                    |
+| openid          | VARCHAR(64)  | 员工绑定的微信 OpenID         |
+| wechat_bound_at | DATETIME     | 微信快捷登录绑定时间             |
+| role            | VARCHAR(32)  | 角色：owner/manager/staff |
+| notify\_enabled | TINYINT(1)   | 订单提示音开关，1开启 0关闭        |
+| browse_notify_enabled | TINYINT(1)   | 浏览提示音开关，1开启 0关闭        |
+| status          | TINYINT      | 状态                     |
+| last\_login\_at | DATETIME     | 最后登录时间                 |
+| last_wechat_login_at | DATETIME     | 最后一次微信快捷登录时间           |
+| created\_at     | DATETIME     | 创建时间                   |
+| updated\_at     | DATETIME     | 更新时间                   |
+
+- 员工管理首版由 `owner` 角色负责，不引入细粒度权限模型。
 
 ### 4.8 商品分类表 (categories)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| name | VARCHAR(64) | 分类名称 |
-| sort | INT | 排序权重 |
-| status | TINYINT | 状态：0禁用 1启用 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+
+| 字段           | 类型          | 描述         |
+| ------------ | ----------- | ---------- |
+| id           | BIGINT      | 主键         |
+| merchant\_id | BIGINT      | 商家ID       |
+| name         | VARCHAR(64) | 分类名称       |
+| sort         | INT         | 排序权重       |
+| status       | TINYINT     | 状态：0禁用 1启用 |
+| created\_at  | DATETIME    | 创建时间       |
+| updated\_at  | DATETIME    | 更新时间       |
 
 ### 4.9 商品表 (products)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| category_id | BIGINT | 分类ID |
-| name | VARCHAR(128) | 商品名称 |
-| description | TEXT | 商品描述 |
-| images | JSON | 图片数组 |
-| price | DECIMAL(10,2) | 售价 |
-| original_price | DECIMAL(10,2) | 原价 |
-| stock | INT | 库存 |
-| unit | VARCHAR(16) | 单位 |
-| sales | INT | 销量 |
-| sort | INT | 排序权重 |
-| status | TINYINT | 状态：0下架 1上架 |
-| deleted_at | DATETIME | 删除时间 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
 
-### 4.10 商品规格表 (product_specs)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| product_id | BIGINT | 商品ID |
-| name | VARCHAR(64) | 规格名称（如：份量） |
-| options | JSON | 规格选项（存储规格和对应价格，如：[{"name":"小份","price":48.00},{"name":"大份","price":68.00}]） |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| 字段              | 类型            | 描述         |
+| --------------- | ------------- | ---------- |
+| id              | BIGINT        | 主键         |
+| merchant\_id    | BIGINT        | 商家ID       |
+| category\_id    | BIGINT        | 分类ID       |
+| name            | VARCHAR(128)  | 商品名称       |
+| description     | TEXT          | 商品描述       |
+| images          | JSON          | 图片数组       |
+| price           | DECIMAL(10,2) | 售价         |
+| original\_price | DECIMAL(10,2) | 原价         |
+| stock           | INT           | 库存         |
+| unit            | VARCHAR(16)   | 单位         |
+| sales           | INT           | 销量         |
+| sort            | INT           | 排序权重       |
+| status          | TINYINT       | 状态：0下架 1上架 |
+| deleted\_at     | DATETIME      | 删除时间       |
+| created\_at     | DATETIME      | 创建时间       |
+| updated\_at     | DATETIME      | 更新时间       |
+
+### 4.10 商品规格表 (product\_specs)
+
+| 字段          | 类型          | 描述                                                                           |
+| ----------- | ----------- | ---------------------------------------------------------------------------- |
+| id          | BIGINT      | 主键                                                                           |
+| product\_id | BIGINT      | 商品ID                                                                         |
+| name        | VARCHAR(64) | 规格名称（如：份量）                                                                   |
+| options     | JSON        | 规格选项（存储规格和对应价格，如：\[{"name":"小份","price":48.00},{"name":"大份","price":68.00}]） |
+| created\_at | DATETIME    | 创建时间                                                                         |
+| updated\_at | DATETIME    | 更新时间                                                                         |
 
 ### 4.12 C端用户表 (users)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| openid | VARCHAR(64) | 微信OpenID |
-| union_id | VARCHAR(64) | 微信UnionID |
-| nickname | VARCHAR(64) | 昵称 |
-| avatar | VARCHAR(512) | 头像 |
-| phone | VARCHAR(20) | 手机号 |
-| status | TINYINT | 状态 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+
+| 字段          | 类型           | 描述        |
+| ----------- | ------------ | --------- |
+| id          | BIGINT       | 主键        |
+| openid      | VARCHAR(64)  | 微信OpenID  |
+| union\_id   | VARCHAR(64)  | 微信UnionID |
+| nickname    | VARCHAR(64)  | 昵称        |
+| avatar      | VARCHAR(512) | 头像        |
+| phone       | VARCHAR(20)  | 手机号       |
+| status      | TINYINT      | 状态        |
+| created\_at | DATETIME     | 创建时间      |
+| updated\_at | DATETIME     | 更新时间      |
 
 ### 4.11 订单表 (orders)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| order_no | VARCHAR(32) | 订单号 |
-| user_id | BIGINT | 用户ID |
-| merchant_id | BIGINT | 商家ID |
-| total_amount | DECIMAL(10,2) | 商品总金额 |
-| delivery_fee | DECIMAL(10,2) | 配送费 |
-| discount_amount | DECIMAL(10,2) | 优惠金额 |
-| pay_amount | DECIMAL(10,2) | 实付金额 |
-| delivery_type | TINYINT | 配送类型：1配送 2堂食 3自提 |
-| delivery_distance | DECIMAL(5,2) | 配送距离（公里） |
-| delivery_address | VARCHAR(256) | 配送地址 |
-| contact_name | VARCHAR(64) | 联系人姓名 |
-| contact_phone | VARCHAR(20) | 联系人电话 |
-| status | TINYINT | 状态 |
-| remark | VARCHAR(256) | 备注 |
-| verify_code | VARCHAR(16) | 核销码 |
-| transaction_id | VARCHAR(64) | 微信支付交易号 |
-| paid_at | DATETIME | 支付时间 |
-| completed_at | DATETIME | 完成时间 |
-| cancelled_at | DATETIME | 取消时间 |
-| refunded_at | DATETIME | 退款时间 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+
+| 字段                 | 类型            | 描述               |
+| ------------------ | ------------- | ---------------- |
+| id                 | BIGINT        | 主键               |
+| order\_no          | VARCHAR(32)   | 订单号              |
+| user\_id           | BIGINT        | 用户ID             |
+| merchant\_id       | BIGINT        | 商家ID             |
+| total\_amount      | DECIMAL(10,2) | 商品总金额            |
+| delivery\_fee      | DECIMAL(10,2) | 配送费              |
+| discount\_amount   | DECIMAL(10,2) | 优惠金额             |
+| pay\_amount        | DECIMAL(10,2) | 实付金额             |
+| delivery\_type     | TINYINT       | 配送类型：1配送 2堂食 3自提 |
+| delivery\_distance | DECIMAL(5,2)  | 配送距离（公里）         |
+| delivery\_address  | VARCHAR(256)  | 配送地址             |
+| contact\_name      | VARCHAR(64)   | 联系人姓名            |
+| contact\_phone     | VARCHAR(20)   | 联系人电话            |
+| status             | TINYINT       | 状态               |
+| remark             | VARCHAR(256)  | 备注               |
+| verify\_code       | VARCHAR(16)   | 核销码              |
+| transaction\_id    | VARCHAR(64)   | 微信支付交易号          |
+| paid\_at           | DATETIME      | 支付时间             |
+| completed\_at      | DATETIME      | 完成时间             |
+| cancelled\_at      | DATETIME      | 取消时间             |
+| refunded\_at       | DATETIME      | 退款时间             |
+| created\_at        | DATETIME      | 创建时间             |
+| updated\_at        | DATETIME      | 更新时间             |
 
 **订单状态流转：**
+
 ```
 pending_payment(待支付) → paid(已支付) → completed(已完成)
         ↓                    ↓
    cancelled(已取消)    refunding(退款中) → refunded(已退款)
 ```
 
-### 4.12 订单商品表 (order_items)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| order_id | BIGINT | 订单ID |
-| merchant_id | BIGINT | 商家ID |
-| product_id | BIGINT | 商品ID |
-| product_name | VARCHAR(128) | 商品名称 |
-| image | VARCHAR(512) | 商品图片 |
-| price | DECIMAL(10,2) | 单价 |
-| quantity | INT | 数量 |
-| spec_info | JSON | 规格信息（如：大份/小份） |
-| subtotal | DECIMAL(10,2) | 小计 |
-| created_at | DATETIME | 创建时间 |
+### 4.12 订单商品表 (order\_items)
+
+| 字段            | 类型            | 描述            |
+| ------------- | ------------- | ------------- |
+| id            | BIGINT        | 主键            |
+| order\_id     | BIGINT        | 订单ID          |
+| merchant\_id  | BIGINT        | 商家ID          |
+| product\_id   | BIGINT        | 商品ID          |
+| product\_name | VARCHAR(128)  | 商品名称          |
+| image         | VARCHAR(512)  | 商品图片          |
+| price         | DECIMAL(10,2) | 单价            |
+| quantity      | INT           | 数量            |
+| spec\_info    | JSON          | 规格信息（如：大份/小份） |
+| subtotal      | DECIMAL(10,2) | 小计            |
+| created\_at   | DATETIME      | 创建时间          |
 
 ### 4.13 退款记录表 (refunds)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| order_id | BIGINT | 订单ID |
-| refund_no | VARCHAR(32) | 退款单号 |
-| refund_amount | DECIMAL(10,2) | 退款金额 |
-| refund_reason | VARCHAR(256) | 退款原因 |
-| status | TINYINT | 状态：0处理中 1成功 2失败 |
-| refund_id | VARCHAR(64) | 微信退款单号 |
-| refunded_at | DATETIME | 退款完成时间 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+
+| 字段             | 类型            | 描述              |
+| -------------- | ------------- | --------------- |
+| id             | BIGINT        | 主键              |
+| order\_id      | BIGINT        | 订单ID            |
+| refund\_no     | VARCHAR(32)   | 退款单号            |
+| refund\_amount | DECIMAL(10,2) | 退款金额            |
+| refund\_reason | VARCHAR(256)  | 退款原因            |
+| status         | TINYINT       | 状态：0处理中 1成功 2失败 |
+| refund\_id     | VARCHAR(64)   | 微信退款单号          |
+| refunded\_at   | DATETIME      | 退款完成时间          |
+| created\_at    | DATETIME      | 创建时间            |
+| updated\_at    | DATETIME      | 更新时间            |
 
 ### 4.14 平台活动表 (activities)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| type | VARCHAR(16) | 类型：banner/announcement |
-| title | VARCHAR(128) | 标题 |
-| content | TEXT | 内容 |
-| image | VARCHAR(512) | 图片URL |
-| link_type | VARCHAR(16) | 跳转类型：merchant/webview/none |
-| link_value | VARCHAR(256) | 跳转值 |
-| sort | INT | 排序 |
-| status | TINYINT | 状态：0禁用 1启用 |
-| start_time | DATETIME | 开始时间 |
-| end_time | DATETIME | 结束时间 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+
+| 字段          | 类型           | 描述                         |
+| ----------- | ------------ | -------------------------- |
+| id          | BIGINT       | 主键                         |
+| type        | VARCHAR(16)  | 类型：banner/announcement     |
+| title       | VARCHAR(128) | 标题                         |
+| content     | TEXT         | 内容                         |
+| image       | VARCHAR(512) | 图片URL                      |
+| link\_type  | VARCHAR(16)  | 跳转类型：merchant/webview/none |
+| link\_value | VARCHAR(256) | 跳转值                        |
+| sort        | INT          | 排序                         |
+| status      | TINYINT      | 状态：0禁用 1启用                 |
+| start\_time | DATETIME     | 开始时间                       |
+| end\_time   | DATETIME     | 结束时间                       |
+| created\_at | DATETIME     | 创建时间                       |
+| updated\_at | DATETIME     | 更新时间                       |
 
 ### 4.15 系统公告表 (announcements)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| service_provider_id | BIGINT | 服务商ID |
-| title | VARCHAR(128) | 公告标题 |
-| content | TEXT | 公告内容 |
-| status | TINYINT | 状态：0禁用 1启用 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
 
-### 4.16 服务号配置表 (wechat_config)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| notify_type | VARCHAR(32) | 通知类型：order_new/order_paid/order_refund |
-| enabled | BOOLEAN | 是否启用 |
-| push_openid | VARCHAR(64) | 接收通知的OpenID |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| 字段                    | 类型           | 描述         |
+| --------------------- | ------------ | ---------- |
+| id                    | BIGINT       | 主键         |
+| service\_provider\_id | BIGINT       | 服务商ID      |
+| title                 | VARCHAR(128) | 公告标题       |
+| content               | TEXT         | 公告内容       |
+| status                | TINYINT      | 状态：0禁用 1启用 |
+| created\_at           | DATETIME     | 创建时间       |
+| updated\_at           | DATETIME     | 更新时间       |
 
-### 4.17 云打印机表 (cloud_printers)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| name | VARCHAR(64) | 打印机名称 |
-| type | VARCHAR(32) | 打印机类型：yilianyun/feie/xp |
-| device_no | VARCHAR(64) | 设备编号 |
-| api_key | VARCHAR(128) | API密钥 |
-| api_url | VARCHAR(256) | API接口地址 |
-| status | TINYINT | 状态：0离线 1在线 |
-| auto_print | BOOLEAN | 自动打印开关 |
-| print_count | INT | 累计打印次数 |
-| is_default | BOOLEAN | 是否默认打印机 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+### 4.16 服务号配置表 (wechat\_config)
 
-### 4.18 打印记录表 (print_logs)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| printer_id | BIGINT | 打印机ID |
-| order_id | BIGINT | 订单ID |
-| status | TINYINT | 状态：0失败 1成功 |
-| error_message | VARCHAR(256) | 错误信息 |
-| print_time | DATETIME | 打印时间 |
-| created_at | DATETIME | 创建时间 |
+| 字段           | 类型          | 描述                                        |
+| ------------ | ----------- | ----------------------------------------- |
+| id           | BIGINT      | 主键                                        |
+| merchant\_id | BIGINT      | 商家ID                                      |
+| notify\_type | VARCHAR(32) | 通知类型：order\_new/order\_paid/order\_refund |
+| enabled      | BOOLEAN     | 是否启用                                      |
+| push\_openid | VARCHAR(64) | 接收通知的OpenID                               |
+| created\_at  | DATETIME    | 创建时间                                      |
+| updated\_at  | DATETIME    | 更新时间                                      |
 
-### 4.19 服务商审核记录表 (merchant_audit_records)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| admin_id | BIGINT | 审核员ID（服务商管理员） |
-| audit_type | VARCHAR(32) | 审核类型：entry/other |
-| old_status | VARCHAR(32) | 审核前状态 |
-| new_status | VARCHAR(32) | 审核后状态 |
-| remark | TEXT | 审核备注 |
-| created_at | DATETIME | 审核时间 |
+### 4.17 云打印机表 (cloud\_printers)
 
-### 4.20 商家年费表 (merchant_fees)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| year | YEAR | 年费年度 |
-| amount | DECIMAL(10,2) | 年费金额 |
-| status | VARCHAR(32) | 状态：unpaid/paid/free |
-| pay_time | DATETIME | 支付时间 |
-| free_reason | VARCHAR(256) | 免年费原因（如限时优惠） |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| 字段           | 类型           | 描述                      |
+| ------------ | ------------ | ----------------------- |
+| id           | BIGINT       | 主键                      |
+| merchant\_id | BIGINT       | 商家ID                    |
+| name         | VARCHAR(64)  | 打印机名称                   |
+| type         | VARCHAR(32)  | 打印机类型：yilianyun/feie/xp |
+| device\_no   | VARCHAR(64)  | 设备编号                    |
+| api\_key     | VARCHAR(128) | API密钥                   |
+| api\_url     | VARCHAR(256) | API接口地址                 |
+| status       | TINYINT      | 状态：0离线 1在线              |
+| auto\_print  | BOOLEAN      | 自动打印开关                  |
+| print\_count | INT          | 累计打印次数                  |
+| is\_default  | BOOLEAN      | 是否默认打印机                 |
+| created\_at  | DATETIME     | 创建时间                    |
+| updated\_at  | DATETIME     | 更新时间                    |
 
-### 4.21 商家手续费率表 (merchant_rates)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID |
-| rate_type | VARCHAR(32) | 费率类型：default/promotion |
-| rate | DECIMAL(5,4) | 手续费率（如0.002表示0.2%） |
-| min_rate | DECIMAL(5,4) | 最低费率 |
-| max_rate | DECIMAL(5,4) | 最高费率 |
-| effective_time | DATETIME | 生效时间 |
-| expire_time | DATETIME | 过期时间 |
-| status | TINYINT | 状态：0禁用 1启用 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+### 4.18 打印记录表 (print\_logs)
 
-### 4.20 用户收货地址表 (user_addresses)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| user_id | BIGINT | 用户ID |
-| name | VARCHAR(64) | 收货人姓名 |
-| phone | VARCHAR(20) | 联系电话 |
-| province | VARCHAR(64) | 省份 |
-| city | VARCHAR(64) | 城市 |
-| district | VARCHAR(64) | 区县 |
-| detail | VARCHAR(512) | 详细地址 |
-| is_default | TINYINT | 是否默认：0否 1是 |
-| status | TINYINT | 状态：0禁用 1正常 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| 字段             | 类型           | 描述         |
+| -------------- | ------------ | ---------- |
+| id             | BIGINT       | 主键         |
+| merchant\_id   | BIGINT       | 商家ID       |
+| printer\_id    | BIGINT       | 打印机ID      |
+| order\_id      | BIGINT       | 订单ID       |
+| status         | TINYINT      | 状态：0失败 1成功 |
+| error\_message | VARCHAR(256) | 错误信息       |
+| print\_time    | DATETIME     | 打印时间       |
+| created\_at    | DATETIME     | 创建时间       |
 
-### 4.21 优惠券/活动表 (coupons)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| merchant_id | BIGINT | 商家ID（0表示平台活动） |
-| name | VARCHAR(128) | 活动名称 |
-| type | VARCHAR(32) | 类型：discount/coupon/gift |
-| discount | DECIMAL(5,2) | 折扣比例（如0.9表示9折） |
-| min_amount | DECIMAL(10,2) | 最低消费金额 |
-| discount_amount | DECIMAL(10,2) | 优惠金额 |
-| total_count | INT | 发放总量 |
-| used_count | INT | 已使用数量 |
-| start_time | DATETIME | 开始时间 |
-| end_time | DATETIME | 结束时间 |
-| status | TINYINT | 状态：0禁用 1启用 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+### 4.19 服务商审核记录表 (merchant\_audit\_records)
 
-### 4.22 优惠券领取记录表 (coupon_records)
-| 字段 | 类型 | 描述 |
-|------|------|------|
-| id | BIGINT | 主键 |
-| coupon_id | BIGINT | 优惠券ID |
-| user_id | BIGINT | 用户ID |
-| order_id | BIGINT | 使用订单ID（NULL表示未使用） |
-| status | VARCHAR(32) | 状态：unused/used/expired |
-| receive_time | DATETIME | 领取时间 |
-| used_time | DATETIME | 使用时间 |
-| created_at | DATETIME | 创建时间 |
+| 字段           | 类型          | 描述               |
+| ------------ | ----------- | ---------------- |
+| id           | BIGINT      | 主键               |
+| merchant\_id | BIGINT      | 商家ID             |
+| admin\_id    | BIGINT      | 审核员ID（服务商管理员）    |
+| audit\_type  | VARCHAR(32) | 审核类型：entry/other |
+| old\_status  | VARCHAR(32) | 审核前状态            |
+| new\_status  | VARCHAR(32) | 审核后状态            |
+| remark       | TEXT        | 审核备注             |
+| created\_at  | DATETIME    | 审核时间             |
 
----
+### 4.20 商家年费表 (merchant\_fees)
+
+| 字段           | 类型            | 描述                  |
+| ------------ | ------------- | ------------------- |
+| id           | BIGINT        | 主键                  |
+| merchant\_id | BIGINT        | 商家ID                |
+| year         | YEAR          | 年费年度                |
+| amount       | DECIMAL(10,2) | 年费金额                |
+| status       | VARCHAR(32)   | 状态：unpaid/paid/free |
+| pay\_time    | DATETIME      | 支付时间                |
+| free\_reason | VARCHAR(256)  | 免年费原因（如限时优惠）        |
+| created\_at  | DATETIME      | 创建时间                |
+| updated\_at  | DATETIME      | 更新时间                |
+
+### 4.21 商家手续费率表 (merchant\_rates)
+
+| 字段              | 类型           | 描述                     |
+| --------------- | ------------ | ---------------------- |
+| id              | BIGINT       | 主键                     |
+| merchant\_id    | BIGINT       | 商家ID                   |
+| rate\_type      | VARCHAR(32)  | 费率类型：default/promotion |
+| rate            | DECIMAL(5,4) | 手续费率（如0.002表示0.2%）     |
+| min\_rate       | DECIMAL(5,4) | 最低费率                   |
+| max\_rate       | DECIMAL(5,4) | 最高费率                   |
+| effective\_time | DATETIME     | 生效时间                   |
+| expire\_time    | DATETIME     | 过期时间                   |
+| status          | TINYINT      | 状态：0禁用 1启用             |
+| created\_at     | DATETIME     | 创建时间                   |
+| updated\_at     | DATETIME     | 更新时间                   |
+
+### 4.20 用户收货地址表 (user\_addresses)
+
+| 字段          | 类型           | 描述         |
+| ----------- | ------------ | ---------- |
+| id          | BIGINT       | 主键         |
+| user\_id    | BIGINT       | 用户ID       |
+| name        | VARCHAR(64)  | 收货人姓名      |
+| phone       | VARCHAR(20)  | 联系电话       |
+| province    | VARCHAR(64)  | 省份         |
+| city        | VARCHAR(64)  | 城市         |
+| district    | VARCHAR(64)  | 区县         |
+| detail      | VARCHAR(512) | 详细地址       |
+| is\_default | TINYINT      | 是否默认：0否 1是 |
+| status      | TINYINT      | 状态：0禁用 1正常 |
+| created\_at | DATETIME     | 创建时间       |
+| updated\_at | DATETIME     | 更新时间       |
+
+### 4.21 用户行为事件表 (user_behavior_events)
+
+| 字段              | 类型           | 描述                    |
+| --------------- | ------------ | --------------------- |
+| id              | BIGINT       | 主键                    |
+| merchant_id     | BIGINT       | 商家ID                  |
+| user_id         | BIGINT       | 用户ID                  |
+| openid          | VARCHAR(64)  | 微信OpenID              |
+| event_type      | VARCHAR(32)  | 事件类型                  |
+| page            | VARCHAR(64)  | 页面标识                  |
+| product_id      | BIGINT       | 商品ID，可空               |
+| order_id        | BIGINT       | 订单ID，可空               |
+| source          | VARCHAR(32)  | 来源，如 scan/store/dev   |
+| payload         | JSON         | 扩展数据                  |
+| created_at      | DATETIME     | 创建时间                  |
+
+**当前事件类型：**
+
+- `store_visit`
+- `page_view`
+- `product_view`
+- `submit_order`
+- `pay_success`
+
+### 4.22 优惠券/活动表 (coupons)
+
+| 字段               | 类型            | 描述                      |
+| ---------------- | ------------- | ----------------------- |
+| id               | BIGINT        | 主键                      |
+| merchant\_id     | BIGINT        | 商家ID（0表示平台活动）           |
+| name             | VARCHAR(128)  | 活动名称                    |
+| type             | VARCHAR(32)   | 类型：discount/coupon/gift |
+| discount         | DECIMAL(5,2)  | 折扣比例（如0.9表示9折）          |
+| min\_amount      | DECIMAL(10,2) | 最低消费金额                  |
+| discount\_amount | DECIMAL(10,2) | 优惠金额                    |
+| total\_count     | INT           | 发放总量                    |
+| used\_count      | INT           | 已使用数量                   |
+| start\_time      | DATETIME      | 开始时间                    |
+| end\_time        | DATETIME      | 结束时间                    |
+| status           | TINYINT       | 状态：0禁用 1启用              |
+| created\_at      | DATETIME      | 创建时间                    |
+| updated\_at      | DATETIME      | 更新时间                    |
+
+> **说明**：优惠券/活动能力不是本轮实施范围，当前仅保留数据结构预留说明。
+
+### 4.23 优惠券领取记录表 (coupon\_records)
+
+| 字段            | 类型          | 描述                     |
+| ------------- | ----------- | ---------------------- |
+| id            | BIGINT      | 主键                     |
+| coupon\_id    | BIGINT      | 优惠券ID                  |
+| user\_id      | BIGINT      | 用户ID                   |
+| order\_id     | BIGINT      | 使用订单ID（NULL表示未使用）      |
+| status        | VARCHAR(32) | 状态：unused/used/expired |
+| receive\_time | DATETIME    | 领取时间                   |
+| used\_time    | DATETIME    | 使用时间                   |
+| created\_at   | DATETIME    | 创建时间                   |
+
+***
 
 ## 5. 技术架构
 
 ### 5.1 技术栈
-| 层级 | 技术选型 | 说明 |
-|------|----------|------|
-| Web框架 | Gin | Go语言高性能Web框架 |
-| ORM | GORM | Go语言ORM库 |
-| 数据库 | MySQL 8.0 | 主数据库 |
-| 缓存 | Redis | 缓存、Session、分布式锁 |
-| 认证 | JWT | 用户认证 |
-| 文档 | Swagger | API文档自动生成 |
-| 支付 | wechatpay-go | 微信支付SDK |
+
+| 层级    | 技术选型         | 说明              |
+| ----- | ------------ | --------------- |
+| Web框架 | Gin          | Go语言高性能Web框架    |
+| ORM   | GORM         | Go语言ORM库        |
+| 数据库   | MySQL 8.0    | 主数据库            |
+| 缓存    | Redis        | 缓存、Session、分布式锁 |
+| 认证    | JWT          | 用户认证            |
+| 文档    | Swagger      | API文档自动生成       |
+| 支付    | wechatpay-go | 微信支付SDK         |
 
 ### 5.2 项目结构
 
 #### 后端项目 (server/)
+
 ```
 server/                          # Go后端服务
 ├── cmd/
@@ -4330,6 +4887,7 @@ server/                          # Go后端服务
 ```
 
 #### 小程序项目 (miniprogram/)
+
 ```
 miniprogram/                    # 微信小程序
 ├── src/
@@ -4343,6 +4901,7 @@ miniprogram/                    # 微信小程序
 ```
 
 ### 5.3 分层架构
+
 ```
 ┌─────────────────────────────────────────────┐
 │              Handlers (Controller)           │  ← 处理HTTP请求/响应
@@ -4356,6 +4915,7 @@ miniprogram/                    # 微信小程序
 ```
 
 ### 5.4 微信支付服务商模式架构
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    服务商商户号                       │
@@ -4375,33 +4935,34 @@ miniprogram/                    # 微信小程序
 
 **核心表索引规划：**
 
-| 表名 | 索引字段 | 索引类型 | 用途 |
-|------|----------|----------|------|
-| merchants | mch_id | UNIQUE | 微信子商户号快速查询 |
-| merchants | status, created_at | BTREE | 商家状态筛选、入驻时间排序 |
-| merchants | category | BTREE | 按行业分类统计 |
-| orders | merchant_id, created_at | BTREE | 商家订单查询、时间范围统计 |
-| orders | order_no | UNIQUE | 订单号快速查询 |
-| orders | status, created_at | BTREE | 订单状态筛选 |
-| users | openid | UNIQUE | 微信用户快速查询 |
-| products | merchant_id, status | BTREE | 商家商品查询 |
-| merchant_audit_records | merchant_id, created_at | BTREE | 审核记录查询 |
+| 表名                       | 索引字段                      | 索引类型   | 用途            |
+| ------------------------ | ------------------------- | ------ | ------------- |
+| merchants                | mch\_id                   | UNIQUE | 微信子商户号快速查询    |
+| merchants                | status, created\_at       | BTREE  | 商家状态筛选、入驻时间排序 |
+| merchants                | category                  | BTREE  | 按行业分类统计       |
+| orders                   | merchant\_id, created\_at | BTREE  | 商家订单查询、时间范围统计 |
+| orders                   | order\_no                 | UNIQUE | 订单号快速查询       |
+| orders                   | status, created\_at       | BTREE  | 订单状态筛选        |
+| users                    | openid                    | UNIQUE | 微信用户快速查询      |
+| products                 | merchant\_id, status      | BTREE  | 商家商品查询        |
+| merchant\_audit\_records | merchant\_id, created\_at | BTREE  | 审核记录查询        |
 
 ### 5.11 Redis缓存策略
 
 **缓存类型：**
 
-| 缓存键 | 数据类型 | 过期时间 | 用途 |
-|--------|----------|----------|------|
-| token:{token} | STRING | 2小时 | 用户登录Token验证 |
-| refresh_token:{token} | STRING | 7天 | Token刷新 |
-| merchant:{id} | HASH | 5分钟 | 商家基本信息缓存 |
-| merchant:{id}:products | LIST | 5分钟 | 商家商品列表缓存 |
-| dashboard:{sp_id} | STRING | 1分钟 | 服务商数据看板缓存 |
-| qrcode:{merchant_id} | STRING | 1小时 | 商家二维码缓存 |
-| rate_limit:{ip} | STRING | 1分钟 | 接口限流计数 |
+| 缓存键                    | 数据类型   | 过期时间 | 用途          |
+| ---------------------- | ------ | ---- | ----------- |
+| token:{token}          | STRING | 2小时  | 用户登录Token验证 |
+| refresh\_token:{token} | STRING | 7天   | Token刷新     |
+| merchant:{id}          | HASH   | 5分钟  | 商家基本信息缓存    |
+| merchant:{id}:products | LIST   | 5分钟  | 商家商品列表缓存    |
+| dashboard:{sp\_id}     | STRING | 1分钟  | 服务商数据看板缓存   |
+| qrcode:{merchant\_id}  | STRING | 1小时  | 商家二维码缓存     |
+| rate\_limit:{ip}       | STRING | 1分钟  | 接口限流计数      |
 
 **缓存更新策略：**
+
 - **写操作后更新缓存**：商家信息、商品信息更新时同步更新缓存
 - **定时刷新**：数据看板类数据设置较短过期时间，定期刷新
 - **缓存击穿处理**：使用互斥锁避免缓存击穿
@@ -4410,20 +4971,22 @@ miniprogram/                    # 微信小程序
 
 **限流规则：**
 
-| 接口类别 | 限制频率 | 说明 |
-|----------|----------|------|
-| 登录接口 | 5次/分钟/IP | 防止暴力破解 |
-| 普通业务接口 | 100次/分钟/IP | 常规限流 |
-| 数据导出接口 | 1次/分钟/用户 | 资源密集型接口 |
-| 支付回调接口 | 1000次/分钟 | 微信支付回调 |
+| 接口类别   | 限制频率       | 说明      |
+| ------ | ---------- | ------- |
+| 登录接口   | 5次/分钟/IP   | 防止暴力破解  |
+| 普通业务接口 | 100次/分钟/IP | 常规限流    |
+| 数据导出接口 | 1次/分钟/用户   | 资源密集型接口 |
+| 支付回调接口 | 1000次/分钟   | 微信支付回调  |
 
 **限流实现：**
+
 1. 使用Redis实现分布式限流
 2. 采用令牌桶算法或滑动窗口算法
 3. 返回429状态码表示限流触发
 4. 记录限流日志便于监控
 
 **限流响应：**
+
 ```json
 {
   "code": 429,
@@ -4432,11 +4995,12 @@ miniprogram/                    # 微信小程序
 }
 ```
 
----
+***
 
 ## 6. 开发计划
 
 ### 6.1 第一阶段：基础架构 (P0)
+
 - [ ] 项目初始化与依赖配置
 - [ ] 数据库连接与迁移脚本
 - [ ] 基础错误处理与响应格式
@@ -4444,6 +5008,7 @@ miniprogram/                    # 微信小程序
 - [ ] 日志系统
 
 ### 6.2 第二阶段：服务商与商家管理 (P0)
+
 - [ ] 服务商管理员登录（服务端文件配置服务商信息）
 - [ ] 商家入驻申请
 - [ ] 商家审核流程
@@ -4452,6 +5017,7 @@ miniprogram/                    # 微信小程序
 - [ ] 系统公告管理（服务商发布，商家查看）
 
 ### 6.3 第三阶段：商品管理 (P0)
+
 - [ ] 商品分类CRUD
 - [ ] 商品CRUD
 - [ ] 商品上下架
@@ -4459,6 +5025,7 @@ miniprogram/                    # 微信小程序
 - [ ] 库存管理
 
 ### 6.4 第四阶段：订单与支付 (P0)
+
 - [ ] 微信支付服务商对接
 - [ ] 子商户绑定
 - [ ] 订单创建
@@ -4468,12 +5035,14 @@ miniprogram/                    # 微信小程序
 - [ ] 退款处理
 
 ### 6.5 第五阶段：数据分析 (P1)
+
 - [ ] 销售统计
 - [ ] 商品销量排行
 - [ ] 时段分析
 - [ ] 库存预警
 
 ### 6.6 第六阶段：优化迭代 (P2)
+
 - [ ] 员工管理
 - [ ] 缓存优化
 - [ ] 性能调优
@@ -4482,6 +5051,7 @@ miniprogram/                    # 微信小程序
 ### 6.7 小程序开发计划
 
 #### 技术选型
+
 - **开发框架**：uni-app（Vue3 + TypeScript）
 - **UI组件**：uView / Vant Weapp
 - **状态管理**：Pinia
@@ -4489,6 +5059,7 @@ miniprogram/                    # 微信小程序
 - **发布平台**：微信小程序（可扩展至H5/APP）
 
 #### 开发原则
+
 1. **简洁实用** - 第一版本专注于功能打通，不追求复杂UI
 2. **商家模板预留** - 组件设计预留样式扩展接口，便于后续商家店铺模板
 3. **接口优先** - 先确保API对接，再优化界面
@@ -4496,62 +5067,71 @@ miniprogram/                    # 微信小程序
 #### 页面优先级（按批次）
 
 **第一批次：认证与入驻**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| auth/login | 商家登录（账号密码） | POST /api/v1/auth/merchant/login |
-| auth/register | 商家入驻申请 | POST /api/v1/merchant/register |
-| auth/verify | 入驻状态查询 | GET /api/v1/merchant/application/status |
+
+| 页面            | 功能描述       | 对接API                                   |
+| ------------- | ---------- | --------------------------------------- |
+| auth/login    | 商家登录（账号密码） | POST /api/v1/auth/merchant/login        |
+| auth/register | 商家入驻申请     | POST /api/v1/merchant/register          |
+| auth/verify   | 入驻状态查询     | GET /api/v1/merchant/application/status |
 
 **第二批次：商户管理中心首页**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| merchant/home | 商户后台首页、快捷入口、待处理事项 | GET /api/v1/merchant/profile |
-| merchant/orders/statistics | 订单统计卡片 | GET /api/v1/merchant/orders/statistics |
-| merchant/analytics/overview | 数据概览 | GET /api/v1/merchant/analytics/overview |
+
+| 页面                          | 功能描述              | 对接API                                   |
+| --------------------------- | ----------------- | --------------------------------------- |
+| merchant/home               | 商户后台首页、快捷入口、待处理事项 | GET /api/v1/merchant/profile            |
+| merchant/orders/statistics  | 订单统计卡片            | GET /api/v1/merchant/orders/statistics  |
+| merchant/analytics/overview | 数据概览              | GET /api/v1/merchant/analytics/overview |
 
 **第三批次：商品管理**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| merchant/products/list | 商品列表、搜索、上下架 | GET /api/v1/merchant/products |
-| merchant/products/edit | 商品编辑、规格设置 | POST/PUT /api/v1/merchant/products |
-| merchant/categories | 分类管理、排序 | GET/POST /api/v1/merchant/categories |
+
+| 页面                     | 功能描述        | 对接API                                |
+| ---------------------- | ----------- | ------------------------------------ |
+| merchant/products/list | 商品列表、搜索、上下架 | GET /api/v1/merchant/products        |
+| merchant/products/edit | 商品编辑、规格设置   | POST/PUT /api/v1/merchant/products   |
+| merchant/categories    | 分类管理、排序     | GET/POST /api/v1/merchant/categories |
 
 **第四批次：订单管理**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| merchant/orders/list | 订单列表、状态筛选 | GET /api/v1/merchant/orders |
+
+| 页面                     | 功能描述      | 对接API                            |
+| ---------------------- | --------- | -------------------------------- |
+| merchant/orders/list   | 订单列表、状态筛选 | GET /api/v1/merchant/orders      |
 | merchant/orders/detail | 订单详情、核销操作 | GET /api/v1/merchant/orders/{id} |
 
 **第五批次：商家设置与系统公告**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| merchant/settings | 商家信息、营业设置 | PUT /api/v1/merchant/profile |
-| merchant/delivery-settings | 配送设置 | GET/PUT /api/v1/merchant/delivery-settings |
-| merchant/announcements | 系统公告列表 | GET /api/v1/merchant/announcements |
+
+| 页面                         | 功能描述      | 对接API                                      |
+| -------------------------- | --------- | ------------------------------------------ |
+| merchant/settings          | 商家信息、营业设置 | PUT /api/v1/merchant/profile               |
+| merchant/delivery-settings | 配送设置      | GET/PUT /api/v1/merchant/delivery-settings |
+| merchant/announcements     | 系统公告列表    | GET /api/v1/merchant/announcements         |
 
 **第六批次：数据分析**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| merchant/analytics/sales | 销售趋势图表 | GET /api/v1/merchant/analytics/sales-trend |
-| merchant/analytics/products | 商品销量排行 | GET /api/v1/merchant/analytics/product-ranking |
-| merchant/analytics/customers | 客户分析 | GET /api/v1/merchant/analytics/customers |
+
+| 页面                           | 功能描述   | 对接API                                          |
+| ---------------------------- | ------ | ---------------------------------------------- |
+| merchant/analytics/sales     | 经营趋势图表（浏览人数/下单人数） | GET /api/v1/merchant/analytics/sales-trend     |
+| merchant/analytics/products  | 商品销量排行 | GET /api/v1/merchant/analytics/product-ranking |
+| merchant/analytics/customers | 客户分析   | GET /api/v1/merchant/analytics/customers       |
 
 **第七批次：C端店铺购物（扫码进入）**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| store/home | 店铺首页、分类商品 | GET /api/v1/store/{id}/home |
-| store/products | 商品列表 | GET /api/v1/store/{id}/products |
-| store/product | 商品详情 | GET /api/v1/store/{id}/products/{id} |
-| store/confirm | 确认订单、支付 | POST /api/v1/user/orders |
+
+| 页面             | 功能描述      | 对接API                                |
+| -------------- | --------- | ------------------------------------ |
+| store/home     | 店铺首页、分类商品 | GET /api/v1/store/{id}/home          |
+| store/products | 商品列表      | GET /api/v1/store/{id}/products      |
+| store/product  | 商品详情      | GET /api/v1/store/{id}/products/{id} |
+| store/confirm  | 确认订单、支付   | POST /api/v1/user/orders             |
 
 **第八批次：微信支付集成**
-| 功能 | 描述 | 对接API |
-|------|------|---------|
-| 支付下单 | 统一下单、获取支付参数 | POST /api/v1/notify/payment |
-| 支付回调 | 支付结果通知 | POST /api/v1/notify/payment |
-| 退款处理 | 申请退款 | POST /api/v1/merchant/orders/{id}/refund |
+
+| 功能   | 描述          | 对接API                                    |
+| ---- | ----------- | ---------------------------------------- |
+| 支付下单 | 统一下单、获取支付参数 | POST /api/v1/notify/payment              |
+| 支付回调 | 支付结果通知      | POST /api/v1/notify/payment              |
+| 退款处理 | 申请退款        | POST /api/v1/merchant/orders/{id}/refund |
 
 #### uni-app 项目结构
+
 ```
 xm-mall/
 ├── src/
@@ -4628,6 +5208,7 @@ xm-mall/
 #### 开发任务清单
 
 **Phase 1：项目初始化与认证**
+
 - [ ] uni-app 项目创建与配置
 - [ ] API请求封装（request.ts）
 - [ ] Pinia状态管理初始化
@@ -4636,12 +5217,14 @@ xm-mall/
 - [ ] Token存储与自动登录
 
 **Phase 2：商户中心基础**
+
 - [ ] 商户首页框架
 - [ ] 商家信息获取与展示
 - [ ] 快捷入口组件
 - [ ] 待处理订单统计卡片
 
 **Phase 3：商品管理**
+
 - [ ] 商品分类管理
 - [ ] 商品列表（支持搜索、筛选）
 - [ ] 商品编辑（基础信息）
@@ -4649,23 +5232,27 @@ xm-mall/
 - [ ] 上下架操作
 
 **Phase 4：订单管理**
+
 - [ ] 订单列表（状态筛选）
 - [ ] 订单详情
 - [ ] 订单核销功能
 - [ ] 订单统计
 
 **Phase 5：商家设置与系统公告**
+
 - [ ] 商家信息编辑
 - [ ] 配送设置
 - [ ] 营业执照上传
 - [ ] 系统公告查看（查看服务商发布的公告）
 
 **Phase 6：服务商系统公告管理**
+
 - [ ] 系统公告列表
 - [ ] 创建/编辑公告
 - [ ] 删除公告
 
 **Phase 7：通知与打印**
+
 - [ ] 服务号订阅配置（接收订单通知）
 - [ ] 商家员工OpenID绑定
 - [ ] 云打印机配置（添加/编辑/删除）
@@ -4674,18 +5261,21 @@ xm-mall/
 - [ ] 打印记录查看
 
 **Phase 7：数据分析**
+
 - [ ] 销售概览
 - [ ] 销售趋势图表
 - [ ] 商品排行
 - [ ] 客户分析
 
 **Phase 8：C端购物**
+
 - [ ] 店铺首页
 - [ ] 商品浏览
 - [ ] 商品详情
 - [ ] 订单确认
 
 **Phase 9：微信支付**
+
 - [ ] 统一下单对接
 - [ ] 支付签名
 - [ ] 支付回调处理
@@ -4694,6 +5284,7 @@ xm-mall/
 ### 6.8 服务商小程序开发计划
 
 #### 技术选型
+
 - **开发框架**：uni-app（Vue3 + TypeScript）
 - **UI组件**：uView / Vant Weapp
 - **状态管理**：Pinia
@@ -4701,6 +5292,7 @@ xm-mall/
 - **发布平台**：微信小程序（可扩展至H5/APP）
 
 #### 开发原则
+
 1. **数据分析优先** - 核心功能围绕数据展示与分析
 2. **独立访问控制** - 通过专用二维码访问，与商家端完全隔离
 3. **可视化呈现** - 使用图表直观展示商家分布、订单趋势、金额统计
@@ -4708,62 +5300,68 @@ xm-mall/
 #### 页面优先级（按批次）
 
 **第一批次：认证与首页**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| sp/login | 服务商管理员登录 | POST /api/v1/sp/auth/login |
-| sp/home | 首页数据看板（卡片+饼图+趋势图） | GET /api/v1/sp/dashboard |
+
+| 页面       | 功能描述              | 对接API                      |
+| -------- | ----------------- | -------------------------- |
+| sp/login | 服务商管理员登录          | POST /api/v1/auth/admin/login |
+| sp/home  | 首页数据看板（卡片+饼图+趋势图） | GET /api/v1/sp/dashboard   |
 
 **第二批次：商家入驻审批**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| sp/merchants/pending | 待审核商家列表 | GET /api/v1/sp/merchants/pending |
-| sp/merchants/{id} | 商家详情查看（资质证照） | GET /api/v1/sp/merchants/{merchant_id} |
-| sp/merchants/{id}/approve | 审核操作（通过/拒绝） | POST /api/v1/sp/merchants/{merchant_id}/approve |
+
+| 页面                        | 功能描述         | 对接API                                            |
+| ------------------------- | ------------ | ------------------------------------------------ |
+| sp/merchants/pending      | 待审核商家列表      | GET /api/v1/sp/merchants/pending                 |
+| sp/merchants/{id}         | 商家详情查看（资质证照） | GET /api/v1/sp/merchants/{merchant\_id}          |
+| sp/merchants/{id}/approve | 审核操作（通过/拒绝）  | POST /api/v1/sp/merchants/{merchant\_id}/approve |
 
 **第三批次：商家数据分析**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| sp/merchants/analytics | 商家分布饼图 | GET /api/v1/sp/merchants/analytics/distribution |
-| sp/merchants/list | 商家列表（基本信息） | GET /api/v1/sp/merchants/list |
+
+| 页面                     | 功能描述       | 对接API                                           |
+| ---------------------- | ---------- | ----------------------------------------------- |
+| sp/merchants/analytics | 商家分布饼图     | GET /api/v1/sp/merchants/analytics/distribution |
+| sp/merchants/list      | 商家列表（基本信息） | GET /api/v1/sp/merchants/list                   |
 
 **第四批次：订单数据分析**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
+
+| 页面                  | 功能描述         | 对接API                           |
+| ------------------- | ------------ | ------------------------------- |
 | sp/orders/analytics | 订单统计（多维度趋势图） | GET /api/v1/sp/orders/analytics |
 
 **第五批次：金额数据分析**
-| 页面 | 功能描述 | 对接API |
-|------|----------|---------|
-| sp/amount/analytics | 交易额统计（金额趋势图） | GET /api/v1/sp/amount/analytics |
-| sp/amount/top-merchants | TOP商家排行榜 | GET /api/v1/sp/amount/top-merchants |
+
+| 页面                      | 功能描述         | 对接API                               |
+| ----------------------- | ------------ | ----------------------------------- |
+| sp/amount/analytics     | 交易额统计（金额趋势图） | GET /api/v1/sp/amount/analytics     |
+| sp/amount/top-merchants | TOP商家排行榜     | GET /api/v1/sp/amount/top-merchants |
 
 #### API对接表
 
-| 功能模块 | 接口路径 | 方法 | 状态 |
-|----------|----------|------|------|
-| 服务商登录 | /api/v1/sp/auth/login | POST | 🆕 待开发 |
-| 首页数据看板 | /api/v1/sp/dashboard | GET | 🆕 待开发 |
-| 商家入驻审核 | /api/v1/sp/merchants/pending | GET | 🆕 待开发 |
-| 商家详情查看 | /api/v1/sp/merchants/{id} | GET | 🆕 待开发 |
-| 商家审核操作 | /api/v1/sp/merchants/{id}/approve | POST | 🆕 待开发 |
-| 商家数据分析 | /api/v1/sp/merchants/analytics/distribution | GET | 🆕 待开发 |
-| 商家列表 | /api/v1/sp/merchants/list | GET | 🆕 待开发 |
-| 订单数据分析 | /api/v1/sp/orders/analytics | GET | 🆕 待开发 |
-| 金额数据分析 | /api/v1/sp/amount/analytics | GET | 🆕 待开发 |
-| TOP商家排行 | /api/v1/sp/amount/top-merchants | GET | 🆕 待开发 |
+| 功能模块    | 接口路径                                        | 方法   | 状态     |
+| ------- | ------------------------------------------- | ---- | ------ |
+| 服务商登录   | /api/v1/auth/admin/login                    | POST | 🆕 待开发 |
+| 首页数据看板  | /api/v1/sp/dashboard                        | GET  | 🆕 待开发 |
+| 商家入驻审核  | /api/v1/sp/merchants/pending                | GET  | 🆕 待开发 |
+| 商家详情查看  | /api/v1/sp/merchants/{id}                   | GET  | 🆕 待开发 |
+| 商家审核操作  | /api/v1/sp/merchants/{id}/approve           | POST | 🆕 待开发 |
+| 商家数据分析  | /api/v1/sp/merchants/analytics/distribution | GET  | 🆕 待开发 |
+| 商家列表    | /api/v1/sp/merchants/list                   | GET  | 🆕 待开发 |
+| 订单数据分析  | /api/v1/sp/orders/analytics                 | GET  | 🆕 待开发 |
+| 金额数据分析  | /api/v1/sp/amount/analytics                 | GET  | 🆕 待开发 |
+| TOP商家排行 | /api/v1/sp/amount/top-merchants             | GET  | 🆕 待开发 |
 
 #### 可视化图表规划
 
-| 图表类型 | 适用场景 | 优先级 |
-|----------|----------|--------|
-| 数据卡片 | 核心指标展示（商家总数、订单量、交易额） | P0 |
-| 饼图 | 商家行业分布、订单配送类型分布 | P0 |
-| 环形图 | 金额构成分析 | P1 |
-| 折线图 | 订单/金额时间趋势（近7天/30天） | P0 |
-| 柱状图 | 商家月度新增对比 | P1 |
-| 排行榜 | TOP商家交易额排行 | P1 |
+| 图表类型 | 适用场景                 | 优先级 |
+| ---- | -------------------- | --- |
+| 数据卡片 | 核心指标展示（商家总数、订单量、交易额） | P0  |
+| 饼图   | 商家行业分布、订单配送类型分布      | P0  |
+| 环形图  | 金额构成分析               | P1  |
+| 折线图  | 订单/金额时间趋势（近7天/30天）   | P0  |
+| 柱状图  | 商家月度新增对比             | P1  |
+| 排行榜  | TOP商家交易额排行           | P1  |
 
 #### 服务商小程序项目结构
+
 ```
 xm-sp/
 ├── src/
@@ -4834,6 +5432,7 @@ xm-sp/
 #### 开发任务清单
 
 **Phase 1：认证与首页**
+
 - [ ] uni-app 项目创建与配置
 - [ ] API请求封装（request.ts）
 - [ ] Pinia状态管理初始化
@@ -4845,23 +5444,27 @@ xm-sp/
 - [ ] 订单趋势折线图
 
 **Phase 2：商家入驻审批**
+
 - [ ] 待审核商家列表页面
 - [ ] 商家详情页面（资质证照查看）
 - [ ] 审核操作功能（通过/拒绝）
 - [ ] 图片预览组件
 
 **Phase 3：商家数据分析**
+
 - [ ] 商家分布饼图（行业维度）
 - [ ] 商家分布饼图（状态维度）
 - [ ] 商家列表页面
 - [ ] 商家搜索与筛选
 
 **Phase 4：订单数据分析**
+
 - [ ] 订单统计概览
 - [ ] 订单趋势折线图（多周期）
 - [ ] 订单配送类型分布饼图
 
 **Phase 5：金额数据分析**
+
 - [ ] 金额统计概览
 - [ ] 金额趋势折线图
 - [ ] 商家维度金额占比
@@ -4869,45 +5472,47 @@ xm-sp/
 
 #### API对接表
 
-| 功能模块 | 接口路径 | 方法 | 状态 |
-|----------|----------|------|------|
-| 服务商登录 | /api/v1/sp/auth/login | POST | 🆕 待开发 |
-| 首页数据看板 | /api/v1/sp/dashboard | GET | 🆕 待开发 |
-| 商家入驻审核 | /api/v1/sp/merchants/pending | GET | 🆕 待开发 |
-| 商家详情查看 | /api/v1/sp/merchants/{id} | GET | 🆕 待开发 |
-| 商家审核操作 | /api/v1/sp/merchants/{id}/approve | POST | 🆕 待开发 |
-| 商家数据分析 | /api/v1/sp/merchants/analytics/distribution | GET | 🆕 待开发 |
-| 商家列表 | /api/v1/sp/merchants/list | GET | 🆕 待开发 |
-| 订单数据分析 | /api/v1/sp/orders/analytics | GET | 🆕 待开发 |
-| 金额数据分析 | /api/v1/sp/amount/analytics | GET | 🆕 待开发 |
-| TOP商家排行 | /api/v1/sp/amount/top-merchants | GET | 🆕 待开发 |
-| 系统公告管理 | /api/v1/sp/announcements/* | CRUD | ✅ 已实现 |
-| 商家登录 | /api/v1/auth/merchant/login | POST | ✅ 已实现 |
-| 商家入驻 | /api/v1/merchant/register | POST | ⚠️ 待完善 |
-| 商家信息 | /api/v1/merchant/profile | GET | ✅ 已实现 |
-| 商家设置 | /api/v1/merchant/settings | PUT | ✅ 已实现 |
-| 商品管理 | /api/v1/merchant/products/* | CRUD | ✅ 已实现 |
-| 分类管理 | /api/v1/merchant/categories/* | CRUD | ✅ 已实现 |
-| 订单管理 | /api/v1/merchant/orders/* | CRUD | ✅ 已实现 |
-| 数据分析 | /api/v1/merchant/analytics/* | GET | ✅ 已实现 |
-| 系统公告 | /api/v1/merchant/announcements/* | GET | ✅ 已实现 |
-| 店铺浏览 | /api/v1/store/{id}/* | GET | ✅ 已实现 |
-| 服务号配置 | /api/v1/sp/wechat-config | GET/PUT | ✅ 已实现 |
-| 订阅配置 | /api/v1/merchant/subscriptions | GET/PUT | ✅ 已实现 |
-| 云打印机 | /api/v1/merchant/printers/* | CRUD | ✅ 已实现 |
-| 打印记录 | /api/v1/merchant/print-logs | GET | ✅ 已实现 |
-| 微信支付 | /api/v1/notify/payment | POST | ⚠️ 待完善 |
+| 功能模块    | 接口路径                                        | 方法      | 状态     |
+| ------- | ------------------------------------------- | ------- | ------ |
+| 服务商登录   | /api/v1/auth/admin/login                    | POST    | 🆕 待开发 |
+| 首页数据看板  | /api/v1/sp/dashboard                        | GET     | 🆕 待开发 |
+| 商家入驻审核  | /api/v1/sp/merchants/pending                | GET     | 🆕 待开发 |
+| 商家详情查看  | /api/v1/sp/merchants/{id}                   | GET     | 🆕 待开发 |
+| 商家审核操作  | /api/v1/sp/merchants/{id}/approve           | POST    | 🆕 待开发 |
+| 商家数据分析  | /api/v1/sp/merchants/analytics/distribution | GET     | 🆕 待开发 |
+| 商家列表    | /api/v1/sp/merchants/list                   | GET     | 🆕 待开发 |
+| 订单数据分析  | /api/v1/sp/orders/analytics                 | GET     | 🆕 待开发 |
+| 金额数据分析  | /api/v1/sp/amount/analytics                 | GET     | 🆕 待开发 |
+| TOP商家排行 | /api/v1/sp/amount/top-merchants             | GET     | 🆕 待开发 |
+| 系统公告管理  | /api/v1/sp/announcements/\*                 | CRUD    | ✅ 已实现  |
+| 商家登录    | /api/v1/auth/merchant/login                 | POST    | ✅ 已实现  |
+| 商家入驻    | /api/v1/merchant/register                   | POST    | ⚠️ 待完善 |
+| 商家信息    | /api/v1/merchant/profile                    | GET     | ✅ 已实现  |
+| 商家设置    | /api/v1/merchant/settings                   | PUT     | ✅ 已实现  |
+| 商品管理    | /api/v1/merchant/products/\*                | CRUD    | ✅ 已实现  |
+| 分类管理    | /api/v1/merchant/categories/\*              | CRUD    | ✅ 已实现  |
+| 订单管理    | /api/v1/merchant/orders/\*                  | CRUD    | ✅ 已实现  |
+| 数据分析    | /api/v1/merchant/analytics/\*               | GET     | ✅ 已实现  |
+| 系统公告    | /api/v1/merchant/announcements/\*           | GET     | ✅ 已实现  |
+| 店铺浏览    | /api/v1/store/{id}/\*                       | GET     | ✅ 已实现  |
+| 服务号配置   | /api/v1/sp/wechat-config                    | GET/PUT | ✅ 已实现  |
+| 订阅配置    | /api/v1/merchant/subscriptions              | GET/PUT | ✅ 已实现  |
+| 云打印机    | /api/v1/merchant/printers/\*                | CRUD    | ✅ 已实现  |
+| 打印记录    | /api/v1/merchant/print-logs                 | GET     | ✅ 已实现  |
+| 微信支付    | /api/v1/notify/payment                      | POST    | ⚠️ 待完善 |
 
 #### 服务号通知说明
 
 **通知触发场景**：
-| 通知类型 | 触发条件 | 接收人 |
-|----------|----------|--------|
-| order_new | 用户创建订单 | 商家管理员 |
-| order_paid | 订单支付成功 | 商家管理员 |
-| order_refund | 退款申请/成功 | 商家管理员 |
+
+| 通知类型          | 触发条件    | 接收人   |
+| ------------- | ------- | ----- |
+| order\_new    | 用户创建订单  | 商家管理员 |
+| order\_paid   | 订单支付成功  | 商家管理员 |
+| order\_refund | 退款申请/成功 | 商家管理员 |
 
 **订阅配置流程**：
+
 ```
 1. 服务商在后台配置服务号AppID和模板消息ID
 2. 商家员工关注服务号，获取OpenID
@@ -4916,17 +5521,21 @@ xm-sp/
 ```
 
 **小程序端实时提醒（补充）**：
+
 - 商家端可通过 WebSocket 接收新订单事件，用于更及时的前台接单提醒（参见 `/api/v1/ws/merchant`）。
-- “新订单声音提醒”开关仅影响本地提示音播放，不影响订单数据与服务号通知。
+- 商家端也可接收顾客浏览事件，用于门店在线感知。
+- “下单提醒 / 浏览提醒”开关仅影响本地提示音播放，不影响订单数据与服务号通知。
 
 #### 云打印集成说明
 
 **支持的打印机品牌**：
+
 - 易联云（yilianyun）
 - 飞鹅打印机（feie）
 - 芯烨打印机（xp）
 
 **打印触发条件**：
+
 - 商家开启自动打印
 - 订单状态变为"已支付"
 - 自动打印至商家设置的默认打印机
@@ -4934,6 +5543,7 @@ xm-sp/
 #### 微信支付集成说明
 
 **支付流程**：
+
 ```
 1. 用户下单 → 前端调用 POST /api/v1/user/orders
 2. 获取支付参数 → 后端返回支付签名信息
@@ -4943,21 +5553,24 @@ xm-sp/
 ```
 
 **需要后端配合**：
+
 - [ ] 统一下单接口（已预留）
 - [ ] 支付回调通知处理
 - [ ] 退款接口
 
----
+***
 
 ## 7. 非功能性需求
 
 ### 7.1 性能要求
+
 - API 响应时间 < 200ms (P95)
 - 支持并发 1000 QPS
 - 数据库查询优化，避免 N+1 问题
 - 合理使用缓存，热点数据缓存命中率 > 90%
 
 ### 7.2 安全要求
+
 - 所有接口使用 HTTPS
 - 敏感信息加密存储（密码、支付密钥等）
 - SQL 注入防护
@@ -4966,17 +5579,19 @@ xm-sp/
 - 支付签名验证
 
 ### 7.3 可维护性
+
 - 完善的日志记录
 - API 文档自动生成
 - 单元测试覆盖率 > 70%
 - 错误码规范化
 - 数据库迁移版本管理
 
----
+***
 
 ## 8. 附录
 
 ### 8.1 统一响应格式
+
 ```json
 {
   "code": 0,
@@ -4986,51 +5601,54 @@ xm-sp/
 ```
 
 ### 8.2 错误码定义
-| 错误码 | 描述 |
-|--------|------|
-| 0 | 成功 |
-| 1001 | 参数错误 |
-| 1002 | 未授权 |
-| 1003 | 禁止访问 |
-| 1004 | 资源不存在 |
-| 2001 | 用户不存在 |
-| 2002 | 用户已存在 |
-| 2003 | 密码错误 |
-| 3001 | 商家不存在 |
-| 3002 | 商家未审核 |
-| 3003 | 商家已禁用 |
-| 3004 | 商家未开通配送 |
-| 3005 | 超出配送范围 |
-| 4001 | 商品不存在 |
-| 4002 | 商品已下架 |
-| 4003 | 库存不足 |
-| 5001 | 订单不存在 |
-| 5002 | 订单状态错误 |
-| 5003 | 订单已支付 |
-| 5004 | 订单已取消 |
+
+| 错误码  | 描述             |
+| ---- | -------------- |
+| 0    | 成功             |
+| 1001 | 参数错误           |
+| 1002 | 未授权            |
+| 1003 | 禁止访问           |
+| 1004 | 资源不存在          |
+| 2001 | 用户不存在          |
+| 2002 | 用户已存在          |
+| 2003 | 密码错误           |
+| 3001 | 商家不存在          |
+| 3002 | 商家未审核          |
+| 3003 | 商家已禁用          |
+| 3004 | 商家未开通配送        |
+| 3005 | 超出配送范围         |
+| 4001 | 商品不存在          |
+| 4002 | 商品已下架          |
+| 4003 | 库存不足           |
+| 5001 | 订单不存在          |
+| 5002 | 订单状态错误         |
+| 5003 | 订单已支付          |
+| 5004 | 订单已取消          |
 | 5005 | 无权操作此订单（跨商家操作） |
-| 5006 | 核销码错误 |
-| 6001 | 支付失败 |
-| 6002 | 退款失败 |
-| 6003 | 进件申请失败 |
-| 6004 | 进件审核中 |
-| 7001 | 分类不存在 |
-| 7002 | 分类下存在商品 |
-| 8001 | 服务商配置错误 |
-| 8002 | 七牛云上传失败 |
-| 9001 | 服务器内部错误 |
+| 5006 | 核销码错误          |
+| 6001 | 支付失败           |
+| 6002 | 退款失败           |
+| 6003 | 进件申请失败         |
+| 6004 | 进件审核中          |
+| 7001 | 分类不存在          |
+| 7002 | 分类下存在商品        |
+| 8001 | 服务商配置错误        |
+| 8002 | 七牛云上传失败        |
+| 9001 | 服务器内部错误        |
 
 ### 8.3 订单状态枚举
-| 状态 | 值 | 描述 |
-|------|-----|------|
-| pending_payment | 1 | 待支付 |
-| paid | 2 | 已支付 |
-| completed | 3 | 已完成 |
-| cancelled | 4 | 已取消 |
-| refunding | 5 | 退款中 |
-| refunded | 6 | 已退款 |
+
+| 状态               | 值 | 描述  |
+| ---------------- | - | --- |
+| pending\_payment | 1 | 待支付 |
+| paid             | 2 | 已支付 |
+| completed        | 3 | 已完成 |
+| cancelled        | 4 | 已取消 |
+| refunding        | 5 | 退款中 |
+| refunded         | 6 | 已退款 |
 
 ### 8.4 分页参数
+
 ```json
 {
   "page": 1,
@@ -5041,6 +5659,7 @@ xm-sp/
 ```
 
 ### 8.5 微信支付回调通知
+
 ```json
 {
   "id": "通知ID",
@@ -5058,7 +5677,7 @@ xm-sp/
 }
 ```
 
----
+***
 
 ## 9. 小程序测试指南
 
@@ -5067,29 +5686,34 @@ xm-sp/
 在小程序正式发布前，由于微信小程序的限制，无法通过扫码直接进入特定商家的店铺页面进行测试。为此，我们提供了两种替代测试方法：
 
 ### 9.1.1 商家端测试账号（开发环境）
+
 用于快速验证商家端页面与接口联调。
 
-| 字段 | 值 |
-|------|----|
-| username | merchant |
+| 字段       | 值           |
+| -------- | ----------- |
+| username | merchant    |
 | password | merchant123 |
 
 ### 9.2 测试方法一：测试入口页面（推荐）
 
 #### 功能说明
+
 创建了专门的测试入口页面 `pages/store/test-entry.vue`，用于在小程序发布前测试用户下单流程。
 
 #### 页面路径
+
 - 路由：`/pages/store/test-entry`
 - 导航标题：`商家店铺测试`
 - 背景色：`#667eea`（紫色渐变）
 
 #### 功能特性
+
 1. **商家ID输入**：支持手动输入商家ID
 2. **商家列表选择**：提供预设商家列表，点击即可快速选择
 3. **直接跳转店铺**：输入商家ID后直接跳转至店铺首页
 
 #### 使用步骤
+
 1. 在微信开发者工具中打开小程序项目
 2. 进入"商家店铺测试"页面
 3. 在输入框中输入商家ID（默认：1）
@@ -5098,13 +5722,15 @@ xm-sp/
 6. 进入店铺首页后可进行商品浏览、加入购物车、下单支付等操作
 
 #### 测试商家列表
-| 商家ID | 商家名称 | 状态 |
-|--------|----------|------|
-| 1 | 美味餐厅 | 营业中 |
-| 2 | 示例商家B | 营业中 |
-| 3 | 示例商家C | 营业中 |
+
+| 商家ID | 商家名称  | 状态  |
+| ---- | ----- | --- |
+| 1    | 美味餐厅  | 营业中 |
+| 2    | 示例商家B | 营业中 |
+| 3    | 示例商家C | 营业中 |
 
 #### 注意事项
+
 - 支付功能需要在微信开发者工具中开启调试
 - 测试支付可使用模拟支付模式
 - 订单数据会真实写入数据库
@@ -5112,78 +5738,90 @@ xm-sp/
 ### 9.3 测试方法二：编译模式直接进入
 
 #### 功能说明
+
 利用微信开发者工具的编译模式功能，直接编译到指定页面并携带参数。
 
 #### 配置步骤
+
 1. 打开微信开发者工具
 2. 点击顶部"编译模式"下拉框
 3. 选择"添加编译模式"
 4. 配置以下参数：
 
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| 编译模式 | `pages/store/home` | 店铺首页 |
-| 启动参数 | `merchant_id=1` | 商家ID参数 |
+| 参数   | 值                  | 说明     |
+| ---- | ------------------ | ------ |
+| 编译模式 | `pages/store/home` | 店铺首页   |
+| 启动参数 | `merchant_id=1`    | 商家ID参数 |
 
 #### 启动参数说明
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| merchant_id | number | 是 | 商家ID，用于加载对应商家的店铺数据 |
+
+| 参数名          | 类型     | 必填 | 说明                 |
+| ------------ | ------ | -- | ------------------ |
+| merchant\_id | number | 是  | 商家ID，用于加载对应商家的店铺数据 |
 
 #### 使用示例
+
 ```
 启动参数：merchant_id=1
 ```
+
 访问商家ID为1的店铺首页
 
 ```
 启动参数：merchant_id=2
 ```
+
 访问商家ID为2的店铺首页
 
 ### 9.4 测试功能清单
 
 #### 可测试功能模块
 
-| 模块 | 功能 | 测试方法一 | 测试方法二 |
-|------|------|-----------|-----------|
-| 店铺浏览 | 查看店铺信息、公告 | ✅ | ✅ |
-| 商品展示 | 商品列表、分类筛选 | ✅ | ✅ |
-| 商品详情 | 查看商品详情、规格选择 | ✅ | ✅ |
-| 购物车 | 添加商品、修改数量、删除 | ✅ | ✅ |
-| 下单流程 | 确认订单、选择配送方式 | ✅ | ✅ |
-| 支付功能 | 微信支付（需开启调试） | ✅ | ✅ |
-| 订单管理 | 查看订单列表、订单详情 | ✅ | ✅ |
-| 退款申请 | 申请退款、查看退款状态 | ✅ | ✅ |
+| 模块   | 功能           | 测试方法一 | 测试方法二 |
+| ---- | ------------ | ----- | ----- |
+| 店铺浏览 | 查看店铺信息、公告    | ✅     | ✅     |
+| 商品展示 | 商品列表、分类筛选    | ✅     | ✅     |
+| 商品详情 | 查看商品详情、规格选择  | ✅     | ✅     |
+| 购物车  | 添加商品、修改数量、删除 | ✅     | ✅     |
+| 下单流程 | 确认订单、选择配送方式  | ✅     | ✅     |
+| 支付功能 | 微信支付（需开启调试）  | ✅     | ✅     |
+| 订单管理 | 查看订单列表、订单详情  | ✅     | ✅     |
+| 退款申请 | 申请退款、查看退款状态  | ✅     | ✅     |
 
 #### 商家端自测清单
-| 模块 | 功能点 | 说明 |
-|------|--------|------|
-| 工作台 | 系统公告滚动栏 | 可查看公告详情、可关闭（本地记忆） |
-| 商品管理 | 商品详情/编辑/删除 | 列表进入详情页正常，编辑保存成功，删除后列表隐藏 |
-| 商品管理 | 商品图片上传 | 调用 `/api/v1/upload/token` 获取 `upload_url` 后直传七牛，上传成功后页面立即回显 |
-| 商品管理 | 私有图片显示 | 商品列表、商品详情、编辑页回显使用接口返回的可访问图片地址 |
-| 订单 | 核销码校验 | 输入 6 位数字核销码，核销成功/失败提示正确 |
-| 设置 | 配送设置-按距离收费 | 支持新增/删除规则，保存后重新进入仍生效 |
-| 设置 | 新订单声音提醒 | 开关切换后调用 `/api/v1/merchant/settings` 保存；重新进入页面与重新登录后状态保持 |
-| 开发联调 | WebSocket 新订单推送 | 可用 /api/v1/dev/order-notify 触发推送进行验证 |
+
+| 模块   | 功能点             | 说明                                                          |
+| ---- | --------------- | ----------------------------------------------------------- |
+| 工作台  | 系统公告滚动栏         | 可查看公告详情、可关闭（本地记忆）                                           |
+| 商品管理 | 商品详情/编辑/删除      | 列表进入详情页正常，编辑保存成功，删除后列表隐藏                                    |
+| 商品管理 | 商品图片上传          | 调用 `/api/v1/upload/token` 获取 `upload_url` 后直传七牛，上传成功后页面立即回显 |
+| 商品管理 | 私有图片显示          | 商品列表、商品详情、编辑页回显使用接口返回的可访问图片地址                               |
+| 订单   | 核销码校验           | 输入 6 位数字核销码，核销成功/失败提示正确                                     |
+| 设置   | 配送设置-按距离收费      | 支持新增/删除规则、区间合法性校验，保存后重新进入仍生效                              |
+| 设置   | 声音提醒管理         | 支持下单提醒、浏览提醒、测试播放；重新进入页面与重新登录后状态保持                        |
+| 设置   | 账号与员工能力        | 支持修改密码、微信快捷登录绑定/解绑、仅店主可见的员工管理入口                            |
+| 开发联调 | WebSocket 实时提醒  | 可用 `/api/v1/dev/order-notify` 与 `/api/v1/dev/store-visit-notify` 触发推送验证 |
 
 ### 9.5 支付配置说明
 
 #### 开发环境配置
+
 1. 打开微信开发者工具
 2. 进入"详情" → "本地设置"
 3. 勾选"不校验合法域名"（开发阶段）
 4. 勾选"不校验HTTPS证书"
 
 #### 生产环境要求
+
 - 需要配置已备案的域名
 - 需要配置SSL证书（HTTPS）
 - 需要在微信小程序后台添加服务器域名配置
 - 需要配置微信支付相关参数
 
 #### 微信支付测试
+
 开发阶段测试微信支付：
+
 1. 使用微信支付开发工具
 2. 或配置测试商户号
 3. 使用沙箱环境进行测试
@@ -5191,17 +5829,20 @@ xm-sp/
 ### 9.6 调试技巧
 
 #### 查看接口请求
+
 1. 打开微信开发者工具
 2. 切换到"Network"面板
 3. 筛选接口请求
 4. 查看请求参数和响应数据
 
 #### 查看控制台日志
+
 1. 在关键代码位置添加 `console.log`
 2. 在"Console"面板查看日志输出
 3. 检查接口返回的数据结构
 
 #### 数据检查
+
 - 使用后端接口直接查看数据库状态
 - 使用 Postman 或 curl 测试 API 接口
 - 检查订单状态是否正确更新

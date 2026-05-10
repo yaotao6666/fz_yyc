@@ -1,3 +1,5 @@
+import { getUploadToken } from './index'
+
 export function uploadImage(filePath: string) {
   return new Promise(async (resolve, reject) => {
     uni.showLoading({ title: '上传中...', mask: true })

@@ -3,18 +3,41 @@
  */
 
 import { defineStore } from 'pinia'
-import { merchantLogin, getMerchantProfile } from '../api'
+import { merchantLogin, merchantWechatLogin, getMerchantProfile } from '../api'
 import type { MerchantStaff, MerchantInfo } from '../types/index'
+import { getMerchantWechatCode } from '../utils/merchant_wechat'
 
 let socketTask: any = null
 let socketListenersBound = false
 let activeStore: any = null
 let reconnectTimer: any = null
 let orderAudio: any = null
+let browseAudio: any = null
 
-const WS_URL = process.env.NODE_ENV === 'development'
-  ? 'ws://localhost:8080/api/v1/ws/merchant'
-  : 'wss://api.example.com/api/v1/ws/merchant'
+const WS_URL = 'ws://localhost:8080/api/v1/ws/merchant'
+
+function getStoredBoolean(key: string, defaultValue = true): boolean {
+  const value = uni.getStorageSync(key)
+  if (value === '') {
+    return defaultValue
+  }
+  return !!value
+}
+
+function createAudio(src: string) {
+  const audio = uni.createInnerAudioContext()
+  audio.src = src
+  audio.obeyMuteSwitch = false
+  return audio
+}
+
+function playAudio(audio: any) {
+  try {
+    audio.stop()
+  } catch (error) {
+  }
+  audio.play()
+}
 
 interface AuthState {
   token: string
@@ -22,7 +45,8 @@ interface AuthState {
   merchantInfo: MerchantInfo | null
   staff: MerchantStaff | null
   isLoggedIn: boolean
-  soundEnabled: boolean
+  orderSoundEnabled: boolean
+  browseSoundEnabled: boolean
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -32,40 +56,71 @@ export const useAuthStore = defineStore('auth', {
     merchantInfo: null,
     staff: null,
     isLoggedIn: !!uni.getStorageSync('token'),
-    soundEnabled: uni.getStorageSync('merchant_sound_enabled') !== '' ? !!uni.getStorageSync('merchant_sound_enabled') : true
+    orderSoundEnabled: getStoredBoolean('merchant_sound_enabled'),
+    browseSoundEnabled: getStoredBoolean('merchant_browse_sound_enabled')
   }),
 
   getters: {
     isAuthenticated: (state) => state.isLoggedIn && !!state.token,
     merchantName: (state) => state.merchantInfo?.name || '',
-    merchantStatus: (state) => state.merchantInfo?.status ?? 0
+    merchantStatus: (state) => state.merchantInfo?.status ?? 0,
+    soundEnabled: (state) => state.orderSoundEnabled
   },
 
   actions: {
+    persistAuthState() {
+      uni.setStorageSync('token', this.token)
+      uni.setStorageSync('merchantId', this.merchantId)
+      uni.setStorageSync('staff', JSON.stringify(this.staff))
+    },
+
+    hydrateSoundSettingsFromStaffSettings() {
+      if (!this.staff) {
+        return
+      }
+      if (typeof this.staff.notify_enabled === 'boolean') {
+        this.setOrderSoundEnabled(this.staff.notify_enabled)
+      }
+      if (typeof this.staff.browse_notify_enabled === 'boolean') {
+        this.setBrowseSoundEnabled(this.staff.browse_notify_enabled)
+      }
+    },
+
     // 商家登录
     async login(username: string, password: string) {
       try {
         const res = await merchantLogin({ username, password })
-        
+
         this.token = res.token
         this.merchantId = res.merchant_id
         this.staff = res.staff
-        
-        // 保存到本地存储
-        uni.setStorageSync('token', res.token)
-        uni.setStorageSync('merchantId', res.merchant_id)
-        uni.setStorageSync('staff', JSON.stringify(res.staff))
-        
         this.isLoggedIn = true
-        
-        // 获取商家信息
+        this.persistAuthState()
+        this.hydrateSoundSettingsFromStaffSettings()
         await this.fetchMerchantInfo()
-
         this.connectOrderSocket()
-        
         return true
       } catch (error: any) {
         uni.showToast({ title: error.message || '登录失败', icon: 'none' })
+        return false
+      }
+    },
+
+    async loginWithWechat() {
+      try {
+        const code = await getMerchantWechatCode()
+        const res = await merchantWechatLogin({ code })
+        this.token = res.token
+        this.merchantId = res.merchant_id
+        this.staff = res.staff
+        this.isLoggedIn = true
+        this.persistAuthState()
+        this.hydrateSoundSettingsFromStaffSettings()
+        await this.fetchMerchantInfo()
+        this.connectOrderSocket()
+        return true
+      } catch (error: any) {
+        uni.showToast({ title: error.message || '快捷登录失败', icon: 'none' })
         return false
       }
     },
@@ -112,10 +167,8 @@ export const useAuthStore = defineStore('auth', {
       this.merchantId = uni.getStorageSync('merchantId')
       this.isLoggedIn = true
 
-      const soundEnabled = uni.getStorageSync('merchant_sound_enabled')
-      if (soundEnabled !== '') {
-        this.soundEnabled = !!soundEnabled
-      }
+      this.orderSoundEnabled = getStoredBoolean('merchant_sound_enabled')
+      this.browseSoundEnabled = getStoredBoolean('merchant_browse_sound_enabled')
       
       const staffStr = uni.getStorageSync('staff')
       if (staffStr) {
@@ -140,9 +193,14 @@ export const useAuthStore = defineStore('auth', {
       return true
     },
 
-    setSoundEnabled(enabled: boolean) {
-      this.soundEnabled = enabled
+    setOrderSoundEnabled(enabled: boolean) {
+      this.orderSoundEnabled = enabled
       uni.setStorageSync('merchant_sound_enabled', enabled)
+    },
+
+    setBrowseSoundEnabled(enabled: boolean) {
+      this.browseSoundEnabled = enabled
+      uni.setStorageSync('merchant_browse_sound_enabled', enabled)
     },
 
     connectOrderSocket() {
@@ -172,24 +230,29 @@ export const useAuthStore = defineStore('auth', {
           try {
             const dataStr = typeof res.data === 'string' ? res.data : ''
             const msg = dataStr ? JSON.parse(dataStr) : null
-            if (!msg || msg.type !== 'order_notify') return
+            if (!msg) return
 
-            const orderNo = msg.payload?.order_no || ''
-
-            if (activeStore?.soundEnabled) {
-              if (!orderAudio) {
-                orderAudio = uni.createInnerAudioContext()
-                orderAudio.src = '/static/sounds/order.wav'
-                orderAudio.obeyMuteSwitch = false
+            if (msg.type === 'order_notify') {
+              const orderNo = msg.payload?.order_no || ''
+              if (activeStore?.orderSoundEnabled) {
+                if (!orderAudio) {
+                  orderAudio = createAudio('/static/sounds/order.mp3')
+                }
+                playAudio(orderAudio)
               }
-              try {
-                orderAudio.stop()
-              } catch (e) {
-              }
-              orderAudio.play()
+              uni.showToast({ title: orderNo ? `新订单 ${orderNo}` : '新订单提醒', icon: 'none' })
+              return
             }
 
-            uni.showToast({ title: orderNo ? `新订单 ${orderNo}` : '新订单提醒', icon: 'none' })
+            if (msg.type === 'store_visit_notify') {
+              if (activeStore?.browseSoundEnabled) {
+                if (!browseAudio) {
+                  browseAudio = createAudio('/static/sounds/browse.mp3')
+                }
+                playAudio(browseAudio)
+              }
+              uni.showToast({ title: '有顾客正在浏览店铺', icon: 'none' })
+            }
           } catch (e) {
           }
         })
@@ -231,6 +294,26 @@ export const useAuthStore = defineStore('auth', {
     updateMerchantInfo(info: MerchantInfo) {
       this.merchantInfo = info
       uni.setStorageSync('merchantInfo', JSON.stringify(info))
+    },
+
+    updateStaffInfo(staff: MerchantStaff) {
+      this.staff = staff
+      uni.setStorageSync('staff', JSON.stringify(staff))
+      this.hydrateSoundSettingsFromStaffSettings()
+    },
+
+    testPlayOrderSound() {
+      if (!orderAudio) {
+        orderAudio = createAudio('/static/sounds/order.mp3')
+      }
+      playAudio(orderAudio)
+    },
+
+    testPlayBrowseSound() {
+      if (!browseAudio) {
+        browseAudio = createAudio('/static/sounds/browse.mp3')
+      }
+      playAudio(browseAudio)
     }
   }
 })

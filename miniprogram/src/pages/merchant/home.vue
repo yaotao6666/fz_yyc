@@ -123,7 +123,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
-import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getMerchantQrcode, getMerchantAnnouncements } from '@api'
+import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getMerchantQrcode, getMerchantAnnouncements, getSalesOverview } from '@api'
 import type { Announcement } from '../../types'
 
 const authStore = useAuthStore()
@@ -226,11 +226,14 @@ async function loadMerchantInfo() {
 async function loadStatistics() {
   try {
     // 获取订单统计
-    const orderStats = await getOrderStatistics()
+    const [orderStats, overview] = await Promise.all([
+      getOrderStatistics(),
+      getSalesOverview({ period: 'today' })
+    ])
     
     statistics.value = {
-      today_orders: orderStats.pending_payment + orderStats.completed,
-      today_sales: 0, // 需要从今日统计中获取
+      today_orders: overview.total_orders || orderStats.pending_payment + orderStats.completed,
+      today_sales: overview.total_sales || 0,
       pending_orders: orderStats.pending_payment + orderStats.pending_complete,
       total_products: 0
     }
@@ -255,17 +258,25 @@ async function loadLowStockCount() {
 
 async function toggleShopStatus() {
   const newStatus = merchantInfo.value?.status === 1 ? 0 : 1
-  const actionText = newStatus === 1 ? '营业' : '暂停'
+  const actionText = newStatus === 1 ? '开始营业' : '暂停营业'
+  const confirmContent = newStatus === 1
+    ? '开始营业后用户可继续下单，当前在线连接会继续保持。'
+    : '休息后将停止接收新订单，但仍保持在线并继续接收顾客浏览提醒。'
   
   uni.showModal({
     title: '提示',
-    content: `确定要${actionText}吗？`,
+    content: confirmContent,
     success: async (res) => {
       if (res.confirm) {
         try {
           await updateMerchantStatus(newStatus)
           merchantInfo.value!.status = newStatus
-          uni.showToast({ title: `${actionText}成功`, icon: 'success' })
+          authStore.updateMerchantInfo({
+            ...(authStore.merchantInfo || {}),
+            ...merchantInfo.value!
+          })
+          const successMessage = newStatus === 1 ? '已开始营业' : '已进入休息，仍会接收浏览提醒'
+          uni.showToast({ title: successMessage, icon: 'success' })
         } catch (error: any) {
           uni.showToast({ title: error.message || '操作失败', icon: 'none' })
         }
@@ -303,7 +314,7 @@ function goOrders(status?: string) {
 }
 
 function goAnalytics() {
-  uni.navigateTo({ url: '/pages/merchant/analytics/index' })
+  uni.switchTab({ url: '/pages/merchant/analytics/index' })
 }
 
 </script>

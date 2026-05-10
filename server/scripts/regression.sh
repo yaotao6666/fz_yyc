@@ -118,7 +118,7 @@ run_full_test() {
     
     echo ""
     print_info "步骤 2/3: 测试服务商登录..."
-    local response=$(curl -s -X POST http://localhost:8080/api/v1/sp/auth/login \
+    local response=$(curl -s -X POST http://localhost:8080/api/v1/auth/admin/login \
         -H "Content-Type: application/json" \
         -d '{"username":"admin","password":"admin123"}')
     
@@ -150,7 +150,7 @@ test_sp_api() {
     print_info "测试服务商登录..."
     echo ""
     
-    local response=$(curl -s -X POST http://localhost:8080/api/v1/sp/auth/login \
+    local response=$(curl -s -X POST http://localhost:8080/api/v1/auth/admin/login \
         -H "Content-Type: application/json" \
         -d '{"username":"admin","password":"admin123"}')
     
@@ -195,7 +195,7 @@ show_accounts() {
     echo "  用户名: admin"
     echo "  密码:   admin123"
     echo "  角色:   超级管理员"
-    echo "  路径:   POST /api/v1/sp/auth/login"
+    echo "  路径:   POST /api/v1/auth/admin/login"
     
     echo ""
     echo -e "  ${CYAN}商家员工${NC}"
@@ -206,13 +206,10 @@ show_accounts() {
     echo "  商家:   美味餐厅 (ID=1)"
     
     echo ""
-    echo -e "  ${CYAN}C端用户${NC}"
+    echo -e "  ${CYAN}初始化数据说明${NC}"
     echo "  ───────────────────────────────────"
-    echo "  小明: 13811112222"
-    echo "  小红: 13811113333"
-    echo "  小张: 13811114444"
-    echo "  小李: 13811115555"
-    echo "  小王: 13811116666"
+    echo "  当前单文件初始化脚本仅保留服务商与商家登录账号"
+    echo "  C端用户、商品、订单与行为数据由联调或测试过程生成"
     echo ""
 }
 

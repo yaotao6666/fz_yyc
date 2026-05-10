@@ -10,6 +10,8 @@ import (
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -64,16 +66,16 @@ func GetProfile(c *gin.Context) {
 }
 
 type UpdateProfileRequest struct {
-	Name          string  `json:"name"`
-	Logo          string  `json:"logo"`
-	ContactName   string  `json:"contact_name"`
-	ContactPhone  string  `json:"contact_phone"`
-	ContactEmail  string  `json:"contact_email"`
-	Address       string  `json:"address"`
-	Lat           float64 `json:"lat"`
-	Lng           float64 `json:"lng"`
-	BusinessHours string  `json:"business_hours"`
-	Announcement  string  `json:"announcement"`
+	Name           string  `json:"name"`
+	Logo           string  `json:"logo"`
+	ContactName    string  `json:"contact_name"`
+	ContactPhone   string  `json:"contact_phone"`
+	ContactEmail   string  `json:"contact_email"`
+	Address        string  `json:"address"`
+	Lat            float64 `json:"lat"`
+	Lng            float64 `json:"lng"`
+	BusinessHours  string  `json:"business_hours"`
+	Announcement   string  `json:"announcement"`
 	MinOrderAmount float64 `json:"min_order_amount"`
 }
 
@@ -133,7 +135,6 @@ func UpdateProfile(c *gin.Context) {
 
 func GetSettings(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
-	username, _ := c.Get("username")
 
 	var merchant models.Merchant
 	if err := database.DB.First(&merchant, merchantID).Error; err != nil {
@@ -145,33 +146,39 @@ func GetSettings(c *gin.Context) {
 	database.DB.Where("merchant_id = ?", merchantID).First(&deliverySettings)
 
 	notifyEnabled := true
-	if usernameStr, ok := username.(string); ok && usernameStr != "" {
-		var staff models.MerchantStaff
-		if err := database.DB.Where("merchant_id = ? AND username = ?", merchantID, usernameStr).First(&staff).Error; err == nil {
-			notifyEnabled = staff.NotifyEnabled
-		}
+	browseNotifyEnabled := true
+	wechatBound := false
+	var wechatBoundAt *time.Time
+	if staff, err := getCurrentMerchantStaff(c); err == nil {
+		notifyEnabled = staff.NotifyEnabled
+		browseNotifyEnabled = staff.BrowseNotifyEnabled
+		wechatBound = strings.TrimSpace(staff.OpenID) != ""
+		wechatBoundAt = staff.WechatBoundAt
 	}
 
 	response.Success(c, gin.H{
-		"announcement":      merchant.Announcement,
-		"business_hours":    merchant.BusinessHours,
-		"min_order_amount":  merchant.MinOrderAmount,
-		"takeout_enabled":   merchant.TakeoutEnabled,
-		"dine_in_enabled":   merchant.DineInEnabled,
-		"notify_enabled":    notifyEnabled,
-		"delivery_settings": deliverySettings,
+		"announcement":          merchant.Announcement,
+		"business_hours":        merchant.BusinessHours,
+		"min_order_amount":      merchant.MinOrderAmount,
+		"takeout_enabled":       merchant.TakeoutEnabled,
+		"dine_in_enabled":       merchant.DineInEnabled,
+		"notify_enabled":        notifyEnabled,
+		"browse_notify_enabled": browseNotifyEnabled,
+		"wechat_bound":          wechatBound,
+		"wechat_bound_at":       wechatBoundAt,
+		"delivery_settings":     deliverySettings,
 	})
 }
 
 type UpdateSettingsRequest struct {
-	TakeoutEnabled *bool `json:"takeout_enabled"`
-	DineInEnabled  *bool `json:"dine_in_enabled"`
-	NotifyEnabled  *bool `json:"notify_enabled"`
+	TakeoutEnabled      *bool `json:"takeout_enabled"`
+	DineInEnabled       *bool `json:"dine_in_enabled"`
+	NotifyEnabled       *bool `json:"notify_enabled"`
+	BrowseNotifyEnabled *bool `json:"browse_notify_enabled"`
 }
 
 func UpdateSettings(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
-	username, _ := c.Get("username")
 
 	var req UpdateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -194,16 +201,24 @@ func UpdateSettings(c *gin.Context) {
 		}
 	}
 
-	if req.NotifyEnabled != nil {
-		usernameStr, ok := username.(string)
-		if !ok || usernameStr == "" {
+	if req.NotifyEnabled != nil || req.BrowseNotifyEnabled != nil {
+		staff, err := getCurrentMerchantStaff(c)
+		if err != nil {
 			response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "获取员工身份失败")
 			return
 		}
 
+		staffUpdates := map[string]interface{}{}
+		if req.NotifyEnabled != nil {
+			staffUpdates["notify_enabled"] = *req.NotifyEnabled
+		}
+		if req.BrowseNotifyEnabled != nil {
+			staffUpdates["browse_notify_enabled"] = *req.BrowseNotifyEnabled
+		}
+
 		if err := database.DB.Model(&models.MerchantStaff{}).
-			Where("merchant_id = ? AND username = ?", merchantID, usernameStr).
-			Update("notify_enabled", *req.NotifyEnabled).Error; err != nil {
+			Where("id = ?", staff.ID).
+			Updates(staffUpdates).Error; err != nil {
 			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新提示音设置失败")
 			return
 		}
@@ -213,15 +228,15 @@ func UpdateSettings(c *gin.Context) {
 }
 
 type LicenseRequest struct {
-	LicenseNo         string `json:"license_no"`
-	LicenseName       string `json:"license_name"`
-	LicenseImage      string `json:"license_image"`
-	LegalPerson       string `json:"legal_person"`
-	LegalPersonID     string `json:"legal_person_id"`
+	LicenseNo          string `json:"license_no"`
+	LicenseName        string `json:"license_name"`
+	LicenseImage       string `json:"license_image"`
+	LegalPerson        string `json:"legal_person"`
+	LegalPersonID      string `json:"legal_person_id"`
 	LegalPersonIDFront string `json:"legal_person_id_front"`
 	LegalPersonIDBack  string `json:"legal_person_id_back"`
-	ValidFrom         string `json:"valid_from"`
-	ValidTo           string `json:"valid_to"`
+	ValidFrom          string `json:"valid_from"`
+	ValidTo            string `json:"valid_to"`
 }
 
 func UpdateLicense(c *gin.Context) {
@@ -269,7 +284,7 @@ func UpdateBankAccount(c *gin.Context) {
 }
 
 type StatusRequest struct {
-	Status uint8 `json:"status" binding:"required"`
+	Status *uint8 `json:"status"`
 }
 
 func UpdateStatus(c *gin.Context) {
@@ -280,8 +295,16 @@ func UpdateStatus(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
+	if req.Status == nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "状态不能为空")
+		return
+	}
+	if *req.Status != 0 && *req.Status != 1 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "状态值不合法")
+		return
+	}
 
-	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Update("status", req.Status).Error; err != nil {
+	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Update("status", *req.Status).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新状态失败")
 		return
 	}
@@ -327,11 +350,11 @@ func GetQRCode(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"qrcode_url": qrCodeURL,
-		"scene":      scene,
-		"page":       "pages/index/index",
+		"qrcode_url":  qrCodeURL,
+		"scene":       scene,
+		"page":        "pages/index/index",
 		"placeholder": err != nil,
-		"message":    "小程序发布后可生成正式二维码",
+		"message":     "小程序发布后可生成正式二维码",
 	})
 }
 
@@ -358,12 +381,73 @@ type DeliverySettingsRequest struct {
 	} `json:"distance_rules"`
 }
 
+type normalizedDistanceRule struct {
+	MinDistance float64 `json:"min_distance"`
+	MaxDistance float64 `json:"max_distance"`
+	Fee         float64 `json:"fee"`
+}
+
+func normalizeDeliverySettingsRules(req DeliverySettingsRequest) ([]normalizedDistanceRule, error) {
+	if req.BaseFee < 0 {
+		return nil, fmt.Errorf("基础配送费不能小于0")
+	}
+	if req.FreeDeliveryAmount < 0 {
+		return nil, fmt.Errorf("满额免配送费门槛不能小于0")
+	}
+	if req.MaxDistance == 0 {
+		return nil, fmt.Errorf("最大配送距离必须大于0")
+	}
+
+	rules := make([]normalizedDistanceRule, 0, len(req.DistanceRules))
+	for index, rule := range req.DistanceRules {
+		if rule.MinDistance < 0 {
+			return nil, fmt.Errorf("第%d条规则起始距离不能小于0", index+1)
+		}
+		if rule.MaxDistance <= rule.MinDistance {
+			return nil, fmt.Errorf("第%d条规则结束距离必须大于起始距离", index+1)
+		}
+		if rule.Fee < 0 {
+			return nil, fmt.Errorf("第%d条规则配送费不能小于0", index+1)
+		}
+		if rule.MaxDistance > float64(req.MaxDistance) {
+			return nil, fmt.Errorf("第%d条规则超出最大配送距离", index+1)
+		}
+
+		rules = append(rules, normalizedDistanceRule{
+			MinDistance: rule.MinDistance,
+			MaxDistance: rule.MaxDistance,
+			Fee:         rule.Fee,
+		})
+	}
+
+	sort.Slice(rules, func(i, j int) bool {
+		if rules[i].MinDistance == rules[j].MinDistance {
+			return rules[i].MaxDistance < rules[j].MaxDistance
+		}
+		return rules[i].MinDistance < rules[j].MinDistance
+	})
+
+	for index := 1; index < len(rules); index++ {
+		if rules[index].MinDistance < rules[index-1].MaxDistance {
+			return nil, fmt.Errorf("第%d条规则与前一条规则区间重叠", index+1)
+		}
+	}
+
+	return rules, nil
+}
+
 func UpdateDeliverySettings(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
 
 	var req DeliverySettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	normalizedRules, err := normalizeDeliverySettingsRules(req)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
 		return
 	}
 
@@ -377,15 +461,7 @@ func UpdateDeliverySettings(c *gin.Context) {
 	settings.FreeDeliveryAmount = req.FreeDeliveryAmount
 	settings.MaxDistance = req.MaxDistance
 
-	rules := req.DistanceRules
-	if rules == nil {
-		rules = []struct {
-			MinDistance float64 `json:"min_distance"`
-			MaxDistance float64 `json:"max_distance"`
-			Fee         float64 `json:"fee"`
-		}{}
-	}
-	rulesJSON, _ := json.Marshal(rules)
+	rulesJSON, _ := json.Marshal(normalizedRules)
 	settings.DistanceRules = models.JSON(rulesJSON)
 
 	if err := database.DB.Save(&settings).Error; err != nil {

@@ -40,6 +40,13 @@
         >
           {{ loading ? '登录中...' : '登录' }}
         </button>
+        <button
+          class="btn-wechat-login"
+          :disabled="wechatLoading"
+          @click="handleWechatLogin"
+        >
+          {{ wechatLoading ? '登录中...' : '微信快捷登录' }}
+        </button>
         <view class="link-group">
           <text class="link" @click="goRegister">商家入驻</text>
         </view>
@@ -65,6 +72,7 @@ const errors = reactive({
 })
 
 const loading = ref(false)
+const wechatLoading = ref(false)
 
 // 表单验证
 function validateUsername() {
@@ -110,6 +118,22 @@ async function handleLogin() {
     }
   } finally {
     loading.value = false
+  }
+}
+
+async function handleWechatLogin() {
+  wechatLoading.value = true
+
+  try {
+    const success = await authStore.loginWithWechat()
+    if (success) {
+      uni.showToast({ title: '登录成功', icon: 'success' })
+      setTimeout(() => {
+        uni.switchTab({ url: '/pages/merchant/home' })
+      }, 500)
+    }
+  } finally {
+    wechatLoading.value = false
   }
 }
 
@@ -212,6 +236,25 @@ function goRegister() {
 .btn-login[disabled] {
   background: #cccccc;
   color: #ffffff;
+}
+
+.btn-wechat-login {
+  width: 100%;
+  height: 96rpx;
+  margin-top: 20rpx;
+  background: #f6ffed;
+  border: 2rpx solid #52c41a;
+  border-radius: 48rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+  color: #389e0d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-wechat-login[disabled] {
+  opacity: 0.6;
 }
 
 .link-group {

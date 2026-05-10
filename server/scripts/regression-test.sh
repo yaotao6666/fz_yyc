@@ -201,7 +201,7 @@ run_tests() {
     
     # 测试1：服务商登录
     print_info "测试1：服务商管理员登录..."
-    local SP_TOKEN=$(curl -s -X POST "${API_HOST}/api/v1/sp/auth/login" \
+    local SP_TOKEN=$(curl -s -X POST "${API_HOST}/api/v1/auth/admin/login" \
         -H "Content-Type: application/json" \
         -d '{"username":"admin","password":"admin123"}' | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
     
@@ -213,7 +213,7 @@ run_tests() {
     
     # 测试2：商家登录
     print_info "测试2：商家管理员登录..."
-    local MERCHANT_TOKEN=$(curl -s -X POST "${API_HOST}/api/v1/merchant/auth/login" \
+    local MERCHANT_TOKEN=$(curl -s -X POST "${API_HOST}/api/v1/auth/merchant/login" \
         -H "Content-Type: application/json" \
         -d '{"username":"merchant","password":"merchant123"}' | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
     

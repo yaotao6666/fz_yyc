@@ -1,20 +1,19 @@
 <template>
   <view class="analytics-container">
-    <!-- 概览卡片 -->
     <view class="overview-card">
-      <view class="overview-header">
-        <view class="period-tabs">
-          <view
-            v-for="tab in periodTabs"
-            :key="tab.value"
-            class="period-tab"
-            :class="{ active: currentPeriod === tab.value }"
-            @click="changePeriod(tab.value)"
-          >
-            {{ tab.label }}
-          </view>
+      <view class="period-tabs">
+        <view
+          v-for="tab in periodTabs"
+          :key="tab.value"
+          class="period-tab"
+          :class="{ active: currentPeriod === tab.value }"
+          @click="changePeriod(tab.value)"
+        >
+          {{ tab.label }}
         </view>
       </view>
+
+      <view class="range-text">{{ currentRangeLabel }}</view>
 
       <view class="overview-main">
         <view class="main-stat">
@@ -22,7 +21,7 @@
           <view class="stat-label">销售额</view>
           <view class="stat-growth" :class="{ positive: (overview?.sales_growth || 0) >= 0 }">
             {{ (overview?.sales_growth || 0) >= 0 ? '↑' : '↓' }}
-            {{ Math.abs(overview?.sales_growth || 0) }}%
+            {{ Math.abs(overview?.sales_growth || 0).toFixed(1) }}%
           </view>
         </view>
       </view>
@@ -30,67 +29,86 @@
       <view class="overview-sub">
         <view class="sub-stat">
           <view class="stat-value">{{ overview?.total_orders || 0 }}</view>
-          <view class="stat-label">订单数</view>
+          <view class="stat-label">支付订单</view>
           <view class="stat-growth" :class="{ positive: (overview?.orders_growth || 0) >= 0 }">
             {{ (overview?.orders_growth || 0) >= 0 ? '↑' : '↓' }}
-            {{ Math.abs(overview?.orders_growth || 0) }}%
+            {{ Math.abs(overview?.orders_growth || 0).toFixed(1) }}%
           </view>
         </view>
         <view class="sub-stat">
-          <view class="stat-value">{{ overview?.total_customers || 0 }}</view>
-          <view class="stat-label">客户数</view>
-          <view class="stat-growth" :class="{ positive: (overview?.customers_growth || 0) >= 0 }">
-            {{ (overview?.customers_growth || 0) >= 0 ? '↑' : '↓' }}
-            {{ Math.abs(overview?.customers_growth || 0) }}%
-          </view>
+          <view class="stat-value">{{ overview?.visit_users || 0 }}</view>
+          <view class="stat-label">浏览人数</view>
         </view>
         <view class="sub-stat">
-          <view class="stat-value">¥{{ formatAmount(overview?.avg_order_amount || 0) }}</view>
-          <view class="stat-label">客单价</view>
+          <view class="stat-value">{{ overview?.pay_success_users || 0 }}</view>
+          <view class="stat-label">支付人数</view>
         </view>
       </view>
     </view>
 
-    <!-- 销售趋势 -->
     <view class="section">
       <view class="section-header">
-        <view class="section-title">销售趋势</view>
-        <picker
-          mode="date"
-          :value="trendParams.start_date"
-          @change="onTrendDateChange"
-          fields="day"
-        >
-          <view class="date-picker">
-            <text>{{ trendParams.start_date }}</text>
-            <text class="arrow">›</text>
-          </view>
-        </picker>
+        <view>
+          <view class="section-title">经营趋势</view>
+          <view class="section-subtitle">浏览人数与下单人数按所选时间维度联动</view>
+        </view>
       </view>
-      <view class="chart-placeholder">
-        <view class="chart-bars">
+
+      <view v-if="trendChartData.length > 0" class="line-chart">
+        <view class="chart-legend">
+          <view class="legend-item">
+            <view class="legend-dot browse"></view>
+            <text>浏览人数</text>
+          </view>
+          <view class="legend-item">
+            <view class="legend-dot order"></view>
+            <text>下单人数</text>
+          </view>
+        </view>
+
+        <view class="chart-plot">
+          <view v-for="line in 4" :key="line" class="chart-grid-line" :style="{ bottom: `${line * 25}%` }"></view>
+
           <view
-            v-for="(item, index) in salesTrend.slice(-7)"
-            :key="index"
-            class="chart-bar"
-            :style="{ height: getBarHeight(item.sales) + '%' }"
+            v-for="(item, index) in trendChartData"
+            :key="item.date"
+            class="chart-column"
           >
-            <text class="bar-value">¥{{ formatShortAmount(item.sales) }}</text>
+            <view
+              v-if="index < trendChartData.length - 1"
+              class="chart-line browse"
+              :style="getTrendLineStyle(item.visit_users, trendChartData[index + 1].visit_users, 'browse')"
+            ></view>
+            <view
+              v-if="index < trendChartData.length - 1"
+              class="chart-line order"
+              :style="getTrendLineStyle(item.submit_order_users, trendChartData[index + 1].submit_order_users, 'order')"
+            ></view>
+
+            <view
+              class="chart-point browse"
+              :style="{ bottom: `${getTrendBottom(item.visit_users)}%` }"
+            ></view>
+            <view
+              class="chart-point order"
+              :style="{ bottom: `${getTrendBottom(item.submit_order_users)}%` }"
+            ></view>
+            <text class="chart-label">{{ item.label }}</text>
           </view>
         </view>
-        <view class="chart-labels">
-          <text v-for="(item, index) in salesTrend.slice(-7)" :key="index">
-            {{ item.date.slice(5) }}
-          </text>
-        </view>
+      </view>
+
+      <view v-else class="empty-ranking">
+        <text>暂无趋势数据</text>
       </view>
     </view>
 
-    <!-- 商品排行 -->
     <view class="section">
       <view class="section-header">
-        <view class="section-title">商品销量排行</view>
-        <text class="more-link" @click="viewProductRanking">查看全部 ›</text>
+        <view>
+          <view class="section-title">商品销量排行</view>
+          <view class="section-subtitle">{{ currentRangeLabel }}</view>
+        </view>
       </view>
       <view class="product-ranking">
         <view
@@ -117,27 +135,6 @@
       </view>
     </view>
 
-    <!-- 时段分析 -->
-    <view class="section">
-      <view class="section-header">
-        <view class="section-title">今日时段分析</view>
-      </view>
-      <view class="hourly-chart">
-        <view
-          v-for="hour in hourlyData"
-          :key="hour.hour"
-          class="hour-bar"
-        >
-          <view
-            class="hour-value"
-            :style="{ height: getHourBarHeight(hour.orders) + '%' }"
-          ></view>
-          <text class="hour-label">{{ hour.hour }}时</text>
-        </view>
-      </view>
-    </view>
-
-    <!-- 库存预警 -->
     <view class="section" v-if="stockAlerts.length > 0">
       <view class="section-header">
         <view class="section-title">库存预警</view>
@@ -158,45 +155,64 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import {
   getSalesOverview,
   getSalesTrend,
   getProductRanking,
-  getHourlyAnalysis,
   getStockAlert
 } from '@api'
 import type {
   SalesOverview,
   SalesTrend,
   ProductRanking,
-  HourlyAnalysis,
   StockAlert
 } from '@types'
 
+type PeriodValue = 'today' | 'week' | 'month' | 'year'
+
 const periodTabs = [
-  { label: '今日', value: 'today' },
-  { label: '本周', value: 'week' },
-  { label: '本月', value: 'month' },
-  { label: '本年', value: 'year' }
+  { label: '今日', value: 'today' as PeriodValue },
+  { label: '本周', value: 'week' as PeriodValue },
+  { label: '本月', value: 'month' as PeriodValue },
+  { label: '本年', value: 'year' as PeriodValue }
 ]
 
-const currentPeriod = ref('today')
+const CHART_HEIGHT = 220
+const CHART_COLUMN_WIDTH = 44
+
+const currentPeriod = ref<PeriodValue>('today')
 const overview = ref<SalesOverview | null>(null)
 const salesTrend = ref<SalesTrend[]>([])
 const productRanking = ref<ProductRanking[]>([])
-const hourlyData = ref<HourlyAnalysis[]>([])
 const stockAlerts = ref<StockAlert[]>([])
 
-const trendParams = reactive({
-  start_date: getTodayDate(),
-  end_date: getTodayDate(),
-  granularity: 'day' as const
+const dateRange = reactive({
+  start_date: '',
+  end_date: '',
+  granularity: 'day'
 })
 
 onShow(() => {
+  applyDateRange(currentPeriod.value)
   loadData()
+})
+
+const currentRangeLabel = computed(() => `${dateRange.start_date} 至 ${dateRange.end_date}`)
+
+const trendChartData = computed(() =>
+  salesTrend.value.map((item) => ({
+    date: item.date,
+    label: formatChartLabel(item.date),
+    visit_users: Number(item.visit_users ?? item.customers ?? 0),
+    submit_order_users: Number(item.submit_order_users ?? item.orders ?? 0)
+  }))
+)
+
+const maxTrendValue = computed(() => {
+  const values = trendChartData.value.flatMap((item) => [item.visit_users, item.submit_order_users])
+  return Math.max(...values, 1)
 })
 
 async function loadData() {
@@ -204,14 +220,13 @@ async function loadData() {
     loadOverview(),
     loadSalesTrend(),
     loadProductRanking(),
-    loadHourlyData(),
     loadStockAlerts()
   ])
 }
 
 async function loadOverview() {
   try {
-    overview.value = await getSalesOverview({ period: currentPeriod.value as any })
+    overview.value = await getSalesOverview({ period: currentPeriod.value })
   } catch (error) {
     console.error('加载销售概览失败:', error)
   }
@@ -219,7 +234,11 @@ async function loadOverview() {
 
 async function loadSalesTrend() {
   try {
-    salesTrend.value = await getSalesTrend(trendParams)
+    salesTrend.value = await getSalesTrend({
+      start_date: dateRange.start_date,
+      end_date: dateRange.end_date,
+      granularity: 'day'
+    })
   } catch (error) {
     console.error('加载销售趋势失败:', error)
   }
@@ -227,17 +246,13 @@ async function loadSalesTrend() {
 
 async function loadProductRanking() {
   try {
-    productRanking.value = await getProductRanking({ limit: 5 })
+    productRanking.value = await getProductRanking({
+      start_date: dateRange.start_date,
+      end_date: dateRange.end_date,
+      limit: 5
+    })
   } catch (error) {
     console.error('加载商品排行失败:', error)
-  }
-}
-
-async function loadHourlyData() {
-  try {
-    hourlyData.value = await getHourlyAnalysis({ date: getTodayDate() })
-  } catch (error) {
-    console.error('加载时段分析失败:', error)
   }
 }
 
@@ -249,14 +264,10 @@ async function loadStockAlerts() {
   }
 }
 
-function changePeriod(period: string) {
+function changePeriod(period: PeriodValue) {
   currentPeriod.value = period
-  loadOverview()
-}
-
-function onTrendDateChange(e: any) {
-  trendParams.start_date = e.detail.value
-  loadSalesTrend()
+  applyDateRange(period)
+  loadData()
 }
 
 function getTodayDate(): string {
@@ -264,38 +275,63 @@ function getTodayDate(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
+function formatDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function applyDateRange(period: PeriodValue) {
+  const now = new Date()
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  let start = new Date(end)
+
+  if (period === 'week') {
+    start.setDate(end.getDate() - 6)
+  } else if (period === 'month') {
+    start = new Date(end.getFullYear(), end.getMonth(), 1)
+  } else if (period === 'year') {
+    start = new Date(end.getFullYear(), 0, 1)
+  }
+
+  dateRange.start_date = formatDate(start)
+  dateRange.end_date = formatDate(end)
+}
+
 function formatAmount(amount: number): string {
   return amount.toFixed(2)
 }
 
-function formatShortAmount(amount: number): string {
-  if (amount >= 10000) {
-    return (amount / 10000).toFixed(1) + 'w'
+function formatChartLabel(date: string) {
+  if (currentPeriod.value === 'year') {
+    return date.slice(5, 7)
   }
-  return amount.toFixed(0)
+  return date.slice(5)
 }
 
-function getBarHeight(sales: number): number {
-  if (salesTrend.value.length === 0) return 0
-  const maxSales = Math.max(...salesTrend.value.map(item => item.sales))
-  if (maxSales === 0) return 0
-  return (sales / maxSales) * 100
+function getTrendBottom(value: number) {
+  if (!value) {
+    return 0
+  }
+  return (value / maxTrendValue.value) * 100
 }
 
-function getHourBarHeight(orders: number): number {
-  if (hourlyData.value.length === 0) return 0
-  const maxOrders = Math.max(...hourlyData.value.map(item => item.orders))
-  if (maxOrders === 0) return 0
-  return (orders / maxOrders) * 100
+function getTrendLineStyle(currentValue: number, nextValue: number, type: 'browse' | 'order') {
+  const currentBottom = getTrendBottom(currentValue)
+  const nextBottom = getTrendBottom(nextValue)
+  const deltaY = ((currentBottom - nextBottom) / 100) * CHART_HEIGHT
+  const angle = Math.atan2(deltaY, CHART_COLUMN_WIDTH) * 180 / Math.PI
+  const length = Math.sqrt(CHART_COLUMN_WIDTH * CHART_COLUMN_WIDTH + deltaY * deltaY)
+
+  return {
+    bottom: `${currentBottom}%`,
+    width: `${length}px`,
+    transform: `rotate(${angle}deg)`,
+    background: type === 'browse' ? '#5b8cff' : '#52c41a'
+  }
 }
 
 function getRankClass(index: number): string {
   const classMap = ['gold', 'silver', 'bronze']
   return index < 3 ? classMap[index] : ''
-}
-
-function viewProductRanking() {
-  uni.navigateTo({ url: '/pages/merchant/analytics/products' })
 }
 </script>
 
@@ -328,11 +364,19 @@ function viewProductRanking() {
   border-radius: 12rpx;
   font-size: 28rpx;
   background: rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
 }
 
 .period-tab.active {
   background: #ffffff;
   color: #007AFF;
+  font-weight: 600;
+}
+
+.range-text {
+  font-size: 24rpx;
+  opacity: 0.9;
+  margin-bottom: 20rpx;
 }
 
 .overview-main {
@@ -362,6 +406,32 @@ function viewProductRanking() {
   justify-content: space-around;
   padding-top: 24rpx;
   border-top: 1rpx solid rgba(255, 255, 255, 0.2);
+}
+
+.overview-extra {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.extra-item {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 16rpx;
+  padding: 16rpx 12rpx;
+  text-align: center;
+}
+
+.extra-label {
+  display: block;
+  font-size: 22rpx;
+  opacity: 0.85;
+  margin-bottom: 8rpx;
+}
+
+.extra-value {
+  font-size: 30rpx;
+  font-weight: 600;
 }
 
 .sub-stat .stat-value {
@@ -405,57 +475,101 @@ function viewProductRanking() {
   color: #1a1a1a;
 }
 
-.date-picker {
+.section-subtitle {
+  font-size: 24rpx;
+  color: #999999;
+  margin-top: 8rpx;
+}
+
+.line-chart {
+  margin-top: 8rpx;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 24rpx;
+  margin-bottom: 20rpx;
+}
+
+.legend-item {
   display: flex;
   align-items: center;
-  font-size: 26rpx;
-  color: #007AFF;
+  font-size: 24rpx;
+  color: #666666;
 }
 
-.arrow {
-  margin-left: 4rpx;
+.legend-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  margin-right: 10rpx;
 }
 
-.more-link {
-  font-size: 26rpx;
-  color: #007AFF;
+.legend-dot.browse {
+  background: #5b8cff;
 }
 
-.chart-placeholder {
-  height: 300rpx;
+.legend-dot.order {
+  background: #52c41a;
 }
 
-.chart-bars {
+.chart-plot {
+  position: relative;
   display: flex;
   align-items: flex-end;
-  justify-content: space-around;
-  height: 240rpx;
-  padding-bottom: 20rpx;
+  height: 320rpx;
+  padding: 24rpx 0 56rpx;
 }
 
-.chart-bar {
-  width: 60rpx;
-  background: linear-gradient(180deg, #007AFF 0%, #e6f0ff 100%);
-  border-radius: 8rpx 8rpx 0 0;
-  position: relative;
-  min-height: 20rpx;
-}
-
-.bar-value {
+.chart-grid-line {
   position: absolute;
-  top: -40rpx;
+  left: 0;
+  right: 0;
+  border-top: 1rpx dashed #eaeaea;
+}
+
+.chart-column {
+  position: relative;
+  flex: 1;
+  height: 100%;
+}
+
+.chart-line {
+  position: absolute;
+  left: 50%;
+  height: 4rpx;
+  border-radius: 999rpx;
+  transform-origin: left center;
+  opacity: 0.95;
+}
+
+.chart-point {
+  position: absolute;
+  left: 50%;
+  width: 18rpx;
+  height: 18rpx;
+  margin-left: -9rpx;
+  border-radius: 50%;
+  border: 4rpx solid #ffffff;
+  box-sizing: border-box;
+}
+
+.chart-point.browse {
+  background: #5b8cff;
+}
+
+.chart-point.order {
+  background: #52c41a;
+}
+
+.chart-label {
+  position: absolute;
+  bottom: -40rpx;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 20rpx;
-  color: #666666;
-  white-space: nowrap;
-}
-
-.chart-labels {
-  display: flex;
-  justify-content: space-around;
   font-size: 22rpx;
   color: #999999;
+  white-space: nowrap;
 }
 
 .product-ranking {
@@ -537,36 +651,6 @@ function viewProductRanking() {
   padding: 48rpx 0;
   font-size: 28rpx;
   color: #999999;
-}
-
-.hourly-chart {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  height: 200rpx;
-  padding-bottom: 40rpx;
-}
-
-.hour-bar {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  justify-content: flex-end;
-}
-
-.hour-value {
-  width: 32rpx;
-  background: #007AFF;
-  border-radius: 4rpx 4rpx 0 0;
-  min-height: 4rpx;
-}
-
-.hour-label {
-  font-size: 20rpx;
-  color: #999999;
-  margin-top: 8rpx;
 }
 
 .warning-badge {

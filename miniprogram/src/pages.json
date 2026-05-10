@@ -71,6 +71,20 @@
       }
     },
     {
+      "path": "pages/merchant/notification-settings",
+      "style": {
+        "navigationBarTitleText": "声音提醒管理",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/merchant/staff",
+      "style": {
+        "navigationBarTitleText": "员工管理",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
       "path": "pages/merchant/delivery-settings",
       "style": {
         "navigationBarTitleText": "配送设置",

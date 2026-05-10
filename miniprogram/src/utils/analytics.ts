@@ -3,6 +3,7 @@
  * 用于记录用户访问、点击等行为事件
  */
 
+import { trackStoreBehaviorEvent } from '../api'
 import { useAuth } from './useAuth'
 
 interface VisitParams {
@@ -11,8 +12,12 @@ interface VisitParams {
 }
 
 interface TrackEventParams {
-  event: string
-  merchant_id?: number
+  event: 'page_view' | 'product_view' | 'submit_order' | 'pay_success'
+  merchant_id: number
+  page?: string
+  product_id?: number
+  order_id?: number
+  source?: string
   data?: Record<string, any>
 }
 
@@ -38,14 +43,9 @@ export function useAnalytics() {
         header: {
           'Content-Type': 'application/json'
         }
-      }) as { data: { code: number; data: { user_id: number; visit_count: number } } }
+      }) as unknown as { data: { code: number; data: { user_id: number; visit_count: number } } }
 
       if (res.data?.code === 0) {
-        console.log('Analytics: 访问埋点已记录', {
-          merchant_id: params.merchant_id,
-          user_id: res.data.data.user_id,
-          visit_count: res.data.data.visit_count
-        })
         return true
       }
 
@@ -66,12 +66,15 @@ export function useAnalytics() {
         return false
       }
 
-      console.log('Analytics: 事件埋点', {
-        event: params.event,
-        merchant_id: params.merchant_id,
-        data: params.data
+      await trackStoreBehaviorEvent(params.merchant_id, {
+        openid,
+        event_type: params.event,
+        page: params.page,
+        product_id: params.product_id,
+        order_id: params.order_id,
+        source: params.source || 'store',
+        payload: params.data
       })
-
       return true
     } catch (error) {
       console.error('Analytics: 事件埋点异常', error)
@@ -79,34 +82,41 @@ export function useAnalytics() {
     }
   }
 
-  const trackPageView = async (page: string, merchantId?: number) => {
+  const trackPageView = async (page: string, merchantId: number, source = 'store') => {
     return await trackEvent({
       event: 'page_view',
       merchant_id: merchantId,
+      page,
+      source,
       data: { page }
     })
   }
 
-  const trackAddToCart = async (merchantId: number, productId: number, quantity: number) => {
+  const trackProductView = async (merchantId: number, productId: number) => {
     return await trackEvent({
-      event: 'add_to_cart',
+      event: 'product_view',
       merchant_id: merchantId,
-      data: { product_id: productId, quantity }
+      product_id: productId,
+      page: 'store_product',
+      data: { product_id: productId }
     })
   }
 
   const trackCheckout = async (merchantId: number, amount: number) => {
     return await trackEvent({
-      event: 'checkout',
+      event: 'submit_order',
       merchant_id: merchantId,
+      page: 'store_confirm',
       data: { amount }
     })
   }
 
   const trackPayment = async (merchantId: number, orderId: number, amount: number) => {
     return await trackEvent({
-      event: 'payment',
+      event: 'pay_success',
       merchant_id: merchantId,
+      order_id: orderId,
+      page: 'store_payment_result',
       data: { order_id: orderId, amount }
     })
   }
@@ -115,7 +125,7 @@ export function useAnalytics() {
     trackVisit,
     trackEvent,
     trackPageView,
-    trackAddToCart,
+    trackProductView,
     trackCheckout,
     trackPayment
   }

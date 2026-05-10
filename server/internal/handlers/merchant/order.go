@@ -226,75 +226,192 @@ func GetOrderStatistics(c *gin.Context) {
 
 func GetAnalyticsOverview(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
+	period := c.DefaultQuery("period", "today")
+	now := time.Now()
+	location := now.Location()
 
-	var todayOrders int64
-	var todayAmount float64
-	var yesterdayOrders int64
-	var yesterdayAmount float64
-	var todayNewUsers int64
-	var totalProducts int64
-	var outOfStock int64
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
+	end := start.Add(24 * time.Hour)
+	prevStart := start.Add(-24 * time.Hour)
+	prevEnd := start
 
-	database.DB.Model(&models.Order{}).Where("merchant_id = ? AND DATE(created_at) = CURDATE()", merchantID).Count(&todayOrders)
-	database.DB.Model(&models.Order{}).Where("merchant_id = ? AND DATE(created_at) = CURDATE() AND status >= 2", merchantID).Select("COALESCE(SUM(pay_amount), 0)").Scan(&todayAmount)
-	database.DB.Model(&models.Order{}).Where("merchant_id = ? AND DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)", merchantID).Count(&yesterdayOrders)
-	database.DB.Model(&models.Order{}).Where("merchant_id = ? AND DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND status >= 2", merchantID).Select("COALESCE(SUM(pay_amount), 0)").Scan(&yesterdayAmount)
-	database.DB.Model(&models.Order{}).Where("merchant_id = ? AND DATE(created_at) = CURDATE()", merchantID).Select("COUNT(DISTINCT user_id)").Scan(&todayNewUsers)
-	database.DB.Model(&models.Product{}).Where("merchant_id = ?", merchantID).Count(&totalProducts)
-	database.DB.Model(&models.Product{}).Where("merchant_id = ? AND stock = 0", merchantID).Count(&outOfStock)
-
-	var orderChange float64
-	if yesterdayOrders > 0 {
-		orderChange = float64(todayOrders-yesterdayOrders) / float64(yesterdayOrders) * 100
+	switch period {
+	case "week":
+		start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location).AddDate(0, 0, -6)
+		end = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location).Add(24 * time.Hour)
+		prevStart = start.AddDate(0, 0, -7)
+		prevEnd = start
+	case "month":
+		start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, location)
+		end = start.AddDate(0, 1, 0)
+		prevStart = start.AddDate(0, -1, 0)
+		prevEnd = start
+	case "year":
+		start = time.Date(now.Year(), 1, 1, 0, 0, 0, 0, location)
+		end = start.AddDate(1, 0, 0)
+		prevStart = start.AddDate(-1, 0, 0)
+		prevEnd = start
 	}
 
-	var amountChange float64
-	if yesterdayAmount > 0 {
-		amountChange = (todayAmount - yesterdayAmount) / yesterdayAmount * 100
+	var totalSales float64
+	var totalOrders int64
+	var totalCustomers int64
+	var prevSales float64
+	var prevOrders int64
+	var prevCustomers int64
+	var visitCount int64
+	var visitUsers int64
+	var paySuccessUsers int64
+
+	database.DB.Model(&models.Order{}).
+		Where("merchant_id = ? AND status >= 2 AND created_at >= ? AND created_at < ?", merchantID, start, end).
+		Select("COALESCE(SUM(pay_amount), 0)").
+		Scan(&totalSales)
+	database.DB.Model(&models.Order{}).
+		Where("merchant_id = ? AND status >= 2 AND created_at >= ? AND created_at < ?", merchantID, start, end).
+		Count(&totalOrders)
+	database.DB.Model(&models.Order{}).
+		Where("merchant_id = ? AND status >= 2 AND created_at >= ? AND created_at < ?", merchantID, start, end).
+		Distinct("user_id").
+		Count(&totalCustomers)
+
+	database.DB.Model(&models.Order{}).
+		Where("merchant_id = ? AND status >= 2 AND created_at >= ? AND created_at < ?", merchantID, prevStart, prevEnd).
+		Select("COALESCE(SUM(pay_amount), 0)").
+		Scan(&prevSales)
+	database.DB.Model(&models.Order{}).
+		Where("merchant_id = ? AND status >= 2 AND created_at >= ? AND created_at < ?", merchantID, prevStart, prevEnd).
+		Count(&prevOrders)
+	database.DB.Model(&models.Order{}).
+		Where("merchant_id = ? AND status >= 2 AND created_at >= ? AND created_at < ?", merchantID, prevStart, prevEnd).
+		Distinct("user_id").
+		Count(&prevCustomers)
+
+	database.DB.Model(&models.UserBehaviorEvent{}).
+		Where("merchant_id = ? AND event_type = ? AND created_at >= ? AND created_at < ?", merchantID, "store_visit", start, end).
+		Count(&visitCount)
+	database.DB.Model(&models.UserBehaviorEvent{}).
+		Where("merchant_id = ? AND event_type = ? AND created_at >= ? AND created_at < ?", merchantID, "store_visit", start, end).
+		Distinct("user_id").
+		Count(&visitUsers)
+	database.DB.Model(&models.UserBehaviorEvent{}).
+		Where("merchant_id = ? AND event_type = ? AND created_at >= ? AND created_at < ?", merchantID, "pay_success", start, end).
+		Distinct("user_id").
+		Count(&paySuccessUsers)
+
+	avgOrderAmount := 0.0
+	if totalOrders > 0 {
+		avgOrderAmount = totalSales / float64(totalOrders)
+	}
+
+	salesGrowth := 0.0
+	if prevSales > 0 {
+		salesGrowth = (totalSales - prevSales) / prevSales * 100
+	}
+
+	ordersGrowth := 0.0
+	if prevOrders > 0 {
+		ordersGrowth = float64(totalOrders-prevOrders) / float64(prevOrders) * 100
+	}
+
+	customersGrowth := 0.0
+	if prevCustomers > 0 {
+		customersGrowth = float64(totalCustomers-prevCustomers) / float64(prevCustomers) * 100
 	}
 
 	response.Success(c, gin.H{
-		"today_orders":     todayOrders,
-		"today_amount":     todayAmount,
-		"order_change":     orderChange,
-		"amount_change":    amountChange,
-		"today_new_users":  todayNewUsers,
-		"total_products":   totalProducts,
-		"out_of_stock":     outOfStock,
+		"total_sales":      totalSales,
+		"total_orders":     totalOrders,
+		"total_customers":  totalCustomers,
+		"avg_order_amount": avgOrderAmount,
+		"sales_growth":     salesGrowth,
+		"orders_growth":    ordersGrowth,
+		"customers_growth": customersGrowth,
+		"visit_count":      visitCount,
+		"visit_users":      visitUsers,
+		"pay_success_users": paySuccessUsers,
 	})
 }
 
 func GetSalesTrend(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
 	days := c.DefaultQuery("days", "7")
 	daysInt, _ := strconv.Atoi(days)
+	location := time.Now().Location()
 
-	var trends []struct {
-		Date   string  `json:"date"`
-		Orders int64   `json:"orders"`
-		Amount float64 `json:"amount"`
+	var start time.Time
+	var end time.Time
+	if startDate != "" {
+		parsedStart, err := time.ParseInLocation("2006-01-02", startDate, location)
+		if err == nil {
+			start = parsedStart
+		}
+	}
+	if endDate != "" {
+		parsedEnd, err := time.ParseInLocation("2006-01-02", endDate, location)
+		if err == nil {
+			end = parsedEnd.Add(24 * time.Hour)
+		}
+	}
+	if start.IsZero() {
+		start = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, location).AddDate(0, 0, -(daysInt - 1))
+	}
+	if end.IsZero() {
+		end = time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, location).Add(24 * time.Hour)
 	}
 
-	for i := daysInt - 1; i >= 0; i-- {
-		date := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+	var trends []struct {
+		Date             string  `json:"date"`
+		Orders           int64   `json:"orders"`
+		Sales            float64 `json:"sales"`
+		Customers        int64   `json:"customers"`
+		VisitUsers       int64   `json:"visit_users"`
+		SubmitOrderUsers int64   `json:"submit_order_users"`
+	}
+
+	for cursor := start; cursor.Before(end); cursor = cursor.Add(24 * time.Hour) {
+		date := cursor.Format("2006-01-02")
 		var orders int64
-		var amount float64
+		var sales float64
+		var customers int64
+		var visitUsers int64
+		var submitOrderUsers int64
 
 		database.DB.Model(&models.Order{}).
 			Where("merchant_id = ? AND DATE(created_at) = ? AND status >= 2", merchantID, date).
 			Count(&orders)
 		database.DB.Model(&models.Order{}).
 			Where("merchant_id = ? AND DATE(created_at) = ? AND status >= 2", merchantID, date).
-			Select("COALESCE(SUM(pay_amount), 0)").Scan(&amount)
+			Select("COALESCE(SUM(pay_amount), 0)").Scan(&sales)
+		database.DB.Model(&models.UserBehaviorEvent{}).
+			Where("merchant_id = ? AND event_type = ? AND DATE(created_at) = ?", merchantID, "store_visit", date).
+			Distinct("user_id").
+			Count(&customers)
+		database.DB.Model(&models.UserBehaviorEvent{}).
+			Where("merchant_id = ? AND event_type = ? AND DATE(created_at) = ?", merchantID, "store_visit", date).
+			Distinct("user_id").
+			Count(&visitUsers)
+		database.DB.Model(&models.UserBehaviorEvent{}).
+			Where("merchant_id = ? AND event_type = ? AND DATE(created_at) = ?", merchantID, "submit_order", date).
+			Distinct("user_id").
+			Count(&submitOrderUsers)
 
 		trends = append(trends, struct {
-			Date   string  `json:"date"`
-			Orders int64   `json:"orders"`
-			Amount float64 `json:"amount"`
+			Date             string  `json:"date"`
+			Orders           int64   `json:"orders"`
+			Sales            float64 `json:"sales"`
+			Customers        int64   `json:"customers"`
+			VisitUsers       int64   `json:"visit_users"`
+			SubmitOrderUsers int64   `json:"submit_order_users"`
 		}{
-			Date:   date,
-			Orders: orders,
-			Amount: amount,
+			Date:             date,
+			Orders:           orders,
+			Sales:            sales,
+			Customers:        customers,
+			VisitUsers:       visitUsers,
+			SubmitOrderUsers: submitOrderUsers,
 		})
 	}
 
@@ -305,21 +422,35 @@ func GetProductRanking(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
 	limit := c.DefaultQuery("limit", "10")
 	limitInt, _ := strconv.Atoi(limit)
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
 
 	var rankings []struct {
 		ProductID   uint64  `json:"product_id"`
 		ProductName string  `json:"product_name"`
 		Image       string  `json:"image"`
-		TotalSales  uint    `json:"total_sales"`
-		TotalAmount float64 `json:"total_amount"`
+		SalesCount  uint    `json:"sales_count"`
+		SalesAmount float64 `json:"sales_amount"`
 	}
 
-	database.DB.Table("order_items").
-		Select("order_items.product_id, order_items.product_name, order_items.image, SUM(order_items.quantity) as total_sales, SUM(order_items.subtotal) as total_amount").
+	query := database.DB.Table("order_items").
+		Select("order_items.product_id, order_items.product_name, order_items.image, SUM(order_items.quantity) as sales_count, SUM(order_items.subtotal) as sales_amount").
 		Joins("JOIN orders ON orders.id = order_items.order_id").
-		Where("orders.merchant_id = ? AND orders.status >= 2", merchantID).
+		Where("orders.merchant_id = ? AND orders.status >= 2", merchantID)
+
+	if startDate != "" {
+		query = query.Where("orders.created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		endDateTime, err := time.Parse("2006-01-02", endDate)
+		if err == nil {
+			query = query.Where("orders.created_at < ?", endDateTime.Add(24*time.Hour))
+		}
+	}
+
+	query.
 		Group("order_items.product_id").
-		Order("total_sales DESC").
+		Order("sales_count DESC").
 		Limit(limitInt).
 		Scan(&rankings)
 
@@ -330,30 +461,30 @@ func GetHourlyAnalysis(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
 
 	var hourlyData []struct {
-		Hour   int   `json:"hour"`
-		Orders int64 `json:"orders"`
-		Amount float64 `json:"amount"`
+		Hour   int     `json:"hour"`
+		Orders int64   `json:"orders"`
+		Sales  float64 `json:"sales"`
 	}
 
 	for h := 0; h < 24; h++ {
 		var orders int64
-		var amount float64
+		var sales float64
 
 		database.DB.Model(&models.Order{}).
 			Where("merchant_id = ? AND HOUR(created_at) = ? AND DATE(created_at) = CURDATE() AND status >= 2", merchantID, h).
 			Count(&orders)
 		database.DB.Model(&models.Order{}).
 			Where("merchant_id = ? AND HOUR(created_at) = ? AND DATE(created_at) = CURDATE() AND status >= 2", merchantID, h).
-			Select("COALESCE(SUM(pay_amount), 0)").Scan(&amount)
+			Select("COALESCE(SUM(pay_amount), 0)").Scan(&sales)
 
 		hourlyData = append(hourlyData, struct {
-			Hour   int    `json:"hour"`
-			Orders int64  `json:"orders"`
-			Amount float64 `json:"amount"`
+			Hour   int     `json:"hour"`
+			Orders int64   `json:"orders"`
+			Sales  float64 `json:"sales"`
 		}{
 			Hour:   h,
 			Orders: orders,
-			Amount: amount,
+			Sales:  sales,
 		})
 	}
 
@@ -380,14 +511,19 @@ func GetCustomerAnalysis(c *gin.Context) {
 	var totalCustomers int64
 	var newCustomers int64
 	var repeatRate float64
+	var visitUsers int64
+	var visitCount int64
+	var submitOrderUsers int64
+	var paySuccessUsers int64
 
 	database.DB.Model(&models.Order{}).
-		Where("merchant_id = ?", merchantID).
+		Where("merchant_id = ? AND status >= 2", merchantID).
 		Select("COUNT(DISTINCT user_id)").Scan(&totalCustomers)
 
-	database.DB.Model(&models.Order{}).
-		Where("merchant_id = ? AND DATE(created_at) = CURDATE()", merchantID).
-		Select("COUNT(DISTINCT user_id)").Scan(&newCustomers)
+	database.DB.Model(&models.UserBehaviorEvent{}).
+		Where("merchant_id = ? AND event_type = ? AND DATE(created_at) = CURDATE()", merchantID, "store_visit").
+		Distinct("user_id").
+		Count(&newCustomers)
 
 	var totalOrders int64
 	var repeatOrders int64
@@ -400,10 +536,30 @@ func GetCustomerAnalysis(c *gin.Context) {
 		repeatRate = float64(repeatOrders) / float64(totalCustomers) * 100
 	}
 
+	database.DB.Model(&models.UserBehaviorEvent{}).
+		Where("merchant_id = ? AND event_type = ?", merchantID, "store_visit").
+		Distinct("user_id").
+		Count(&visitUsers)
+	database.DB.Model(&models.UserBehaviorEvent{}).
+		Where("merchant_id = ? AND event_type = ?", merchantID, "store_visit").
+		Count(&visitCount)
+	database.DB.Model(&models.UserBehaviorEvent{}).
+		Where("merchant_id = ? AND event_type = ?", merchantID, "submit_order").
+		Distinct("user_id").
+		Count(&submitOrderUsers)
+	database.DB.Model(&models.UserBehaviorEvent{}).
+		Where("merchant_id = ? AND event_type = ?", merchantID, "pay_success").
+		Distinct("user_id").
+		Count(&paySuccessUsers)
+
 	response.Success(c, gin.H{
-		"total_customers": totalCustomers,
-		"new_customers":   newCustomers,
-		"repeat_rate":      repeatRate,
+		"total_customers":   totalCustomers,
+		"new_customers":     newCustomers,
+		"repeat_rate":       repeatRate,
+		"visit_users":       visitUsers,
+		"visit_count":       visitCount,
+		"submit_order_users": submitOrderUsers,
+		"pay_success_users": paySuccessUsers,
 	})
 }
 

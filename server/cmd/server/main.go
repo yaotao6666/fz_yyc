@@ -80,6 +80,7 @@ func setupRoutes(r *gin.Engine) {
 		devGroup := v1.Group("/dev")
 		{
 			devGroup.POST("/order-notify", wsHandler.DevOrderNotify)
+			devGroup.POST("/store-visit-notify", wsHandler.DevStoreVisitNotify)
 		}
 
 		// 认证相关
@@ -87,6 +88,7 @@ func setupRoutes(r *gin.Engine) {
 		{
 			authGroup.POST("/admin/login", admin.Login)
 			authGroup.POST("/merchant/login", merchant.Login)
+			authGroup.POST("/merchant/wechat-login", merchant.WechatQuickLogin)
 			authGroup.POST("/user/wechat-login", user.WechatLogin)
 		}
 
@@ -107,6 +109,7 @@ func setupRoutes(r *gin.Engine) {
 			storeGroup.GET("/delivery-rules", user.GetDeliveryRules)
 			storeGroup.POST("/orders", user.CreateOrder)
 			storeGroup.POST("/visit", user.RecordUserVisit)
+			storeGroup.POST("/event", user.RecordBehaviorEvent)
 		}
 
 		// C端用户接口（需要登录）
@@ -166,6 +169,9 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.PUT("/profile", merchant.UpdateProfile)
 			merchantGroup.GET("/settings", merchant.GetSettings)
 			merchantGroup.PUT("/settings", merchant.UpdateSettings)
+			merchantGroup.POST("/account/change-password", merchant.ChangePassword)
+			merchantGroup.POST("/account/wechat/bind", merchant.BindWechat)
+			merchantGroup.DELETE("/account/wechat/bind", merchant.UnbindWechat)
 			merchantGroup.PUT("/license", merchant.UpdateLicense)
 			merchantGroup.PUT("/bank-account", merchant.UpdateBankAccount)
 			merchantGroup.POST("/status", merchant.UpdateStatus)
@@ -179,6 +185,7 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.POST("/staff", merchant.CreateStaff)
 			merchantGroup.PUT("/staff/:id", merchant.UpdateStaff)
 			merchantGroup.DELETE("/staff/:id", merchant.DeleteStaff)
+			merchantGroup.POST("/staff/:id/reset-password", merchant.ResetStaffPassword)
 
 			// 系统公告（商家查看）
 			merchantGroup.GET("/announcements", merchant.GetAnnouncements)

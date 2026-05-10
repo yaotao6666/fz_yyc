@@ -46,6 +46,7 @@
         <view class="form-item">
           <view class="form-label">配送距离</view>
           <picker
+            v-if="deliveryRules.length > 0"
             mode="selector"
             :range="deliveryRules"
             range-key="label"
@@ -56,8 +57,11 @@
               {{ deliveryRules[deliveryDistanceIndex]?.label || '请选择距离' }}
             </view>
           </picker>
-          <view class="distance-tip" v-if="deliveryDistance > maxSafeDistance">
-            ⚠️ 超出建议配送距离，可能无法配送
+          <view v-else class="picker-value disabled">
+            当前暂无可选配送档位
+          </view>
+          <view class="distance-tip" v-if="deliveryRules.length > 0">
+            由商家配置配送范围档位，用户手动选择，不进行真实定位计算
           </view>
         </view>
       </view>
@@ -132,9 +136,11 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { createOrder, getStoreDeliveryRules } from '@api'
 import { useCartStore } from '../../stores/cart'
+import { useAnalytics } from '@utils/analytics'
 import type { CreateOrderRequest } from '@types'
 
 const cartStore = useCartStore()
+const { trackPageView, trackPayment } = useAnalytics()
 
 const deliveryTypes = [
   { value: 1, name: '配送', icon: '🚚' },
@@ -150,10 +156,16 @@ const deliveryDistance = ref(0)
 const deliveryDistanceIndex = ref(0)
 const remark = ref('')
 const merchantId = ref(1)
+const deliveryConfig = ref({
+  enabled: false,
+  base_fee: 0,
+  free_delivery_amount: 0,
+  max_distance: 0,
+  distance_rules: [] as { min_distance: number; max_distance: number; fee: number }[]
+})
 
-// 配送距离选项
-const deliveryRules = ref<{ distance: number; label: string }[]>([])
-const maxSafeDistance = ref(3) // 建议配送距离
+// 配送档位选项
+const deliveryRules = ref<{ distance: number; fee: number; label: string }[]>([])
 
 onShow(() => {
   const pages = getCurrentPages()
@@ -162,42 +174,34 @@ onShow(() => {
 
   // 加载配送规则
   loadDeliveryRules()
+  trackPageView('store_confirm', merchantId.value)
 })
 
 async function loadDeliveryRules() {
   try {
     const rules = await getStoreDeliveryRules(merchantId.value)
+    deliveryConfig.value = rules
+    deliveryRules.value = (rules.distance_rules || []).map((item) => ({
+      distance: item.max_distance,
+      fee: item.fee,
+      label: `${item.min_distance}-${item.max_distance}km · 配送费 ¥${item.fee.toFixed(2)}`
+    }))
 
-    const maxDistance = rules.max_distance || 5
-    maxSafeDistance.value = Math.floor(maxDistance * 0.8 * 10) / 10
-
-    // 生成距离选项（0.5km递增）
-    for (let d = 0.5; d <= maxDistance; d += 0.5) {
-      const isWarning = d > maxSafeDistance.value
-      deliveryRules.value.push({
-        distance: d,
-        label: `${d.toFixed(1)}km${isWarning ? ' ⚠️' : ''}`
-      })
+    if (deliveryRules.value.length === 0 && rules.max_distance > 0) {
+      deliveryRules.value = [{
+        distance: rules.max_distance,
+        fee: rules.base_fee,
+        label: `0-${rules.max_distance}km · 配送费 ¥${rules.base_fee.toFixed(2)}`
+      }]
     }
 
-    // 默认选择第一项
     if (deliveryRules.value.length > 0) {
       deliveryDistanceIndex.value = 0
       deliveryDistance.value = deliveryRules.value[0].distance
     }
   } catch (error) {
     console.error('获取配送规则失败:', error)
-    // 使用默认选项
-    for (let d = 0.5; d <= 5; d += 0.5) {
-      deliveryRules.value.push({
-        distance: d,
-        label: `${d.toFixed(1)}km`
-      })
-    }
-    if (deliveryRules.value.length > 0) {
-      deliveryDistanceIndex.value = 0
-      deliveryDistance.value = deliveryRules.value[0].distance
-    }
+    deliveryRules.value = []
   }
 }
 
@@ -210,13 +214,20 @@ function onDistanceChange(e: any) {
   deliveryDistance.value = deliveryRules.value[e.detail.value].distance
 }
 
+const selectedDeliveryRule = computed(() => deliveryRules.value[deliveryDistanceIndex.value] || null)
+
 const deliveryFee = computed(() => {
   if (deliveryType.value !== 1) return 0
-  
-  if (deliveryDistance.value <= 2) return 0
-  if (deliveryDistance.value <= 5) return 3
-  if (deliveryDistance.value <= 10) return 6
-  return 10
+
+  if (cartStore.totalAmount >= deliveryConfig.value.free_delivery_amount && deliveryConfig.value.free_delivery_amount > 0) {
+    return 0
+  }
+
+  if (!selectedDeliveryRule.value) {
+    return deliveryConfig.value.base_fee || 0
+  }
+
+  return selectedDeliveryRule.value.fee
 })
 
 const totalAmount = computed(() => {
@@ -225,6 +236,9 @@ const totalAmount = computed(() => {
 
 async function submitOrder() {
   if (deliveryType.value === 1) {
+    if (!deliveryConfig.value.enabled) {
+      return uni.showToast({ title: '商家暂未开启配送', icon: 'none' })
+    }
     if (!deliveryAddress.value) {
       return uni.showToast({ title: '请输入收货地址', icon: 'none' })
     }
@@ -233,6 +247,18 @@ async function submitOrder() {
     }
     if (!contactPhone.value) {
       return uni.showToast({ title: '请输入联系电话', icon: 'none' })
+    }
+    if (!deliveryRules.value.length) {
+      return uni.showToast({ title: '当前暂无可选配送档位', icon: 'none' })
+    }
+    if (!selectedDeliveryRule.value) {
+      return uni.showToast({ title: '请选择配送距离档位', icon: 'none' })
+    }
+    if (deliveryDistance.value > deliveryConfig.value.max_distance) {
+      return uni.showToast({ title: '已超出商家配送范围', icon: 'none' })
+    }
+    if (!/^1\d{10}$/.test(contactPhone.value)) {
+      return uni.showToast({ title: '请输入正确的联系电话', icon: 'none' })
     }
   }
 
@@ -243,12 +269,18 @@ async function submitOrder() {
   const orderData: CreateOrderRequest = {
     items: cartStore.items.map(item => ({
       product_id: item.product_id,
-      spec_option: item.specs,
+      spec_info: item.specs,
       quantity: item.quantity
     })),
     delivery_type: deliveryType.value,
-    delivery_distance: deliveryDistance.value,
     remark: remark.value
+  }
+
+  if (deliveryType.value === 1) {
+    orderData.delivery_distance = deliveryDistance.value
+    orderData.delivery_address = deliveryAddress.value
+    orderData.contact_name = contactName.value
+    orderData.contact_phone = contactPhone.value
   }
 
   try {
@@ -268,9 +300,10 @@ async function submitOrder() {
         package: res.pay_params.package,
         signType: res.pay_params.signType,
         paySign: res.pay_params.paySign,
-        success: () => {
+        success: async () => {
           uni.hideLoading()
           uni.showToast({ title: '支付成功', icon: 'success' })
+          await trackPayment(merchantId.value, res.order.id, res.order.pay_amount)
           
           setTimeout(() => {
             uni.redirectTo({
@@ -297,6 +330,7 @@ async function submitOrder() {
       // 无需支付，直接跳转订单页
       uni.hideLoading()
       uni.showToast({ title: '订单创建成功', icon: 'success' })
+      await trackPayment(merchantId.value, res.order.id, res.order.pay_amount)
       
       setTimeout(() => {
         uni.redirectTo({
@@ -395,6 +429,10 @@ async function submitOrder() {
   display: flex;
   align-items: center;
   color: #1a1a1a;
+}
+
+.picker-value.disabled {
+  color: #999999;
 }
 
 .distance-tip {

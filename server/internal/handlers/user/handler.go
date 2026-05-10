@@ -5,6 +5,7 @@ import (
 	"fz_yyc_api/internal/config"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
+	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
@@ -49,6 +50,63 @@ type StoreProductResponse struct {
 	Specs         []StoreProductSpecResponse `json:"specs"`
 	CreatedAt     time.Time                  `json:"created_at"`
 	UpdatedAt     time.Time                  `json:"updated_at"`
+}
+
+type RecordBehaviorEventRequest struct {
+	OpenID    string                 `json:"openid" binding:"required"`
+	EventType string                 `json:"event_type" binding:"required"`
+	Page      string                 `json:"page"`
+	ProductID uint64                 `json:"product_id"`
+	OrderID   uint64                 `json:"order_id"`
+	Source    string                 `json:"source"`
+	Payload   map[string]interface{} `json:"payload"`
+}
+
+func getOrCreateStoreUser(openID string, now time.Time) (*models.User, bool, error) {
+	var user models.User
+	result := database.DB.Where("openid = ?", openID).First(&user)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		user = models.User{
+			OpenID:       openID,
+			Nickname:     "微信用户",
+			Status:       1,
+			FirstVisitAt: &now,
+			LastVisitAt:  &now,
+			VisitCount:   1,
+		}
+		if err := database.DB.Create(&user).Error; err != nil {
+			return nil, false, err
+		}
+		return &user, true, nil
+	}
+	if result.Error != nil {
+		return nil, false, result.Error
+	}
+
+	return &user, false, nil
+}
+
+func recordUserBehaviorEvent(merchantID uint64, userID uint64, openID string, eventType string, page string, productID uint64, orderID uint64, source string, payload map[string]interface{}) {
+	var payloadJSON models.JSON
+	if len(payload) > 0 {
+		if raw, err := json.Marshal(payload); err == nil {
+			payloadJSON = models.JSON(raw)
+		}
+	}
+
+	event := models.UserBehaviorEvent{
+		MerchantID: merchantID,
+		UserID:     userID,
+		OpenID:     openID,
+		EventType:  eventType,
+		Page:       page,
+		ProductID:  productID,
+		OrderID:    orderID,
+		Source:     source,
+		Payload:    payloadJSON,
+	}
+	database.DB.Create(&event)
 }
 
 func parseProductImages(raw models.JSON) []string {
@@ -181,11 +239,6 @@ func GetStoreHome(c *gin.Context) {
 	var merchant models.Merchant
 	if err := database.DB.First(&merchant, id).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
-		return
-	}
-
-	if merchant.Status != 1 {
-		response.Fail(c, http.StatusForbidden, response.CodeForbidden, "商家已停业")
 		return
 	}
 
@@ -331,28 +384,15 @@ func RecordUserVisit(c *gin.Context) {
 		req.Source = "scan"
 	}
 
-	var user models.User
-	result := database.DB.Where("openid = ?", req.OpenID).First(&user)
-
 	now := time.Now()
 
-	if result.Error == gorm.ErrRecordNotFound {
-		user = models.User{
-			OpenID:       req.OpenID,
-			Nickname:     "微信用户",
-			Status:       1,
-			FirstVisitAt: &now,
-			LastVisitAt:  &now,
-			VisitCount:   1,
-		}
-		if err := database.DB.Create(&user).Error; err != nil {
-			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建用户失败")
-			return
-		}
-	} else if result.Error != nil {
+	user, created, err := getOrCreateStoreUser(req.OpenID, now)
+	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询用户失败")
 		return
-	} else {
+	}
+
+	if !created {
 		updates := map[string]interface{}{
 			"last_visit_at": now,
 			"visit_count":   gorm.Expr("visit_count + 1"),
@@ -360,7 +400,8 @@ func RecordUserVisit(c *gin.Context) {
 		if user.FirstVisitAt == nil {
 			updates["first_visit_at"] = now
 		}
-		database.DB.Model(&user).Updates(updates)
+		database.DB.Model(user).Updates(updates)
+		user.VisitCount += 1
 	}
 
 	visit := models.UserVisit{
@@ -372,19 +413,52 @@ func RecordUserVisit(c *gin.Context) {
 	}
 	database.DB.Create(&visit)
 
+	recordUserBehaviorEvent(mid, user.ID, req.OpenID, "store_visit", "store_home", 0, 0, req.Source, map[string]interface{}{
+		"source": req.Source,
+	})
+	wsHandler.BroadcastStoreVisitNotify(mid, req.OpenID, req.Source)
+
 	response.Success(c, gin.H{
 		"user_id":     user.ID,
 		"visit_count": user.VisitCount,
 	})
 }
 
+func RecordBehaviorEvent(c *gin.Context) {
+	merchantID := c.Param("merchant_id")
+	mid, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	var req RecordBehaviorEventRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	switch req.EventType {
+	case "page_view", "product_view", "submit_order", "pay_success":
+	default:
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "不支持的事件类型")
+		return
+	}
+
+	now := time.Now()
+	user, _, err := getOrCreateStoreUser(req.OpenID, now)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询用户失败")
+		return
+	}
+
+	recordUserBehaviorEvent(mid, user.ID, req.OpenID, req.EventType, req.Page, req.ProductID, req.OrderID, req.Source, req.Payload)
+	response.Success(c, gin.H{"message": "记录成功"})
+}
+
 type CreateOrderRequest struct {
-	MerchantID       uint64 `json:"merchant_id" binding:"required"`
-	DeliveryType     uint8  `json:"delivery_type" binding:"required,oneof=1 2"`
+	MerchantID       uint64 `json:"merchant_id"`
+	DeliveryType     uint8  `json:"delivery_type" binding:"required,oneof=1 2 3"`
 	DeliveryDistance float64 `json:"delivery_distance"`
 	DeliveryAddress  string `json:"delivery_address"`
-	ContactName      string `json:"contact_name" binding:"required"`
-	ContactPhone     string `json:"contact_phone" binding:"required"`
+	ContactName      string `json:"contact_name"`
+	ContactPhone     string `json:"contact_phone"`
 	Remark           string `json:"remark"`
 	Items            []struct {
 		ProductID uint64 `json:"product_id" binding:"required"`
@@ -395,6 +469,8 @@ type CreateOrderRequest struct {
 }
 
 func CreateOrder(c *gin.Context) {
+	merchantID := c.Param("merchant_id")
+	pathMerchantID, _ := strconv.ParseUint(merchantID, 10, 64)
 	userID := utils.GetUserID(c)
 
 	if userID == 0 {
@@ -427,10 +503,40 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
+	req.MerchantID = pathMerchantID
+
 	var merchant models.Merchant
 	if err := database.DB.First(&merchant, req.MerchantID).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeMerchantNotFound, "商家不存在")
 		return
+	}
+	if merchant.Status != 1 {
+		response.Fail(c, http.StatusForbidden, response.CodeForbidden, "商家休息中，暂不接单")
+		return
+	}
+
+	if req.DeliveryType == 1 {
+		if req.DeliveryAddress == "" {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请输入收货地址")
+			return
+		}
+		if req.ContactName == "" {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请输入联系人")
+			return
+		}
+		if req.ContactPhone == "" {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请输入联系电话")
+			return
+		}
+		if req.DeliveryDistance <= 0 {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请选择配送距离档位")
+			return
+		}
+	} else {
+		req.DeliveryDistance = 0
+		req.DeliveryAddress = ""
+		req.ContactName = ""
+		req.ContactPhone = ""
 	}
 
 	var totalAmount float64
@@ -495,18 +601,20 @@ func CreateOrder(c *gin.Context) {
 	var deliveryFee float64
 	if req.DeliveryType == 1 {
 		var settings models.MerchantDeliverySettings
-		if err := database.DB.Where("merchant_id = ?", req.MerchantID).First(&settings).Error; err == nil && settings.Enabled {
-			if req.DeliveryDistance > float64(settings.MaxDistance) {
-				response.Fail(c, http.StatusBadRequest, response.CodeOutOfRange, "超出配送范围")
-				return
-			}
-
-			var rules []map[string]interface{}
-			if settings.DistanceRules != nil {
-				_ = json.Unmarshal(settings.DistanceRules, &rules)
-			}
-			deliveryFee = utils.CalculateDeliveryFee(totalAmount, settings.BaseFee, settings.FreeDeliveryAmount, req.DeliveryDistance, rules)
+		if err := database.DB.Where("merchant_id = ?", req.MerchantID).First(&settings).Error; err != nil || !settings.Enabled {
+			response.Fail(c, http.StatusBadRequest, response.CodeForbidden, "商家暂未开启配送")
+			return
 		}
+		if req.DeliveryDistance > float64(settings.MaxDistance) {
+			response.Fail(c, http.StatusBadRequest, response.CodeOutOfRange, "超出配送范围")
+			return
+		}
+
+		var rules []map[string]interface{}
+		if settings.DistanceRules != nil {
+			_ = json.Unmarshal(settings.DistanceRules, &rules)
+		}
+		deliveryFee = utils.CalculateDeliveryFee(totalAmount, settings.BaseFee, settings.FreeDeliveryAmount, req.DeliveryDistance, rules)
 	}
 
 	payAmount := totalAmount + deliveryFee
@@ -583,6 +691,12 @@ func CreateOrder(c *gin.Context) {
 		"has_ordered":   true,
 		"total_orders":  gorm.Expr("total_orders + 1"),
 		"total_spent":   gorm.Expr("total_spent + ?", payAmount),
+	})
+
+	recordUserBehaviorEvent(req.MerchantID, userID, "", "submit_order", "store_confirm", 0, order.ID, "store", map[string]interface{}{
+		"delivery_type":     req.DeliveryType,
+		"delivery_distance": req.DeliveryDistance,
+		"pay_amount":        payAmount,
 	})
 
 	// 如果是支付金额大于0的订单，更新支付状态

@@ -8,11 +8,19 @@ import type { RequestOptions } from '../utils/request'
 import type {
   MerchantLoginRequest,
   MerchantLoginResponse,
+  ServiceProviderLoginRequest,
+  ServiceProviderLoginResponse,
   MerchantRegisterRequest,
   MerchantRegisterResponse,
   MerchantInfo,
+  MerchantWechatLoginRequest,
   MerchantApplicationStatus,
   MerchantSettings,
+  MerchantStaffListResponse,
+  CreateMerchantStaffRequest,
+  UpdateMerchantStaffRequest,
+  ChangePasswordRequest,
+  UploadTokenResponse,
   DeliverySettings,
   Category,
   Product,
@@ -28,10 +36,13 @@ import type {
   HourlyAnalysis,
   SalesOverview,
   SalesTrend,
+  CustomerAnalysis,
+  CustomerTrend,
   StoreHomeInfo,
   StoreProductGroup,
   CreateOrderRequest,
   CreateOrderResponse,
+  MerchantBehaviorEventRequest,
   Announcement,
   AnnouncementListResponse,
 } from '../types'
@@ -60,6 +71,45 @@ function getToken(): string {
   return uni.getStorageSync('token') || ''
 }
 
+function parseDistanceRules(value: unknown): { min_distance: number; max_distance: number; fee: number }[] {
+  if (Array.isArray(value)) {
+    return value.map((item: any) => ({
+      min_distance: Number(item?.min_distance || 0),
+      max_distance: Number(item?.max_distance || 0),
+      fee: Number(item?.fee || 0)
+    }))
+  }
+
+  if (typeof value === 'string' && value) {
+    try {
+      return parseDistanceRules(JSON.parse(value))
+    } catch (error) {
+      console.warn('解析配送规则失败:', error)
+    }
+  }
+
+  return []
+}
+
+function normalizeDeliverySettings(data: Partial<DeliverySettings> | null | undefined): DeliverySettings {
+  return {
+    enabled: !!data?.enabled,
+    base_fee: Number(data?.base_fee || 0),
+    free_delivery_amount: Number(data?.free_delivery_amount || 0),
+    max_distance: Number(data?.max_distance || 10),
+    distance_rules: parseDistanceRules(data?.distance_rules)
+  }
+}
+
+function normalizeMerchantSettings(data: MerchantSettings): MerchantSettings {
+  return {
+    ...data,
+    delivery_settings: data?.delivery_settings
+      ? normalizeDeliverySettings(data.delivery_settings)
+      : undefined
+  }
+}
+
 // ============ 认证相关 ============
 
 /**
@@ -73,6 +123,20 @@ export async function merchantLogin(data: MerchantLoginRequest): Promise<Merchan
     uni.setStorageSync('merchant_info', res.staff)
   }
   return res
+}
+
+export async function merchantWechatLogin(data: MerchantWechatLoginRequest): Promise<MerchantLoginResponse> {
+  const res = await post<MerchantLoginResponse>('/api/v1/auth/merchant/wechat-login', data)
+  if (res.token) {
+    uni.setStorageSync('token', res.token)
+    uni.setStorageSync('merchant_id', res.merchant_id)
+    uni.setStorageSync('merchant_info', res.staff)
+  }
+  return res
+}
+
+export function spLogin(data: ServiceProviderLoginRequest) {
+  return post<ServiceProviderLoginResponse>('/api/v1/sp/auth/login', data)
 }
 
 /**
@@ -109,7 +173,7 @@ export function updateMerchantProfile(data: Partial<MerchantInfo>) {
  * 获取商家设置
  */
 export function getMerchantSettings() {
-  return get<MerchantSettings>('/api/v1/merchant/settings')
+  return get<MerchantSettings>('/api/v1/merchant/settings').then(normalizeMerchantSettings)
 }
 
 /**
@@ -119,18 +183,31 @@ export function updateMerchantSettings(data: Partial<MerchantSettings>) {
   return put<null>('/api/v1/merchant/settings', data)
 }
 
+export function changeMerchantPassword(data: ChangePasswordRequest) {
+  return post<{ message: string }>('/api/v1/merchant/account/change-password', data)
+}
+
+export function bindMerchantWechat(data: { code: string }) {
+  return post<{ openid: string; wechat_bound_at: string; message: string }>('/api/v1/merchant/account/wechat/bind', data)
+}
+
+export function unbindMerchantWechat() {
+  return del<{ message: string }>('/api/v1/merchant/account/wechat/bind')
+}
+
 /**
  * 获取配送设置
  */
 export function getDeliverySettings() {
-  return get<DeliverySettings>('/api/v1/merchant/delivery-settings')
+  return get<DeliverySettings>('/api/v1/merchant/delivery-settings').then(normalizeDeliverySettings)
 }
 
 /**
  * 更新配送设置
  */
 export function updateDeliverySettings(data: Partial<DeliverySettings>) {
-  return put<DeliverySettings>('/api/v1/merchant/delivery-settings', data)
+  const payload = normalizeDeliverySettings(data)
+  return put<DeliverySettings>('/api/v1/merchant/delivery-settings', payload).then(normalizeDeliverySettings)
 }
 
 /**
@@ -160,8 +237,8 @@ export function getMerchantAnnouncementDetail(announcementId: number) {
 /**
  * 获取分类列表
  */
-export function getCategories() {
-  return get<Category[]>('/api/v1/merchant/categories')
+export function getCategories(options?: Partial<RequestOptions>) {
+  return get<Category[]>('/api/v1/merchant/categories', undefined, options)
 }
 
 /**
@@ -467,14 +544,36 @@ export function getStockAlert(params?: { threshold?: number }) {
  * 获取客户分析
  */
 export function getCustomerAnalysis() {
-  return get<any>('/api/v1/merchant/analytics/customers')
+  return get<CustomerAnalysis>('/api/v1/merchant/analytics/customers')
 }
 
 /**
  * 获取客户趋势
  */
 export function getCustomerTrend(params: { start_date: string; end_date: string }) {
-  return get<any[]>('/api/v1/merchant/analytics/customer-trend', params)
+  return get<CustomerTrend[]>('/api/v1/merchant/analytics/customer-trend', params)
+}
+
+export function getMerchantStaffList(params?: { page?: number; page_size?: number }) {
+  return get<MerchantStaffListResponse>('/api/v1/merchant/staff', params)
+}
+
+export function createMerchantStaff(data: CreateMerchantStaffRequest) {
+  return post<{ id: number; message: string }>('/api/v1/merchant/staff', data)
+}
+
+export function updateMerchantStaff(staffId: number, data: UpdateMerchantStaffRequest) {
+  return put(`/api/v1/merchant/staff/${staffId}`, data)
+}
+
+export function deleteMerchantStaff(staffId: number) {
+  return del<{ message: string }>(`/api/v1/merchant/staff/${staffId}`)
+}
+
+export function resetMerchantStaffPassword(staffId: number, newPassword: string) {
+  return post<{ message: string }>(`/api/v1/merchant/staff/${staffId}/reset-password`, {
+    new_password: newPassword
+  })
 }
 
 // ============ 邀请入驻相关 ============
@@ -506,7 +605,7 @@ export function getInviteRecords(params?: { page?: number; page_size?: number })
  * 获取上传凭证
  */
 export async function getUploadToken() {
-  const res = await get<{ token: string; domain: string; prefix: string; upload_url: string }>('/api/v1/upload/token')
+  const res = await get<UploadTokenResponse>('/api/v1/upload/token')
   if (res?.domain) {
     uni.setStorageSync('qiniu_domain', res.domain)
   }
@@ -612,6 +711,10 @@ export function createOrder(merchantId: number, data: CreateOrderRequest) {
   return post<CreateOrderResponse>(`/api/v1/store/${merchantId}/orders`, data)
 }
 
+export function trackStoreBehaviorEvent(merchantId: number, data: MerchantBehaviorEventRequest) {
+  return post<{ message: string }>(`/api/v1/store/${merchantId}/event`, data)
+}
+
 /**
  * 获取我的订单列表
  * @param params.page 页码
@@ -654,6 +757,7 @@ export function getPrintLogs(params?: { page?: number; page_size?: number; start
 export default {
   // 认证
   merchantLogin,
+  merchantWechatLogin,
   getMerchantProfile,
   merchantRegister,
   getMerchantApplicationStatus,
@@ -661,10 +765,18 @@ export default {
   updateMerchantProfile,
   getMerchantSettings,
   updateMerchantSettings,
+  changeMerchantPassword,
+  bindMerchantWechat,
+  unbindMerchantWechat,
   getDeliverySettings,
   updateDeliverySettings,
   updateMerchantStatus,
   getMerchantQrcode,
+  getMerchantStaffList,
+  createMerchantStaff,
+  updateMerchantStaff,
+  deleteMerchantStaff,
+  resetMerchantStaffPassword,
   // 商品分类
   getCategories,
   createCategory,
@@ -707,6 +819,7 @@ export default {
   getStoreProducts,
   getStoreProduct,
   getStoreDeliveryRules,
+  trackStoreBehaviorEvent,
   // C端订单
   createOrder,
   getMyOrders,

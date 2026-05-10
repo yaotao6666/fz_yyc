@@ -29,9 +29,13 @@
           </view>
         </view>
       </view>
-      <view class="store-status" :class="{ closed: storeInfo?.merchant?.status === 'closed' }">
-        {{ storeInfo?.merchant?.status === 'open' ? '营业中' : '休息中' }}
+      <view class="store-status" :class="{ closed: storeInfo?.merchant?.status !== 1 }">
+        {{ storeInfo?.merchant?.status === 1 ? '营业中' : '休息中' }}
       </view>
+    </view>
+
+    <view v-if="storeInfo?.merchant?.status !== 1" class="rest-tip">
+      当前店铺休息中，可继续浏览商品；新订单暂不支持提交。
     </view>
 
     <!-- 分类和商品 -->
@@ -170,7 +174,7 @@ import type { StoreHomeInfo, Product } from '@types'
 
 const cartStore = useCartStore()
 const { ensureAuth, isLoggedIn } = useAuth()
-const { trackVisit } = useAnalytics()
+const { trackVisit, trackPageView } = useAnalytics()
 
 const storeInfo = ref<StoreHomeInfo | null>(null)
 const currentCategoryIndex = ref(0)
@@ -208,6 +212,7 @@ onShow(async () => {
 
   // 记录用户访问埋点
   await trackVisit({ merchant_id: merchantId, source })
+  await trackPageView('store_home', merchantId, source)
 
   loadStoreHome(merchantId)
   // 每次进入都显示指引弹窗
@@ -406,6 +411,15 @@ function goMyOrders() {
 
 .store-status.closed {
   background: #999999;
+}
+
+.rest-tip {
+  margin: 24rpx 24rpx 0;
+  padding: 20rpx 24rpx;
+  background: #fff7e6;
+  border-radius: 16rpx;
+  color: #d46b08;
+  font-size: 26rpx;
 }
 
 .main-content {
