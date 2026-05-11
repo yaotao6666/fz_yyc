@@ -12,6 +12,15 @@ import type {
   ServiceProviderLoginResponse,
   MerchantRegisterRequest,
   MerchantRegisterResponse,
+  SpSettings,
+  MerchantApplication,
+  MerchantListItem,
+  MerchantDetail,
+  AnnouncementStatus,
+  MerchantDistributionData,
+  OrderAnalyticsData,
+  AmountAnalyticsData,
+  TopMerchantRanking,
   MerchantInfo,
   MerchantWechatLoginRequest,
   MerchantApplicationStatus,
@@ -139,6 +148,93 @@ export function spLogin(data: ServiceProviderLoginRequest) {
   return post<ServiceProviderLoginResponse>('/api/v1/sp/auth/login', data)
 }
 
+export function spLogout() {
+  return post<{ message: string }>('/api/v1/sp/auth/logout', {})
+}
+
+export function getSpSettings() {
+  return get<SpSettings>('/api/v1/sp/settings')
+}
+
+export function changeSpPassword(data: { old_password: string; new_password: string }) {
+  return post<{ message: string }>('/api/v1/sp/account/change-password', data)
+}
+
+export function getSpMerchantsPending(params?: {
+  page?: number
+  page_size?: number
+  status?: number
+  keyword?: string
+}) {
+  return get<{ list: MerchantApplication[]; pagination: { total: number; page: number; page_size: number } }>(
+    '/api/v1/sp/merchants/pending',
+    params
+  )
+}
+
+export async function getMerchantList(params?: any) {
+  const res = await get<{ list: any[]; pagination: { total: number; page: number; page_size: number } }>(
+    '/api/v1/sp/merchants/list',
+    params
+  )
+
+  const list: MerchantListItem[] = (res.list || []).map((item: any) => ({
+    ...item,
+    total_users: Number(item?.total_users || 0),
+    total_orders: Number(item?.total_orders || 0),
+    total_amount: Number(item?.total_amount || 0)
+  }))
+
+  return { ...res, list }
+}
+
+export function getMerchantDetail(merchantId: number) {
+  return get<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}`)
+}
+
+export async function getAnnouncements(params?: { page?: number; page_size?: number }) {
+  const res = await get<AnnouncementListResponse>('/api/v1/sp/announcements', params)
+
+  const list = (res.list || []).map((item: any) => ({
+    ...item,
+    summary: typeof item?.summary === 'string' ? item.summary : String(item?.content || '').slice(0, 60),
+    published_at: typeof item?.published_at === 'string' ? item.published_at : item?.created_at
+  }))
+
+  return { ...res, list }
+}
+
+export function getAnnouncement(announcementId: number) {
+  return get<Announcement>(`/api/v1/sp/announcements/${announcementId}`)
+}
+
+export function createAnnouncement(data: { title: string; content: string; status?: AnnouncementStatus }) {
+  return post<{ id: number; message: string }>('/api/v1/sp/announcements', data)
+}
+
+export function updateAnnouncement(
+  announcementId: number,
+  data: { title: string; content: string; status?: AnnouncementStatus }
+) {
+  return put<Announcement>(`/api/v1/sp/announcements/${announcementId}`, data)
+}
+
+export function getMerchantDistribution() {
+  return get<MerchantDistributionData>('/api/v1/sp/merchants/analytics/distribution')
+}
+
+export function getOrderAnalytics(params?: { days?: number }) {
+  return get<OrderAnalyticsData>('/api/v1/sp/orders/analytics', params)
+}
+
+export function getAmountAnalytics(params?: { days?: number }) {
+  return get<AmountAnalyticsData>('/api/v1/sp/amount/analytics', params)
+}
+
+export function getTopMerchants(params?: { limit?: number }) {
+  return get<TopMerchantRanking[]>('/api/v1/sp/amount/top-merchants', params)
+}
+
 /**
  * 获取商家信息
  */
@@ -238,6 +334,11 @@ export function getMerchantAnnouncementDetail(announcementId: number) {
  * 获取分类列表
  */
 export function getCategories(options?: Partial<RequestOptions>) {
+  const token = uni.getStorageSync('token') || ''
+  const spToken = uni.getStorageSync('sp_token') || ''
+  if (!token && spToken) {
+    return Promise.resolve([])
+  }
   return get<Category[]>('/api/v1/merchant/categories', undefined, options)
 }
 

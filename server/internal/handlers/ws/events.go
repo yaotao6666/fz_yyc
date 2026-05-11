@@ -28,8 +28,8 @@ func BroadcastOrderNotify(merchantID uint64, orderNo string) int {
 
 func BroadcastStoreVisitNotify(merchantID uint64, visitorOpenID string, source string) int {
 	return broadcastMerchantEvent(merchantID, "store_visit_notify", map[string]interface{}{
-		"merchant_id":     merchantID,
-		"visitor_openid":  visitorOpenID,
-		"source":          source,
+		"merchant_id":    merchantID,
+		"visitor_openid": visitorOpenID,
+		"source":         source,
 	})
 }

@@ -84,12 +84,12 @@ func GetInviteInfo(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"invite_code":         record.InviteCode,
-		"total_invites":       totalInvites,
-		"completed_invites":   completedInvites,
-		"pending_invites":     pendingInvites,
+		"invite_code":       record.InviteCode,
+		"total_invites":     totalInvites,
+		"completed_invites": completedInvites,
+		"pending_invites":   pendingInvites,
 		"rewards": gin.H{
-			"free_year_count":      freeYearCount,
+			"free_year_count":       freeYearCount,
 			"lowest_rate_qualified": lowestRateQualified,
 		},
 	})
@@ -128,11 +128,11 @@ func GetInviteRecords(c *gin.Context) {
 	var result []gin.H
 	for _, record := range records {
 		item := gin.H{
-			"id":          record.ID,
-			"invite_code": record.InviteCode,
-			"status":      record.Status,
-			"reward_type": record.RewardType,
-			"created_at":  record.CreatedAt,
+			"id":           record.ID,
+			"invite_code":  record.InviteCode,
+			"status":       record.Status,
+			"reward_type":  record.RewardType,
+			"created_at":   record.CreatedAt,
 			"completed_at": record.CompletedAt,
 		}
 

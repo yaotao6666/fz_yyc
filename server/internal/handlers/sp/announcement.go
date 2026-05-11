@@ -10,6 +10,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func getCurrentServiceProviderID(c *gin.Context) (uint64, bool) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		return 0, false
+	}
+	adminID, ok := userIDValue.(uint64)
+	if !ok {
+		return 0, false
+	}
+
+	var admin models.ServiceProviderAdmin
+	if err := database.DB.Select("service_provider_id").First(&admin, adminID).Error; err != nil {
+		return 0, false
+	}
+	return admin.ServiceProviderID, true
+}
+
 func GetAnnouncements(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
@@ -21,12 +38,22 @@ func GetAnnouncements(c *gin.Context) {
 		pageSize = 10
 	}
 
+	spID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+
 	var total int64
-	database.DB.Model(&models.Announcement{}).Count(&total)
+	database.DB.Model(&models.Announcement{}).Where("service_provider_id = ?", spID).Count(&total)
 
 	var announcements []models.Announcement
 	offset := (page - 1) * pageSize
-	if err := database.DB.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&announcements).Error; err != nil {
+	if err := database.DB.Where("service_provider_id = ?", spID).
+		Offset(offset).
+		Limit(pageSize).
+		Order("created_at DESC").
+		Find(&announcements).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取公告列表失败")
 		return
 	}
@@ -44,6 +71,26 @@ func GetAnnouncements(c *gin.Context) {
 type CreateAnnouncementRequest struct {
 	Title   string `json:"title" binding:"required"`
 	Content string `json:"content" binding:"required"`
+	Status  uint8  `json:"status" binding:"omitempty,oneof=0 1"`
+}
+
+func GetAnnouncementDetail(c *gin.Context) {
+	id := c.Param("id")
+	announcementID, _ := strconv.ParseUint(id, 10, 64)
+
+	spID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+
+	var announcement models.Announcement
+	if err := database.DB.Where("id = ? AND service_provider_id = ?", announcementID, spID).First(&announcement).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "公告不存在")
+		return
+	}
+
+	response.Success(c, announcement)
 }
 
 func CreateAnnouncement(c *gin.Context) {
@@ -53,17 +100,22 @@ func CreateAnnouncement(c *gin.Context) {
 		return
 	}
 
-	var sp models.ServiceProvider
-	if err := database.DB.First(&sp).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
+	spID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
 		return
 	}
 
+	status := uint8(1)
+	if req.Status == 0 {
+		status = 0
+	}
+
 	announcement := models.Announcement{
-		ServiceProviderID: sp.ID,
-		Title:          req.Title,
-		Content:        req.Content,
-		Status:         1,
+		ServiceProviderID: spID,
+		Title:             req.Title,
+		Content:           req.Content,
+		Status:            status,
 	}
 
 	if err := database.DB.Create(&announcement).Error; err != nil {
@@ -84,8 +136,14 @@ func UpdateAnnouncement(c *gin.Context) {
 		return
 	}
 
+	spID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+
 	var announcement models.Announcement
-	if err := database.DB.First(&announcement, announcementID).Error; err != nil {
+	if err := database.DB.Where("id = ? AND service_provider_id = ?", announcementID, spID).First(&announcement).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "公告不存在")
 		return
 	}
@@ -93,6 +151,7 @@ func UpdateAnnouncement(c *gin.Context) {
 	updates := map[string]interface{}{
 		"title":   req.Title,
 		"content": req.Content,
+		"status":  req.Status,
 	}
 
 	if err := database.DB.Model(&announcement).Updates(updates).Error; err != nil {
@@ -108,8 +167,14 @@ func DeleteAnnouncement(c *gin.Context) {
 	id := c.Param("id")
 	announcementID, _ := strconv.ParseUint(id, 10, 64)
 
+	spID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+
 	var announcement models.Announcement
-	if err := database.DB.First(&announcement, announcementID).Error; err != nil {
+	if err := database.DB.Where("id = ? AND service_provider_id = ?", announcementID, spID).First(&announcement).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "公告不存在")
 		return
 	}

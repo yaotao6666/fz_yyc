@@ -853,7 +853,7 @@ POST /api/v1/user/auth/wechat-login
 #### 3.2.1 服务商管理员登录
 
 ```
-POST /api/v1/auth/admin/login
+POST /api/v1/sp/auth/login
 ```
 
 **请求参数：**
@@ -929,11 +929,12 @@ Authorization: Bearer {token}
 
 **请求参数：**
 
-| 参数         | 类型     | 必填 | 描述                           |
-| ---------- | ------ | -- | ---------------------------- |
-| page       | int    | 否  | 页码                           |
-| page\_size | int    | 否  | 每页数量                         |
-| status     | string | 否  | 状态：pending/approved/rejected |
+| 参数         | 类型   | 必填 | 描述                       |
+| ---------- | ---- | -- | ------------------------ |
+| page       | int  | 否  | 页码                       |
+| page\_size | int  | 否  | 每页数量                     |
+| status     | int  | 否  | 审核状态：0待审核/1通过/2拒绝 |
+| keyword    | string | 否 | 搜索：商家名称/联系人/电话    |
 
 **响应：**
 
@@ -948,14 +949,16 @@ Authorization: Bearer {token}
         "contact_name": "张三",
         "contact_phone": "13800138000",
         "business_category": "餐饮",
-        "address": "店铺地址",
-        "status": "pending",
-        "created_at": "2024-01-01T10:00:00Z"
+        "applied_at": "2024-01-01T10:00:00Z",
+        "status": 0,
+        "reject_reason": ""
       }
     ],
-    "total": 50,
-    "page": 1,
-    "page_size": 10
+    "pagination": {
+      "total": 50,
+      "page": 1,
+      "page_size": 10
+    }
   }
 }
 ```
@@ -979,29 +982,26 @@ Authorization: Bearer {token}
     "contact_phone": "13800138000",
     "business_category": "餐饮",
     "address": "店铺地址",
-    "license": {
-      "license_no": "营业执照号",
-      "license_name": "营业执照名称",
-      "license_image": "图片URL",
-      "legal_person": "法人姓名",
-      "legal_person_id": "身份证号",
-      "legal_person_id_front": "身份证正面",
-      "legal_person_id_back": "身份证反面",
-      "valid_from": "2020-01-01",
-      "valid_to": "2030-01-01"
+    "status": 1,
+    "audit_status": 0,
+    "audit_remark": "",
+    "qrcode_url": "",
+    "created_at": "2024-01-01T10:00:00Z",
+    "application": {
+      "business_license_info": {},
+      "legal_person_info": {},
+      "bank_account_info": {},
+      "store_info": {}
     },
-    "bank_account": {
-      "bank_name": "开户银行",
-      "bank_branch": "开户支行",
-      "account_no": "银行账号",
-      "account_name": "账户名称"
+    "license": {},
+    "settings": {
+      "bank_account": {},
+      "store_images": []
     },
-    "store_info": {
-      "store_name": "门店名称",
-      "store_images": ["门头照", "内景照"]
-    },
-    "status": "pending",
-    "created_at": "2024-01-01T10:00:00Z"
+    "store_name": "",
+    "total_orders": 0,
+    "total_amount": 0,
+    "total_users": 0
   }
 }
 ```
@@ -1017,8 +1017,8 @@ Authorization: Bearer {token}
 
 ```json
 {
-  "status": "approved",
-  "remark": "审核通过"
+  "audit_status": 1,
+  "audit_remark": "审核通过"
 }
 ```
 
@@ -1404,12 +1404,43 @@ Authorization: Bearer {token}
     "list": [
       {
         "id": 1,
+        "service_provider_id": 1,
         "title": "系统升级通知",
         "content": "平台将于本周六进行系统升级",
-        "create_time": "2024-01-15 10:30:00"
+        "status": 1,
+        "created_at": "2024-01-15T10:30:00Z",
+        "updated_at": "2024-01-15T10:30:00Z"
       }
     ],
-    "total": 10
+    "pagination": {
+      "total": 10,
+      "page": 1,
+      "page_size": 10
+    }
+  }
+}
+```
+
+#### 3.2.17.1 系统公告详情
+
+```
+GET /api/v1/sp/announcements/{id}
+Authorization: Bearer {token}
+```
+
+**响应：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "id": 1,
+    "service_provider_id": 1,
+    "title": "系统升级通知",
+    "content": "平台将于本周六进行系统升级",
+    "status": 1,
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
   }
 }
 ```
@@ -1426,7 +1457,8 @@ Authorization: Bearer {token}
 ```json
 {
   "title": "系统公告标题",
-  "content": "公告内容"
+  "content": "公告内容",
+  "status": 1
 }
 ```
 
@@ -1435,7 +1467,10 @@ Authorization: Bearer {token}
 ```json
 {
   "code": 0,
-  "message": "创建成功"
+  "data": {
+    "id": 1,
+    "message": "创建成功"
+  }
 }
 ```
 
@@ -1451,7 +1486,8 @@ Authorization: Bearer {token}
 ```json
 {
   "title": "更新后的标题",
-  "content": "更新后的内容"
+  "content": "更新后的内容",
+  "status": 1
 }
 ```
 
@@ -1460,7 +1496,15 @@ Authorization: Bearer {token}
 ```json
 {
   "code": 0,
-  "message": "更新成功"
+  "data": {
+    "id": 1,
+    "service_provider_id": 1,
+    "title": "更新后的标题",
+    "content": "更新后的内容",
+    "status": 1,
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  }
 }
 ```
 
@@ -1535,10 +1579,10 @@ Authorization: Bearer {token}
   "data": {
     "service_provider_id": 1,
     "name": "服务商名称",
-    "contact_name": "联系人",
+    "admin_name": "管理员姓名",
     "contact_phone": "13800138000",
-    "notify_enabled": true,
-    "notify_types": ["approval", "refund", "order"]
+    "contact_email": "",
+    "created_at": "2024-01-01T00:00:00Z"
   }
 }
 ```
@@ -1555,9 +1599,7 @@ Authorization: Bearer {token}
 ```json
 {
   "contact_name": "新联系人",
-  "contact_phone": "13900139000",
-  "notify_enabled": true,
-  "notify_types": ["approval", "refund"]
+  "contact_phone": "13900139000"
 }
 ```
 
@@ -1566,7 +1608,34 @@ Authorization: Bearer {token}
 ```json
 {
   "code": 0,
-  "message": "更新成功"
+  "message": "设置成功"
+}
+```
+
+#### 3.2.23.1 服务商修改密码
+
+```
+POST /api/v1/sp/account/change-password
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+
+```json
+{
+  "old_password": "旧密码",
+  "new_password": "新密码"
+}
+```
+
+**响应：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "message": "修改成功"
+  }
 }
 ```
 
@@ -2827,6 +2896,9 @@ Authorization: Bearer {token}
 }
 ```
 
+实现约束：
+- 当前版本暂不支持对不同 `notify_type` 分别配置开关；更新时各项 `enabled` 需保持一致，否则返回参数错误。
+
 #### 3.3.19 更新商家订阅配置
 
 ```
@@ -3251,6 +3323,9 @@ Authorization: Bearer {token}
   }
 }
 ```
+
+实现说明：
+- 当前版本暂未实现 `skus` 维度的持久化与校验，接口会返回 `skus: []`，并在保存时忽略请求中的 `skus` 字段。
 
 #### 3.5.10 创建/更新商品规格
 
@@ -5125,14 +5200,14 @@ miniprogram/                    # 微信小程序
 | store/home     | 店铺首页、分类商品 | GET /api/v1/store/{id}/home          |
 | store/products | 商品列表      | GET /api/v1/store/{id}/products      |
 | store/product  | 商品详情      | GET /api/v1/store/{id}/products/{id} |
-| store/confirm  | 确认订单、支付   | POST /api/v1/user/orders             |
+| store/confirm  | 确认订单、支付   | POST /api/v1/store/{merchant_id}/orders |
 
 **第八批次：微信支付集成**
 
 | 功能   | 描述          | 对接API                                    |
 | ---- | ----------- | ---------------------------------------- |
-| 支付下单 | 统一下单、获取支付参数 | POST /api/v1/notify/payment              |
-| 支付回调 | 支付结果通知      | POST /api/v1/notify/payment              |
+| 支付下单 | 统一下单、获取支付参数 | POST /api/v1/store/{merchant_id}/orders  |
+| 支付回调 | 支付结果通知      | POST /api/v1/callback/wechat             |
 | 退款处理 | 申请退款        | POST /api/v1/merchant/orders/{id}/refund |
 
 #### uni-app 项目结构
@@ -5308,7 +5383,7 @@ xm-mall/
 
 | 页面       | 功能描述              | 对接API                      |
 | -------- | ----------------- | -------------------------- |
-| sp/login | 服务商管理员登录          | POST /api/v1/auth/admin/login |
+| sp/login | 服务商管理员登录          | POST /api/v1/sp/auth/login |
 | sp/home  | 首页数据看板（卡片+饼图+趋势图） | GET /api/v1/sp/dashboard   |
 
 **第二批次：商家入驻审批**
@@ -5343,16 +5418,16 @@ xm-mall/
 
 | 功能模块    | 接口路径                                        | 方法   | 状态     |
 | ------- | ------------------------------------------- | ---- | ------ |
-| 服务商登录   | /api/v1/auth/admin/login                    | POST | 🆕 待开发 |
-| 首页数据看板  | /api/v1/sp/dashboard                        | GET  | 🆕 待开发 |
-| 商家入驻审核  | /api/v1/sp/merchants/pending                | GET  | 🆕 待开发 |
-| 商家详情查看  | /api/v1/sp/merchants/{id}                   | GET  | 🆕 待开发 |
-| 商家审核操作  | /api/v1/sp/merchants/{id}/approve           | POST | 🆕 待开发 |
-| 商家数据分析  | /api/v1/sp/merchants/analytics/distribution | GET  | 🆕 待开发 |
-| 商家列表    | /api/v1/sp/merchants/list                   | GET  | 🆕 待开发 |
-| 订单数据分析  | /api/v1/sp/orders/analytics                 | GET  | 🆕 待开发 |
-| 金额数据分析  | /api/v1/sp/amount/analytics                 | GET  | 🆕 待开发 |
-| TOP商家排行 | /api/v1/sp/amount/top-merchants             | GET  | 🆕 待开发 |
+| 服务商登录   | /api/v1/sp/auth/login                       | POST | ✅ 已实现  |
+| 首页数据看板  | /api/v1/sp/dashboard                        | GET  | ✅ 已实现  |
+| 商家入驻审核  | /api/v1/sp/merchants/pending                | GET  | ✅ 已实现  |
+| 商家详情查看  | /api/v1/sp/merchants/{id}                   | GET  | ✅ 已实现  |
+| 商家审核操作  | /api/v1/sp/merchants/{id}/approve           | POST | ✅ 已实现  |
+| 商家数据分析  | /api/v1/sp/merchants/analytics/distribution | GET  | ✅ 已实现  |
+| 商家列表    | /api/v1/sp/merchants/list                   | GET  | ✅ 已实现  |
+| 订单数据分析  | /api/v1/sp/orders/analytics                 | GET  | ✅ 已实现  |
+| 金额数据分析  | /api/v1/sp/amount/analytics                 | GET  | ✅ 已实现  |
+| TOP商家排行 | /api/v1/sp/amount/top-merchants             | GET  | ✅ 已实现  |
 
 #### 可视化图表规划
 
@@ -5479,19 +5554,19 @@ xm-sp/
 
 | 功能模块    | 接口路径                                        | 方法      | 状态     |
 | ------- | ------------------------------------------- | ------- | ------ |
-| 服务商登录   | /api/v1/auth/admin/login                    | POST    | 🆕 待开发 |
-| 首页数据看板  | /api/v1/sp/dashboard                        | GET     | 🆕 待开发 |
-| 商家入驻审核  | /api/v1/sp/merchants/pending                | GET     | 🆕 待开发 |
-| 商家详情查看  | /api/v1/sp/merchants/{id}                   | GET     | 🆕 待开发 |
-| 商家审核操作  | /api/v1/sp/merchants/{id}/approve           | POST    | 🆕 待开发 |
-| 商家数据分析  | /api/v1/sp/merchants/analytics/distribution | GET     | 🆕 待开发 |
-| 商家列表    | /api/v1/sp/merchants/list                   | GET     | 🆕 待开发 |
-| 订单数据分析  | /api/v1/sp/orders/analytics                 | GET     | 🆕 待开发 |
-| 金额数据分析  | /api/v1/sp/amount/analytics                 | GET     | 🆕 待开发 |
-| TOP商家排行 | /api/v1/sp/amount/top-merchants             | GET     | 🆕 待开发 |
+| 服务商登录   | /api/v1/sp/auth/login                       | POST    | ✅ 已实现  |
+| 首页数据看板  | /api/v1/sp/dashboard                        | GET     | ✅ 已实现  |
+| 商家入驻审核  | /api/v1/sp/merchants/pending                | GET     | ✅ 已实现  |
+| 商家详情查看  | /api/v1/sp/merchants/{id}                   | GET     | ✅ 已实现  |
+| 商家审核操作  | /api/v1/sp/merchants/{id}/approve           | POST    | ✅ 已实现  |
+| 商家数据分析  | /api/v1/sp/merchants/analytics/distribution | GET     | ✅ 已实现  |
+| 商家列表    | /api/v1/sp/merchants/list                   | GET     | ✅ 已实现  |
+| 订单数据分析  | /api/v1/sp/orders/analytics                 | GET     | ✅ 已实现  |
+| 金额数据分析  | /api/v1/sp/amount/analytics                 | GET     | ✅ 已实现  |
+| TOP商家排行 | /api/v1/sp/amount/top-merchants             | GET     | ✅ 已实现  |
 | 系统公告管理  | /api/v1/sp/announcements/\*                 | CRUD    | ✅ 已实现  |
 | 商家登录    | /api/v1/auth/merchant/login                 | POST    | ✅ 已实现  |
-| 商家入驻    | /api/v1/merchant/register                   | POST    | ⚠️ 待完善 |
+| 商家入驻    | /api/v1/merchant/register                   | POST    | ✅ 已实现  |
 | 商家信息    | /api/v1/merchant/profile                    | GET     | ✅ 已实现  |
 | 商家设置    | /api/v1/merchant/settings                   | PUT     | ✅ 已实现  |
 | 商品管理    | /api/v1/merchant/products/\*                | CRUD    | ✅ 已实现  |
@@ -5504,7 +5579,8 @@ xm-sp/
 | 订阅配置    | /api/v1/merchant/subscriptions              | GET/PUT | ✅ 已实现  |
 | 云打印机    | /api/v1/merchant/printers/\*                | CRUD    | ✅ 已实现  |
 | 打印记录    | /api/v1/merchant/print-logs                 | GET     | ✅ 已实现  |
-| 微信支付    | /api/v1/notify/payment                      | POST    | ⚠️ 待完善 |
+| 微信支付回调  | /api/v1/callback/wechat                     | POST    | ✅ 已实现  |
+| 微信支付回调(兼容) | /api/v1/notify/payment                  | POST    | ✅ 已实现  |
 
 #### 服务号通知说明
 

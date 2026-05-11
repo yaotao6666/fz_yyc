@@ -17,12 +17,12 @@ import (
 )
 
 type WechatPayNotify struct {
-	ReturnCode     string `xml:"return_code"`
-	ReturnMsg      string `xml:"return_msg"`
-	ResultCode     string `xml:"result_code"`
-	TransactionID  string `xml:"transaction_id"`
-	OrderID        string `xml:"out_trade_no"`
-	TimeEnd        string `xml:"time_end"`
+	ReturnCode    string `xml:"return_code"`
+	ReturnMsg     string `xml:"return_msg"`
+	ResultCode    string `xml:"result_code"`
+	TransactionID string `xml:"transaction_id"`
+	OrderID       string `xml:"out_trade_no"`
+	TimeEnd       string `xml:"time_end"`
 }
 
 type WechatPayNotifyResponse struct {
@@ -32,18 +32,18 @@ type WechatPayNotifyResponse struct {
 
 type DecryptedNotifyData struct {
 	TransactionID string `json:"transaction_id"`
-	Amount         struct {
-		Total       int `json:"total"`
-		PayerTotal  int `json:"payer_total"`
-		Currency    string `json:"currency"`
+	Amount        struct {
+		Total         int    `json:"total"`
+		PayerTotal    int    `json:"payer_total"`
+		Currency      string `json:"currency"`
 		PayerCurrency string `json:"payer_currency"`
 	} `json:"amount"`
-	OutTradeNo     string `json:"out_trade_no"`
-	PayerOpenID    string `json:"payer.openid"`
-	TradeState     string `json:"trade_state"`
-	TradeType      string `json:"trade_type"`
-	Attach         string `json:"attach"`
-	SuccessTime    string `json:"success_time"`
+	OutTradeNo  string `json:"out_trade_no"`
+	PayerOpenID string `json:"payer.openid"`
+	TradeState  string `json:"trade_state"`
+	TradeType   string `json:"trade_type"`
+	Attach      string `json:"attach"`
+	SuccessTime string `json:"success_time"`
 }
 
 func PaymentNotify(c *gin.Context) {
@@ -65,9 +65,9 @@ func PaymentNotify(c *gin.Context) {
 
 func handleV3Notify(c *gin.Context, body []byte) {
 	var notifyReq struct {
-		EventType       string `json:"event_type"`
-		ResourceType    string `json:"resource_type"`
-		Resource        struct {
+		EventType    string `json:"event_type"`
+		ResourceType string `json:"resource_type"`
+		Resource     struct {
 			Algorithm      string `json:"algorithm"`
 			ciphertext     string `json:"ciphertext"`
 			OriginalBytes  string `json:"original_bytes"`
@@ -193,7 +193,7 @@ func processPaymentSuccess(orderID, transactionID string) error {
 
 	updates := map[string]interface{}{
 		"status":         "paid",
-		"pay_time":        database.DB.NowFunc(),
+		"pay_time":       database.DB.NowFunc(),
 		"transaction_id": transactionID,
 	}
 

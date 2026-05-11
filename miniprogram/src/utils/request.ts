@@ -42,7 +42,10 @@ export interface RequestOptions {
 /**
  * 获取 Token
  */
-function getToken(): string {
+function getToken(url: string): string {
+  if (url.startsWith('/api/v1/sp/')) {
+    return uni.getStorageSync('sp_token') || ''
+  }
   return uni.getStorageSync('token') || ''
 }
 
@@ -112,7 +115,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
       data,
       header: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getToken()}`,
+        'Authorization': `Bearer ${getToken(url)}`,
         ...header
       },
       success: (res) => {
@@ -129,10 +132,18 @@ function request<T = any>(options: RequestOptions): Promise<T> {
             resolve(apiResponse.data)
           } else if (apiResponse.code === ResponseCode.UNAUTHORIZED) {
             // Token 过期，跳转登录
-            uni.removeStorageSync('token')
-            uni.removeStorageSync('userInfo')
-            uni.showToast({ title: '请先登录', icon: 'none' })
-            uni.reLaunch({ url: '/pages/auth/login' })
+            if (url.startsWith('/api/v1/sp/')) {
+              uni.removeStorageSync('sp_token')
+              uni.removeStorageSync('sp_id')
+              uni.removeStorageSync('sp_info')
+              uni.showToast({ title: '请先登录', icon: 'none' })
+              uni.reLaunch({ url: '/pages/sp/login' })
+            } else {
+              uni.removeStorageSync('token')
+              uni.removeStorageSync('userInfo')
+              uni.showToast({ title: '请先登录', icon: 'none' })
+              uni.reLaunch({ url: '/pages/auth/login' })
+            }
             reject(createRequestError({
               message: apiResponse.message || '未授权',
               code: apiResponse.code,
@@ -222,7 +233,7 @@ export function upload<T = any>(
       name,
       formData,
       header: {
-        'Authorization': `Bearer ${getToken()}`
+        'Authorization': `Bearer ${getToken(url)}`
       },
       success: (res) => {
         uni.hideLoading()

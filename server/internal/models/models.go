@@ -652,11 +652,15 @@ type CloudPrinter struct {
 	ID          uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
 	MerchantID  uint64     `gorm:"not null;index" json:"merchant_id"`
 	Name        string     `gorm:"size:64;not null" json:"name"`
-	Brand       string     `gorm:"size:32" json:"brand"`
+	Brand       string     `gorm:"size:32" json:"type"`
 	DeviceNo    string     `gorm:"size:64;not null" json:"device_no"`
-	APIKey      string     `gorm:"size:64" json:"api_key"`
+	APIKey      string     `gorm:"size:64" json:"-"`
+	APIURL      string     `gorm:"size:256" json:"api_url"`
 	PrintTypes  JSON       `gorm:"type:json" json:"print_types"`
 	Status      uint8      `gorm:"not null;default:1" json:"status"`
+	AutoPrint   bool       `gorm:"not null;default:false" json:"auto_print"`
+	IsDefault   bool       `gorm:"not null;default:false" json:"is_default"`
+	PrintCount  int        `gorm:"not null;default:0" json:"print_count"`
 	LastPrintAt *time.Time `json:"last_print_at"`
 	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time  `gorm:"autoUpdateTime" json:"updated_at"`

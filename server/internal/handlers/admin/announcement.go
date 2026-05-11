@@ -61,9 +61,9 @@ func CreateAnnouncement(c *gin.Context) {
 
 	announcement := models.Announcement{
 		ServiceProviderID: sp.ID,
-		Title:            req.Title,
-		Content:          req.Content,
-		Status:           1,
+		Title:             req.Title,
+		Content:           req.Content,
+		Status:            1,
 	}
 
 	if err := database.DB.Create(&announcement).Error; err != nil {

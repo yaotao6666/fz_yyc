@@ -26,10 +26,10 @@ type AppConfig struct {
 
 // App 应用配置
 type App struct {
-	Name string
-	Host string
-	Port int
-	Env  string
+	Name  string
+	Host  string
+	Port  int
+	Env   string
 	Debug bool
 }
 
@@ -309,10 +309,10 @@ func mergeEnvConfig() {
 func getDefaultConfig() *AppConfig {
 	return &AppConfig{
 		App: App{
-			Name: "fz_yyc_api",
-			Host: "0.0.0.0",
-			Port: 8080,
-			Env: "development",
+			Name:  "fz_yyc_api",
+			Host:  "0.0.0.0",
+			Port:  8080,
+			Env:   "development",
 			Debug: true,
 		},
 		Database: Database{

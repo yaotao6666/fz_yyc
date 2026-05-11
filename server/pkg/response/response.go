@@ -8,17 +8,17 @@ import (
 
 // 错误码定义
 const (
-	CodeSuccess          = 0    // 成功
-	CodeParamError       = 1001 // 参数错误
-	CodeUnauthorized     = 1002 // 未授权
-	CodeForbidden        = 1003 // 禁止访问
-	CodeNotFound         = 1004 // 资源不存在
-	CodeServerError      = 9001 // 服务器内部错误
+	CodeSuccess      = 0    // 成功
+	CodeParamError   = 1001 // 参数错误
+	CodeUnauthorized = 1002 // 未授权
+	CodeForbidden    = 1003 // 禁止访问
+	CodeNotFound     = 1004 // 资源不存在
+	CodeServerError  = 9001 // 服务器内部错误
 
 	// 用户相关
-	CodeUserNotFound     = 2001 // 用户不存在
-	CodeUserExists       = 2002 // 用户已存在
-	CodePasswordError    = 2003 // 密码错误
+	CodeUserNotFound  = 2001 // 用户不存在
+	CodeUserExists    = 2002 // 用户已存在
+	CodePasswordError = 2003 // 密码错误
 
 	// 商家相关
 	CodeMerchantNotFound = 3001 // 商家不存在
@@ -28,9 +28,9 @@ const (
 	CodeOutOfRange       = 3005 // 超出配送范围
 
 	// 商品相关
-	CodeProductNotFound  = 4001 // 商品不存在
-	CodeProductOffSale   = 4002 // 商品已下架
-	CodeStockNotEnough   = 4003 // 库存不足
+	CodeProductNotFound = 4001 // 商品不存在
+	CodeProductOffSale  = 4002 // 商品已下架
+	CodeStockNotEnough  = 4003 // 库存不足
 
 	// 订单相关
 	CodeOrderNotFound    = 5001 // 订单不存在
@@ -41,10 +41,10 @@ const (
 	CodeVerifyCodeError  = 5006 // 核销码错误
 
 	// 支付相关
-	CodePayFailed        = 6001 // 支付失败
-	CodeRefundFailed     = 6002 // 退款失败
-	CodeApplyFailed      = 6003 // 进件申请失败
-	CodeApplyAuditing    = 6004 // 进件审核中
+	CodePayFailed     = 6001 // 支付失败
+	CodeRefundFailed  = 6002 // 退款失败
+	CodeApplyFailed   = 6003 // 进件申请失败
+	CodeApplyAuditing = 6004 // 进件审核中
 
 	// 分类相关
 	CodeCategoryNotFound = 7001 // 分类不存在
@@ -52,7 +52,7 @@ const (
 
 	// 服务商相关
 	CodeProviderConfigError = 8001 // 服务商配置错误
-	CodeQiniuUploadFailed  = 8002 // 七牛云上传失败
+	CodeQiniuUploadFailed   = 8002 // 七牛云上传失败
 )
 
 // Response 统一响应结构

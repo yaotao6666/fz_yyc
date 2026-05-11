@@ -41,3 +41,7 @@ func (h *UploadHandler) GetToken(c *gin.Context) {
 		"upload_url": qiniu.GetService().UploadURL,
 	})
 }
+
+func (h *UploadHandler) Callback(c *gin.Context) {
+	response.Success(c, gin.H{"message": "ok"})
+}

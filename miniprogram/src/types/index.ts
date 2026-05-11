@@ -28,10 +28,14 @@ export interface Announcement {
   service_provider_id: number
   title: string
   content: string
+  summary?: string
+  published_at?: string
   status: number
   created_at: string
   updated_at: string
 }
+
+export type AnnouncementStatus = 0 | 1
 
 export interface AnnouncementListResponse {
   list: Announcement[]
@@ -67,6 +71,7 @@ export interface ServiceProviderLoginResponse {
   service_provider: {
     id: number
     name: string
+    admin_name?: string
   }
 }
 
@@ -94,6 +99,89 @@ export interface ServiceProviderAdmin {
   phone: string
   role: string
   status: number
+}
+
+export interface SpSettings {
+  name: string
+  admin_name: string
+  contact_phone: string
+  contact_email?: string
+  created_at?: string
+}
+
+export enum MerchantAuditStatus {
+  PENDING = 0,
+  APPROVED = 1,
+  REJECTED = 2
+}
+
+export const MerchantAuditStatusText: Record<number, string> = {
+  [MerchantAuditStatus.PENDING]: '待审核',
+  [MerchantAuditStatus.APPROVED]: '已通过',
+  [MerchantAuditStatus.REJECTED]: '已拒绝'
+}
+
+export interface MerchantApplication {
+  id: number
+  name: string
+  contact_name: string
+  contact_phone: string
+  business_category: string
+  applied_at: string
+  status: number
+  reject_reason?: string
+}
+
+export interface MerchantListItem {
+  id: number
+  name: string
+  business_category: string
+  status: number
+  created_at: string
+  total_users: number
+  total_orders: number
+  total_amount: number
+}
+
+export interface MerchantDetail extends MerchantListItem {
+  address?: string
+  audit_status: number
+  audit_remark?: string
+  qrcode_url?: string
+  store_name?: string
+  license?: any
+  settings?: {
+    bank_account?: any
+    store_images?: string[]
+  }
+  application?: {
+    business_license_info?: any
+    legal_person_info?: any
+    bank_account_info?: any
+    store_info?: any
+  }
+}
+
+export interface MerchantDistributionData {
+  business: { category: string; count: number }[]
+  status: { status: string; count: number }[]
+}
+
+export interface OrderAnalyticsData {
+  trends: { date: string; orders: number; amount: number }[]
+  total_orders: number
+  total_amount: number
+}
+
+export interface AmountAnalyticsData {
+  trends: { date: string; amount: number }[]
+}
+
+export interface TopMerchantRanking {
+  merchant_id: number
+  merchant_name: string
+  total_amount: number
+  order_count: number
 }
 
 // ============ 商家相关 ============

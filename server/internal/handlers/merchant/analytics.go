@@ -12,15 +12,15 @@ import (
 )
 
 type UserStats struct {
-	TotalUsers       int64   `json:"total_users"`
-	NewUsersToday    int64   `json:"new_users_today"`
-	NewUsersWeek     int64   `json:"new_users_week"`
-	NewUsersMonth    int64   `json:"new_users_month"`
-	PaidUsers        int64   `json:"paid_users"`
-	UnpaidUsers      int64   `json:"unpaid_users"`
-	TotalVisitCount  int64   `json:"total_visit_count"`
-	AvgVisitPerUser  float64 `json:"avg_visit_per_user"`
-	ActiveUsers      int64   `json:"active_users"`
+	TotalUsers      int64   `json:"total_users"`
+	NewUsersToday   int64   `json:"new_users_today"`
+	NewUsersWeek    int64   `json:"new_users_week"`
+	NewUsersMonth   int64   `json:"new_users_month"`
+	PaidUsers       int64   `json:"paid_users"`
+	UnpaidUsers     int64   `json:"unpaid_users"`
+	TotalVisitCount int64   `json:"total_visit_count"`
+	AvgVisitPerUser float64 `json:"avg_visit_per_user"`
+	ActiveUsers     int64   `json:"active_users"`
 }
 
 func GetUserStats(c *gin.Context) {
@@ -95,13 +95,13 @@ func GetUserStats(c *gin.Context) {
 }
 
 type MerchantOverview struct {
-	MerchantID    uint64  `json:"merchant_id"`
-	MerchantName  string  `json:"merchant_name"`
-	TotalUsers    int64   `json:"total_users"`
-	TotalOrders   int64   `json:"total_orders"`
-	TotalSales    float64 `json:"total_sales"`
-	TodayOrders   int64   `json:"today_orders"`
-	TodaySales    float64 `json:"today_sales"`
+	MerchantID   uint64  `json:"merchant_id"`
+	MerchantName string  `json:"merchant_name"`
+	TotalUsers   int64   `json:"total_users"`
+	TotalOrders  int64   `json:"total_orders"`
+	TotalSales   float64 `json:"total_sales"`
+	TodayOrders  int64   `json:"today_orders"`
+	TodaySales   float64 `json:"today_sales"`
 }
 
 func GetMerchantsOverview(c *gin.Context) {

@@ -15,6 +15,76 @@
       }
     },
     {
+      "path": "pages/sp/login",
+      "style": {
+        "navigationBarTitleText": "服务商登录",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/sp/home",
+      "style": {
+        "navigationBarTitleText": "服务商工作台",
+        "navigationBarBackgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/sp/merchants/audit",
+      "style": {
+        "navigationBarTitleText": "待审核商家",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/sp/merchants/audit-detail",
+      "style": {
+        "navigationBarTitleText": "审核详情",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/sp/merchants/list",
+      "style": {
+        "navigationBarTitleText": "商家列表",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/sp/merchants/detail",
+      "style": {
+        "navigationBarTitleText": "商家详情",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/sp/announcements/index",
+      "style": {
+        "navigationBarTitleText": "系统公告",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/sp/announcements/edit",
+      "style": {
+        "navigationBarTitleText": "编辑公告",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/sp/analytics/merchant-stats",
+      "style": {
+        "navigationBarTitleText": "商家统计",
+        "navigationBarBackgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/sp/settings",
+      "style": {
+        "navigationBarTitleText": "服务商设置",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
       "path": "pages/merchant/home",
       "style": {
         "navigationBarTitleText": "商户管理中心",
@@ -192,6 +262,10 @@
       {
         "name": "商家登录",
         "path": "pages/auth/login"
+      },
+      {
+        "name": "服务商登录",
+        "path": "pages/sp/login"
       },
       {
         "name": "测试入口",

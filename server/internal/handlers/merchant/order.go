@@ -64,8 +64,8 @@ func GetOrders(c *gin.Context) {
 	response.Success(c, gin.H{
 		"list": orders,
 		"pagination": gin.H{
-			"total":    total,
-			"page":     page,
+			"total":     total,
+			"page":      page,
 			"page_size": pageSize,
 		},
 	})
@@ -215,12 +215,12 @@ func GetOrderStatistics(c *gin.Context) {
 
 	response.Success(c, gin.H{
 		"total_orders":     totalOrders,
-		"total_amount":      totalAmount,
+		"total_amount":     totalAmount,
 		"today_orders":     todayOrders,
 		"today_amount":     todayAmount,
 		"pending_orders":   pendingOrders,
 		"completed_orders": completedOrders,
-		"refunded_amount": refundedAmount,
+		"refunded_amount":  refundedAmount,
 	})
 }
 
@@ -320,15 +320,15 @@ func GetAnalyticsOverview(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"total_sales":      totalSales,
-		"total_orders":     totalOrders,
-		"total_customers":  totalCustomers,
-		"avg_order_amount": avgOrderAmount,
-		"sales_growth":     salesGrowth,
-		"orders_growth":    ordersGrowth,
-		"customers_growth": customersGrowth,
-		"visit_count":      visitCount,
-		"visit_users":      visitUsers,
+		"total_sales":       totalSales,
+		"total_orders":      totalOrders,
+		"total_customers":   totalCustomers,
+		"avg_order_amount":  avgOrderAmount,
+		"sales_growth":      salesGrowth,
+		"orders_growth":     ordersGrowth,
+		"customers_growth":  customersGrowth,
+		"visit_count":       visitCount,
+		"visit_users":       visitUsers,
 		"pay_success_users": paySuccessUsers,
 	})
 }
@@ -553,13 +553,13 @@ func GetCustomerAnalysis(c *gin.Context) {
 		Count(&paySuccessUsers)
 
 	response.Success(c, gin.H{
-		"total_customers":   totalCustomers,
-		"new_customers":     newCustomers,
-		"repeat_rate":       repeatRate,
-		"visit_users":       visitUsers,
-		"visit_count":       visitCount,
+		"total_customers":    totalCustomers,
+		"new_customers":      newCustomers,
+		"repeat_rate":        repeatRate,
+		"visit_users":        visitUsers,
+		"visit_count":        visitCount,
 		"submit_order_users": submitOrderUsers,
-		"pay_success_users": paySuccessUsers,
+		"pay_success_users":  paySuccessUsers,
 	})
 }
 
@@ -569,10 +569,10 @@ func GetCustomerTrend(c *gin.Context) {
 	daysInt, _ := strconv.Atoi(days)
 
 	var trends []struct {
-		Date         string `json:"date"`
-		TotalUsers   int64  `json:"total_users"`
-		NewUsers     int64  `json:"new_users"`
-		OrderCount   int64  `json:"order_count"`
+		Date       string `json:"date"`
+		TotalUsers int64  `json:"total_users"`
+		NewUsers   int64  `json:"new_users"`
+		OrderCount int64  `json:"order_count"`
 	}
 
 	for i := daysInt - 1; i >= 0; i-- {
@@ -594,10 +594,10 @@ func GetCustomerTrend(c *gin.Context) {
 			Count(&orderCount)
 
 		trends = append(trends, struct {
-			Date         string `json:"date"`
-			TotalUsers   int64  `json:"total_users"`
-			NewUsers     int64  `json:"new_users"`
-			OrderCount   int64  `json:"order_count"`
+			Date       string `json:"date"`
+			TotalUsers int64  `json:"total_users"`
+			NewUsers   int64  `json:"new_users"`
+			OrderCount int64  `json:"order_count"`
 		}{
 			Date:       date,
 			TotalUsers: totalUsers,

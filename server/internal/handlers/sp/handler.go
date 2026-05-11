@@ -1,6 +1,7 @@
 package sp
 
 import (
+	"encoding/json"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
@@ -12,6 +13,31 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
+
+func parseModelJSON(value models.JSON) any {
+	if len(value) == 0 {
+		return nil
+	}
+	var out any
+	if err := json.Unmarshal([]byte(value), &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func parseStringSlice(value any) []string {
+	rawList, ok := value.([]any)
+	if !ok {
+		return []string{}
+	}
+	result := make([]string, 0, len(rawList))
+	for _, item := range rawList {
+		if s, ok := item.(string); ok && s != "" {
+			result = append(result, s)
+		}
+	}
+	return result
+}
 
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
@@ -40,11 +66,24 @@ func Login(c *gin.Context) {
 	database.DB.Model(&admin).Update("last_login_at", now)
 
 	token, _ := utils.GenerateToken(admin.ID, "sp", admin.Username)
+	database.DB.Preload("ServiceProvider").First(&admin, admin.ID)
+	serviceProviderName := ""
+	if admin.ServiceProvider != nil {
+		serviceProviderName = admin.ServiceProvider.Name
+	}
+	if serviceProviderName == "" {
+		serviceProviderName = admin.Username
+	}
+	adminName := admin.Name
+	if adminName == "" {
+		adminName = admin.Username
+	}
 	response.Success(c, gin.H{
 		"token": token,
 		"service_provider": gin.H{
-			"id":   admin.ID,
-			"name": admin.Username,
+			"id":         admin.ServiceProviderID,
+			"name":       serviceProviderName,
+			"admin_name": adminName,
 		},
 	})
 }
@@ -97,6 +136,8 @@ func GetDashboard(c *gin.Context) {
 func GetPendingMerchants(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	status := c.Query("status")
+	keyword := c.Query("keyword")
 
 	if page < 1 {
 		page = 1
@@ -105,18 +146,58 @@ func GetPendingMerchants(c *gin.Context) {
 		pageSize = 10
 	}
 
+	query := database.DB.Model(&models.Merchant{})
+	if status != "" {
+		statusInt, err := strconv.Atoi(status)
+		if err == nil {
+			query = query.Where("audit_status = ?", statusInt)
+		}
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		query = query.Where(
+			"name LIKE ? OR contact_name LIKE ? OR contact_phone LIKE ?",
+			like, like, like,
+		)
+	}
+
 	var total int64
-	database.DB.Model(&models.Merchant{}).Where("audit_status = ?", 0).Count(&total)
+	query.Count(&total)
 
 	var merchants []models.Merchant
 	offset := (page - 1) * pageSize
-	if err := database.DB.Where("audit_status = ?", 0).Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&merchants).Error; err != nil {
+	if err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&merchants).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取待审核商家失败")
 		return
 	}
 
+	type pendingMerchantItem struct {
+		ID               uint64    `json:"id"`
+		Name             string    `json:"name"`
+		ContactName      string    `json:"contact_name"`
+		ContactPhone     string    `json:"contact_phone"`
+		BusinessCategory string    `json:"business_category"`
+		AppliedAt        time.Time `json:"applied_at"`
+		Status           uint8     `json:"status"`
+		RejectReason     string    `json:"reject_reason,omitempty"`
+	}
+	list := make([]pendingMerchantItem, 0, len(merchants))
+	for _, merchant := range merchants {
+		item := pendingMerchantItem{
+			ID:               merchant.ID,
+			Name:             merchant.Name,
+			ContactName:      merchant.ContactName,
+			ContactPhone:     merchant.ContactPhone,
+			BusinessCategory: merchant.BusinessCategory,
+			AppliedAt:        merchant.CreatedAt,
+			Status:           merchant.AuditStatus,
+			RejectReason:     merchant.AuditRemark,
+		}
+		list = append(list, item)
+	}
+
 	response.Success(c, gin.H{
-		"list": merchants,
+		"list": list,
 		"pagination": gin.H{
 			"total":     total,
 			"page":      page,
@@ -135,7 +216,61 @@ func GetMerchantDetail(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, merchant)
+	var application models.MerchantApplication
+	_ = database.DB.Where("merchant_id = ?", id).Order("created_at DESC").First(&application).Error
+
+	var totalOrders int64
+	database.DB.Model(&models.Order{}).Where("merchant_id = ?", id).Count(&totalOrders)
+
+	var totalAmount float64
+	database.DB.Model(&models.Order{}).
+		Where("merchant_id = ? AND status >= 2", id).
+		Select("COALESCE(SUM(pay_amount), 0)").
+		Scan(&totalAmount)
+
+	businessLicenseInfo := parseModelJSON(application.BusinessLicenseInfo)
+	legalPersonInfo := parseModelJSON(application.LegalPersonInfo)
+	bankAccountInfo := parseModelJSON(application.BankAccountInfo)
+	storeInfo := parseModelJSON(application.StoreInfo)
+
+	storeName := ""
+	storeImages := []string{}
+	if storeMap, ok := storeInfo.(map[string]any); ok {
+		if v, ok := storeMap["store_name"].(string); ok {
+			storeName = v
+		}
+		storeImages = parseStringSlice(storeMap["store_images"])
+	}
+
+	response.Success(c, gin.H{
+		"id":                merchant.ID,
+		"name":              merchant.Name,
+		"logo":              merchant.Logo,
+		"contact_name":      merchant.ContactName,
+		"contact_phone":     merchant.ContactPhone,
+		"address":           merchant.Address,
+		"business_category": merchant.BusinessCategory,
+		"status":            merchant.Status,
+		"audit_status":      merchant.AuditStatus,
+		"audit_remark":      merchant.AuditRemark,
+		"qrcode_url":        merchant.QRCodeURL,
+		"created_at":        merchant.CreatedAt,
+		"store_name":        storeName,
+		"application": gin.H{
+			"business_license_info": businessLicenseInfo,
+			"legal_person_info":     legalPersonInfo,
+			"bank_account_info":     bankAccountInfo,
+			"store_info":            storeInfo,
+		},
+		"license": businessLicenseInfo,
+		"settings": gin.H{
+			"bank_account": bankAccountInfo,
+			"store_images": storeImages,
+		},
+		"total_orders": totalOrders,
+		"total_amount": totalAmount,
+		"total_users":  0,
+	})
 }
 
 type AuditRequest struct {
@@ -267,7 +402,7 @@ func GetOrderAnalytics(c *gin.Context) {
 	database.DB.Model(&models.Order{}).Where("status >= 2").Select("COALESCE(SUM(pay_amount), 0)").Scan(&totalAmount)
 
 	response.Success(c, gin.H{
-		"trends":      trends,
+		"trends":       trends,
 		"total_orders": totalOrders,
 		"total_amount": totalAmount,
 	})
@@ -305,7 +440,7 @@ func GetTopMerchants(c *gin.Context) {
 		MerchantID   uint64  `json:"merchant_id"`
 		MerchantName string  `json:"merchant_name"`
 		TotalAmount  float64 `json:"total_amount"`
-		OrderCount   int64    `json:"order_count"`
+		OrderCount   int64   `json:"order_count"`
 	}
 
 	database.DB.Table("orders").
@@ -384,10 +519,10 @@ func GetMerchantRate(c *gin.Context) {
 }
 
 type SetRateRequest struct {
-	Rate           float64 `json:"rate" binding:"required"`
-	EffectiveTime  string  `json:"effective_time"`
-	ExpireTime     string  `json:"expire_time"`
-	Remark         string  `json:"remark"`
+	Rate          float64 `json:"rate" binding:"required"`
+	EffectiveTime string  `json:"effective_time"`
+	ExpireTime    string  `json:"expire_time"`
+	Remark        string  `json:"remark"`
 }
 
 func SetMerchantRate(c *gin.Context) {
@@ -488,32 +623,71 @@ func GetRefunds(c *gin.Context) {
 }
 
 func GetSettings(c *gin.Context) {
-	var sp models.ServiceProvider
-	if err := database.DB.First(&sp).Error; err != nil {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+	adminID, ok := userIDValue.(uint64)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+
+	var admin models.ServiceProviderAdmin
+	if err := database.DB.Preload("ServiceProvider").First(&admin, adminID).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
+		return
+	}
+	if admin.ServiceProvider == nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}
 
+	adminName := admin.Name
+	if adminName == "" {
+		adminName = admin.Username
+	}
+
 	response.Success(c, gin.H{
-		"service_provider_id": sp.ID,
-		"name":                sp.Name,
-		"contact_name":        sp.ContactName,
-		"contact_phone":       sp.ContactPhone,
+		"service_provider_id": admin.ServiceProvider.ID,
+		"name":                admin.ServiceProvider.Name,
+		"admin_name":          adminName,
+		"contact_phone":       admin.ServiceProvider.ContactPhone,
+		"contact_email":       "",
+		"created_at":          admin.ServiceProvider.CreatedAt,
 	})
 }
 
 func UpdateSettings(c *gin.Context) {
-	var sp models.ServiceProvider
-	if err := database.DB.First(&sp).Error; err != nil {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+	adminID, ok := userIDValue.(uint64)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+
+	var admin models.ServiceProviderAdmin
+	if err := database.DB.Preload("ServiceProvider").First(&admin, adminID).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}
+	if admin.ServiceProvider == nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
+		return
+	}
+	sp := admin.ServiceProvider
 
 	var req struct {
 		ContactName  string `json:"contact_name"`
 		ContactPhone string `json:"contact_phone"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
@@ -526,10 +700,58 @@ func UpdateSettings(c *gin.Context) {
 	}
 
 	if len(updates) > 0 {
-		database.DB.Model(&sp).Updates(updates)
+		database.DB.Model(sp).Updates(updates)
 	}
 
 	response.Success(c, gin.H{"message": "设置成功"})
+}
+
+type changePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
+}
+
+func ChangePassword(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+	adminID, ok := userIDValue.(uint64)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
+		return
+	}
+
+	var req changePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var admin models.ServiceProviderAdmin
+	if err := database.DB.First(&admin, adminID).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "修改失败")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(req.OldPassword)); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "旧密码错误")
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "修改失败")
+		return
+	}
+
+	if err := database.DB.Model(&admin).Update("password", string(hashed)).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "修改失败")
+		return
+	}
+
+	response.Success(c, gin.H{"message": "修改成功"})
 }
 
 func GetMerchantApplications(c *gin.Context) {
@@ -624,7 +846,7 @@ func GetActivities(c *gin.Context) {
 	database.DB.Where("type = ? AND status = ?", "announcement", 1).Order("sort ASC, created_at DESC").Find(&announcements)
 
 	response.Success(c, gin.H{
-		"banners":      banners,
+		"banners":       banners,
 		"announcements": announcements,
 	})
 }
@@ -739,12 +961,12 @@ func DeleteActivity(c *gin.Context) {
 }
 
 type WechatConfig struct {
-	AppID         string                 `json:"app_id"`
-	AppSecret     string                 `json:"app_secret"`
-	Token         string                 `json:"token"`
-	EncodingAESKey string               `json:"encoding_aes_key"`
-	TemplateIDs   map[string]string      `json:"template_ids"`
-	Enabled       bool                   `json:"enabled"`
+	AppID          string            `json:"app_id"`
+	AppSecret      string            `json:"app_secret"`
+	Token          string            `json:"token"`
+	EncodingAESKey string            `json:"encoding_aes_key"`
+	TemplateIDs    map[string]string `json:"template_ids"`
+	Enabled        bool              `json:"enabled"`
 }
 
 func GetWechatConfig(c *gin.Context) {
@@ -758,8 +980,8 @@ func GetWechatConfig(c *gin.Context) {
 		AppID:   sp.MchID,
 		Enabled: true,
 		TemplateIDs: map[string]string{
-			"order_new":  "",
-			"order_paid": "",
+			"order_new":    "",
+			"order_paid":   "",
 			"order_refund": "",
 		},
 	}

@@ -3,9 +3,9 @@ package user
 import (
 	"encoding/json"
 	"fz_yyc_api/internal/config"
+	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
-	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
@@ -28,8 +28,8 @@ type StoreProductSpecOptionResponse struct {
 }
 
 type StoreProductSpecResponse struct {
-	ID      uint64                          `json:"id"`
-	Name    string                          `json:"name"`
+	ID      uint64                           `json:"id"`
+	Name    string                           `json:"name"`
 	Options []StoreProductSpecOptionResponse `json:"options"`
 }
 
@@ -162,8 +162,8 @@ func buildStoreProductResponse(product models.Product) StoreProductResponse {
 	specs := make([]StoreProductSpecResponse, 0, len(product.Specs))
 	for _, spec := range product.Specs {
 		specs = append(specs, StoreProductSpecResponse{
-			ID:   spec.ID,
-			Name: spec.Name,
+			ID:      spec.ID,
+			Name:    spec.Name,
 			Options: parseStoreSpecOptions(spec.Options),
 		})
 	}
@@ -257,9 +257,9 @@ func GetStoreHome(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"merchant":         merchant,
-		"categories":       categories,
-		"hot_products":     hotProductResponses,
+		"merchant":          merchant,
+		"categories":        categories,
+		"hot_products":      hotProductResponses,
 		"delivery_settings": deliverySettings,
 	})
 }
@@ -311,12 +311,12 @@ func GetProducts(c *gin.Context) {
 		"list": list,
 		"merchant": gin.H{
 			"min_order_amount": merchant.MinOrderAmount,
-			"takeout_enabled": merchant.TakeoutEnabled,
-			"dine_in_enabled": merchant.DineInEnabled,
+			"takeout_enabled":  merchant.TakeoutEnabled,
+			"dine_in_enabled":  merchant.DineInEnabled,
 		},
 		"pagination": gin.H{
-			"total":    total,
-			"page":     page,
+			"total":     total,
+			"page":      page,
 			"page_size": pageSize,
 		},
 	})
@@ -359,11 +359,11 @@ func GetDeliveryRules(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"enabled":             settings.Enabled,
-		"base_fee":           settings.BaseFee,
+		"enabled":              settings.Enabled,
+		"base_fee":             settings.BaseFee,
 		"free_delivery_amount": settings.FreeDeliveryAmount,
-		"max_distance":       settings.MaxDistance,
-		"distance_rules":     distanceRules,
+		"max_distance":         settings.MaxDistance,
+		"distance_rules":       distanceRules,
 	})
 }
 
@@ -453,17 +453,17 @@ func RecordBehaviorEvent(c *gin.Context) {
 }
 
 type CreateOrderRequest struct {
-	MerchantID       uint64 `json:"merchant_id"`
-	DeliveryType     uint8  `json:"delivery_type" binding:"required,oneof=1 2 3"`
+	MerchantID       uint64  `json:"merchant_id"`
+	DeliveryType     uint8   `json:"delivery_type" binding:"required,oneof=1 2 3"`
 	DeliveryDistance float64 `json:"delivery_distance"`
-	DeliveryAddress  string `json:"delivery_address"`
-	ContactName      string `json:"contact_name"`
-	ContactPhone     string `json:"contact_phone"`
-	Remark           string `json:"remark"`
+	DeliveryAddress  string  `json:"delivery_address"`
+	ContactName      string  `json:"contact_name"`
+	ContactPhone     string  `json:"contact_phone"`
+	Remark           string  `json:"remark"`
 	Items            []struct {
-		ProductID uint64 `json:"product_id" binding:"required"`
-		Quantity  uint   `json:"quantity" binding:"required,min=1"`
-		SpecInfo  string `json:"spec_info"`
+		ProductID uint64  `json:"product_id" binding:"required"`
+		Quantity  uint    `json:"quantity" binding:"required,min=1"`
+		SpecInfo  string  `json:"spec_info"`
 		Price     float64 `json:"price"`
 	} `json:"items" binding:"required,min=1"`
 }
@@ -688,9 +688,9 @@ func CreateOrder(c *gin.Context) {
 
 	// 更新用户下单统计
 	database.DB.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
-		"has_ordered":   true,
-		"total_orders":  gorm.Expr("total_orders + 1"),
-		"total_spent":   gorm.Expr("total_spent + ?", payAmount),
+		"has_ordered":  true,
+		"total_orders": gorm.Expr("total_orders + 1"),
+		"total_spent":  gorm.Expr("total_spent + ?", payAmount),
 	})
 
 	recordUserBehaviorEvent(req.MerchantID, userID, "", "submit_order", "store_confirm", 0, order.ID, "store", map[string]interface{}{
@@ -703,8 +703,8 @@ func CreateOrder(c *gin.Context) {
 	if payAmount > 0 {
 		now := time.Now()
 		database.DB.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
-			"has_paid":       true,
-			"first_paid_at":  gorm.Expr("CASE WHEN first_paid_at IS NULL THEN ? ELSE first_paid_at END", now),
+			"has_paid":      true,
+			"first_paid_at": gorm.Expr("CASE WHEN first_paid_at IS NULL THEN ? ELSE first_paid_at END", now),
 		})
 	}
 
@@ -776,8 +776,8 @@ func GetOrders(c *gin.Context) {
 	response.Success(c, gin.H{
 		"list": orders,
 		"pagination": gin.H{
-			"total":    total,
-			"page":     page,
+			"total":     total,
+			"page":      page,
 			"page_size": pageSize,
 		},
 	})

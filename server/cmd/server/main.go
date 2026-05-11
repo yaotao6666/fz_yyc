@@ -92,12 +92,21 @@ func setupRoutes(r *gin.Engine) {
 			authGroup.POST("/user/wechat-login", user.WechatLogin)
 		}
 
+		v1.POST("/merchant/register", merchant.Register)
+		v1.POST("/user/auth/wechat-login", user.WechatLogin)
+		v1.GET("/user/merchant/status", user.GetMerchantStatus)
+
 		// 文件上传接口
 		uploadHandler := upload.NewUploadHandler()
-		uploadGroup := v1.Group("/upload")
-		uploadGroup.Use(middleware.JWTAuth())
+		uploadPublicGroup := v1.Group("/upload")
 		{
-			uploadGroup.GET("/token", uploadHandler.GetToken)
+			uploadPublicGroup.POST("/callback", uploadHandler.Callback)
+
+			uploadGroup := uploadPublicGroup.Group("")
+			uploadGroup.Use(middleware.JWTAuth())
+			{
+				uploadGroup.GET("/token", uploadHandler.GetToken)
+			}
 		}
 
 		// C端店铺公开接口（无需登录即可访问）
@@ -120,44 +129,10 @@ func setupRoutes(r *gin.Engine) {
 			userGroup.GET("/orders/:order_id", user.GetOrderDetail)
 			userGroup.POST("/orders/:order_id/cancel", user.CancelOrder)
 			userGroup.POST("/orders/:order_id/refund", user.ApplyRefund)
-		}
-
-		// 服务商管理员接口 - 向后兼容性保留，重定向到 /sp
-		adminGroup := v1.Group("/admin")
-		adminGroup.Use(middleware.JWTAuth())
-		{
-			// 服务商配置 - 重定向到 /sp/settings
-			adminGroup.GET("/service-provider", sp.GetSettings)
-			adminGroup.PUT("/service-provider", sp.UpdateSettings)
-
-			// 商家进件管理
-			adminGroup.GET("/merchant-applications", sp.GetMerchantApplications)
-			adminGroup.GET("/merchant-applications/:id", sp.GetMerchantApplicationDetail)
-			adminGroup.POST("/merchant-applications/:id/submit", sp.SubmitMerchantApplication)
-			adminGroup.GET("/merchant-applications/:id/status", sp.GetMerchantApplicationStatus)
-
-			// 商家审核
-			adminGroup.GET("/merchants/pending", sp.GetPendingMerchants)
-			adminGroup.POST("/merchants/:merchant_id/audit", sp.AuditMerchant)
-
-			// 数据看板
-			adminGroup.GET("/dashboard", sp.GetDashboard)
-
-			// 活动管理
-			adminGroup.GET("/activities", sp.GetActivities)
-			adminGroup.POST("/activities", sp.CreateActivity)
-			adminGroup.PUT("/activities/:id", sp.UpdateActivity)
-			adminGroup.DELETE("/activities/:id", sp.DeleteActivity)
-
-			// 系统公告管理
-			adminGroup.GET("/announcements", sp.GetAnnouncements)
-			adminGroup.POST("/announcements", sp.CreateAnnouncement)
-			adminGroup.PUT("/announcements/:id", sp.UpdateAnnouncement)
-			adminGroup.DELETE("/announcements/:id", sp.DeleteAnnouncement)
-
-			// 服务号配置
-			adminGroup.GET("/wechat-config", sp.GetWechatConfig)
-			adminGroup.PUT("/wechat-config", sp.UpdateWechatConfig)
+			userGroup.GET("/addresses", user.GetAddresses)
+			userGroup.POST("/addresses", user.CreateAddress)
+			userGroup.PUT("/addresses/:id", user.UpdateAddress)
+			userGroup.DELETE("/addresses/:id", user.DeleteAddress)
 		}
 
 		// 商家管理员接口
@@ -179,6 +154,8 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.GET("/qrcode", merchant.GetQRCode)
 			merchantGroup.GET("/delivery-settings", merchant.GetDeliverySettings)
 			merchantGroup.PUT("/delivery-settings", merchant.UpdateDeliverySettings)
+			merchantGroup.GET("/subscriptions", merchant.GetSubscriptions)
+			merchantGroup.PUT("/subscriptions", merchant.UpdateSubscriptions)
 
 			// 员工管理
 			merchantGroup.GET("/staff", merchant.GetStaffList)
@@ -208,6 +185,9 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.POST("/products/batch-status", merchant.BatchUpdateProductStatus)
 			merchantGroup.DELETE("/products/:product_id", merchant.DeleteProduct)
 			merchantGroup.PUT("/products/:product_id/stock", merchant.UpdateStock)
+			merchantGroup.GET("/products/:product_id/specs", merchant.GetProductSpecs)
+			merchantGroup.PUT("/products/:product_id/specs", merchant.UpdateProductSpecs)
+			merchantGroup.DELETE("/products/:product_id/specs", merchant.DeleteProductSpecs)
 
 			// 订单管理
 			merchantGroup.GET("/orders", merchant.GetOrders)
@@ -224,57 +204,76 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.GET("/analytics/stock-alert", merchant.GetStockAlert)
 			merchantGroup.GET("/analytics/customers", merchant.GetCustomerAnalysis)
 			merchantGroup.GET("/analytics/customer-trend", merchant.GetCustomerTrend)
+
+			merchantGroup.GET("/printers", merchant.GetPrinters)
+			merchantGroup.POST("/printers", merchant.CreatePrinter)
+			merchantGroup.PUT("/printers/:printer_id", merchant.UpdatePrinter)
+			merchantGroup.DELETE("/printers/:printer_id", merchant.DeletePrinter)
+			merchantGroup.POST("/printers/:printer_id/test", merchant.TestPrinter)
+			merchantGroup.GET("/print-logs", merchant.GetPrintLogs)
 		}
 
 		// 服务商小程序接口
-		spGroup := v1.Group("/sp")
-		spGroup.Use(middleware.JWTAuth())
+		spPublicGroup := v1.Group("/sp")
 		{
-			spGroup.POST("/auth/login", sp.Login)
-			spGroup.POST("/auth/logout", sp.Logout)
-			spGroup.GET("/dashboard", sp.GetDashboard)
-			spGroup.GET("/merchants/pending", sp.GetPendingMerchants)
-			spGroup.GET("/merchants/:merchant_id", sp.GetMerchantDetail)
-			spGroup.POST("/merchants/:merchant_id/approve", sp.AuditMerchant)
-			spGroup.GET("/merchants/analytics/distribution", sp.GetMerchantDistribution)
-			spGroup.GET("/merchants/list", sp.GetMerchantList)
-			spGroup.GET("/merchants/audit-records", sp.GetAuditRecords)
-			spGroup.GET("/merchants/:merchant_id/fee", sp.GetMerchantFee)
-			spGroup.GET("/merchants/:merchant_id/rate", sp.GetMerchantRate)
-			spGroup.POST("/merchants/:merchant_id/rate", sp.SetMerchantRate)
-			spGroup.GET("/merchants/:merchant_id/qrcode", sp.GetMerchantQRCode)
-			spGroup.GET("/orders/analytics", sp.GetOrderAnalytics)
-			spGroup.GET("/amount/analytics", sp.GetAmountAnalytics)
-			spGroup.GET("/amount/top-merchants", sp.GetTopMerchants)
-			spGroup.GET("/orders/refunds", sp.GetRefunds)
-			spGroup.GET("/settings", sp.GetSettings)
-			spGroup.PUT("/settings", sp.UpdateSettings)
-			spGroup.GET("/announcements", sp.GetAnnouncements)
-			spGroup.POST("/announcements", sp.CreateAnnouncement)
-			spGroup.PUT("/announcements/:id", sp.UpdateAnnouncement)
-			spGroup.DELETE("/announcements/:id", sp.DeleteAnnouncement)
+			spPublicGroup.POST("/auth/login", sp.Login)
 
-			// 商家进件管理
-			spGroup.GET("/merchant-applications", sp.GetMerchantApplications)
-			spGroup.GET("/merchant-applications/:id", sp.GetMerchantApplicationDetail)
-			spGroup.POST("/merchant-applications/:id/submit", sp.SubmitMerchantApplication)
-			spGroup.GET("/merchant-applications/:id/status", sp.GetMerchantApplicationStatus)
+			spGroup := spPublicGroup.Group("")
+			spGroup.Use(middleware.JWTAuth())
+			{
+				spGroup.POST("/auth/logout", sp.Logout)
+				spGroup.GET("/dashboard", sp.GetDashboard)
+				spGroup.GET("/merchants/pending", sp.GetPendingMerchants)
+				spGroup.GET("/merchants/:merchant_id", sp.GetMerchantDetail)
+				spGroup.POST("/merchants/:merchant_id/approve", sp.AuditMerchant)
+				spGroup.GET("/merchants/analytics/distribution", sp.GetMerchantDistribution)
+				spGroup.GET("/merchants/list", sp.GetMerchantList)
+				spGroup.GET("/merchants/audit-records", sp.GetAuditRecords)
+				spGroup.GET("/merchants/:merchant_id/fee", sp.GetMerchantFee)
+				spGroup.GET("/merchants/:merchant_id/rate", sp.GetMerchantRate)
+				spGroup.POST("/merchants/:merchant_id/rate", sp.SetMerchantRate)
+				spGroup.GET("/merchants/:merchant_id/qrcode", sp.GetMerchantQRCode)
+				spGroup.GET("/orders/analytics", sp.GetOrderAnalytics)
+				spGroup.GET("/amount/analytics", sp.GetAmountAnalytics)
+				spGroup.GET("/amount/top-merchants", sp.GetTopMerchants)
+				spGroup.GET("/orders/refunds", sp.GetRefunds)
+				spGroup.GET("/settings", sp.GetSettings)
+				spGroup.PUT("/settings", sp.UpdateSettings)
+				spGroup.POST("/account/change-password", sp.ChangePassword)
+				spGroup.GET("/announcements", sp.GetAnnouncements)
+				spGroup.GET("/announcements/:id", sp.GetAnnouncementDetail)
+				spGroup.POST("/announcements", sp.CreateAnnouncement)
+				spGroup.PUT("/announcements/:id", sp.UpdateAnnouncement)
+				spGroup.DELETE("/announcements/:id", sp.DeleteAnnouncement)
 
-			// 活动管理
-			spGroup.GET("/activities", sp.GetActivities)
-			spGroup.POST("/activities", sp.CreateActivity)
-			spGroup.PUT("/activities/:id", sp.UpdateActivity)
-			spGroup.DELETE("/activities/:id", sp.DeleteActivity)
+				// 商家进件管理
+				spGroup.GET("/merchant-applications", sp.GetMerchantApplications)
+				spGroup.GET("/merchant-applications/:id", sp.GetMerchantApplicationDetail)
+				spGroup.POST("/merchant-applications/:id/submit", sp.SubmitMerchantApplication)
+				spGroup.GET("/merchant-applications/:id/status", sp.GetMerchantApplicationStatus)
 
-			// 服务号配置
-			spGroup.GET("/wechat-config", sp.GetWechatConfig)
-			spGroup.PUT("/wechat-config", sp.UpdateWechatConfig)
+				// 活动管理
+				spGroup.GET("/activities", sp.GetActivities)
+				spGroup.POST("/activities", sp.CreateActivity)
+				spGroup.PUT("/activities/:id", sp.UpdateActivity)
+				spGroup.DELETE("/activities/:id", sp.DeleteActivity)
+
+				// 服务号配置
+				spGroup.GET("/wechat-config", sp.GetWechatConfig)
+				spGroup.PUT("/wechat-config", sp.UpdateWechatConfig)
+			}
 		}
 
 		// 微信支付回调
 		notifyGroup := v1.Group("/notify")
 		{
 			notifyGroup.POST("/payment", admin.PaymentNotify)
+		}
+
+		// 微信支付回调（PRD口径）
+		callbackGroup := v1.Group("/callback")
+		{
+			callbackGroup.POST("/wechat", admin.PaymentNotify)
 		}
 	}
 }

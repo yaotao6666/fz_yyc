@@ -177,11 +177,11 @@ func GetInviteStats(c *gin.Context) {
 		Scan(&inviteTrend)
 
 	response.Success(c, gin.H{
-		"total_invites":      totalInvites,
-		"completed_invites":  completedInvites,
-		"pending_invites":    pendingInvites,
-		"total_rewards":      totalRewards,
-		"invite_trend":       inviteTrend,
+		"total_invites":     totalInvites,
+		"completed_invites": completedInvites,
+		"pending_invites":   pendingInvites,
+		"total_rewards":     totalRewards,
+		"invite_trend":      inviteTrend,
 	})
 }
 
