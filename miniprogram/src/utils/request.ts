@@ -3,8 +3,7 @@
  * 基于 uni.request 封装统一请求方法
  */
 
-// API 基础配置
-const BASE_URL = 'http://localhost:8080'
+import { API_BASE_URL } from '../config/env'
 
 // 响应码
 export const ResponseCode = {
@@ -110,7 +109,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
 
   return new Promise((resolve, reject) => {
     uni.request({
-      url: `${BASE_URL}${url}`,
+      url: `${API_BASE_URL}${url}`,
       method,
       data,
       header: {
@@ -228,7 +227,7 @@ export function upload<T = any>(
     uni.showLoading({ title: '上传中...', mask: true })
     
     uni.uploadFile({
-      url: `${BASE_URL}${url}`,
+      url: `${API_BASE_URL}${url}`,
       filePath,
       name,
       formData,

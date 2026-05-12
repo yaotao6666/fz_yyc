@@ -3,7 +3,7 @@
     <!-- 顶部商家信息卡片 -->
     <view class="merchant-card">
       <view class="merchant-info">
-        <image class="merchant-logo" :src="merchantInfo?.logo || '/static/default-logo.png'" mode="aspectFill" />
+        <image class="merchant-logo" :src="merchantInfo?.logo || BrandAsset.DEFAULT_MERCHANT_LOGO" mode="aspectFill" />
         <view class="merchant-detail">
           <view class="merchant-name">{{ merchantInfo?.name || '加载中...' }}</view>
           <view class="merchant-status">
@@ -39,6 +39,24 @@
       </view>
     </view>
 
+    <view class="ws-status-section">
+      <view class="section-title">商铺连接状态</view>
+      <view class="ws-status-card">
+        <view class="ws-status-row">
+          <text class="ws-status-label">当前状态</text>
+          <text class="ws-status-value" :class="socketStatusClass">{{ socketStatusText }}</text>
+        </view>
+        <view class="ws-status-row">
+          <text class="ws-status-label">最近消息</text>
+          <text class="ws-status-content">{{ lastSocketMessageText }}</text>
+        </view>
+        <view class="ws-status-row">
+          <text class="ws-status-label">接收时间</text>
+          <text class="ws-status-content">{{ authStore.lastSocketMessageAt || '暂无' }}</text>
+        </view>
+      </view>
+    </view>
+
     <!-- 今日数据概览 -->
     <view class="stats-section">
       <view class="section-title">今日概览</view>
@@ -66,23 +84,23 @@
     <view class="menu-section">
       <view class="section-title">快捷功能</view>
       <view class="menu-grid">
-        <view class="menu-item" @click="goProducts">
-          <view class="menu-icon" style="background: #e6f7ff;">
-            <image src="/static/icons/product.png" />
-          </view>
-          <text class="menu-text">商品管理</text>
-        </view>
         <view class="menu-item" @click="goCategories">
           <view class="menu-icon" style="background: #fff7e6;">
             <image src="/static/icons/category.png" />
           </view>
           <text class="menu-text">分类管理</text>
         </view>
-        <view class="menu-item" @click="goAnalytics">
-          <view class="menu-icon" style="background: #fff1f0;">
-            <image src="/static/icons/analytics.png" />
+        <view class="menu-item" @click="goProducts">
+          <view class="menu-icon" style="background: #e6f7ff;">
+            <image src="/static/icons/product.png" />
           </view>
-          <text class="menu-text">数据分析</text>
+          <text class="menu-text">商品管理</text>
+        </view>
+        <view class="menu-item" @click="openQuickVerifyDialog">
+          <view class="menu-icon" style="background: #f6ffed;">
+            <image src="/static/icons/order.png" />
+          </view>
+          <text class="menu-text">快速核销</text>
         </view>
       </view>
     </view>
@@ -116,15 +134,40 @@
 
     <!-- 底部tabbar占位 -->
     <view class="tabbar-placeholder"></view>
+
+    <view v-if="showQuickVerifyDialog" class="dialog-mask" @click="closeQuickVerifyDialog">
+      <view class="dialog-content" @click.stop>
+        <view class="dialog-title">快速核销</view>
+        <view class="dialog-subtitle">支持输入 6 位核销码，或扫一扫自动识别后直接核销</view>
+        <view class="verify-input-section">
+          <input
+            v-model="quickVerifyCode"
+            class="verify-input"
+            type="text"
+            maxlength="6"
+            placeholder="请输入 6 位核销码"
+          />
+        </view>
+        <view class="quick-verify-actions">
+          <button class="scan-btn" :disabled="quickVerifying" @click="scanQuickVerifyCode">扫一扫</button>
+          <button class="confirm-btn" :disabled="quickVerifying" @click="submitQuickVerify">
+            {{ quickVerifying ? '核销中...' : '确认核销' }}
+          </button>
+        </view>
+        <!-- <view class="dialog-cancel" @click="closeQuickVerifyDialog">取消</view> -->
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
+
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
-import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getMerchantQrcode, getMerchantAnnouncements, getSalesOverview } from '@api'
-import type { Announcement } from '../../types'
+import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getMerchantQrcode, getMerchantAnnouncements, getSalesOverview, quickCompleteOrder } from '@api'
+import type { Announcement, Order } from '../../types'
+import { BrandAsset } from '../../utils/constants'
 
 const authStore = useAuthStore()
 
@@ -137,6 +180,9 @@ const statistics = ref<any>({
   total_products: 0
 })
 const lowStockCount = ref(0)
+const showQuickVerifyDialog = ref(false)
+const quickVerifyCode = ref('')
+const quickVerifying = ref(false)
 
 const announcement = ref<Announcement | null>(null)
 const announcementVisible = ref(false)
@@ -150,6 +196,30 @@ const hasPendingItems = computed(() => {
 })
 
 const hasLowStock = computed(() => lowStockCount.value > 0)
+const socketStatusTextMap: Record<string, string> = {
+  disconnected: '未连接',
+  connecting: '连接中',
+  connected: '已连接',
+  reconnecting: '重连中'
+}
+const socketStatusText = computed(() => socketStatusTextMap[authStore.socketStatus] || '未连接')
+const socketStatusClass = computed(() => `socket-${authStore.socketStatus}`)
+const lastSocketMessageText = computed(() => {
+  const message = authStore.lastSocketMessage
+  if (!message) {
+    return '暂无'
+  }
+
+  if (message.type === 'order_notify') {
+    return `订单提醒，订单号：${message.orderNo || '未提供'}`
+  }
+
+  if (message.type === 'store_visit_notify') {
+    return `顾客进店，访客：${message.visitorOpenId || '未提供'}，来源：${message.source || '未提供'}`
+  }
+
+  return message.type || '未知消息'
+})
 
 onShow(() => {
   loadData()
@@ -313,8 +383,90 @@ function goOrders(status?: string) {
   uni.navigateTo({ url })
 }
 
-function goAnalytics() {
-  uni.switchTab({ url: '/pages/merchant/analytics/index' })
+function openQuickVerifyDialog() {
+  quickVerifyCode.value = ''
+  showQuickVerifyDialog.value = true
+}
+
+function closeQuickVerifyDialog() {
+  showQuickVerifyDialog.value = false
+  quickVerifyCode.value = ''
+}
+
+function extractVerifyCode(rawValue: string): string {
+  const content = String(rawValue || '').trim()
+  if (/^\d{6}$/.test(content)) {
+    return content
+  }
+
+  const queryMatch = content.match(/verify_code=(\d{6})/)
+  if (queryMatch?.[1]) {
+    return queryMatch[1]
+  }
+
+  const digitMatch = content.match(/(\d{6})/)
+  return digitMatch?.[1] || ''
+}
+
+async function handleQuickVerifySuccess(order: Order) {
+  await loadData()
+  uni.showModal({
+    title: '核销成功',
+    content: `订单号：${order.order_no}\n核销人：${order.completed_by_name || '未知'}\n核销时间：${order.completed_at ? formatDateTime(order.completed_at) : '未知'}`,
+    confirmText: '查看订单',
+    cancelText: '关闭',
+    success: (result) => {
+      if (result.confirm) {
+        uni.navigateTo({ url: `/pages/merchant/orders/detail?id=${order.id}` })
+      }
+    }
+  })
+}
+
+async function submitQuickVerify() {
+  const code = quickVerifyCode.value.trim()
+  if (!/^\d{6}$/.test(code)) {
+    uni.showToast({ title: '核销码应为6位数字', icon: 'none' })
+    return
+  }
+
+  quickVerifying.value = true
+  try {
+    const order = await quickCompleteOrder(code)
+    closeQuickVerifyDialog()
+    await handleQuickVerifySuccess(order)
+  } catch (error: any) {
+    uni.showToast({ title: error?.message || '核销失败', icon: 'none' })
+  } finally {
+    quickVerifying.value = false
+  }
+}
+
+function scanQuickVerifyCode() {
+  uni.scanCode({
+    success: async (result) => {
+      const code = extractVerifyCode(result.result)
+      if (!code) {
+        uni.showToast({ title: '未识别到核销码', icon: 'none' })
+        return
+      }
+
+      quickVerifyCode.value = code
+      await submitQuickVerify()
+    },
+    fail: (error) => {
+      const message = String((error as any)?.errMsg || '')
+      if (message.includes('cancel')) {
+        return
+      }
+      uni.showToast({ title: '扫码失败', icon: 'none' })
+    }
+  })
+}
+
+function formatDateTime(time: string): string {
+  const date = new Date(time)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 </script>
@@ -476,6 +628,59 @@ function goAnalytics() {
   margin-bottom: 24rpx;
 }
 
+.ws-status-section {
+  background: #ffffff;
+  margin: 0 24rpx 24rpx;
+  padding: 32rpx;
+  border-radius: 24rpx;
+}
+
+.ws-status-card {
+  background: #f8faff;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+}
+
+.ws-status-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 12rpx 0;
+}
+
+.ws-status-row:not(:last-child) {
+  border-bottom: 1rpx solid #eef2ff;
+}
+
+.ws-status-label {
+  flex-shrink: 0;
+  font-size: 26rpx;
+  color: #666666;
+}
+
+.ws-status-value,
+.ws-status-content {
+  flex: 1;
+  text-align: right;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: #1a1a1a;
+}
+
+.socket-connected {
+  color: #16a34a;
+}
+
+.socket-connecting,
+.socket-reconnecting {
+  color: #2563eb;
+}
+
+.socket-disconnected {
+  color: #dc2626;
+}
+
 .stats-section {
   background: #ffffff;
   margin: 0 24rpx 24rpx;
@@ -622,5 +827,82 @@ function goAnalytics() {
 
 .tabbar-placeholder {
   height: 120rpx;
+}
+
+.dialog-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx;
+  z-index: 1000;
+}
+
+.dialog-content {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 32rpx;
+}
+
+.dialog-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.dialog-subtitle {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #666666;
+}
+
+.verify-input-section {
+  margin-top: 28rpx;
+}
+
+.verify-input {
+  height: 88rpx;
+  border-radius: 16rpx;
+  background: #f8f9fa;
+  padding: 0 24rpx;
+  font-size: 30rpx;
+}
+
+.quick-verify-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 24rpx;
+}
+
+.scan-btn,
+.confirm-btn {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scan-btn {
+  background: #f0f5ff;
+  color: #0056CC;
+}
+
+.confirm-btn {
+  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  color: #ffffff;
+}
+
+.dialog-cancel {
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #999999;
 }
 </style>

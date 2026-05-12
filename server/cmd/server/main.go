@@ -192,6 +192,7 @@ func setupRoutes(r *gin.Engine) {
 			// 订单管理
 			merchantGroup.GET("/orders", merchant.GetOrders)
 			merchantGroup.GET("/orders/:order_id", merchant.GetOrderDetail)
+			merchantGroup.POST("/orders/quick-complete", merchant.QuickCompleteOrder)
 			merchantGroup.POST("/orders/:order_id/complete", merchant.CompleteOrder)
 			merchantGroup.POST("/orders/:order_id/refund", merchant.RefundOrder)
 			merchantGroup.GET("/orders/statistics", merchant.GetOrderStatistics)

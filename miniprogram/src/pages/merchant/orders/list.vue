@@ -250,12 +250,12 @@ async function confirmVerify() {
   verifying.value = true
 
   try {
-    await completeOrder(currentOrder.value.id, code)
+    const updatedOrder = await completeOrder(currentOrder.value.id, code)
     
     // 更新订单状态
     const index = orders.value.findIndex(o => o.id === currentOrder.value!.id)
     if (index !== -1) {
-      orders.value[index].status = OrderStatus.COMPLETED
+      orders.value[index] = updatedOrder
     }
 
     uni.showToast({ title: '核销成功', icon: 'success' })

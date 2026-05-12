@@ -178,7 +178,7 @@
     {
       "path": "pages/store/order-sound-test",
       "style": {
-        "navigationBarTitleText": "订单提醒测试",
+        "navigationBarTitleText": "WebSocket联调测试",
         "navigationBarBackgroundColor": "#FFFFFF"
       }
     },
@@ -264,24 +264,24 @@
         "path": "pages/auth/login"
       },
       {
-        "name": "服务商登录",
+        "name": "服务商登录（后台）",
         "path": "pages/sp/login"
       },
       {
-        "name": "测试入口",
+        "name": "C端测试入口",
         "path": "pages/store/test-entry"
       },
       {
-        "name": "订单提醒测试",
+        "name": "WebSocket联调测试",
         "path": "pages/store/order-sound-test"
       },
       {
-        "name": "店铺首页(商家1)",
+        "name": "C端店铺首页(商家1)",
         "path": "pages/store/home",
         "query": "merchant_id=1"
       },
       {
-        "name": "店铺首页(商家2)",
+        "name": "C端店铺首页(商家2)",
         "path": "pages/store/home",
         "query": "merchant_id=2"
       },

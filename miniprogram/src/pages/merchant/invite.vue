@@ -5,7 +5,7 @@
       <view class="card-header">
         <image
           class="merchant-logo"
-          :src="merchantInfo?.logo || '/static/default-logo.png'"
+          :src="merchantInfo?.logo || BrandAsset.DEFAULT_MERCHANT_LOGO"
           mode="aspectFill"
         />
         <view class="merchant-info">
@@ -111,6 +111,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { generateInviteCode, getMyInviteInfo, getInviteRecords } from '@api'
 import type { InviteInfo, MyInviteInfo, InviteRecord } from '@types'
+import { BrandAsset } from '../../utils/constants'
 
 const authStore = useAuthStore()
 const merchantInfo = authStore.merchantInfo

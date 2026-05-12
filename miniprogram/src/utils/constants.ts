@@ -2,9 +2,6 @@
  * 常量定义
  */
 
-// 当前项目以前后端本地联调为主，统一使用本地 API 地址。
-export const API_BASE_URL = 'http://localhost:8080'
-
 // 存储 Key
 export const StorageKey = {
   TOKEN: 'token',
@@ -57,13 +54,18 @@ export const InviteStatus = {
   CANCELLED: 2    // 已取消
 } as const
 
+export const BrandAsset = {
+  APP_LOGO: '/static/brand-icons/xunmeng-private-butler/icon-circle-aggregated-portal.svg',
+  DEFAULT_MERCHANT_LOGO: '/static/brand-icons/xunmeng-private-butler/icon-circle-store-data-butler.svg'
+} as const
+
 export default {
-  API_BASE_URL,
   StorageKey,
   OrderStatus,
   OrderStatusText,
   ProductStatus,
   DeliveryType,
   RewardType,
-  InviteStatus
+  InviteStatus,
+  BrandAsset
 }

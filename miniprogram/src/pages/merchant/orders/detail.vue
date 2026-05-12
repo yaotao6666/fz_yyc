@@ -103,6 +103,14 @@
           <text class="copy-btn" @click="copyVerifyCode">复制</text>
         </view>
       </view>
+      <view class="info-row" v-if="order.completed_at">
+        <text class="info-label">核销时间</text>
+        <text class="info-value">{{ formatDateTime(order.completed_at) }}</text>
+      </view>
+      <view class="info-row" v-if="order.completed_by_name">
+        <text class="info-label">核销人</text>
+        <text class="info-value">{{ order.completed_by_name }}</text>
+      </view>
     </view>
 
     <!-- 金额明细 -->
@@ -269,8 +277,7 @@ async function confirmVerify() {
   verifying.value = true
 
   try {
-    await completeOrder(order.value.id, code)
-    order.value.status = OrderStatus.COMPLETED
+    order.value = await completeOrder(order.value.id, code)
     uni.showToast({ title: '核销成功', icon: 'success' })
     closeVerifyDialog()
   } catch (error: any) {

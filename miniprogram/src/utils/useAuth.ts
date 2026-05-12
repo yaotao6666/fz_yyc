@@ -5,11 +5,14 @@
  */
 
 import { ref } from 'vue'
+import { API_BASE_URL } from '../config/env'
 
 const token = ref(uni.getStorageSync('token') || '')
 const userInfo = ref(uni.getStorageSync('userInfo') || null)
-const isLoggedIn = ref(!!token.value)
 const openid = ref(uni.getStorageSync('openid') || '')
+const isLoggedIn = ref(!!token.value && !!openid.value)
+
+let loginPromise: Promise<LoginResult> | null = null
 
 interface LoginResponse {
   token: string
@@ -29,6 +32,11 @@ interface LoginResult {
 
 export function useAuth() {
   const login = async (): Promise<LoginResult> => {
+    if (loginPromise) {
+      return loginPromise
+    }
+
+    loginPromise = (async () => {
     try {
       // 已登录则直接返回
       if (token.value && openid.value) {
@@ -61,7 +69,7 @@ export function useAuth() {
 
       // 调用后端微信登录接口
       const res = await uni.request({
-        url: 'http://localhost:8080/api/v1/auth/user/wechat-login',
+        url: `${API_BASE_URL}/api/v1/auth/user/wechat-login`,
         method: 'POST',
         data: { code },
         header: {
@@ -116,6 +124,11 @@ export function useAuth() {
 
       return { success: false, error: error.message || '登录异常' }
     }
+    })().finally(() => {
+      loginPromise = null
+    })
+
+    return loginPromise
   }
 
   const logout = () => {
@@ -132,7 +145,7 @@ export function useAuth() {
   }
 
   const ensureAuth = async (): Promise<boolean> => {
-    if (!isLoggedIn.value) {
+    if (!isAuthenticated()) {
       const result = await login()
       return result.success
     }

@@ -84,15 +84,17 @@ import { getSpMerchantsPending } from '@api'
 import type { MerchantApplication } from '@types'
 import { MerchantAuditStatus, MerchantAuditStatusText } from '@types'
 
+type AuditTabValue = 'all' | MerchantAuditStatus
+
 // 状态标签配置
-const statusTabs = [
-  { label: '全部', value: 0, count: 0 },
+const statusTabs: Array<{ label: string; value: AuditTabValue; count: number }> = [
+  { label: '全部', value: 'all', count: 0 },
   { label: '待审核', value: MerchantAuditStatus.PENDING, count: 0 },
   { label: '已通过', value: MerchantAuditStatus.APPROVED, count: 0 },
   { label: '已拒绝', value: MerchantAuditStatus.REJECTED, count: 0 }
 ]
 
-const currentStatus = ref(0)
+const currentStatus = ref<AuditTabValue>('all')
 const keyword = ref('')
 const merchants = ref<MerchantApplication[]>([])
 const loading = ref(false)
@@ -121,7 +123,7 @@ async function loadMerchants(reset = false) {
       page_size: pageSize
     }
 
-    if (currentStatus.value !== 0) {
+    if (currentStatus.value !== 'all') {
       params.status = currentStatus.value
     }
 
@@ -157,7 +159,7 @@ function handleSearch() {
   loadMerchants(true)
 }
 
-function changeStatus(status: number) {
+function changeStatus(status: AuditTabValue) {
   currentStatus.value = status
   loadMerchants(true)
 }

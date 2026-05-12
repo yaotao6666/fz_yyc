@@ -1,7 +1,7 @@
 <template>
   <view class="login-container">
     <view class="login-header">
-      <image class="logo" src="../../static/logo.png" mode="aspectFit" />
+      <image class="logo" :src="BrandAsset.APP_LOGO" mode="aspectFit" />
       <text class="title">寻梦私域管家</text>
       <text class="subtitle">服务商管理平台</text>
     </view>
@@ -48,6 +48,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useSpStore } from '../../stores/sp'
+import { BrandAsset } from '../../utils/constants'
 
 const spStore = useSpStore()
 
@@ -99,7 +100,8 @@ async function handleLogin() {
       uni.showToast({ title: '登录成功', icon: 'success' })
 
       setTimeout(() => {
-        uni.switchTab({ url: '/pages/sp/home' })
+        // 服务商首页不是 tabBar 页面，登录后需重置页面栈进入后台首页。
+        uni.reLaunch({ url: '/pages/sp/home' })
       }, 500)
     }
   } finally {

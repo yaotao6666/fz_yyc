@@ -176,6 +176,13 @@ func mergeConfig() {
 		Config.JWT.Expire = viper.GetInt("JWT_EXPIRE")
 	}
 
+	if viper.IsSet("WECHAT_APP_ID") {
+		Config.Wechat.AppID = viper.GetString("WECHAT_APP_ID")
+	}
+	if viper.IsSet("WECHAT_APP_SECRET") {
+		Config.Wechat.AppSecret = viper.GetString("WECHAT_APP_SECRET")
+	}
+
 	if viper.IsSet("WECHAT_PAY_MCH_ID") {
 		Config.WechatPay.MchID = viper.GetString("WECHAT_PAY_MCH_ID")
 	}
@@ -288,6 +295,17 @@ func mergeEnvConfig() {
 	if env := os.Getenv("WECHAT_APP_SECRET"); env != "" {
 		Config.Wechat.AppSecret = env
 	}
+
+	if env := os.Getenv("WECHAT_PAY_MCH_ID"); env != "" {
+		Config.WechatPay.MchID = env
+	}
+	if env := os.Getenv("WECHAT_PAY_API_KEY"); env != "" {
+		Config.WechatPay.APIKey = env
+	}
+	if env := os.Getenv("WECHAT_PAY_CALLBACK_URL"); env != "" {
+		Config.WechatPay.CallbackURL = env
+	}
+
 	if env := os.Getenv("QINIU_ACCESS_KEY"); env != "" {
 		Config.Qiniu.AccessKey = env
 	}

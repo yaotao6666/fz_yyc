@@ -35,8 +35,27 @@
           │ • 订单管理       │ │ • 我的订单       │ │ • 数据分析       │
           │ • 数据分析       │ │                 │ │ • 商家审核       │
           │ • 商家二维码     │ │                 │ │                 │
-          └─────────────────┘ └─────────────────┘ └─────────────────┘
+          └─────────
+          .────────┘ └─────────────────┘ └─────────────────┘
 ```
+**小程序设计风格**
+为一个专为中小商家设计的私域经营平台设计图标，产品名称为“寻梦私域管家”。
+
+设计原则：
+- 核心：围绕“商家运营管理”这一中心
+- 理念：统一、聚合、专业、可靠ß
+
+视觉元素建议：
+- 主图形：抽象的“店铺”+“数据”+“管家”元素融合
+- 可选元素：盾牌（安全）、网格（统一入口）、指南针（私域向导）
+- 风格：简洁扁平、现代商务、辨识度高
+
+配色方案：
+- 主色：深蓝 + 金色/橙色点缀
+  （深蓝代表专业可靠，金色/橙色代表商家的财富增长）
+- 辅助色：白色用于图形/文字
+
+输出：6个不同方向的SVG设计变体，包含方形图标和圆形图标两种形式。
 
 ### 1.3 商家管理端（默认入口）
 
@@ -94,10 +113,12 @@
 
 **店铺首页优化功能**：
 
-- **操作指引弹窗**：用户扫码进入店铺首页时，自动显示操作指引弹窗，包含四步购物流程说明，帮助用户快速了解如何使用小程序
-- **我的订单入口**：在底部购物栏左侧添加「我的订单」快速入口按钮，方便用户快速查看当前商家的订单记录
-- **底部TabBar切换**：店铺首页底部支持购物车和我的订单Tab切换，类似tabBar的切换体验
+- **操作指引弹窗**：用户首次进入店铺首页时，自动显示操作指引弹窗，包含四步购物流程说明；关闭后不再自动弹出
+- **我的订单入口**：在店铺首页商品区上方提供「我的订单」快捷入口，方便用户快速查看当前商家的订单记录
+- **底部购物车结算栏**：店铺首页底部固定展示购物车汇总与去购物车/去结算动作，统一与商品详情页底部的视觉风格
+- **加购弹窗**：在店铺首页点击商品「+」时弹出规格与数量选择，确认后加入购物车并累计金额
 - **自动授权登录**：用户进入店铺首页时自动完成微信授权登录，获取openid作为唯一身份标识，无需手动登录
+  - 说明：openid 同时用于访问/行为埋点归因；登录需做并发保护，避免进店时重复触发多次登录请求
 
 **用户授权登录流程**：
 
@@ -735,13 +756,13 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 
 ### 2.8 服务号通知模块
 
-| 功能      | 描述             | 优先级 |
-| ------- | -------------- | --- |
-| 商家订阅配置  | 商家配置需要接收的通知类型  | P1  |
-| 订单下单通知  | 用户下单后推送给商家     | P0  |
-| 订单支付通知  | 订单支付成功推送给商家    | P0  |
-| 订单退款通知  | 退款申请/退款成功通知商家  | P1  |
-| 声音提醒管理 | 支持商家端分别配置下单提醒、浏览提醒与测试播放 | P2  |
+| 功能     | 描述                      | 优先级 |
+| ------ | ----------------------- | --- |
+| 商家订阅配置 | 商家配置需要接收的通知类型           | P1  |
+| 订单下单通知 | 用户下单后推送给商家              | P0  |
+| 订单支付通知 | 订单支付成功推送给商家             | P0  |
+| 订单退款通知 | 退款申请/退款成功通知商家           | P1  |
+| 声音提醒管理 | 支持商家端分别配置下单提醒、浏览提醒 | P2  |
 
 **小程序端实时提醒（补充）**：
 
@@ -929,12 +950,12 @@ Authorization: Bearer {token}
 
 **请求参数：**
 
-| 参数         | 类型   | 必填 | 描述                       |
-| ---------- | ---- | -- | ------------------------ |
-| page       | int  | 否  | 页码                       |
-| page\_size | int  | 否  | 每页数量                     |
-| status     | int  | 否  | 审核状态：0待审核/1通过/2拒绝 |
-| keyword    | string | 否 | 搜索：商家名称/联系人/电话    |
+| 参数         | 类型     | 必填 | 描述                |
+| ---------- | ------ | -- | ----------------- |
+| page       | int    | 否  | 页码                |
+| page\_size | int    | 否  | 每页数量              |
+| status     | int    | 否  | 审核状态：0待审核/1通过/2拒绝 |
+| keyword    | string | 否  | 搜索：商家名称/联系人/电话    |
 
 **响应：**
 
@@ -2897,6 +2918,7 @@ Authorization: Bearer {token}
 ```
 
 实现约束：
+
 - 当前版本暂不支持对不同 `notify_type` 分别配置开关；更新时各项 `enabled` 需保持一致，否则返回参数错误。
 
 #### 3.3.19 更新商家订阅配置
@@ -3325,6 +3347,7 @@ Authorization: Bearer {token}
 ```
 
 实现说明：
+
 - 当前版本暂未实现 `skus` 维度的持久化与校验，接口会返回 `skus: []`，并在保存时忽略请求中的 `skus` 字段。
 
 #### 3.5.10 创建/更新商品规格
@@ -3501,6 +3524,7 @@ Authorization: Bearer {token}
     "created_at": "2024-01-01T12:00:00Z",
     "paid_at": "2024-01-01T12:01:00Z",
     "completed_at": null,
+    "completed_by_name": null,
     "refunded_at": null
   }
 }
@@ -3534,12 +3558,35 @@ Authorization: Bearer {token}
   "code": 0,
   "message": "核销成功",
   "data": {
-    "order_id": 1,
+    "id": 1,
     "order_no": "202401010001",
-    "completed_at": "2024-01-01T14:00:00Z"
+    "verify_code": "123456",
+    "status": 3,
+    "completed_at": "2024-01-01T14:00:00Z",
+    "completed_by_name": "收银员A"
   }
 }
 ```
+
+#### 3.6.3.1 按核销码快速核销
+
+```
+POST /api/v1/merchant/orders/quick-complete
+Authorization: Bearer {token}
+```
+
+**请求参数：**
+
+```json
+{
+  "verify_code": "123456"
+}
+```
+
+**说明：**
+
+- 用于商家工作台的“扫一扫 / 输入核销码快速核销”入口。
+- 系统会在当前登录商家下查找匹配核销码且状态为“已支付”的订单并完成核销。
 
 **错误情况：**
 
@@ -4089,11 +4136,11 @@ Authorization: Bearer {token}
 
 **delivery\_type 说明：**
 
-| 值 | 描述           |
-| - | ------------ |
+| 值 | 描述                         |
+| - | -------------------------- |
 | 1 | 配送（需要填写配送距离、配送地址、联系人、联系电话） |
-| 2 | 堂食（不需要配送费）   |
-| 3 | 自提（不需要配送费）   |
+| 2 | 堂食（不需要配送费）                 |
+| 3 | 自提（不需要配送费）                 |
 
 **响应：**
 
@@ -4538,17 +4585,17 @@ POST /api/v1/callback/wechat
 
 ### 4.5 商家配送设置表 (merchant\_delivery\_settings)
 
-| 字段                     | 类型            | 描述         |
-| ---------------------- | ------------- | ---------- |
-| id                     | BIGINT        | 主键         |
-| merchant\_id           | BIGINT        | 商家ID       |
-| enabled                | BOOLEAN       | 是否开启配送     |
-| base\_fee              | DECIMAL(10,2) | 基础配送费      |
-| free\_delivery\_amount | DECIMAL(10,2) | 满额免配送费金额   |
+| 字段                     | 类型            | 描述                    |
+| ---------------------- | ------------- | --------------------- |
+| id                     | BIGINT        | 主键                    |
+| merchant\_id           | BIGINT        | 商家ID                  |
+| enabled                | BOOLEAN       | 是否开启配送                |
+| base\_fee              | DECIMAL(10,2) | 基础配送费                 |
+| free\_delivery\_amount | DECIMAL(10,2) | 满额免配送费金额              |
 | max\_distance          | INT           | 最大配送距离（公里，作为用户可选档位上限） |
-| distance\_rules        | JSON          | 按距离收费规则    |
-| created\_at            | DATETIME      | 创建时间       |
-| updated\_at            | DATETIME      | 更新时间       |
+| distance\_rules        | JSON          | 按距离收费规则               |
+| created\_at            | DATETIME      | 创建时间                  |
+| updated\_at            | DATETIME      | 更新时间                  |
 
 **distance\_rules JSON 结构：**
 
@@ -4584,25 +4631,25 @@ POST /api/v1/callback/wechat
 
 ### 4.7 商家员工表 (merchant\_staffs)
 
-| 字段              | 类型           | 描述                     |
-| --------------- | ------------ | ---------------------- |
-| id              | BIGINT       | 主键                     |
-| merchant\_id    | BIGINT       | 商家ID                   |
-| username        | VARCHAR(64)  | 用户名                    |
-| password        | VARCHAR(128) | 密码                     |
-| name            | VARCHAR(64)  | 姓名                     |
-| phone           | VARCHAR(20)  | 手机号                    |
-| openid          | VARCHAR(64)  | 员工绑定的微信 OpenID         |
-| unionid         | VARCHAR(64)  | 员工绑定微信返回的 UnionID     |
-| wechat_bound_at | DATETIME     | 微信快捷登录绑定时间             |
-| role            | VARCHAR(32)  | 角色：owner/manager/staff |
-| notify\_enabled | TINYINT(1)   | 订单提示音开关，1开启 0关闭        |
-| browse_notify_enabled | TINYINT(1)   | 浏览提示音开关，1开启 0关闭        |
-| status          | TINYINT      | 状态                     |
-| last\_login\_at | DATETIME     | 最后登录时间                 |
-| last_wechat_login_at | DATETIME     | 最后一次微信快捷登录时间           |
-| created\_at     | DATETIME     | 创建时间                   |
-| updated\_at     | DATETIME     | 更新时间                   |
+| 字段                      | 类型           | 描述                     |
+| ----------------------- | ------------ | ---------------------- |
+| id                      | BIGINT       | 主键                     |
+| merchant\_id            | BIGINT       | 商家ID                   |
+| username                | VARCHAR(64)  | 用户名                    |
+| password                | VARCHAR(128) | 密码                     |
+| name                    | VARCHAR(64)  | 姓名                     |
+| phone                   | VARCHAR(20)  | 手机号                    |
+| openid                  | VARCHAR(64)  | 员工绑定的微信 OpenID         |
+| unionid                 | VARCHAR(64)  | 员工绑定微信返回的 UnionID      |
+| wechat\_bound\_at       | DATETIME     | 微信快捷登录绑定时间             |
+| role                    | VARCHAR(32)  | 角色：owner/manager/staff |
+| notify\_enabled         | TINYINT(1)   | 订单提示音开关，1开启 0关闭        |
+| browse\_notify\_enabled | TINYINT(1)   | 浏览提示音开关，1开启 0关闭        |
+| status                  | TINYINT      | 状态                     |
+| last\_login\_at         | DATETIME     | 最后登录时间                 |
+| last\_wechat\_login\_at | DATETIME     | 最后一次微信快捷登录时间           |
+| created\_at             | DATETIME     | 创建时间                   |
+| updated\_at             | DATETIME     | 更新时间                   |
 
 - 员工管理首版由 `owner` 角色负责，不引入细粒度权限模型。
 
@@ -4646,7 +4693,7 @@ POST /api/v1/callback/wechat
 | id          | BIGINT      | 主键                                                                           |
 | product\_id | BIGINT      | 商品ID                                                                         |
 | name        | VARCHAR(64) | 规格名称（如：份量）                                                                   |
-| options     | JSON        | 规格选项（存储规格和对应价格，如：\[{"name":"小份","price":48.00},{"name":"大份","price":68.00}]） |
+| options     | JSON        | 规格选项（存储规格和对应加价，最终售价=商品基础价+所选规格加价；如：\[{"name":"小份","price":0.00},{"name":"大份","price":3.00}]） |
 | created\_at | DATETIME    | 创建时间                                                                         |
 | updated\_at | DATETIME    | 更新时间                                                                         |
 
@@ -4661,6 +4708,14 @@ POST /api/v1/callback/wechat
 | avatar      | VARCHAR(512) | 头像        |
 | phone       | VARCHAR(20)  | 手机号       |
 | status      | TINYINT      | 状态        |
+| first\_visit\_at | DATETIME     | 首次访问时间    |
+| last\_visit\_at  | DATETIME     | 最近访问时间    |
+| visit\_count     | INT          | 访问次数      |
+| has\_ordered     | TINYINT(1)   | 是否下过单     |
+| total\_orders    | INT          | 累计订单数     |
+| total\_spent     | DECIMAL(10,2) | 累计消费金额    |
+| has\_paid        | TINYINT(1)   | 是否发生过支付   |
+| first\_paid\_at  | DATETIME     | 首次支付时间    |
 | created\_at | DATETIME     | 创建时间      |
 | updated\_at | DATETIME     | 更新时间      |
 
@@ -4687,6 +4742,7 @@ POST /api/v1/callback/wechat
 | transaction\_id    | VARCHAR(64)   | 微信支付交易号          |
 | paid\_at           | DATETIME      | 支付时间             |
 | completed\_at      | DATETIME      | 完成时间             |
+| completed\_by\_name | VARCHAR(64)  | 核销人             |
 | cancelled\_at      | DATETIME      | 取消时间             |
 | refunded\_at       | DATETIME      | 退款时间             |
 | created\_at        | DATETIME      | 创建时间             |
@@ -4864,21 +4920,21 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 | created\_at | DATETIME     | 创建时间       |
 | updated\_at | DATETIME     | 更新时间       |
 
-### 4.21 用户行为事件表 (user_behavior_events)
+### 4.21 用户行为事件表 (user\_behavior\_events)
 
-| 字段              | 类型           | 描述                    |
-| --------------- | ------------ | --------------------- |
-| id              | BIGINT       | 主键                    |
-| merchant_id     | BIGINT       | 商家ID                  |
-| user_id         | BIGINT       | 用户ID                  |
-| openid          | VARCHAR(64)  | 微信OpenID              |
-| event_type      | VARCHAR(32)  | 事件类型                  |
-| page            | VARCHAR(64)  | 页面标识                  |
-| product_id      | BIGINT       | 商品ID，可空               |
-| order_id        | BIGINT       | 订单ID，可空               |
-| source          | VARCHAR(32)  | 来源，如 scan/store/dev   |
-| payload         | JSON         | 扩展数据                  |
-| created_at      | DATETIME     | 创建时间                  |
+| 字段           | 类型          | 描述                  |
+| ------------ | ----------- | ------------------- |
+| id           | BIGINT      | 主键                  |
+| merchant\_id | BIGINT      | 商家ID                |
+| user\_id     | BIGINT      | 用户ID                |
+| openid       | VARCHAR(64) | 微信OpenID            |
+| event\_type  | VARCHAR(32) | 事件类型                |
+| page         | VARCHAR(64) | 页面标识                |
+| product\_id  | BIGINT      | 商品ID，可空             |
+| order\_id    | BIGINT      | 订单ID，可空             |
+| source       | VARCHAR(32) | 来源，如 scan/store/dev |
+| payload      | JSON        | 扩展数据                |
+| created\_at  | DATETIME    | 创建时间                |
 
 **当前事件类型：**
 
@@ -5187,26 +5243,26 @@ miniprogram/                    # 微信小程序
 
 **第六批次：数据分析**
 
-| 页面                           | 功能描述   | 对接API                                          |
-| ---------------------------- | ------ | ---------------------------------------------- |
+| 页面                           | 功能描述              | 对接API                                          |
+| ---------------------------- | ----------------- | ---------------------------------------------- |
 | merchant/analytics/sales     | 经营趋势图表（浏览人数/下单人数） | GET /api/v1/merchant/analytics/sales-trend     |
-| merchant/analytics/products  | 商品销量排行 | GET /api/v1/merchant/analytics/product-ranking |
-| merchant/analytics/customers | 客户分析   | GET /api/v1/merchant/analytics/customers       |
+| merchant/analytics/products  | 商品销量排行            | GET /api/v1/merchant/analytics/product-ranking |
+| merchant/analytics/customers | 客户分析              | GET /api/v1/merchant/analytics/customers       |
 
 **第七批次：C端店铺购物（扫码进入）**
 
-| 页面             | 功能描述      | 对接API                                |
-| -------------- | --------- | ------------------------------------ |
-| store/home     | 店铺首页、分类商品 | GET /api/v1/store/{id}/home          |
-| store/products | 商品列表      | GET /api/v1/store/{id}/products      |
-| store/product  | 商品详情      | GET /api/v1/store/{id}/products/{id} |
-| store/confirm  | 确认订单、支付   | POST /api/v1/store/{merchant_id}/orders |
+| 页面             | 功能描述      | 对接API                                    |
+| -------------- | --------- | ---------------------------------------- |
+| store/home     | 店铺首页、分类商品 | GET /api/v1/store/{id}/home              |
+| store/products | 商品列表      | GET /api/v1/store/{id}/products          |
+| store/product  | 商品详情      | GET /api/v1/store/{id}/products/{id}     |
+| store/confirm  | 确认订单、支付   | POST /api/v1/store/{merchant\_id}/orders |
 
 **第八批次：微信支付集成**
 
 | 功能   | 描述          | 对接API                                    |
 | ---- | ----------- | ---------------------------------------- |
-| 支付下单 | 统一下单、获取支付参数 | POST /api/v1/store/{merchant_id}/orders  |
+| 支付下单 | 统一下单、获取支付参数 | POST /api/v1/store/{merchant\_id}/orders |
 | 支付回调 | 支付结果通知      | POST /api/v1/callback/wechat             |
 | 退款处理 | 申请退款        | POST /api/v1/merchant/orders/{id}/refund |
 
@@ -5416,18 +5472,18 @@ xm-mall/
 
 #### API对接表
 
-| 功能模块    | 接口路径                                        | 方法   | 状态     |
-| ------- | ------------------------------------------- | ---- | ------ |
-| 服务商登录   | /api/v1/sp/auth/login                       | POST | ✅ 已实现  |
-| 首页数据看板  | /api/v1/sp/dashboard                        | GET  | ✅ 已实现  |
-| 商家入驻审核  | /api/v1/sp/merchants/pending                | GET  | ✅ 已实现  |
-| 商家详情查看  | /api/v1/sp/merchants/{id}                   | GET  | ✅ 已实现  |
-| 商家审核操作  | /api/v1/sp/merchants/{id}/approve           | POST | ✅ 已实现  |
-| 商家数据分析  | /api/v1/sp/merchants/analytics/distribution | GET  | ✅ 已实现  |
-| 商家列表    | /api/v1/sp/merchants/list                   | GET  | ✅ 已实现  |
-| 订单数据分析  | /api/v1/sp/orders/analytics                 | GET  | ✅ 已实现  |
-| 金额数据分析  | /api/v1/sp/amount/analytics                 | GET  | ✅ 已实现  |
-| TOP商家排行 | /api/v1/sp/amount/top-merchants             | GET  | ✅ 已实现  |
+| 功能模块    | 接口路径                                        | 方法   | 状态    |
+| ------- | ------------------------------------------- | ---- | ----- |
+| 服务商登录   | /api/v1/sp/auth/login                       | POST | ✅ 已实现 |
+| 首页数据看板  | /api/v1/sp/dashboard                        | GET  | ✅ 已实现 |
+| 商家入驻审核  | /api/v1/sp/merchants/pending                | GET  | ✅ 已实现 |
+| 商家详情查看  | /api/v1/sp/merchants/{id}                   | GET  | ✅ 已实现 |
+| 商家审核操作  | /api/v1/sp/merchants/{id}/approve           | POST | ✅ 已实现 |
+| 商家数据分析  | /api/v1/sp/merchants/analytics/distribution | GET  | ✅ 已实现 |
+| 商家列表    | /api/v1/sp/merchants/list                   | GET  | ✅ 已实现 |
+| 订单数据分析  | /api/v1/sp/orders/analytics                 | GET  | ✅ 已实现 |
+| 金额数据分析  | /api/v1/sp/amount/analytics                 | GET  | ✅ 已实现 |
+| TOP商家排行 | /api/v1/sp/amount/top-merchants             | GET  | ✅ 已实现 |
 
 #### 可视化图表规划
 
@@ -5552,35 +5608,35 @@ xm-sp/
 
 #### API对接表
 
-| 功能模块    | 接口路径                                        | 方法      | 状态     |
-| ------- | ------------------------------------------- | ------- | ------ |
-| 服务商登录   | /api/v1/sp/auth/login                       | POST    | ✅ 已实现  |
-| 首页数据看板  | /api/v1/sp/dashboard                        | GET     | ✅ 已实现  |
-| 商家入驻审核  | /api/v1/sp/merchants/pending                | GET     | ✅ 已实现  |
-| 商家详情查看  | /api/v1/sp/merchants/{id}                   | GET     | ✅ 已实现  |
-| 商家审核操作  | /api/v1/sp/merchants/{id}/approve           | POST    | ✅ 已实现  |
-| 商家数据分析  | /api/v1/sp/merchants/analytics/distribution | GET     | ✅ 已实现  |
-| 商家列表    | /api/v1/sp/merchants/list                   | GET     | ✅ 已实现  |
-| 订单数据分析  | /api/v1/sp/orders/analytics                 | GET     | ✅ 已实现  |
-| 金额数据分析  | /api/v1/sp/amount/analytics                 | GET     | ✅ 已实现  |
-| TOP商家排行 | /api/v1/sp/amount/top-merchants             | GET     | ✅ 已实现  |
-| 系统公告管理  | /api/v1/sp/announcements/\*                 | CRUD    | ✅ 已实现  |
-| 商家登录    | /api/v1/auth/merchant/login                 | POST    | ✅ 已实现  |
-| 商家入驻    | /api/v1/merchant/register                   | POST    | ✅ 已实现  |
-| 商家信息    | /api/v1/merchant/profile                    | GET     | ✅ 已实现  |
-| 商家设置    | /api/v1/merchant/settings                   | PUT     | ✅ 已实现  |
-| 商品管理    | /api/v1/merchant/products/\*                | CRUD    | ✅ 已实现  |
-| 分类管理    | /api/v1/merchant/categories/\*              | CRUD    | ✅ 已实现  |
-| 订单管理    | /api/v1/merchant/orders/\*                  | CRUD    | ✅ 已实现  |
-| 数据分析    | /api/v1/merchant/analytics/\*               | GET     | ✅ 已实现  |
-| 系统公告    | /api/v1/merchant/announcements/\*           | GET     | ✅ 已实现  |
-| 店铺浏览    | /api/v1/store/{id}/\*                       | GET     | ✅ 已实现  |
-| 服务号配置   | /api/v1/sp/wechat-config                    | GET/PUT | ✅ 已实现  |
-| 订阅配置    | /api/v1/merchant/subscriptions              | GET/PUT | ✅ 已实现  |
-| 云打印机    | /api/v1/merchant/printers/\*                | CRUD    | ✅ 已实现  |
-| 打印记录    | /api/v1/merchant/print-logs                 | GET     | ✅ 已实现  |
-| 微信支付回调  | /api/v1/callback/wechat                     | POST    | ✅ 已实现  |
-| 微信支付回调(兼容) | /api/v1/notify/payment                  | POST    | ✅ 已实现  |
+| 功能模块       | 接口路径                                        | 方法      | 状态    |
+| ---------- | ------------------------------------------- | ------- | ----- |
+| 服务商登录      | /api/v1/sp/auth/login                       | POST    | ✅ 已实现 |
+| 首页数据看板     | /api/v1/sp/dashboard                        | GET     | ✅ 已实现 |
+| 商家入驻审核     | /api/v1/sp/merchants/pending                | GET     | ✅ 已实现 |
+| 商家详情查看     | /api/v1/sp/merchants/{id}                   | GET     | ✅ 已实现 |
+| 商家审核操作     | /api/v1/sp/merchants/{id}/approve           | POST    | ✅ 已实现 |
+| 商家数据分析     | /api/v1/sp/merchants/analytics/distribution | GET     | ✅ 已实现 |
+| 商家列表       | /api/v1/sp/merchants/list                   | GET     | ✅ 已实现 |
+| 订单数据分析     | /api/v1/sp/orders/analytics                 | GET     | ✅ 已实现 |
+| 金额数据分析     | /api/v1/sp/amount/analytics                 | GET     | ✅ 已实现 |
+| TOP商家排行    | /api/v1/sp/amount/top-merchants             | GET     | ✅ 已实现 |
+| 系统公告管理     | /api/v1/sp/announcements/\*                 | CRUD    | ✅ 已实现 |
+| 商家登录       | /api/v1/auth/merchant/login                 | POST    | ✅ 已实现 |
+| 商家入驻       | /api/v1/merchant/register                   | POST    | ✅ 已实现 |
+| 商家信息       | /api/v1/merchant/profile                    | GET     | ✅ 已实现 |
+| 商家设置       | /api/v1/merchant/settings                   | PUT     | ✅ 已实现 |
+| 商品管理       | /api/v1/merchant/products/\*                | CRUD    | ✅ 已实现 |
+| 分类管理       | /api/v1/merchant/categories/\*              | CRUD    | ✅ 已实现 |
+| 订单管理       | /api/v1/merchant/orders/\*                  | CRUD    | ✅ 已实现 |
+| 数据分析       | /api/v1/merchant/analytics/\*               | GET     | ✅ 已实现 |
+| 系统公告       | /api/v1/merchant/announcements/\*           | GET     | ✅ 已实现 |
+| 店铺浏览       | /api/v1/store/{id}/\*                       | GET     | ✅ 已实现 |
+| 服务号配置      | /api/v1/sp/wechat-config                    | GET/PUT | ✅ 已实现 |
+| 订阅配置       | /api/v1/merchant/subscriptions              | GET/PUT | ✅ 已实现 |
+| 云打印机       | /api/v1/merchant/printers/\*                | CRUD    | ✅ 已实现 |
+| 打印记录       | /api/v1/merchant/print-logs                 | GET     | ✅ 已实现 |
+| 微信支付回调     | /api/v1/callback/wechat                     | POST    | ✅ 已实现 |
+| 微信支付回调(兼容) | /api/v1/notify/payment                      | POST    | ✅ 已实现 |
 
 #### 服务号通知说明
 
@@ -5764,45 +5820,114 @@ xm-sp/
 
 ### 9.1 测试环境说明
 
-在小程序正式发布前，由于微信小程序的限制，无法通过扫码直接进入特定商家的店铺页面进行测试。为此，我们提供了两种替代测试方法：
+当前小程序开发环境包含三类测试入口，分别对应不同角色与用途：
 
-### 9.1.1 商家端测试账号（开发环境）
+1. **服务商端**：服务商管理员登录后进入管理后台，用于审核商家、查看统计、发布公告与维护服务商设置。
+2. **商家端**：商家员工登录后进入经营后台，用于商品、订单、设置与员工能力联调。
+3. **C 端店铺端**：用户浏览店铺并下单的链路测试，由于开发阶段无法总是通过扫码直达指定商家店铺，因此提供测试入口页与编译模式两种方式。
 
-用于快速验证商家端页面与接口联调。
+开发测试时，需明确区分以下入口：
 
-| 字段       | 值           |
-| -------- | ----------- |
-| username | merchant    |
-| password | merchant123 |
+- `pages/sp/login`：服务商登录入口
+- `pages/auth/login`：商家登录入口
+- `pages/store/test-entry`：C 端店铺测试入口，不是服务商入口
+- `pages/store/home?merchant_id=...`：C 端店铺首页直达方式，不是服务商入口
 
-### 9.2 测试方法一：测试入口页面（推荐）
+### 9.1.1 测试账号总表（开发环境）
 
-#### 功能说明
+| 角色     | 账号         | 密码            | 说明                 |
+| ------ | ---------- | ------------- | ------------------ |
+| 服务商管理员 | `admin`    | `admin123`    | 用于服务商管理后台登录与功能验证   |
+| 商家员工   | `merchant` | `merchant123` | 用于商家工作台、商品、订单与设置联调 |
+
+### 9.2 服务商端测试
+
+#### 入口与登录
+
+- 入口页面：`pages/sp/login`
+- 登录后首页：`pages/sp/home`
+- 建议在微信开发者工具编译模式中直接选择“服务商登录”或手动打开 `pages/sp/login`
+
+#### 使用步骤
+
+1. 在微信开发者工具中打开小程序项目
+2. 选择服务商编译模式，或直接进入 `pages/sp/login`
+3. 使用测试账号 `admin / admin123` 登录
+4. 登录成功后进入服务商工作台 `pages/sp/home`
+5. 继续验证服务商相关页面与接口联调
+
+#### 可测试功能
+
+| 模块   | 功能点             | 页面/入口                               |
+| ---- | --------------- | ----------------------------------- |
+| 工作台  | 数据看板、待处理任务、快捷入口 | `pages/sp/home`                     |
+| 商家审核 | 待审核商家列表、审核详情    | `pages/sp/merchants/audit`          |
+| 商家管理 | 商家列表、商家详情、商家二维码 | `pages/sp/merchants/list`           |
+| 数据分析 | 商家统计            | `pages/sp/analytics/merchant-stats` |
+| 公告管理 | 公告列表、新增、编辑      | `pages/sp/announcements/index`      |
+| 设置   | 修改密码、清除缓存、退出登录  | `pages/sp/settings`                 |
+
+### 9.3 商家端测试
+
+#### 入口与登录
+
+- 入口页面：`pages/auth/login`
+- 登录后首页：`pages/merchant/home`
+- 使用测试账号：`merchant / merchant123`
+
+#### 使用步骤
+
+1. 在微信开发者工具中打开小程序项目
+2. 选择“商家登录”编译模式，或直接进入 `pages/auth/login`
+3. 使用测试账号 `merchant / merchant123` 登录
+4. 登录成功后进入商家工作台
+5. 按需继续验证商品、订单、设置与员工能力
+
+#### 商家端自测清单
+
+| 模块   | 功能点            | 说明                                                                      |
+| ---- | -------------- | ----------------------------------------------------------------------- |
+| 工作台  | 系统公告滚动栏        | 可查看公告详情、可关闭（本地记忆）                                                       |
+| 工作台  | 快速核销入口         | 支持扫一扫和输入 6 位核销码快速核销，核销成功后可直接查看订单详情                                       |
+| 商品管理 | 商品详情/编辑/删除     | 列表进入详情页正常，编辑保存成功，删除后列表隐藏                                                |
+| 商品管理 | 商品图片上传         | 调用 `/api/v1/upload/token` 获取 `upload_url` 后直传七牛，上传成功后页面立即回显             |
+| 商品管理 | 私有图片显示         | 商品列表、商品详情、编辑页回显使用接口返回的可访问图片地址                                           |
+| 订单   | 核销码校验          | 输入 6 位数字核销码，核销成功/失败提示正确，订单详情可查看核销码、核销时间与核销人                              |
+| 设置   | 配送设置-按距离收费     | 支持新增/删除规则、区间合法性校验，保存后重新进入仍生效                                            |
+| 设置   | 声音提醒管理         | 支持下单提醒、浏览提醒；重新进入页面与重新登录后状态保持                                             |
+| 设置   | 账号与员工能力        | 支持修改密码、微信快捷登录绑定/解绑、仅店主可见的员工管理入口                                         |
+| 开发联调 | WebSocket 实时提醒 | 可用 `/api/v1/dev/order-notify` 与 `/api/v1/dev/store-visit-notify` 触发推送验证；前端提供 WebSocket 联调测试页，支持输入商家 ID 手动发送“顾客进店提醒”和“订单成功提醒” |
+
+### 9.4 C 端店铺测试
+
+#### 9.4.1 测试方法一：测试入口页面（推荐）
+
+##### 功能说明
 
 创建了专门的测试入口页面 `pages/store/test-entry.vue`，用于在小程序发布前测试用户下单流程。
 
-#### 页面路径
+##### 页面路径
 
 - 路由：`/pages/store/test-entry`
 - 导航标题：`商家店铺测试`
 - 背景色：`#667eea`（紫色渐变）
 
-#### 功能特性
+##### 功能特性
 
 1. **商家ID输入**：支持手动输入商家ID
 2. **商家列表选择**：提供预设商家列表，点击即可快速选择
 3. **直接跳转店铺**：输入商家ID后直接跳转至店铺首页
 
-#### 使用步骤
+##### 使用步骤
 
 1. 在微信开发者工具中打开小程序项目
-2. 进入"商家店铺测试"页面
+2. 进入“商家店铺测试”页面
 3. 在输入框中输入商家ID（默认：1）
 4. 或直接点击商家列表中的商家
-5. 点击"进入商家店铺"按钮
+5. 点击“进入商家店铺”按钮
 6. 进入店铺首页后可进行商品浏览、加入购物车、下单支付等操作
 
-#### 测试商家列表
+##### 测试商家列表
 
 | 商家ID | 商家名称  | 状态  |
 | ---- | ----- | --- |
@@ -5810,23 +5935,47 @@ xm-sp/
 | 2    | 示例商家B | 营业中 |
 | 3    | 示例商家C | 营业中 |
 
-#### 注意事项
+##### 注意事项
 
 - 支付功能需要在微信开发者工具中开启调试
 - 测试支付可使用模拟支付模式
 - 订单数据会真实写入数据库
+- 此页面仅用于 C 端店铺测试，不用于服务商登录
 
-### 9.3 测试方法二：编译模式直接进入
+#### 9.4.2 测试方法二：商家端 WebSocket 联调页
 
-#### 功能说明
+##### 功能说明
+
+提供专门的 `pages/store/order-sound-test.vue` 页面，用于验证商家端登录成功后是否已建立 WebSocket 连接。
+
+##### 页面能力
+
+1. 支持输入目标 `merchant_id`
+2. 支持手动发送“顾客进店提醒”
+3. 支持手动发送“订单成功提醒”
+4. 支持显示本次推送命中的在线连接数 `delivered`
+5. 商家首页同步展示 WebSocket 当前状态、最近消息和接收时间
+
+##### 使用步骤
+
+1. 先使用商家账号登录并进入 `pages/merchant/home`
+2. 确认商家首页已显示 WebSocket 连接状态
+3. 打开 `pages/store/order-sound-test`
+4. 输入目标 `merchant_id`
+5. 点击发送“顾客进店提醒”或“订单成功提醒”
+6. 根据页面返回的 `delivered` 数量和商家首页最近消息，确认是否已成功推送到在线商家
+
+#### 9.4.3 测试方法三：编译模式直接进入
+
+##### 功能说明
 
 利用微信开发者工具的编译模式功能，直接编译到指定页面并携带参数。
 
-#### 配置步骤
+##### 配置步骤
 
 1. 打开微信开发者工具
-2. 点击顶部"编译模式"下拉框
-3. 选择"添加编译模式"
+2. 点击顶部“编译模式”下拉框
+3. 选择“添加编译模式”
 4. 配置以下参数：
 
 | 参数   | 值                  | 说明     |
@@ -5834,29 +5983,27 @@ xm-sp/
 | 编译模式 | `pages/store/home` | 店铺首页   |
 | 启动参数 | `merchant_id=1`    | 商家ID参数 |
 
-#### 启动参数说明
+##### 启动参数说明
 
 | 参数名          | 类型     | 必填 | 说明                 |
 | ------------ | ------ | -- | ------------------ |
 | merchant\_id | number | 是  | 商家ID，用于加载对应商家的店铺数据 |
 
-#### 使用示例
+##### 使用示例
 
-```
+```text
 启动参数：merchant_id=1
 ```
 
 访问商家ID为1的店铺首页
 
-```
+```text
 启动参数：merchant_id=2
 ```
 
 访问商家ID为2的店铺首页
 
-### 9.4 测试功能清单
-
-#### 可测试功能模块
+#### 9.4.3 可测试功能模块
 
 | 模块   | 功能           | 测试方法一 | 测试方法二 |
 | ---- | ------------ | ----- | ----- |
@@ -5869,19 +6016,17 @@ xm-sp/
 | 订单管理 | 查看订单列表、订单详情  | ✅     | ✅     |
 | 退款申请 | 申请退款、查看退款状态  | ✅     | ✅     |
 
-#### 商家端自测清单
+### 9.4.4 常见问题排查
 
-| 模块   | 功能点             | 说明                                                          |
-| ---- | --------------- | ----------------------------------------------------------- |
-| 工作台  | 系统公告滚动栏         | 可查看公告详情、可关闭（本地记忆）                                           |
-| 商品管理 | 商品详情/编辑/删除      | 列表进入详情页正常，编辑保存成功，删除后列表隐藏                                    |
-| 商品管理 | 商品图片上传          | 调用 `/api/v1/upload/token` 获取 `upload_url` 后直传七牛，上传成功后页面立即回显 |
-| 商品管理 | 私有图片显示          | 商品列表、商品详情、编辑页回显使用接口返回的可访问图片地址                               |
-| 订单   | 核销码校验           | 输入 6 位数字核销码，核销成功/失败提示正确                                     |
-| 设置   | 配送设置-按距离收费      | 支持新增/删除规则、区间合法性校验，保存后重新进入仍生效                              |
-| 设置   | 声音提醒管理         | 支持下单提醒、浏览提醒、测试播放；重新进入页面与重新登录后状态保持                        |
-| 设置   | 账号与员工能力        | 支持修改密码、微信快捷登录绑定/解绑、仅店主可见的员工管理入口                            |
-| 开发联调 | WebSocket 实时提醒  | 可用 `/api/v1/dev/order-notify` 与 `/api/v1/dev/store-visit-notify` 触发推送验证 |
+1. **找不到服务商入口**
+   - 优先检查当前编译模式是否指向 `pages/sp/login`
+   - 如果进入的是 `pages/store/test-entry` 或 `pages/store/home`，说明打开的是 C 端测试入口，而不是服务商入口
+2. **进入店铺首页后看不到服务商功能**
+   - 这是正常现象，店铺首页仅用于 C 端浏览与下单测试
+   - 服务商功能需使用 `admin / admin123` 从 `pages/sp/login` 登录后进入
+3. **C 端店铺页面加载异常**
+   - 检查 `merchant_id` 参数是否传入且对应商家存在
+   - 优先使用测试入口页选择已有商家
 
 ### 9.5 支付配置说明
 
@@ -5891,6 +6036,9 @@ xm-sp/
 2. 进入"详情" → "本地设置"
 3. 勾选"不校验合法域名"（开发阶段）
 4. 勾选"不校验HTTPS证书"
+5. 小程序前端统一通过环境变量文件配置地址：开发环境使用 `miniprogram/.env.development`，生产环境使用 `miniprogram/.env.production`，示例见 `miniprogram/.env.example`
+6. `VITE_API_BASE_URL` 管理 HTTP 接口基址，`VITE_WS_BASE_URL` 管理 WebSocket 基址；生产环境需显式配置为 `wss://` 协议
+7. 业务代码禁止再直接写死 `localhost:8080`，H5 开发代理统一由 `miniprogram/vite.config.ts` 读取环境变量生成
 
 #### 生产环境要求
 

@@ -11,6 +11,15 @@
           </view>
         </view>
       </view>
+      <view class="setting-item">
+        <view class="setting-left">
+          <view class="setting-icon"><text>📞</text></view>
+          <view class="setting-info">
+            <view class="setting-label">联系电话</view>
+            <view class="setting-value">{{ merchantInfo?.contact_phone || '未绑定' }}</view>
+          </view>
+        </view>
+      </view>
       <view class="setting-item" @click="goDeliverySettings">
         <view class="setting-left">
           <view class="setting-icon"><text>🚚</text></view>
@@ -56,15 +65,6 @@
           </view>
         </view>
         <text class="arrow">›</text>
-      </view>
-      <view class="setting-item">
-        <view class="setting-left">
-          <view class="setting-icon"><text>📞</text></view>
-          <view class="setting-info">
-            <view class="setting-label">绑定手机</view>
-            <view class="setting-value">{{ merchantInfo?.contact_phone || '未绑定' }}</view>
-          </view>
-        </view>
       </view>
     </view>
 

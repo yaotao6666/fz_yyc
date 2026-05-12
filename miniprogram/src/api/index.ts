@@ -74,8 +74,6 @@ export const ResponseCode = {
   QINIU_UPLOAD_FAILED: 8002,
 } as const
 
-const BASE_URL = 'http://localhost:8080'
-
 function getToken(): string {
   return uni.getStorageSync('token') || ''
 }
@@ -107,6 +105,17 @@ function normalizeDeliverySettings(data: Partial<DeliverySettings> | null | unde
     free_delivery_amount: Number(data?.free_delivery_amount || 0),
     max_distance: Number(data?.max_distance || 10),
     distance_rules: parseDistanceRules(data?.distance_rules)
+  }
+}
+
+function normalizeArrayResponse<T>(response: T[] | null | undefined): T[] {
+  return Array.isArray(response) ? response : []
+}
+
+function normalizeListField<T, R extends { list?: T[] | null }>(response: R): R & { list: T[] } {
+  return {
+    ...response,
+    list: normalizeArrayResponse(response?.list)
   }
 }
 
@@ -232,7 +241,7 @@ export function getAmountAnalytics(params?: { days?: number }) {
 }
 
 export function getTopMerchants(params?: { limit?: number }) {
-  return get<TopMerchantRanking[]>('/api/v1/sp/amount/top-merchants', params)
+  return get<TopMerchantRanking[] | null>('/api/v1/sp/amount/top-merchants', params).then(normalizeArrayResponse)
 }
 
 /**
@@ -321,7 +330,7 @@ export function getMerchantQrcode(params?: { page?: string; width?: number }) {
 }
 
 export function getMerchantAnnouncements(params?: { page?: number; page_size?: number }) {
-  return get<AnnouncementListResponse>('/api/v1/merchant/announcements', params)
+  return get<AnnouncementListResponse>('/api/v1/merchant/announcements', params).then(normalizeListField)
 }
 
 export function getMerchantAnnouncementDetail(announcementId: number) {
@@ -339,7 +348,7 @@ export function getCategories(options?: Partial<RequestOptions>) {
   if (!token && spToken) {
     return Promise.resolve([])
   }
-  return get<Category[]>('/api/v1/merchant/categories', undefined, options)
+  return get<Category[] | null>('/api/v1/merchant/categories', undefined, options).then(normalizeArrayResponse)
 }
 
 /**
@@ -570,7 +579,7 @@ export function getOrders(params?: {
   end_date?: string
   order_no?: string
 }) {
-  return get<OrderListResponse>('/api/v1/merchant/orders', params)
+  return get<OrderListResponse>('/api/v1/merchant/orders', params).then(normalizeListField)
 }
 
 /**
@@ -584,10 +593,16 @@ export function getOrder(orderId: number) {
  * 订单核销
  */
 export function completeOrder(orderId: number, verifyCode: string) {
-  return post<{ order_id: number; order_no: string; completed_at: string }>(
+  return post<Order>(
     `/api/v1/merchant/orders/${orderId}/complete`,
     { verify_code: verifyCode }
   )
+}
+
+export function quickCompleteOrder(verifyCode: string) {
+  return post<Order>('/api/v1/merchant/orders/quick-complete', {
+    verify_code: verifyCode
+  })
 }
 
 /**
@@ -617,28 +632,29 @@ export function getSalesOverview(params?: { period?: string }) {
  * 获取销售趋势
  */
 export function getSalesTrend(params: { start_date: string; end_date: string; granularity?: string }) {
-  return get<SalesTrend[]>('/api/v1/merchant/analytics/sales-trend', params)
+  return get<SalesTrend[] | null>('/api/v1/merchant/analytics/sales-trend', params).then(normalizeArrayResponse)
 }
 
 /**
  * 获取商品排行
  */
 export function getProductRanking(params?: { start_date?: string; end_date?: string; limit?: number; sort_by?: string }) {
-  return get<ProductRanking[]>('/api/v1/merchant/analytics/product-ranking', params)
+  return get<ProductRanking[] | null>('/api/v1/merchant/analytics/product-ranking', params).then(normalizeArrayResponse)
 }
 
 /**
  * 获取时段分析
  */
 export function getHourlyAnalysis(params: { date: string }) {
-  return get<HourlyAnalysis[]>('/api/v1/merchant/analytics/hourly', params)
+  return get<HourlyAnalysis[] | null>('/api/v1/merchant/analytics/hourly', params).then(normalizeArrayResponse)
 }
 
 /**
  * 获取库存预警
  */
 export function getStockAlert(params?: { threshold?: number }) {
-  return get<StockAlert[]>('/api/v1/merchant/analytics/stock-alert', params)
+  // 后端无预警数据时可能返回 null，这里统一兜底为空数组，避免页面直接读取 length 报错。
+  return get<StockAlert[] | null>('/api/v1/merchant/analytics/stock-alert', params).then(normalizeArrayResponse)
 }
 
 /**
@@ -652,11 +668,11 @@ export function getCustomerAnalysis() {
  * 获取客户趋势
  */
 export function getCustomerTrend(params: { start_date: string; end_date: string }) {
-  return get<CustomerTrend[]>('/api/v1/merchant/analytics/customer-trend', params)
+  return get<CustomerTrend[] | null>('/api/v1/merchant/analytics/customer-trend', params).then(normalizeArrayResponse)
 }
 
 export function getMerchantStaffList(params?: { page?: number; page_size?: number }) {
-  return get<MerchantStaffListResponse>('/api/v1/merchant/staff', params)
+  return get<MerchantStaffListResponse>('/api/v1/merchant/staff', params).then(normalizeListField)
 }
 
 export function createMerchantStaff(data: CreateMerchantStaffRequest) {
@@ -697,7 +713,7 @@ export function getMyInviteInfo() {
  * 获取邀请记录
  */
 export function getInviteRecords(params?: { page?: number; page_size?: number }) {
-  return get<InviteRecordListResponse>('/api/v1/merchant/invite/records', params)
+  return get<InviteRecordListResponse>('/api/v1/merchant/invite/records', params).then(normalizeListField)
 }
 
 // ============ 文件上传相关 ============
@@ -780,7 +796,7 @@ export function getStoreHome(merchantId: number) {
  * 获取店铺商品列表
  */
 export function getStoreProducts(merchantId: number, params?: { category_id?: number }) {
-  return get<StoreProductGroup[]>(`/api/v1/store/${merchantId}/products`, params)
+  return get<ProductListResponse>(`/api/v1/store/${merchantId}/products`, params).then(normalizeListField)
 }
 
 /**
@@ -829,7 +845,7 @@ export function getMyOrders(params?: {
   status?: number
   merchant_id?: number
 }) {
-  return get<OrderListResponse>('/api/v1/user/orders', params)
+  return get<OrderListResponse>('/api/v1/user/orders', params).then(normalizeListField)
 }
 
 /**
@@ -898,6 +914,7 @@ export default {
   getOrders,
   getOrder,
   completeOrder,
+  quickCompleteOrder,
   refundOrder,
   getOrderStatistics,
   // 数据分析

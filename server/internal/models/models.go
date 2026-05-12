@@ -304,7 +304,7 @@ func (ProductSpec) TableName() string {
 // ============================================
 type User struct {
 	ID           uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	OpenID       string     `gorm:"size:64;uniqueIndex" json:"openid"`
+	OpenID       string     `gorm:"column:openid;size:64;uniqueIndex" json:"openid"`
 	UnionID      string     `gorm:"size:64;index" json:"union_id"`
 	Nickname     string     `gorm:"size:64" json:"nickname"`
 	Avatar       string     `gorm:"size:512" json:"avatar"`
@@ -333,7 +333,7 @@ type UserVisit struct {
 	ID         uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserID     uint64    `gorm:"not null;index" json:"user_id"`
 	MerchantID uint64    `gorm:"not null;index" json:"merchant_id"`
-	OpenID     string    `gorm:"size:64;index" json:"openid"`
+	OpenID     string    `gorm:"column:openid;size:64;index" json:"openid"`
 	VisitTime  time.Time `gorm:"autoCreateTime" json:"visit_time"`
 	Source     string    `gorm:"size:32" json:"source"`
 }
@@ -349,7 +349,7 @@ type UserBehaviorEvent struct {
 	ID         uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
 	MerchantID uint64    `gorm:"not null;index" json:"merchant_id"`
 	UserID     uint64    `gorm:"not null;index" json:"user_id"`
-	OpenID     string    `gorm:"size:64;index" json:"openid"`
+	OpenID     string    `gorm:"column:openid;size:64;index" json:"openid"`
 	EventType  string    `gorm:"size:32;not null;index" json:"event_type"`
 	Page       string    `gorm:"size:64" json:"page"`
 	ProductID  uint64    `gorm:"index" json:"product_id"`
@@ -386,6 +386,7 @@ type Order struct {
 	TransactionID    string      `gorm:"size:64" json:"transaction_id"`
 	PaidAt           *time.Time  `json:"paid_at"`
 	CompletedAt      *time.Time  `json:"completed_at"`
+	CompletedByName  string      `gorm:"size:64" json:"completed_by_name"`
 	CancelledAt      *time.Time  `json:"cancelled_at"`
 	RefundedAt       *time.Time  `json:"refunded_at"`
 	CreatedAt        time.Time   `gorm:"autoCreateTime;index" json:"created_at"`

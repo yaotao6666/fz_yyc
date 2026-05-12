@@ -32,11 +32,11 @@
             <view class="stat-label">今日订单</view>
           </view>
           <view class="stat-card">
-            <view class="stat-value">¥{{ formatAmount(dashboardData?.today_amount || 0) }}</view>
+            <view class="stat-value">¥{{ formatAmount(dashboardData?.today_revenue || 0) }}</view>
             <view class="stat-label">今日金额</view>
           </view>
           <view class="stat-card">
-            <view class="stat-value">¥{{ formatAmount(dashboardData?.avg_order_amount || 0) }}</view>
+            <view class="stat-value">¥{{ formatAmount(avgOrderAmount) }}</view>
             <view class="stat-label">平均订单金额</view>
           </view>
         </view>
@@ -46,19 +46,11 @@
       <view class="todo-section" v-if="hasPendingTasks && dashboardData">
         <view class="section-title">待处理任务</view>
         <view class="todo-grid">
-          <view class="todo-item" v-if="(dashboardData.merchant_approvals || 0) > 0" @click="goMerchantAudit">
+          <view class="todo-item" v-if="(dashboardData.pending_merchants || 0) > 0" @click="goMerchantAudit">
             <view class="todo-icon approval"></view>
             <view class="todo-content">
-              <text class="todo-count">{{ dashboardData.merchant_approvals }}</text>
+              <text class="todo-count">{{ dashboardData.pending_merchants }}</text>
               <text class="todo-label">待审核商家</text>
-            </view>
-            <text class="arrow">›</text>
-          </view>
-          <view class="todo-item" v-if="(dashboardData.order_issues || 0) > 0" @click="goOrderIssues">
-            <view class="todo-icon issue"></view>
-            <view class="todo-content">
-              <text class="todo-count">{{ dashboardData.order_issues }}</text>
-              <text class="todo-label">订单异常</text>
             </view>
             <text class="arrow">›</text>
           </view>
@@ -156,8 +148,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { get, post } from '@api'
-import type { ApiResponse } from '@types'
+import { get } from '@api'
 
 // 服务商信息
 interface ServiceProviderInfo {
@@ -169,13 +160,11 @@ interface ServiceProviderInfo {
 // Dashboard数据
 interface DashboardData {
   total_merchants: number
+  pending_merchants: number
   today_orders: number
-  today_amount: number
-  avg_order_amount: number
-  merchant_approvals: number
-  order_issues: number
-  industry_distribution: { name: string; value: number }[]
-  order_trend: { date: string; orders: number; amount: number }[]
+  today_revenue: number
+  distribution: { category: string; count: number }[]
+  trend: { date: string; orders: number }[]
 }
 
 // 图表颜色
@@ -189,22 +178,32 @@ const dashboardData = ref<DashboardData | null>(null)
 
 // 计算属性
 const hasPendingTasks = computed(() => {
-  return (dashboardData.value?.merchant_approvals || 0) > 0 || (dashboardData.value?.order_issues || 0) > 0
+  return (dashboardData.value?.pending_merchants || 0) > 0
+})
+
+const avgOrderAmount = computed(() => {
+  const todayOrders = dashboardData.value?.today_orders || 0
+  const todayRevenue = dashboardData.value?.today_revenue || 0
+  if (todayOrders <= 0) {
+    return 0
+  }
+  return todayRevenue / todayOrders
 })
 
 // 行业分布数据
 const industryDistribution = computed(() => {
-  if (!dashboardData.value?.industry_distribution) return []
-  const total = dashboardData.value.industry_distribution.reduce((sum, item) => sum + item.value, 0)
-  return dashboardData.value.industry_distribution.map(item => ({
-    ...item,
-    percent: total > 0 ? Math.round((item.value / total) * 100) : 0
+  if (!dashboardData.value?.distribution) return []
+  const total = dashboardData.value.distribution.reduce((sum, item) => sum + item.count, 0)
+  return dashboardData.value.distribution.map(item => ({
+    name: item.category || '未分类',
+    value: item.count,
+    percent: total > 0 ? Math.round((item.count / total) * 100) : 0
   }))
 })
 
 // 订单趋势数据
 const orderTrend = computed(() => {
-  return dashboardData.value?.order_trend || []
+  return dashboardData.value?.trend || []
 })
 
 // 最大订单数（用于计算柱状图高度）
@@ -234,10 +233,14 @@ async function loadDashboard() {
     const response = await get<DashboardData>('/api/v1/sp/dashboard')
     dashboardData.value = response
 
-    // 尝试从缓存获取服务商信息
+    // 服务商信息在登录时以 JSON 字符串写入缓存，这里兼容字符串与对象两种情况。
     const cachedInfo = uni.getStorageSync('sp_info')
     if (cachedInfo) {
-      providerInfo.value = cachedInfo
+      if (typeof cachedInfo === 'string') {
+        providerInfo.value = JSON.parse(cachedInfo)
+      } else {
+        providerInfo.value = cachedInfo
+      }
     }
   } catch (err: any) {
     console.error('加载Dashboard失败:', err)
@@ -262,11 +265,6 @@ function goAnalytics() {
 
 function goAnnouncements() {
   uni.navigateTo({ url: '/pages/sp/announcements/index' })
-}
-
-function goOrderIssues() {
-  // uni.navigateTo({ url: '/pages/sp/orders/issues' })
-  uni.showToast({ title: '异常订单模块开发中', icon: 'none' })
 }
 
 // 页面显示时加载数据

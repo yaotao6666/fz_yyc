@@ -16,8 +16,10 @@ NC='\033[0m' # No Color
 DB_NAME="fz_yyc_api"
 DB_USER="root"
 DB_PASS=""
-DB_HOST="localhost"
+DB_HOST="127.0.0.1"
 DB_PORT="3306"
+INIT_SQL_FILE="migrations/20240101000000_full_init.sql"
+MOCK_SQL_FILE="migrations/20260511120000_mock_seed.sql"
 
 # 打印带颜色的消息
 print_info() {
@@ -44,7 +46,9 @@ show_help() {
 用法: $0 [命令] [选项]
 
 命令:
-    init        初始化数据库（创建表结构和测试数据）
+    init        初始化数据库（最小初始化数据）
+    init-mock   初始化数据库并导入完整模拟数据
+    mock        在最小初始化基础上导入完整模拟数据
     reset       重置数据库（删除所有数据后重新初始化）
     test        执行回归测试
     clean       清理测试数据
@@ -59,13 +63,51 @@ show_help() {
     -d, --database  数据库名称 (默认: fz_yyc_api)
 
 示例:
-    $0 init                                    # 初始化数据库
-    $0 init -u myuser -P mypass               # 使用指定用户初始化
+    $0 init                                    # 初始化最小数据
+    $0 init-mock                               # 初始化并导入完整模拟数据
+    $0 mock                                    # 为已有最小初始化补充模拟数据
+    $0 init -u myuser -P mypass                # 使用指定用户初始化
     $0 reset                                   # 重置数据库
     $0 test                                    # 执行回归测试
     $0 status                                  # 查看状态
 
 EOF
+}
+
+# 解析命令行参数
+parse_args() {
+    COMMAND="${1:-help}"
+    shift || true
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -h|--host)
+                DB_HOST="$2"
+                shift 2
+                ;;
+            -p|--port)
+                DB_PORT="$2"
+                shift 2
+                ;;
+            -u|--user)
+                DB_USER="$2"
+                shift 2
+                ;;
+            -P|--password)
+                DB_PASS="$2"
+                shift 2
+                ;;
+            -d|--database)
+                DB_NAME="$2"
+                shift 2
+                ;;
+            *)
+                print_error "未知参数: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
 }
 
 # 检查依赖
@@ -86,37 +128,61 @@ check_dependencies() {
     print_success "依赖检查完成"
 }
 
-# 初始化数据库
-init_database() {
-    print_info "开始初始化数据库..."
-    
-    local SQL_FILE="migrations/20240101000000_full_init.sql"
-    
-    if [ ! -f "$SQL_FILE" ]; then
-        print_error "初始化脚本不存在: $SQL_FILE"
-        exit 1
-    fi
-    
-    # 构建 MySQL 命令
+# 构建 MySQL 命令
+build_mysql_cmd() {
     local MYSQL_CMD="mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USER}"
-    
+
     if [ -n "$DB_PASS" ]; then
         MYSQL_CMD="${MYSQL_CMD} -p${DB_PASS}"
     fi
-    
-    # 执行初始化脚本
-    print_info "执行初始化脚本..."
-    ${MYSQL_CMD} < "$SQL_FILE"
-    
-    if [ $? -eq 0 ]; then
-        print_success "数据库初始化成功！"
-        print_info "测试账号信息："
-        echo "  服务商管理员: admin / admin123"
-        echo "  商家管理员:   merchant / merchant123"
-    else
-        print_error "数据库初始化失败！"
+
+    echo "$MYSQL_CMD"
+}
+
+# 导入 SQL 文件
+import_sql_file() {
+    local SQL_FILE="$1"
+    local DESCRIPTION="$2"
+
+    if [ ! -f "$SQL_FILE" ]; then
+        print_error "SQL 文件不存在: $SQL_FILE"
         exit 1
     fi
+
+    local MYSQL_CMD
+    MYSQL_CMD=$(build_mysql_cmd)
+
+    print_info "执行${DESCRIPTION}: ${SQL_FILE}"
+    ${MYSQL_CMD} < "$SQL_FILE"
+
+    if [ $? -eq 0 ]; then
+        print_success "${DESCRIPTION}成功"
+    else
+        print_error "${DESCRIPTION}失败！"
+        exit 1
+    fi
+}
+
+# 初始化数据库
+init_database() {
+    print_info "开始初始化数据库（最小模式）..."
+    import_sql_file "$INIT_SQL_FILE" "最小初始化脚本"
+    print_info "测试账号信息："
+    echo "  服务商管理员: admin / admin123"
+    echo "  商家管理员:   merchant / merchant123"
+}
+
+# 导入模拟数据
+import_mock_data() {
+    print_info "开始导入完整模拟数据..."
+    import_sql_file "$MOCK_SQL_FILE" "完整模拟数据脚本"
+    print_info "模拟数据已覆盖商家、商品、用户、订单、邀请、公告、打印等业务表"
+}
+
+# 初始化数据库并导入模拟数据
+init_mock_database() {
+    init_database
+    import_mock_data
 }
 
 # 重置数据库
@@ -152,13 +218,10 @@ reset_database() {
 # 查看数据库状态
 show_status() {
     print_info "数据库状态："
-    
-    local MYSQL_CMD="mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USER}"
-    
-    if [ -n "$DB_PASS" ]; then
-        MYSQL_CMD="${MYSQL_CMD} -p${DB_PASS}"
-    fi
-    
+
+    local MYSQL_CMD
+    MYSQL_CMD=$(build_mysql_cmd)
+
     ${MYSQL_CMD} -e "
         SELECT 
             '数据表' AS 项目,
@@ -189,7 +252,22 @@ show_status() {
         SELECT 
             '订单数量' AS 项目,
             COUNT(*) AS 数量
-        FROM ${DB_NAME}.orders;
+        FROM ${DB_NAME}.orders
+        UNION ALL
+        SELECT
+            '邀请记录' AS 项目,
+            COUNT(*) AS 数量
+        FROM ${DB_NAME}.invite_records
+        UNION ALL
+        SELECT
+            '系统公告' AS 项目,
+            COUNT(*) AS 数量
+        FROM ${DB_NAME}.announcements
+        UNION ALL
+        SELECT
+            '打印机数量' AS 项目,
+            COUNT(*) AS 数量
+        FROM ${DB_NAME}.cloud_printers;
     "
 }
 
@@ -260,11 +338,8 @@ clean_data() {
     
     print_info "清理测试数据..."
     
-    local MYSQL_CMD="mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USER}"
-    
-    if [ -n "$DB_PASS" ]; then
-        MYSQL_CMD="${MYSQL_CMD} -p${DB_PASS}"
-    fi
+    local MYSQL_CMD
+    MYSQL_CMD=$(build_mysql_cmd)
     
     ${MYSQL_CMD} ${DB_NAME} << 'EOF'
         DELETE FROM order_items;
@@ -303,11 +378,20 @@ EOF
 
 # 主函数
 main() {
-    # 解析命令行参数
-    case "${1:-help}" in
+    parse_args "$@"
+
+    case "${COMMAND}" in
         init)
             check_dependencies
             init_database
+            ;;
+        init-mock)
+            check_dependencies
+            init_mock_database
+            ;;
+        mock)
+            check_dependencies
+            import_mock_data
             ;;
         reset)
             check_dependencies

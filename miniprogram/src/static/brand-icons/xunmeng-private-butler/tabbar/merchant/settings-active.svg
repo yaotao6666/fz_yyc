@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">设置 Tab 图标（选中）</title>
+  <desc id="desc">简洁齿轮图标，选中状态使用品牌金色。</desc>
+  <g fill="none" stroke="#FFB020" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M512 298 574 330 646 314 678 378 744 424 716 496 744 568 678 614 646 678 574 662 512 694 450 662 378 678 346 614 280 568 308 496 280 424 346 378 378 314 450 330 512 298Z"/>
+    <circle cx="512" cy="496" r="98"/>
+  </g>
+  <circle cx="744" cy="424" r="22" fill="#FF8A00"/>
+</svg>
+

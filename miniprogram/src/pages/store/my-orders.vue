@@ -24,7 +24,7 @@
           <view class="merchant-info">
             <image
               class="merchant-logo"
-              :src="order.merchant?.logo || '/static/default-logo.png'"
+              :src="order.merchant?.logo || BrandAsset.DEFAULT_MERCHANT_LOGO"
               mode="aspectFill"
             />
             <text class="merchant-name">{{ order.merchant?.name || '商家' }}</text>
@@ -126,6 +126,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { getMyOrders, cancelMyOrder, applyRefund } from '@api'
 import { OrderStatus, OrderStatusText } from '@types'
 import type { Order } from '@types'
+import { BrandAsset } from '../../utils/constants'
 
 const statusTabs = [
   { label: '全部', value: 0 },

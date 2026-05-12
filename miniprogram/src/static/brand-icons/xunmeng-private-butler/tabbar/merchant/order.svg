@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">订单 Tab 图标（未选中）</title>
+  <desc id="desc">票据/清单外形融合对勾，表达订单处理与状态确认。</desc>
+  <g fill="none" stroke="#9AA7B4" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M320 214h384v596l-64-44-64 44-64-44-64 44-64-44-64 44V214Z"/>
+    <path d="M392 360h240"/>
+    <path d="M392 460h240"/>
+    <path d="M404 604l66 66 150-150"/>
+  </g>
+  <circle cx="704" cy="260" r="22" fill="#9AA7B4"/>
+</svg>
+

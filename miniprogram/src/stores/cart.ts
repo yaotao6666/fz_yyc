@@ -5,6 +5,8 @@
 import { defineStore } from 'pinia'
 
 export interface CartItem {
+  merchant_id?: number
+  merchant_name?: string
   product_id: number
   product_name: string
   image: string
@@ -44,14 +46,19 @@ export const useCartStore = defineStore('cart', {
   actions: {
     // 添加商品到购物车
     addItem(item: CartItem) {
-      // 检查是否为不同商家
-      if (this.merchantId && this.merchantId !== item.product_id) {
-        // 清空购物车
+      const incomingMerchantId = item.merchant_id ?? null
+      const incomingMerchantName = item.merchant_name ?? ''
+
+      if (incomingMerchantId && this.merchantId && this.merchantId !== incomingMerchantId) {
         this.clearCart()
       }
 
-      this.merchantId = item.product_id
-      this.merchantName = item.product_name
+      if (incomingMerchantId) {
+        this.merchantId = incomingMerchantId
+      }
+      if (incomingMerchantName) {
+        this.merchantName = incomingMerchantName
+      }
 
       const existIndex = this.items.findIndex(
         i => i.product_id === item.product_id && i.specs === item.specs

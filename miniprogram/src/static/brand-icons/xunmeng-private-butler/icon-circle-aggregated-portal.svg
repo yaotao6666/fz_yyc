@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">寻梦私域管家 - 圆形图标（聚合入口×运营面板）</title>
+  <desc id="desc">以聚合入口的四象限面板为核心，上方店铺屋檐点题，右上角金色增长点。</desc>
+  <circle cx="512" cy="512" r="416" fill="#0B1F3A"/>
+  <circle cx="512" cy="512" r="416" fill="none" stroke="#FFFFFF" stroke-width="18" opacity="0.18"/>
+  <path d="M336 438c0-22 18-40 40-40h272c22 0 40 18 40 40v280c0 22-18 40-40 40H376c-22 0-40-18-40-40V438Z" fill="#FFFFFF"/>
+  <path d="M336 520h392" fill="none" stroke="#0B1F3A" stroke-width="22" opacity="0.18"/>
+  <path d="M532 398v360" fill="none" stroke="#0B1F3A" stroke-width="22" opacity="0.18"/>
+  <path d="M350 424 386 328h252l36 96" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M402 640v-72" fill="none" stroke="#0B1F3A" stroke-width="34" stroke-linecap="round" opacity="0.9"/>
+  <path d="M460 640v-108" fill="none" stroke="#0B1F3A" stroke-width="34" stroke-linecap="round" opacity="0.9"/>
+  <path d="M590 640v-86" fill="none" stroke="#0B1F3A" stroke-width="34" stroke-linecap="round" opacity="0.9"/>
+  <path d="M648 640v-132" fill="none" stroke="#FF8A00" stroke-width="34" stroke-linecap="round"/>
+  <path d="M566 466c18 0 32 14 32 32s-14 32-32 32-32-14-32-32 14-32 32-32Z" fill="#FFB020"/>
+  <circle cx="716" cy="360" r="18" fill="#FFB020"/>
+</svg>
+

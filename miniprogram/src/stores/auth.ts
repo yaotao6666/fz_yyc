@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { merchantLogin, merchantWechatLogin, getMerchantProfile } from '../api'
 import type { MerchantStaff, MerchantInfo } from '../types/index'
+import { MERCHANT_SOCKET_URL } from '../config/env'
 import { getMerchantWechatCode } from '../utils/merchant_wechat'
 
 let socketTask: any = null
@@ -14,7 +15,15 @@ let reconnectTimer: any = null
 let orderAudio: any = null
 let browseAudio: any = null
 
-const WS_URL = 'ws://localhost:8080/api/v1/ws/merchant'
+export type MerchantSocketStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
+
+export interface MerchantSocketMessageSummary {
+  type: string
+  merchantId?: number
+  orderNo?: string
+  visitorOpenId?: string
+  source?: string
+}
 
 function getStoredBoolean(key: string, defaultValue = true): boolean {
   const value = uni.getStorageSync(key)
@@ -22,6 +31,23 @@ function getStoredBoolean(key: string, defaultValue = true): boolean {
     return defaultValue
   }
   return !!value
+}
+
+function getCurrentDateTime(): string {
+  const now = new Date()
+  const datePart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const timePart = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+  return `${datePart} ${timePart}`
+}
+
+function buildSocketMessageSummary(message: any): MerchantSocketMessageSummary {
+  return {
+    type: message?.type || 'unknown',
+    merchantId: Number(message?.payload?.merchant_id || 0) || undefined,
+    orderNo: message?.payload?.order_no || undefined,
+    visitorOpenId: message?.payload?.visitor_openid || undefined,
+    source: message?.payload?.source || undefined
+  }
 }
 
 function createAudio(src: string) {
@@ -47,6 +73,9 @@ interface AuthState {
   isLoggedIn: boolean
   orderSoundEnabled: boolean
   browseSoundEnabled: boolean
+  socketStatus: MerchantSocketStatus
+  lastSocketMessage: MerchantSocketMessageSummary | null
+  lastSocketMessageAt: string
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -57,7 +86,10 @@ export const useAuthStore = defineStore('auth', {
     staff: null,
     isLoggedIn: !!uni.getStorageSync('token'),
     orderSoundEnabled: getStoredBoolean('merchant_sound_enabled'),
-    browseSoundEnabled: getStoredBoolean('merchant_browse_sound_enabled')
+    browseSoundEnabled: getStoredBoolean('merchant_browse_sound_enabled'),
+    socketStatus: 'disconnected',
+    lastSocketMessage: null,
+    lastSocketMessageAt: ''
   }),
 
   getters: {
@@ -203,14 +235,27 @@ export const useAuthStore = defineStore('auth', {
       uni.setStorageSync('merchant_browse_sound_enabled', enabled)
     },
 
+    setSocketStatus(status: MerchantSocketStatus) {
+      this.socketStatus = status
+    },
+
+    setLastSocketMessage(message: MerchantSocketMessageSummary) {
+      this.lastSocketMessage = message
+      this.lastSocketMessageAt = getCurrentDateTime()
+    },
+
     connectOrderSocket() {
       if (socketTask) return
       const token = this.token || uni.getStorageSync('token')
-      if (!token) return
+      if (!token) {
+        this.setSocketStatus('disconnected')
+        return
+      }
 
       activeStore = this
+      this.setSocketStatus('connecting')
       socketTask = uni.connectSocket({
-        url: WS_URL,
+        url: MERCHANT_SOCKET_URL,
         header: {
           Authorization: `Bearer ${token}`
         }
@@ -220,6 +265,7 @@ export const useAuthStore = defineStore('auth', {
         socketListenersBound = true
 
         uni.onSocketOpen(() => {
+          activeStore?.setSocketStatus('connected')
           if (reconnectTimer) {
             clearTimeout(reconnectTimer)
             reconnectTimer = null
@@ -231,6 +277,8 @@ export const useAuthStore = defineStore('auth', {
             const dataStr = typeof res.data === 'string' ? res.data : ''
             const msg = dataStr ? JSON.parse(dataStr) : null
             if (!msg) return
+
+            activeStore?.setLastSocketMessage(buildSocketMessageSummary(msg))
 
             if (msg.type === 'order_notify') {
               const orderNo = msg.payload?.order_no || ''
@@ -258,18 +306,22 @@ export const useAuthStore = defineStore('auth', {
         })
 
         uni.onSocketError(() => {
+          activeStore?.setSocketStatus('disconnected')
           socketTask = null
         })
 
         uni.onSocketClose(() => {
           socketTask = null
           if (activeStore?.isLoggedIn) {
+            activeStore?.setSocketStatus('reconnecting')
             if (reconnectTimer) {
               clearTimeout(reconnectTimer)
             }
             reconnectTimer = setTimeout(() => {
               activeStore?.connectOrderSocket()
             }, 2000)
+          } else {
+            activeStore?.setSocketStatus('disconnected')
           }
         })
       }
@@ -286,6 +338,7 @@ export const useAuthStore = defineStore('auth', {
         } catch (e) {
         }
       }
+      this.setSocketStatus('disconnected')
       socketTask = null
       activeStore = null
     },
@@ -300,20 +353,6 @@ export const useAuthStore = defineStore('auth', {
       this.staff = staff
       uni.setStorageSync('staff', JSON.stringify(staff))
       this.hydrateSoundSettingsFromStaffSettings()
-    },
-
-    testPlayOrderSound() {
-      if (!orderAudio) {
-        orderAudio = createAudio('/static/sounds/order.mp3')
-      }
-      playAudio(orderAudio)
-    },
-
-    testPlayBrowseSound() {
-      if (!browseAudio) {
-        browseAudio = createAudio('/static/sounds/browse.mp3')
-      }
-      playAudio(browseAudio)
     }
   }
 })

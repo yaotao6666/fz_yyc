@@ -143,3 +143,12 @@ func GetUserType(c *gin.Context) string {
 func GetMerchantID(c *gin.Context) uint64 {
 	return GetUserID(c)
 }
+
+// GetUsername 获取当前登录用户名
+func GetUsername(c *gin.Context) string {
+	username, _ := c.Get("username")
+	if username == nil {
+		return ""
+	}
+	return username.(string)
+}

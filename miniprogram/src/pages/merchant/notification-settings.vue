@@ -19,12 +19,6 @@
         <switch :checked="browseEnabled" :disabled="saving" color="#007AFF" @change="toggleBrowseNotify" />
       </view>
     </view>
-
-    <view class="section">
-      <view class="section-title">测试播放</view>
-      <button class="test-btn" @click="handleTestOrderSound">测试下单提醒</button>
-      <button class="test-btn secondary" @click="handleTestBrowseSound">测试浏览提醒</button>
-    </view>
   </view>
 </template>
 
@@ -94,14 +88,6 @@ function toggleBrowseNotify(event: any) {
   browseEnabled.value = !!event.detail.value
   saveSettings({ browse_notify_enabled: browseEnabled.value })
 }
-
-function handleTestOrderSound() {
-  authStore.testPlayOrderSound()
-}
-
-function handleTestBrowseSound() {
-  authStore.testPlayBrowseSound()
-}
 </script>
 
 <style scoped>
@@ -151,23 +137,5 @@ function handleTestBrowseSound() {
 .setting-value {
   font-size: 24rpx;
   color: #999999;
-}
-
-.test-btn {
-  width: 100%;
-  height: 88rpx;
-  border-radius: 44rpx;
-  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
-  color: #ffffff;
-  font-size: 30rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 20rpx;
-}
-
-.test-btn.secondary {
-  background: #f0f5ff;
-  color: #0056CC;
 }
 </style>

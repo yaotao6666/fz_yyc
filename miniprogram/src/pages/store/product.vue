@@ -125,17 +125,16 @@ const selectedPrice = computed(() => {
   if (!product.value) return 0
   
   let price = product.value.price
-  
+
   if (product.value.specs?.length) {
     for (const spec of product.value.specs) {
       const selectedOption = spec.options.find(o => o.name === selectedSpecs[spec.name])
       if (selectedOption) {
-        price = selectedOption.price
-        break
+        price += selectedOption.price
       }
     }
   }
-  
+
   return price
 })
 
@@ -159,7 +158,6 @@ onShow(() => {
   const currentPage = pages[pages.length - 1] as any
   merchantId.value = Number(currentPage?.options?.merchant_id) || 1
   productId.value = Number(currentPage?.options?.product_id) || 1
-  
   loadProduct()
 })
 
@@ -218,6 +216,8 @@ function addToCart() {
   if (!product.value) return
 
   cartStore.addItem({
+    merchant_id: merchantId.value,
+    merchant_name: cartStore.merchantName || '',
     product_id: product.value.id,
     product_name: product.value.name,
     image: product.value.images?.[0] || '',
@@ -257,7 +257,7 @@ function goCart() {
 .product-detail-container {
   min-height: 100vh;
   background: #f5f5f5;
-  padding-bottom: 140rpx;
+  padding-bottom: 160rpx;
 }
 
 .product-swiper {
@@ -427,12 +427,13 @@ function goCart() {
   padding: 0 32rpx;
   padding-bottom: env(safe-area-inset-bottom);
   box-shadow: 0 -2rpx 10rpx rgba(0, 0, 0, 0.05);
+  z-index: 100;
 }
 
 .action-icons {
   display: flex;
-  gap: 40rpx;
-  margin-right: 32rpx;
+  gap: 32rpx;
+  margin-right: 24rpx;
 }
 
 .icon-item {
@@ -461,7 +462,7 @@ function goCart() {
   background: #ff4d4f;
   color: #ffffff;
   border-radius: 16rpx;
-  font-size: 20rpx;
+  font-size: 22rpx;
   display: flex;
   align-items: center;
   justify-content: center;

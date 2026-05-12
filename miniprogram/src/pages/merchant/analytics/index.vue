@@ -6,7 +6,7 @@
           v-for="tab in periodTabs"
           :key="tab.value"
           class="period-tab"
-          :class="{ active: currentPeriod === tab.value }"
+          :class="{ 'period-tab-active': tab.active }"
           @click="changePeriod(tab.value)"
         >
           {{ tab.label }}
@@ -172,12 +172,12 @@ import type {
 
 type PeriodValue = 'today' | 'week' | 'month' | 'year'
 
-const periodTabs = [
-  { label: '今日', value: 'today' as PeriodValue },
-  { label: '本周', value: 'week' as PeriodValue },
-  { label: '本月', value: 'month' as PeriodValue },
-  { label: '本年', value: 'year' as PeriodValue }
-]
+const periodTabs = computed(() => [
+  { label: '今日', value: 'today' as PeriodValue, active: currentPeriod.value === 'today' },
+  { label: '本周', value: 'week' as PeriodValue, active: currentPeriod.value === 'week' },
+  { label: '本月', value: 'month' as PeriodValue, active: currentPeriod.value === 'month' },
+  { label: '本年', value: 'year' as PeriodValue, active: currentPeriod.value === 'year' }
+])
 
 const CHART_HEIGHT = 220
 const CHART_COLUMN_WIDTH = 44
@@ -367,10 +367,10 @@ function getRankClass(index: number): string {
   transition: all 0.2s ease;
 }
 
-.period-tab.active {
-  background: #ffffff;
-  color: #007AFF;
-  font-weight: 600;
+.period-tab-active {
+  background: #ffffff !important;
+  color: #007AFF !important;
+  font-weight: 600 !important;
 }
 
 .range-text {

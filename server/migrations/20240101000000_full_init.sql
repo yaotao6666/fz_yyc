@@ -274,12 +274,22 @@ CREATE TABLE `users` (
     `avatar` VARCHAR(512) DEFAULT NULL,
     `phone` VARCHAR(20) DEFAULT NULL,
     `status` TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    `first_visit_at` DATETIME DEFAULT NULL,
+    `last_visit_at` DATETIME DEFAULT NULL,
+    `visit_count` INT UNSIGNED NOT NULL DEFAULT 1,
+    `has_ordered` TINYINT(1) NOT NULL DEFAULT 0,
+    `total_orders` INT UNSIGNED NOT NULL DEFAULT 0,
+    `total_spent` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `has_paid` TINYINT(1) NOT NULL DEFAULT 0,
+    `first_paid_at` DATETIME DEFAULT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_users_openid` (`openid`),
     KEY `idx_users_union_id` (`union_id`),
-    KEY `idx_users_phone` (`phone`)
+    KEY `idx_users_phone` (`phone`),
+    KEY `idx_users_first_visit_at` (`first_visit_at`),
+    KEY `idx_users_has_paid` (`has_paid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='C端用户表';
 
 -- 12. 用户收货地址表
@@ -362,6 +372,7 @@ CREATE TABLE `orders` (
     `transaction_id` VARCHAR(64) DEFAULT NULL,
     `paid_at` DATETIME DEFAULT NULL,
     `completed_at` DATETIME DEFAULT NULL,
+    `completed_by_name` VARCHAR(64) DEFAULT NULL,
     `cancelled_at` DATETIME DEFAULT NULL,
     `refunded_at` DATETIME DEFAULT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

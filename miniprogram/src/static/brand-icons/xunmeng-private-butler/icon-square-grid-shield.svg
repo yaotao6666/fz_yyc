@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">寻梦私域管家 - 方形图标（统一入口×安全）</title>
+  <desc id="desc">网格统一入口为底，叠加护盾与店铺抽象轮廓，突出专业可靠与安全。</desc>
+  <rect x="96" y="96" width="832" height="832" rx="168" fill="#0B1F3A"/>
+  <g opacity="0.28" fill="#FFFFFF">
+    <rect x="250" y="250" width="92" height="92" rx="22"/>
+    <rect x="360" y="250" width="92" height="92" rx="22"/>
+    <rect x="470" y="250" width="92" height="92" rx="22"/>
+    <rect x="580" y="250" width="92" height="92" rx="22"/>
+    <rect x="250" y="360" width="92" height="92" rx="22"/>
+    <rect x="360" y="360" width="92" height="92" rx="22"/>
+    <rect x="470" y="360" width="92" height="92" rx="22"/>
+    <rect x="580" y="360" width="92" height="92" rx="22"/>
+    <rect x="250" y="470" width="92" height="92" rx="22"/>
+    <rect x="360" y="470" width="92" height="92" rx="22"/>
+    <rect x="470" y="470" width="92" height="92" rx="22"/>
+    <rect x="580" y="470" width="92" height="92" rx="22"/>
+    <rect x="250" y="580" width="92" height="92" rx="22"/>
+    <rect x="360" y="580" width="92" height="92" rx="22"/>
+    <rect x="470" y="580" width="92" height="92" rx="22"/>
+    <rect x="580" y="580" width="92" height="92" rx="22"/>
+  </g>
+  <path d="M512 270c122 70 238 70 238 70v198c0 138-94 256-238 306-144-50-238-168-238-306V340s116 0 238-70Z" fill="#FFFFFF" opacity="0.12"/>
+  <path d="M512 292c106 60 206 60 206 60v176c0 116-78 216-206 262-128-46-206-146-206-262V352s100 0 206-60Z" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linejoin="round"/>
+  <path d="M396 476 436 374h152l40 102" fill="none" stroke="#FFB020" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M414 468c0-14 12-26 26-26h144c14 0 26 12 26 26v186c0 14-12 26-26 26H440c-14 0-26-12-26-26V468Z" fill="#FFFFFF"/>
+  <path d="M470 612v-92" fill="none" stroke="#0B1F3A" stroke-width="34" stroke-linecap="round" opacity="0.9"/>
+  <path d="M540 612V548" fill="none" stroke="#0B1F3A" stroke-width="34" stroke-linecap="round" opacity="0.9"/>
+  <path d="M610 612V508" fill="none" stroke="#FF8A00" stroke-width="34" stroke-linecap="round"/>
+  <circle cx="684" cy="326" r="18" fill="#FF8A00"/>
+</svg>
+

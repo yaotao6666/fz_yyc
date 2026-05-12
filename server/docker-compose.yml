@@ -7,11 +7,11 @@ services:
     container_name: fz_yyc_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root123456
-      MYSQL_DATABASE: fz_yyc_api
-      MYSQL_USER: fz_yyc
-      MYSQL_PASSWORD: fz_yyc123
-      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fz_yyc_api}
+      MYSQL_USER: ${MYSQL_USER:-fz_yyc}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-fz_yyc123}
+      TZ: ${TZ:-Asia/Shanghai}
     ports:
       - "3306:3306"
     volumes:
@@ -35,9 +35,9 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --requirepass redis123
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis123", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis123}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,32 +51,37 @@ services:
       dockerfile: Dockerfile
     container_name: fz_yyc_api
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "8080:8080"
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_USER: fz_yyc
-      DB_PASSWORD: fz_yyc123
-      DB_NAME: fz_yyc_api
-      DB_CHARSET: utf8mb4
+      DB_USER: ${DB_USER:-fz_yyc}
+      DB_PASSWORD: ${DB_PASSWORD:-fz_yyc123}
+      DB_NAME: ${DB_NAME:-fz_yyc_api}
+      DB_CHARSET: ${DB_CHARSET:-utf8mb4}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: redis123
-      REDIS_DB: 0
-      JWT_SECRET: default-secret-change-in-production
-      JWT_EXPIRE: 720
-      APP_HOST: 0.0.0.0
-      APP_PORT: 8080
-      APP_ENV: development
-      APP_DEBUG: "true"
-      WECHAT_APP_ID: wx71a54b66552dc9e8
-      WECHAT_APP_SECRET: 81fc6e0836839b5a8ce6b7fbc990b883
-      QINIU_ACCESS_KEY: 1FctZeFOq4pUyZ55WhkfyzU9rI31anReup9lHbkF
-      QINIU_SECRET_KEY: 9jzDbPHC06UvA0HyXnNkZiHy_yEZjdUbKChQeBHY
-      QINIU_BUCKET: xm-lexiang
-      QINIU_DOMAIN: https://lexiang-oss.jxxme.cn
-      QINIU_UPLOAD_URL: https://up-z0.qiniup.com
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123}
+      REDIS_DB: ${REDIS_DB:-0}
+      JWT_SECRET: ${JWT_SECRET:-default-secret-change-in-production}
+      JWT_EXPIRE: ${JWT_EXPIRE:-720}
+      APP_HOST: ${APP_HOST:-0.0.0.0}
+      APP_PORT: ${APP_PORT:-8080}
+      APP_ENV: ${APP_ENV:-development}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+      WECHAT_PAY_MCH_ID: ${WECHAT_PAY_MCH_ID:-}
+      WECHAT_PAY_API_KEY: ${WECHAT_PAY_API_KEY:-}
+      WECHAT_PAY_CALLBACK_URL: ${WECHAT_PAY_CALLBACK_URL:-}
+      QINIU_ACCESS_KEY: ${QINIU_ACCESS_KEY:-}
+      QINIU_SECRET_KEY: ${QINIU_SECRET_KEY:-}
+      QINIU_BUCKET: ${QINIU_BUCKET:-}
+      QINIU_DOMAIN: ${QINIU_DOMAIN:-}
+      QINIU_UPLOAD_URL: ${QINIU_UPLOAD_URL:-}
     depends_on:
       mysql:
         condition: service_healthy

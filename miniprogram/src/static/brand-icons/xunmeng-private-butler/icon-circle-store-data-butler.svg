@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">寻梦私域管家 - 圆形图标（店铺×数据×管家）</title>
+  <desc id="desc">圆形深蓝底，店铺轮廓中嵌入数据柱与管家领结，强调运营与增长。</desc>
+  <circle cx="512" cy="512" r="416" fill="#0B1F3A"/>
+  <circle cx="512" cy="512" r="416" fill="none" stroke="#FFFFFF" stroke-width="18" opacity="0.18"/>
+  <path d="M316 454 362 330h300l46 124" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M342 476c0-18 14-32 32-32h276c18 0 32 14 32 32v282c0 18-14 32-32 32H374c-18 0-32-14-32-32V476Z" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linejoin="round"/>
+  <path d="M408 706v-120" fill="none" stroke="#FFB020" stroke-width="38" stroke-linecap="round"/>
+  <path d="M496 706V554" fill="none" stroke="#FFB020" stroke-width="38" stroke-linecap="round"/>
+  <path d="M584 706V516" fill="none" stroke="#FF8A00" stroke-width="38" stroke-linecap="round"/>
+  <path d="M512 510c30 0 54 24 54 54 0 20-10 38-26 48l10 92c0 10-8 18-18 18h-40c-10 0-18-8-18-18l10-92c-16-10-26-28-26-48 0-30 24-54 54-54Z" fill="#FFFFFF"/>
+  <path d="M512 580 482 614l30 24 30-24-30-34Z" fill="#FF8A00"/>
+  <circle cx="690" cy="352" r="16" fill="#FFB020"/>
+</svg>
+

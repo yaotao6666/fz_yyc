@@ -26,14 +26,7 @@
   "h5": {
     "devServer": {
       "port": 3000,
-      "disableHostCheck": true,
-      "proxy": {
-        "/api": {
-          "target": "http://localhost:8080",
-          "changeOrigin": true,
-          "secure": false
-        }
-      }
+      "disableHostCheck": true
     },
     "router": {
       "mode": "hash"

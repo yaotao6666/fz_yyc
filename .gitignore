@@ -43,8 +43,8 @@ project.private.config.json
 # 后端
 server/vendor/
 server/.env
+server/.env.production
 *.exe
 
 # 嵌套仓库（不纳入版本控制）
 fz_yyc/
-

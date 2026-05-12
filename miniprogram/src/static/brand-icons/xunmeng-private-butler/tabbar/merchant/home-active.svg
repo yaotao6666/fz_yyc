@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">工作台 Tab 图标（选中）</title>
+  <desc id="desc">简洁线性店铺/工作台图标，适配底部 tabBar 选中状态（品牌金色）。</desc>
+  <g fill="none" stroke="#FFB020" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M224 454 320 272h384l96 182"/>
+    <path d="M272 470h480v356H272V470Z"/>
+    <path d="M414 826V636h196v190"/>
+  </g>
+  <circle cx="792" cy="308" r="24" fill="#FF8A00"/>
+</svg>
+

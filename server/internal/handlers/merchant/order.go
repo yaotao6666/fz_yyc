@@ -17,6 +17,67 @@ type CompleteOrderRequest struct {
 	VerifyCode string `json:"verify_code" binding:"required"`
 }
 
+type QuickCompleteOrderRequest struct {
+	VerifyCode string `json:"verify_code" binding:"required"`
+}
+
+func loadMerchantOrderByID(merchantID, orderID uint64) (*models.Order, error) {
+	var order models.Order
+	if err := database.DB.Preload("User").Preload("Items").Where("id = ? AND merchant_id = ?", orderID, merchantID).First(&order).Error; err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
+func getCompleterName(c *gin.Context, merchantID uint64) string {
+	username := strings.TrimSpace(middleware.GetUsername(c))
+	if username == "" {
+		return ""
+	}
+
+	var staff models.MerchantStaff
+	if err := database.DB.
+		Where("merchant_id = ? AND username = ?", merchantID, username).
+		First(&staff).Error; err == nil {
+		if strings.TrimSpace(staff.Name) != "" {
+			return strings.TrimSpace(staff.Name)
+		}
+	}
+
+	return username
+}
+
+func completeMerchantOrder(c *gin.Context, order *models.Order, verifyCode string) {
+	if order.VerifyCode != verifyCode {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码错误")
+		return
+	}
+
+	if order.Status != 2 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单状态不正确")
+		return
+	}
+
+	now := time.Now()
+	completedByName := getCompleterName(c, order.MerchantID)
+	if err := database.DB.Model(order).Updates(map[string]interface{}{
+		"status":            3,
+		"completed_at":      now,
+		"completed_by_name": completedByName,
+	}).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "完成订单失败")
+		return
+	}
+
+	updatedOrder, err := loadMerchantOrderByID(order.MerchantID, order.ID)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "加载订单详情失败")
+		return
+	}
+
+	response.Success(c, updatedOrder)
+}
+
 func GetOrders(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -76,8 +137,8 @@ func GetOrderDetail(c *gin.Context) {
 	orderID := c.Param("order_id")
 	id, _ := strconv.ParseUint(orderID, 10, 64)
 
-	var order models.Order
-	if err := database.DB.Preload("User").Preload("Items").Where("id = ? AND merchant_id = ?", id, merchantID).First(&order).Error; err != nil {
+	order, err := loadMerchantOrderByID(merchantID, id)
+	if err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
 		return
 	}
@@ -107,33 +168,46 @@ func CompleteOrder(c *gin.Context) {
 		}
 	}
 
-	var order models.Order
-	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&order).Error; err != nil {
+	order, err := loadMerchantOrderByID(merchantID, id)
+	if err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
 		return
 	}
 
-	if order.VerifyCode != verifyCode {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码错误")
+	completeMerchantOrder(c, order, verifyCode)
+}
+
+func QuickCompleteOrder(c *gin.Context) {
+	merchantID := middleware.GetMerchantID(c)
+
+	var req QuickCompleteOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
 
-	if order.Status != 2 {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单状态不正确")
+	verifyCode := strings.TrimSpace(req.VerifyCode)
+	if len(verifyCode) != 6 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码应为6位数字")
+		return
+	}
+	for _, r := range verifyCode {
+		if r < '0' || r > '9' {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码应为6位数字")
+			return
+		}
+	}
+
+	var order models.Order
+	if err := database.DB.
+		Where("merchant_id = ? AND verify_code = ? AND status = ?", merchantID, verifyCode, 2).
+		Order("created_at DESC").
+		First(&order).Error; err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "未找到可核销订单")
 		return
 	}
 
-	now := time.Now()
-	if err := database.DB.Model(&order).Updates(map[string]interface{}{
-		"status":       3,
-		"completed_at": now,
-	}).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "完成订单失败")
-		return
-	}
-
-	database.DB.Preload("User").Preload("Items").First(&order, id)
-	response.Success(c, order)
+	completeMerchantOrder(c, &order, verifyCode)
 }
 
 type RefundRequest struct {

@@ -5,7 +5,8 @@
 - 测试日期: 2026-05-11
 - 测试环境: Docker (MySQL 8.0, Redis 7, API Server)
 - API 服务: http://localhost:8080
-- 初始化方式: `server/migrations/20240101000000_full_init.sql`
+- 默认初始化方式: `server/migrations/20240101000000_full_init.sql`
+- 可选模拟数据: `server/migrations/20260511120000_mock_seed.sql`
 
 ## 测试执行总结
 
@@ -14,6 +15,7 @@
 - 测试结果: 通过
 - 结论:
   - 单文件初始化 SQL 可成功导入
+  - 可选 mock seed SQL 可在最小初始化后成功导入
   - `api` 重建后可正常启动并通过健康检查
   - `merchant_staffs` 相关字段未再出现缺失报错
 
@@ -24,12 +26,12 @@
   - 数据表数量: 28
   - 服务商管理员账号: 1
   - 商家员工账号: 1
-  - 商品数量: 0
-  - C 端用户数量: 0
-  - 订单数量: 0
+  - 默认初始化商品数量: 0
+  - 默认初始化 C 端用户数量: 0
+  - 默认初始化订单数量: 0
 - 说明:
   - 当前初始化脚本只保留最小登录数据
-  - 商品、订单、C 端用户等业务数据由联调或测试过程生成
+  - 导入 mock seed 后，可获得完整商家、商品、用户、订单、邀请、公告、打印等联调数据
 
 ### 3. API 接口测试
 
@@ -77,6 +79,12 @@
 cd server
 docker exec -i fz_yyc_mysql mysql -uroot -proot123456 < migrations/20240101000000_full_init.sql
 
+# 导入完整模拟数据
+docker exec -i fz_yyc_mysql mysql -uroot -proot123456 < migrations/20260511120000_mock_seed.sql
+
+# 或使用回归脚本一步完成最小初始化与 mock 数据
+./scripts/regression-test.sh init-mock
+
 # 重建并启动 api
 docker compose up --build -d api
 
@@ -94,6 +102,6 @@ curl -X POST http://localhost:8080/api/v1/auth/merchant/login \
 ## 结论
 
 - 单文件迁移重建方案可用，已可替代旧拆分迁移口径。
-- 当前仓库应以 `20240101000000_full_init.sql` 作为唯一初始化入口。
+- 当前仓库以 `20240101000000_full_init.sql` 作为默认初始化入口，并通过 `20260511120000_mock_seed.sql` 提供可选完整模拟数据。
 - 账号口径已收敛为 `admin / admin123` 与 `merchant / merchant123`。
 - 回归脚本、迁移文档和 PRD 需要统一到当前真实登录接口，避免继续误报。

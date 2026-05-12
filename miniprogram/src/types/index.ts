@@ -470,6 +470,7 @@ export interface Order {
   created_at: string
   paid_at?: string
   completed_at?: string
+  completed_by_name?: string
   cancelled_at?: string
   refunded_at?: string
 }

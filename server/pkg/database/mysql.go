@@ -38,6 +38,14 @@ func InitDB(cfg *config.Database) error {
 		return fmt.Errorf("初始化用户行为事件表失败: %w", ensureErr)
 	}
 
+	if ensureErr := ensureUserTables(DB); ensureErr != nil {
+		return fmt.Errorf("初始化用户表扩展字段失败: %w", ensureErr)
+	}
+
+	if ensureErr := ensureOrderColumns(DB); ensureErr != nil {
+		return fmt.Errorf("初始化订单扩展字段失败: %w", ensureErr)
+	}
+
 	// 获取底层 sql.DB
 	sqlDB, err := DB.DB()
 	if err != nil {
@@ -151,6 +159,35 @@ func ensureMerchantStaffIndex(db *gorm.DB, indexName string, createSQL string) e
 
 func ensureUserBehaviorEventsTable(db *gorm.DB) error {
 	return db.AutoMigrate(&models.UserBehaviorEvent{})
+}
+
+func ensureUserTables(db *gorm.DB) error {
+	return db.AutoMigrate(
+		&models.User{},
+		&models.UserVisit{},
+	)
+}
+
+func ensureOrderColumns(db *gorm.DB) error {
+	var count int64
+	queryErr := db.Raw(`
+		SELECT COUNT(*)
+		FROM INFORMATION_SCHEMA.COLUMNS
+		WHERE TABLE_SCHEMA = DATABASE()
+		  AND TABLE_NAME = 'orders'
+		  AND COLUMN_NAME = 'completed_by_name'
+	`).Scan(&count).Error
+	if queryErr != nil {
+		return queryErr
+	}
+
+	if count > 0 {
+		return nil
+	}
+
+	return db.Exec(
+		"ALTER TABLE orders ADD COLUMN completed_by_name VARCHAR(64) DEFAULT NULL COMMENT '核销人' AFTER completed_at",
+	).Error
 }
 
 // GetDB 获取数据库实例

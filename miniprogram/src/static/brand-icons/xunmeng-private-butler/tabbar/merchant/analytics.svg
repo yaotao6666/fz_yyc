@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">数据分析 Tab 图标（未选中）</title>
+  <desc id="desc">柱状图+趋势线的简洁线性图标，强调运营数据洞察。</desc>
+  <g fill="none" stroke="#9AA7B4" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 760V360"/>
+    <path d="M416 760V520"/>
+    <path d="M576 760V450"/>
+    <path d="M736 760V300"/>
+    <path d="M240 760h544"/>
+    <path d="M304 454l140 86 144-126 156 76"/>
+  </g>
+  <circle cx="744" cy="300" r="24" fill="#9AA7B4"/>
+</svg>
+

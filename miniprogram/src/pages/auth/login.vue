@@ -1,7 +1,7 @@
 <template>
   <view class="login-container">
     <view class="login-header">
-      <image class="logo" src="../../static/logo.png" mode="aspectFit" />
+      <image class="logo" :src="BrandAsset.APP_LOGO" mode="aspectFit" />
       <text class="title">寻梦私域管家</text>
       <text class="subtitle">商家管理平台</text>
     </view>
@@ -58,6 +58,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import { BrandAsset } from '../../utils/constants'
 
 const authStore = useAuthStore()
 

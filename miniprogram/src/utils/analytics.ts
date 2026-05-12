@@ -4,6 +4,7 @@
  */
 
 import { trackStoreBehaviorEvent } from '../api'
+import { API_BASE_URL } from '../config/env'
 import { useAuth } from './useAuth'
 
 interface VisitParams {
@@ -22,11 +23,27 @@ interface TrackEventParams {
 }
 
 export function useAnalytics() {
-  const { getOpenid } = useAuth()
+  const { getOpenid, ensureAuth } = useAuth()
+
+  let authPromise: Promise<boolean> | null = null
+
+  async function getOrEnsureOpenid(): Promise<string> {
+    const existing = getOpenid()
+    if (existing) return existing
+
+    if (!authPromise) {
+      authPromise = ensureAuth().finally(() => {
+        authPromise = null
+      })
+    }
+
+    await authPromise
+    return getOpenid()
+  }
 
   const trackVisit = async (params: VisitParams): Promise<boolean> => {
     try {
-      const openid = getOpenid()
+      const openid = await getOrEnsureOpenid()
 
       if (!openid) {
         console.log('Analytics: 用户未登录，跳过访问埋点')
@@ -34,7 +51,7 @@ export function useAnalytics() {
       }
 
       const res = await uni.request({
-        url: `http://localhost:8080/api/v1/store/${params.merchant_id}/visit`,
+        url: `${API_BASE_URL}/api/v1/store/${params.merchant_id}/visit`,
         method: 'POST',
         data: {
           openid,
@@ -59,7 +76,7 @@ export function useAnalytics() {
 
   const trackEvent = async (params: TrackEventParams): Promise<boolean> => {
     try {
-      const openid = getOpenid()
+      const openid = await getOrEnsureOpenid()
 
       if (!openid) {
         console.log('Analytics: 用户未登录，跳过事件埋点')
