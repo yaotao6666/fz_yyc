@@ -1,0 +1,232 @@
+# PRD-接口文档
+
+## 1. 文档定位
+
+本文件用于承接 `PRD.md` 中与“接口、返回结构、字段口径、空值约定、WebSocket 协议”相关的内容。
+
+读取顺序：
+
+1. 先读根目录 `PRD.md`
+2. 再读本文件
+3. 如需功能背景，联读 `docs/prd/PRD-功能说明.md`
+
+## 2. 接口分组
+
+### 2.1 认证相关接口
+
+- 商家账号密码登录
+- 商家微信快捷登录
+- 服务商登录 / 退出
+- C 端微信登录
+
+关键约束：
+
+- 登录态字段、缓存字段、角色标识必须在前后端统一。
+- 商家退出登录后，前端需要主动断开 WebSocket 连接。
+
+### 2.2 服务商接口
+
+- 仪表盘
+- 创建商家：`POST /api/v1/sp/merchants`
+- 商家列表
+- 商家详情
+- 更新商家资料：`PUT /api/v1/sp/merchants/:merchant_id`
+- 更新支付配置：`PUT /api/v1/sp/merchants/:merchant_id/payment-config`
+- 商家图片资产更新：`PUT /api/v1/sp/merchants/:merchant_id/assets`
+- 分账历史：`GET /api/v1/sp/profit-sharing-records`
+- 商家费率
+- 商家二维码
+- 系统公告
+- 服务商数据分析
+
+当前重点约束：
+
+- 服务商数据分析接口需按以下维度输出：
+  - 商家访问率
+  - 商家下单率
+  - 商家下单金额
+  - 商家下单均价
+  - 日 / 周 / 月 / 年订单量
+  - 商家排行维度切换
+- `GET /api/v1/sp/merchants/analytics/distribution` 返回 `merchants + totals` 结构。
+- `GET /api/v1/sp/orders/analytics` 返回 `day/week/month/year` 四组订单量桶。
+- `GET /api/v1/sp/amount/top-merchants` 支持 `metric` 参数切换排行维度。
+
+### 2.3 商家管理接口
+
+- 商家资料查询 / 更新
+- 商家设置
+- 员工绑定微信 / 解绑微信
+- 商家营业状态
+- 配送设置
+- 商家二维码
+- 商家分账历史：`GET /api/v1/merchant/profit-sharing-records`
+
+当前重点约束：
+
+- 商家资料更新需支持 `logo` 与背景图字段。
+- 服务商若代商家维护资料，必须通过明确的服务商侧管理接口或授权更新接口。
+- 商家分账历史至少返回：
+  - `profit_sharing_date`
+  - `order_no`
+  - `pay_amount`
+  - `profit_sharing_ratio`
+  - `profit_sharing_amount`
+  - `merchant_received_amount`
+  - `status`
+  - `error_message`
+
+### 2.4 商品与分类接口
+
+- 商品分类列表 / 新增 / 修改 / 删除
+- 商品列表 / 详情 / 新增 / 更新 / 删除
+- 商品规格相关接口
+
+当前重点约束：
+
+- 商品图片字段以当前接口返回结构为准。
+- 商品相关列表接口返回空值时，数组字段统一返回 `[]`。
+
+### 2.5 订单接口
+
+- 商家订单列表
+- 商家订单详情
+- 当前订单核销
+- 快速核销：`POST /api/v1/merchant/orders/quick-complete`
+- 商家退款
+- 订单统计
+- C 端订单列表 / 详情 / 取消 / 申请退款
+
+当前重点约束：
+
+- 商家订单详情应返回：
+  - `verify_code`
+  - `completed_at`
+  - `completed_by_name`
+- 商家订单列表接口支持：
+  - `status`
+  - `start_date`
+  - `end_date`
+- 商家对当前订单执行核销时，不再要求重复输入核销码。
+- 商家退款接口需与前端请求参数保持一致，至少明确：
+  - `reason`
+  - `refund_amount`
+- 商家退款接口在未传 `refund_amount` 或传入 `<= 0` 时，默认按订单实付金额处理。
+- 支付成功后，订单需回写：
+  - `transaction_id`
+  - `pay_notify_payload`
+  - `profit_sharing_status`
+  - `profit_sharing_amount`
+  - `profit_sharing_order_no`
+  - `profit_sharing_at`
+  - `profit_sharing_error`
+
+### 2.6 支付与分账接口
+
+- C 端下单支付由服务商模式统一拉起。
+- 商家支付配置字段：
+  - `sub_mch_id`
+  - `profit_sharing_enabled`
+  - `profit_sharing_ratio`
+  - `payment_config_status`
+- 微信支付回调入口：
+  - `/api/v1/notify/payment`
+  - `/api/v1/callback/wechat`
+
+当前重点约束：
+
+- 下单时必须按商家维度读取 `sub_mch_id`。
+- 已进件商家仅通过服务商后台回填 `sub_mch_id` 完成支付配置，本轮联调样例为 `1112649854`。
+- 支付成功与分账成功不是同一状态，前后端需分别展示。
+- 分账历史需覆盖成功 / 失败 / 跳过三类状态。
+
+### 2.7 数据分析接口
+
+#### 商家端
+
+- 今日概览
+- 订单趋势
+- 客户分析
+- 商品排行
+- 库存预警
+
+#### 服务商端
+
+- 商家转化分析
+- 商家排行榜
+- 周期订单分析
+
+当前重点约束：
+
+- 所有列表型分析接口必须保证空数组兜底。
+- 所有对象型统计字段在无数据时应返回 `0` 或明确的空对象结构。
+- `GET /api/v1/merchant/analytics/stock-alert` 默认使用阈值查询低库存商品，当前前端按 `threshold = 10` 使用。
+- 库存预警接口返回结果按库存升序处理，前端据此做风险分组和看板展示。
+
+### 2.8 上传接口
+
+- 上传 token
+- 七牛上传地址
+- 图片前缀 / 域名
+
+当前重点约束：
+
+- 前端禁止写死上传地址。
+- 图片上传成功后的持久化字段口径必须在前后端统一。
+
+### 2.9 WebSocket 与联调接口
+
+- 商家 WebSocket：`/api/v1/ws/merchant`
+- 开发联调接口：
+  - 订单提醒下发：`POST /api/v1/dev/order-notify`
+  - 用户进店提醒下发：`POST /api/v1/dev/store-visit-notify`
+
+当前重点约束：
+
+- 商家登录成功后建立连接。
+- 商家退出登录时主动断开。
+- 商家登录失效触发 401 时，也要收口前端登录态并主动断开。
+- 非开发环境不应暴露不必要的联调接口。
+
+## 3. 返回结构与空值约定
+
+### 3.1 列表返回
+
+- 列表字段统一使用空数组 `[]` 兜底。
+- 若带分页，至少保证：
+  - `list: []`
+  - `pagination.total`
+  - `pagination.page`
+  - `pagination.page_size`
+
+### 3.2 统计返回
+
+- 统计对象无数据时返回结构化对象，不直接返回 `null`。
+- 数值字段默认返回 `0`。
+
+### 3.3 图表返回
+
+- 趋势、排行、分布类图表字段必须返回数组。
+- 维度切换接口无数据时返回空数组并由前端展示空态。
+
+## 4. 当前重点同步要求
+
+1. 功能改动涉及接口时，必须同时更新：
+   - 根 `PRD.md`
+   - 本文件对应章节
+2. 若字段口径调整，必须同步更新：
+   - 请求参数
+   - 响应示例
+   - 空值约定
+3. 若只是 UI 调整但不改协议，可只更新功能说明文档，不必改本文件。
+
+## 5. 与根 PRD 的对应关系
+
+- 认证相关接口：对应 `PRD.md` `3.1`
+- 服务商接口：对应 `PRD.md` `3.2`
+- 商家管理接口：对应 `PRD.md` `3.3`
+- 商品分类 / 商品接口：对应 `PRD.md` `3.4`、`3.5`
+- 订单接口：对应 `PRD.md` `3.6`
+- 数据分析接口：对应 `PRD.md` `3.7`
+- C 端接口：对应 `PRD.md` `3.8`
+- 微信支付接口：对应 `PRD.md` `3.9`

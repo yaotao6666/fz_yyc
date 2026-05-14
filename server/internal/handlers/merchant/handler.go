@@ -68,6 +68,7 @@ func GetProfile(c *gin.Context) {
 type UpdateProfileRequest struct {
 	Name           string  `json:"name"`
 	Logo           string  `json:"logo"`
+	CoverImage     string  `json:"cover_image"`
 	ContactName    string  `json:"contact_name"`
 	ContactPhone   string  `json:"contact_phone"`
 	ContactEmail   string  `json:"contact_email"`
@@ -94,6 +95,9 @@ func UpdateProfile(c *gin.Context) {
 	}
 	if req.Logo != "" {
 		updates["logo"] = req.Logo
+	}
+	if req.CoverImage != "" {
+		updates["cover_image"] = req.CoverImage
 	}
 	if req.ContactName != "" {
 		updates["contact_name"] = req.ContactName
@@ -230,62 +234,6 @@ func UpdateSettings(c *gin.Context) {
 	response.Success(c, gin.H{"message": "设置更新成功"})
 }
 
-type LicenseRequest struct {
-	LicenseNo          string `json:"license_no"`
-	LicenseName        string `json:"license_name"`
-	LicenseImage       string `json:"license_image"`
-	LegalPerson        string `json:"legal_person"`
-	LegalPersonID      string `json:"legal_person_id"`
-	LegalPersonIDFront string `json:"legal_person_id_front"`
-	LegalPersonIDBack  string `json:"legal_person_id_back"`
-	ValidFrom          string `json:"valid_from"`
-	ValidTo            string `json:"valid_to"`
-}
-
-func UpdateLicense(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
-	var req LicenseRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
-		return
-	}
-
-	var license models.MerchantLicense
-	if err := database.DB.Where("merchant_id = ?", merchantID).First(&license).Error; err != nil {
-		license = models.MerchantLicense{MerchantID: merchantID}
-	}
-
-	license.LicenseNo = req.LicenseNo
-	license.LicenseName = req.LicenseName
-	license.LicenseImage = req.LicenseImage
-	license.LegalPerson = req.LegalPerson
-	license.LegalPersonID = req.LegalPersonID
-	license.LegalPersonIDFront = req.LegalPersonIDFront
-	license.LegalPersonIDBack = req.LegalPersonIDBack
-
-	if req.ValidFrom != "" {
-		validFrom, _ := time.Parse("2006-01-02", req.ValidFrom)
-		license.ValidFrom = &validFrom
-	}
-	if req.ValidTo != "" {
-		validTo, _ := time.Parse("2006-01-02", req.ValidTo)
-		license.ValidTo = &validTo
-	}
-
-	if err := database.DB.Save(&license).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新证照信息失败")
-		return
-	}
-
-	response.Success(c, license)
-}
-
-func UpdateBankAccount(c *gin.Context) {
-	// 银行账户更新逻辑
-	response.Success(c, gin.H{"message": "银行账户更新成功"})
-}
-
 type StatusRequest struct {
 	Status *uint8 `json:"status"`
 }
@@ -313,18 +261,6 @@ func UpdateStatus(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"message": "状态更新成功"})
-}
-
-func GetApplicationStatus(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
-	var merchant models.Merchant
-	if err := database.DB.Select("applyment_status, audit_status, audit_remark, sub_mch_status").First(&merchant, merchantID).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
-		return
-	}
-
-	response.Success(c, merchant)
 }
 
 func GetQRCode(c *gin.Context) {

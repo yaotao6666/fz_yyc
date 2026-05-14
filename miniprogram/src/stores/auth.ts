@@ -14,6 +14,7 @@ let activeStore: any = null
 let reconnectTimer: any = null
 let orderAudio: any = null
 let browseAudio: any = null
+let isManualSocketDisconnect = false
 
 export type MerchantSocketStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 
@@ -100,6 +101,27 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
+    clearAuthState(shouldRedirect = false) {
+      this.isLoggedIn = false
+      this.disconnectOrderSocket(true)
+
+      this.token = ''
+      this.merchantId = null
+      this.merchantInfo = null
+      this.staff = null
+      this.lastSocketMessage = null
+      this.lastSocketMessageAt = ''
+
+      uni.removeStorageSync('token')
+      uni.removeStorageSync('merchantId')
+      uni.removeStorageSync('staff')
+      uni.removeStorageSync('merchantInfo')
+
+      if (shouldRedirect) {
+        uni.reLaunch({ url: '/pages/auth/login' })
+      }
+    },
+
     persistAuthState() {
       uni.setStorageSync('token', this.token)
       uni.setStorageSync('merchantId', this.merchantId)
@@ -172,20 +194,11 @@ export const useAuthStore = defineStore('auth', {
 
     // 登出
     logout() {
-      this.disconnectOrderSocket()
+      this.clearAuthState(true)
+    },
 
-      this.token = ''
-      this.merchantId = null
-      this.merchantInfo = null
-      this.staff = null
-      this.isLoggedIn = false
-      
-      uni.removeStorageSync('token')
-      uni.removeStorageSync('merchantId')
-      uni.removeStorageSync('staff')
-      uni.removeStorageSync('merchantInfo')
-      
-      uni.reLaunch({ url: '/pages/auth/login' })
+    handleSessionExpired() {
+      this.clearAuthState(false)
     },
 
     // 检查登录状态
@@ -252,6 +265,7 @@ export const useAuthStore = defineStore('auth', {
         return
       }
 
+      isManualSocketDisconnect = false
       activeStore = this
       this.setSocketStatus('connecting')
       socketTask = uni.connectSocket({
@@ -308,10 +322,19 @@ export const useAuthStore = defineStore('auth', {
         uni.onSocketError(() => {
           activeStore?.setSocketStatus('disconnected')
           socketTask = null
+          if (isManualSocketDisconnect) {
+            activeStore = null
+          }
         })
 
         uni.onSocketClose(() => {
           socketTask = null
+          if (isManualSocketDisconnect) {
+            activeStore?.setSocketStatus('disconnected')
+            activeStore = null
+            return
+          }
+
           if (activeStore?.isLoggedIn) {
             activeStore?.setSocketStatus('reconnecting')
             if (reconnectTimer) {
@@ -327,11 +350,12 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    disconnectOrderSocket() {
+    disconnectOrderSocket(isManual = false) {
       if (reconnectTimer) {
         clearTimeout(reconnectTimer)
         reconnectTimer = null
       }
+      isManualSocketDisconnect = isManual
       if (socketTask) {
         try {
           socketTask.close()
@@ -340,7 +364,9 @@ export const useAuthStore = defineStore('auth', {
       }
       this.setSocketStatus('disconnected')
       socketTask = null
-      activeStore = null
+      if (!isManual) {
+        activeStore = null
+      }
     },
 
     // 更新商家信息

@@ -62,9 +62,12 @@ type JWT struct {
 
 // WechatPay 微信支付配置
 type WechatPay struct {
-	MchID       string
-	APIKey      string
-	CallbackURL string
+	SPMchID      string
+	APIV3Key     string
+	CertSerialNo string
+	PrivateKey   string
+	PublicKey    string
+	CallbackURL  string
 }
 
 // Qiniu 七牛云配置
@@ -183,13 +186,40 @@ func mergeConfig() {
 		Config.Wechat.AppSecret = viper.GetString("WECHAT_APP_SECRET")
 	}
 
-	if viper.IsSet("WECHAT_PAY_MCH_ID") {
-		Config.WechatPay.MchID = viper.GetString("WECHAT_PAY_MCH_ID")
+	if viper.IsSet("WECHAT_PAY_SP_MCH_ID") {
+		Config.WechatPay.SPMchID = viper.GetString("WECHAT_PAY_SP_MCH_ID")
 	}
-	if viper.IsSet("WECHAT_PAY_API_KEY") {
-		Config.WechatPay.APIKey = viper.GetString("WECHAT_PAY_API_KEY")
+	if viper.IsSet("WECHAT_PAY_MCH_ID") && Config.WechatPay.SPMchID == "" {
+		Config.WechatPay.SPMchID = viper.GetString("WECHAT_PAY_MCH_ID")
 	}
-	if viper.IsSet("WECHAT_PAY_CALLBACK_URL") {
+	if viper.IsSet("WECHAT_PAY_SP_API_V3_KEY") {
+		Config.WechatPay.APIV3Key = viper.GetString("WECHAT_PAY_SP_API_V3_KEY")
+	}
+	if viper.IsSet("WECHAT_PAY_API_V3_KEY") && Config.WechatPay.APIV3Key == "" {
+		Config.WechatPay.APIV3Key = viper.GetString("WECHAT_PAY_API_V3_KEY")
+	}
+	if viper.IsSet("WECHAT_PAY_SP_CERT_SERIAL_NO") {
+		Config.WechatPay.CertSerialNo = viper.GetString("WECHAT_PAY_SP_CERT_SERIAL_NO")
+	}
+	if viper.IsSet("WECHAT_PAY_CERT_SERIAL_NO") && Config.WechatPay.CertSerialNo == "" {
+		Config.WechatPay.CertSerialNo = viper.GetString("WECHAT_PAY_CERT_SERIAL_NO")
+	}
+	if viper.IsSet("WECHAT_PAY_SP_PRIVATE_KEY") {
+		Config.WechatPay.PrivateKey = viper.GetString("WECHAT_PAY_SP_PRIVATE_KEY")
+	}
+	if viper.IsSet("WECHAT_PAY_PRIVATE_KEY") && Config.WechatPay.PrivateKey == "" {
+		Config.WechatPay.PrivateKey = viper.GetString("WECHAT_PAY_PRIVATE_KEY")
+	}
+	if viper.IsSet("WECHAT_PAY_SP_PUBLIC_KEY") {
+		Config.WechatPay.PublicKey = viper.GetString("WECHAT_PAY_SP_PUBLIC_KEY")
+	}
+	if viper.IsSet("WECHAT_PAY_PUBLIC_KEY") && Config.WechatPay.PublicKey == "" {
+		Config.WechatPay.PublicKey = viper.GetString("WECHAT_PAY_PUBLIC_KEY")
+	}
+	if viper.IsSet("WECHAT_PAY_SP_CALLBACK_URL") {
+		Config.WechatPay.CallbackURL = viper.GetString("WECHAT_PAY_SP_CALLBACK_URL")
+	}
+	if viper.IsSet("WECHAT_PAY_CALLBACK_URL") && Config.WechatPay.CallbackURL == "" {
 		Config.WechatPay.CallbackURL = viper.GetString("WECHAT_PAY_CALLBACK_URL")
 	}
 
@@ -296,13 +326,34 @@ func mergeEnvConfig() {
 		Config.Wechat.AppSecret = env
 	}
 
-	if env := os.Getenv("WECHAT_PAY_MCH_ID"); env != "" {
-		Config.WechatPay.MchID = env
+	if env := os.Getenv("WECHAT_PAY_SP_MCH_ID"); env != "" {
+		Config.WechatPay.SPMchID = env
+	} else if env := os.Getenv("WECHAT_PAY_MCH_ID"); env != "" {
+		Config.WechatPay.SPMchID = env
 	}
-	if env := os.Getenv("WECHAT_PAY_API_KEY"); env != "" {
-		Config.WechatPay.APIKey = env
+	if env := os.Getenv("WECHAT_PAY_SP_API_V3_KEY"); env != "" {
+		Config.WechatPay.APIV3Key = env
+	} else if env := os.Getenv("WECHAT_PAY_API_V3_KEY"); env != "" {
+		Config.WechatPay.APIV3Key = env
 	}
-	if env := os.Getenv("WECHAT_PAY_CALLBACK_URL"); env != "" {
+	if env := os.Getenv("WECHAT_PAY_SP_CERT_SERIAL_NO"); env != "" {
+		Config.WechatPay.CertSerialNo = env
+	} else if env := os.Getenv("WECHAT_PAY_CERT_SERIAL_NO"); env != "" {
+		Config.WechatPay.CertSerialNo = env
+	}
+	if env := os.Getenv("WECHAT_PAY_SP_PRIVATE_KEY"); env != "" {
+		Config.WechatPay.PrivateKey = env
+	} else if env := os.Getenv("WECHAT_PAY_PRIVATE_KEY"); env != "" {
+		Config.WechatPay.PrivateKey = env
+	}
+	if env := os.Getenv("WECHAT_PAY_SP_PUBLIC_KEY"); env != "" {
+		Config.WechatPay.PublicKey = env
+	} else if env := os.Getenv("WECHAT_PAY_PUBLIC_KEY"); env != "" {
+		Config.WechatPay.PublicKey = env
+	}
+	if env := os.Getenv("WECHAT_PAY_SP_CALLBACK_URL"); env != "" {
+		Config.WechatPay.CallbackURL = env
+	} else if env := os.Getenv("WECHAT_PAY_CALLBACK_URL"); env != "" {
 		Config.WechatPay.CallbackURL = env
 	}
 
@@ -357,6 +408,14 @@ func getDefaultConfig() *AppConfig {
 		Wechat: Wechat{
 			AppID:     "",
 			AppSecret: "",
+		},
+		WechatPay: WechatPay{
+			SPMchID:      "",
+			APIV3Key:     "",
+			CertSerialNo: "",
+			PrivateKey:   "",
+			PublicKey:    "",
+			CallbackURL:  "",
 		},
 		Qiniu: Qiniu{
 			AccessKey: "",

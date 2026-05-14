@@ -107,6 +107,9 @@ function request<T = any>(options: RequestOptions): Promise<T> {
     uni.showLoading({ title: loadingText, mask: true })
   }
 
+  const isSpRequest = url.startsWith('/api/v1/sp/')
+  const isMerchantRequest = url.startsWith('/api/v1/merchant/')
+
   return new Promise((resolve, reject) => {
     uni.request({
       url: `${API_BASE_URL}${url}`,
@@ -131,15 +134,24 @@ function request<T = any>(options: RequestOptions): Promise<T> {
             resolve(apiResponse.data)
           } else if (apiResponse.code === ResponseCode.UNAUTHORIZED) {
             // Token 过期，跳转登录
-            if (url.startsWith('/api/v1/sp/')) {
+            if (isSpRequest) {
               uni.removeStorageSync('sp_token')
               uni.removeStorageSync('sp_id')
               uni.removeStorageSync('sp_info')
               uni.showToast({ title: '请先登录', icon: 'none' })
               uni.reLaunch({ url: '/pages/sp/login' })
+            } else if (isMerchantRequest) {
+              uni.removeStorageSync('token')
+              uni.removeStorageSync('merchantId')
+              uni.removeStorageSync('staff')
+              uni.removeStorageSync('merchantInfo')
+              uni.$emit('merchant-session-expired')
+              uni.showToast({ title: '登录已失效，请重新登录', icon: 'none' })
+              uni.reLaunch({ url: '/pages/auth/login' })
             } else {
               uni.removeStorageSync('token')
               uni.removeStorageSync('userInfo')
+              uni.removeStorageSync('openid')
               uni.showToast({ title: '请先登录', icon: 'none' })
               uni.reLaunch({ url: '/pages/auth/login' })
             }

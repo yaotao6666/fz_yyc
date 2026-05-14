@@ -1,598 +1,572 @@
 <template>
   <view class="merchant-detail-container">
-    <!-- 加载状态 -->
-    <view v-if="loading" class="loading-container">
-      <text>加载中...</text>
-    </view>
-
-    <!-- 商家详情 -->
-    <view v-else-if="merchant" class="detail-content">
-      <!-- 基本信息 -->
-      <view class="section">
-        <view class="section-title">基本信息</view>
-        <view class="info-grid">
-          <view class="info-item">
-            <text class="info-label">商家名称</text>
-            <text class="info-value">{{ merchant.name || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">行业分类</text>
-            <text class="info-value">{{ merchant.business_category || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">商家地址</text>
-            <text class="info-value">{{ merchant.address || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">商家状态</text>
-            <text class="info-value" :class="getStatusClass(merchant.status)">
-              {{ getStatusText(merchant.status) }}
-            </text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 联系人信息 -->
-      <view class="section">
-        <view class="section-title">联系人信息</view>
-        <view class="info-grid">
-          <view class="info-item">
-            <text class="info-label">姓名</text>
-            <text class="info-value">{{ merchant.contact_name || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">电话</text>
-            <text class="info-value">{{ merchant.contact_phone || '-' }}</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 营业执照信息 -->
-      <view class="section" v-if="licenseInfo">
-        <view class="section-title">营业执照信息</view>
-        <view class="info-grid">
-          <view class="info-item">
-            <text class="info-label">营业执照号</text>
-            <text class="info-value">{{ licenseInfo.license_no || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">营业执照名称</text>
-            <text class="info-value">{{ licenseInfo.license_name || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">法人姓名</text>
-            <text class="info-value">{{ licenseInfo.legal_person || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">法人身份证号</text>
-            <text class="info-value">{{ licenseInfo.legal_person_id || '-' }}</text>
-          </view>
-          <view class="info-item" v-if="licenseInfo.valid_from || licenseInfo.valid_to">
-            <text class="info-label">有效期</text>
-            <text class="info-value">
-              {{ licenseInfo.valid_from || '-' }} 至 {{ licenseInfo.valid_to || '长期' }}
-            </text>
-          </view>
-        </view>
-
-        <!-- 营业执照图片 -->
-        <view class="image-section" v-if="licenseInfo.license_image">
-          <text class="info-label">营业执照图片</text>
-          <view class="image-grid">
-            <image
-              class="preview-image"
-              :src="licenseInfo.license_image"
-              mode="aspectFill"
-              @click="previewImage(licenseInfo.license_image)"
-            />
-          </view>
-        </view>
-
-        <!-- 身份证照片 -->
-        <view class="image-section" v-if="licenseInfo.legal_person_id_front || licenseInfo.legal_person_id_back">
-          <text class="info-label">身份证照片</text>
-          <view class="image-grid">
-            <view class="image-item" v-if="licenseInfo.legal_person_id_front">
-              <text class="image-label">正面</text>
-              <image
-                class="preview-image"
-                :src="licenseInfo.legal_person_id_front"
-                mode="aspectFill"
-                @click="previewImage(licenseInfo.legal_person_id_front)"
-              />
-            </view>
-            <view class="image-item" v-if="licenseInfo.legal_person_id_back">
-              <text class="image-label">反面</text>
-              <image
-                class="preview-image"
-                :src="licenseInfo.legal_person_id_back"
-                mode="aspectFill"
-                @click="previewImage(licenseInfo.legal_person_id_back)"
-              />
-            </view>
-          </view>
-        </view>
-      </view>
-
-      <!-- 银行账户信息 -->
-      <view class="section" v-if="bankAccountInfo">
-        <view class="section-title">银行账户信息</view>
-        <view class="info-grid">
-          <view class="info-item">
-            <text class="info-label">开户银行</text>
-            <text class="info-value">{{ bankAccountInfo.bank_name || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">开户支行</text>
-            <text class="info-value">{{ bankAccountInfo.bank_branch || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">银行账号</text>
-            <text class="info-value">{{ bankAccountInfo.account_no || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">账户名称</text>
-            <text class="info-value">{{ bankAccountInfo.account_name || '-' }}</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 门店信息 -->
-      <view class="section" v-if="storeImages && storeImages.length > 0">
-        <view class="section-title">门店信息</view>
-        <view class="info-grid" v-if="merchant.store_name">
-          <view class="info-item">
-            <text class="info-label">门店名称</text>
-            <text class="info-value">{{ merchant.store_name }}</text>
-          </view>
-        </view>
-
-        <!-- 门头照 -->
-        <view class="image-section" v-if="storeImages.length > 0">
-          <text class="info-label">门店照片</text>
-          <view class="image-grid">
-            <image
-              v-for="(image, index) in storeImages"
-              :key="index"
-              class="preview-image"
-              :src="image"
-              mode="aspectFill"
-              @click="previewImages(storeImages, index)"
-            />
-          </view>
-        </view>
-      </view>
-
-      <!-- 经营数据 -->
-      <view class="section">
-        <view class="section-title">经营数据</view>
-        <view class="stats-grid">
-          <view class="stat-item">
-            <text class="stat-value">{{ merchant.total_orders || 0 }}</text>
-            <text class="stat-label">累计订单数</text>
-          </view>
-          <view class="stat-item">
-            <text class="stat-value">¥{{ formatAmount(merchant.total_amount) }}</text>
-            <text class="stat-label">累计金额</text>
-          </view>
-        </view>
-        <view class="info-grid" style="margin-top: 24rpx;">
-          <view class="info-item">
-            <text class="info-label">入驻时间</text>
-            <text class="info-value">{{ merchant.created_at || '-' }}</text>
-          </view>
-          <view class="info-item">
-            <text class="info-label">当前状态</text>
-            <text class="info-value" :class="getStatusClass(merchant.status)">
-              {{ getStatusText(merchant.status) }}
-            </text>
-          </view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 加载失败 -->
-    <view v-else class="error-container">
+    <view v-if="loading" class="state-card">加载中...</view>
+    <view v-else-if="!merchant" class="state-card error-state">
       <text>加载失败，请重试</text>
       <button class="retry-btn" @click="loadMerchantDetail">重新加载</button>
     </view>
 
-    <!-- 底部操作按钮 -->
-    <view class="action-bar" v-if="merchant">
-      <button class="action-btn" @click="goToSetRate">
-        <text class="action-icon">⚙</text>
-        <text class="action-text">设置手续费率</text>
-      </button>
-      <button class="action-btn" @click="showQrcode">
-        <text class="action-icon">⬡</text>
-        <text class="action-text">商家二维码</text>
-      </button>
-      <button class="action-btn primary" @click="contactMerchant">
-        <text class="action-icon">☎</text>
-        <text class="action-text">联系商家</text>
-      </button>
-    </view>
-
-    <!-- 二维码弹窗 -->
-    <view class="qrcode-modal" v-if="showQrcodeModal" @click="showQrcodeModal = false">
-      <view class="qrcode-content" @click.stop>
-        <text class="qrcode-title">商家小程序码</text>
-        <image
-          v-if="merchant?.qrcode_url"
-          class="qrcode-image"
-          :src="merchant.qrcode_url"
-          mode="aspectFit"
-        />
-        <view v-else class="qrcode-placeholder">
-          <text>暂无二维码</text>
+    <template v-else>
+      <scroll-view class="detail-scroll" scroll-y>
+        <view class="hero-card">
+          <view class="hero-main">
+            <view>
+              <text class="merchant-name">{{ merchant.name }}</text>
+              <text class="merchant-meta">{{ merchant.contact_name || '未设置联系人' }} · {{ merchant.contact_phone || '未设置电话' }}</text>
+            </view>
+            <view class="merchant-status" :class="getStatusClass(merchant.status)">
+              {{ getStatusText(merchant.status) }}
+            </view>
+          </view>
+          <view class="hero-summary">
+            <text class="hero-item">收款商户号：{{ merchant.sub_mch_id || '未配置' }}</text>
+            <text class="hero-item">支付配置：{{ getPaymentConfigText(merchant.payment_config_status) }}</text>
+            <text class="hero-item">
+              分账设置：{{ merchant.profit_sharing_enabled ? `已开启 ${formatRatio(merchant.profit_sharing_ratio)}` : '未开启' }}
+            </text>
+          </view>
         </view>
-        <button class="qrcode-close" @click="showQrcodeModal = false">关闭</button>
+
+        <view class="section-card">
+          <view class="section-title">图片资产</view>
+          <view class="asset-grid">
+            <view class="asset-card">
+              <text class="asset-label">商家 Logo</text>
+              <image
+                v-if="merchant.logo"
+                class="asset-image logo-image"
+                :src="merchant.logo"
+                mode="aspectFill"
+                @click="previewImage(merchant.logo)"
+              />
+              <view v-else class="asset-placeholder">未上传</view>
+              <button class="asset-btn" :disabled="uploadingField === 'logo'" @click="chooseAndUploadImage('logo')">
+                {{ uploadingField === 'logo' ? '上传中...' : '更换 Logo' }}
+              </button>
+            </view>
+            <view class="asset-card">
+              <text class="asset-label">背景图</text>
+              <image
+                v-if="merchant.cover_image"
+                class="asset-image cover-image"
+                :src="merchant.cover_image"
+                mode="aspectFill"
+                @click="previewImage(merchant.cover_image)"
+              />
+              <view v-else class="asset-placeholder">未上传</view>
+              <button class="asset-btn" :disabled="uploadingField === 'cover_image'" @click="chooseAndUploadImage('cover_image')">
+                {{ uploadingField === 'cover_image' ? '上传中...' : '更换背景图' }}
+              </button>
+            </view>
+          </view>
+        </view>
+
+        <view class="section-card">
+          <view class="section-title">商家资料</view>
+          <view class="info-grid">
+            <view class="info-item">
+              <text class="info-label">行业分类</text>
+              <text class="info-value">{{ merchant.business_category || '未设置' }}</text>
+            </view>
+            <view class="info-item">
+              <text class="info-label">联系邮箱</text>
+              <text class="info-value">{{ merchant.contact_email || '未设置' }}</text>
+            </view>
+            <view class="info-item full-width">
+              <text class="info-label">营业时间</text>
+              <text class="info-value">{{ merchant.business_hours || '未设置' }}</text>
+            </view>
+            <view class="info-item full-width">
+              <text class="info-label">商家地址</text>
+              <text class="info-value">{{ merchant.address || '未设置' }}</text>
+            </view>
+            <view class="info-item full-width">
+              <text class="info-label">商家公告</text>
+              <text class="info-value">{{ merchant.announcement || '未设置' }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="section-card">
+          <view class="section-title">支付与分账配置</view>
+          <view class="info-grid">
+            <view class="info-item">
+              <text class="info-label">子商户号</text>
+              <text class="info-value">{{ merchant.sub_mch_id || '未配置' }}</text>
+            </view>
+            <view class="info-item">
+              <text class="info-label">支付配置状态</text>
+              <text class="info-value" :class="getPaymentConfigClass(merchant.payment_config_status)">
+                {{ getPaymentConfigText(merchant.payment_config_status) }}
+              </text>
+            </view>
+            <view class="info-item">
+              <text class="info-label">是否分账</text>
+              <text class="info-value">{{ merchant.profit_sharing_enabled ? '已开启' : '未开启' }}</text>
+            </view>
+            <view class="info-item">
+              <text class="info-label">抽佣比例</text>
+              <text class="info-value">{{ formatRatio(merchant.profit_sharing_ratio) }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="section-card">
+          <view class="section-title">经营数据</view>
+          <view class="stats-grid">
+            <view class="stat-card">
+              <text class="stat-value">{{ merchant.total_users || 0 }}</text>
+              <text class="stat-label">用户数</text>
+            </view>
+            <view class="stat-card">
+              <text class="stat-value">{{ merchant.total_orders || 0 }}</text>
+              <text class="stat-label">订单数</text>
+            </view>
+            <view class="stat-card">
+              <text class="stat-value">¥{{ formatAmount(merchant.total_amount) }}</text>
+              <text class="stat-label">累计金额</text>
+            </view>
+            <view class="stat-card">
+              <text class="stat-value">{{ formatDate(merchant.created_at) }}</text>
+              <text class="stat-label">创建时间</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="action-bar">
+        <button class="action-btn" @click="goEditMerchant">编辑商家</button>
+        <button class="action-btn" @click="goEditPaymentConfig">支付配置</button>
+        <button class="action-btn" @click="goProfitSharingHistory">分账历史</button>
+        <button class="action-btn primary" @click="openQrcode">商家二维码</button>
       </view>
-    </view>
+
+      <view class="qrcode-modal" v-if="showQrcodeModal" @click="showQrcodeModal = false">
+        <view class="qrcode-content" @click.stop>
+          <text class="qrcode-title">商家二维码</text>
+          <image v-if="merchant.qrcode_url" class="qrcode-image" :src="merchant.qrcode_url" mode="aspectFit" />
+          <view v-else class="asset-placeholder">暂无二维码</view>
+          <view class="qrcode-actions">
+            <button class="modal-btn" @click="contactMerchant">联系商家</button>
+            <button class="modal-btn primary" @click="showQrcodeModal = false">关闭</button>
+          </view>
+        </view>
+      </view>
+    </template>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getMerchantDetail } from '@api'
-import type { MerchantDetail } from '@types'
+import { getMerchantDetail, updateSpMerchantAssets, uploadImage } from '@api'
+import { PaymentConfigStatusText } from '@types'
+import type { MerchantDetail, PaymentConfigStatus } from '@types'
 
-const merchantId = ref<number>(0)
+const merchantId = ref(0)
 const merchant = ref<MerchantDetail | null>(null)
-const loading = ref<boolean>(true)
-const showQrcodeModal = ref<boolean>(false)
+const loading = ref(true)
+const showQrcodeModal = ref(false)
+const uploadingField = ref<'logo' | 'cover_image' | ''>('')
 
 onLoad((options: any) => {
-  if (options?.id) {
-    merchantId.value = parseInt(options.id)
+  const id = Number(options?.id || 0)
+  if (!Number.isNaN(id) && id > 0) {
+    merchantId.value = id
     loadMerchantDetail()
   }
-})
-
-const licenseInfo = computed(() => {
-  return merchant.value?.license || null
-})
-
-const bankAccountInfo = computed(() => {
-  return merchant.value?.settings?.bank_account || null
-})
-
-const storeImages = computed(() => {
-  return merchant.value?.settings?.store_images || []
 })
 
 async function loadMerchantDetail() {
   loading.value = true
   try {
-    const res = await getMerchantDetail(merchantId.value)
-    merchant.value = res
-  } catch (error) {
-    console.error('获取商家详情失败:', error)
-    uni.showToast({
-      title: '获取详情失败',
-      icon: 'none'
-    })
+    merchant.value = await getMerchantDetail(merchantId.value)
+  } catch (requestError) {
+    console.error('获取商家详情失败:', requestError)
+    uni.showToast({ title: '获取商家详情失败', icon: 'none' })
+    merchant.value = null
   } finally {
     loading.value = false
   }
 }
 
-function previewImage(url: string) {
-  if (!url) return
-  uni.previewImage({
-    urls: [url],
-    current: 0
-  })
+function previewImage(url?: string) {
+  if (!url) {
+    return
+  }
+  uni.previewImage({ urls: [url], current: 0 })
 }
 
-function previewImages(urls: string[], currentIndex: number = 0) {
-  if (!urls || urls.length === 0) return
-  uni.previewImage({
-    urls: urls,
-    current: currentIndex
-  })
+async function chooseAndUploadImage(field: 'logo' | 'cover_image') {
+  if (!merchant.value) {
+    return
+  }
+
+  try {
+    const chooseResult = await uni.chooseImage({
+      count: 1,
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera']
+    })
+    const filePath = chooseResult.tempFilePaths?.[0]
+    if (!filePath) {
+      return
+    }
+
+    uploadingField.value = field
+    const uploadResult = await uploadImage(filePath)
+    merchant.value = await updateSpMerchantAssets(merchantId.value, {
+      [field]: uploadResult.url
+    })
+    uni.showToast({ title: '图片更新成功', icon: 'success' })
+  } catch (requestError) {
+    console.error('更新图片失败:', requestError)
+    uni.showToast({ title: '图片更新失败', icon: 'none' })
+  } finally {
+    uploadingField.value = ''
+  }
 }
 
-function getStatusText(status: number): string {
+function getStatusText(status: number) {
   const statusMap: Record<number, string> = {
     1: '营业中',
     2: '休息中',
     3: '已关闭'
   }
-  return statusMap[status] || '未知'
+  return statusMap[status] || '未知状态'
 }
 
-function getStatusClass(status: number): string {
+function getStatusClass(status: number) {
   const classMap: Record<number, string> = {
-    1: 'status-open',
-    2: 'status-rest',
-    3: 'status-closed'
+    1: 'open',
+    2: 'rest',
+    3: 'closed'
   }
   return classMap[status] || ''
 }
 
-function formatAmount(amount: number | undefined): string {
-  if (!amount) return '0.00'
-  return amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+function getPaymentConfigText(status?: number) {
+  return PaymentConfigStatusText[(status ?? 0) as PaymentConfigStatus] || '待完善'
 }
 
-function goToSetRate() {
-  uni.navigateTo({
-    url: `/pages/sp/merchants/rate?id=${merchantId.value}`
-  })
+function getPaymentConfigClass(status?: number) {
+  return Number(status || 0) === 1 ? 'success' : 'warning'
 }
 
-function showQrcode() {
-  if (merchant.value?.qrcode_url) {
-    showQrcodeModal.value = true
-  } else {
-    uni.showToast({
-      title: '暂无可用二维码',
-      icon: 'none'
-    })
+function formatAmount(amount = 0) {
+  return Number(amount || 0).toFixed(2)
+}
+
+function formatRatio(ratio = 0) {
+  return `${Number(ratio || 0).toFixed(2)}%`
+}
+
+function formatDate(value?: string) {
+  if (!value) {
+    return '-'
   }
+  return value.replace('T', ' ').slice(0, 19)
+}
+
+function goEditMerchant() {
+  uni.navigateTo({ url: `/pages/sp/merchants/edit?id=${merchantId.value}` })
+}
+
+function goEditPaymentConfig() {
+  uni.navigateTo({ url: `/pages/sp/merchants/edit?id=${merchantId.value}` })
+}
+
+function goProfitSharingHistory() {
+  uni.navigateTo({ url: `/pages/sp/settlements/history?merchant_id=${merchantId.value}` })
+}
+
+function openQrcode() {
+  showQrcodeModal.value = true
 }
 
 function contactMerchant() {
   if (!merchant.value?.contact_phone) {
-    uni.showToast({
-      title: '暂无联系电话',
-      icon: 'none'
-    })
+    uni.showToast({ title: '暂无联系电话', icon: 'none' })
     return
   }
-
-  uni.makePhoneCall({
-    phoneNumber: merchant.value.contact_phone,
-    fail: () => {
-      uni.showToast({
-        title: '拨打电话失败',
-        icon: 'none'
-      })
-    }
-  })
+  uni.makePhoneCall({ phoneNumber: merchant.value.contact_phone })
 }
 </script>
 
 <style scoped>
 .merchant-detail-container {
   min-height: 100vh;
-  background-color: #f5f5f5;
-  padding-bottom: 140rpx;
+  background: #f5f5f5;
 }
 
-.loading-container,
-.error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 100rpx 0;
-  color: #666;
+.detail-scroll {
+  height: calc(100vh - 136rpx);
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.state-card {
+  margin: 24rpx;
+  padding: 48rpx 32rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  text-align: center;
+  color: #4e5969;
+}
+
+.error-state {
+  color: #cf1322;
 }
 
 .retry-btn {
-  margin-top: 20rpx;
-  padding: 10rpx 40rpx;
-  background-color: #007aff;
-  color: #fff;
-  border-radius: 8rpx;
-  font-size: 28rpx;
+  margin-top: 24rpx;
+  width: 220rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+  border: none;
+  border-radius: 999rpx;
+  background: #1677ff;
+  color: #ffffff;
 }
 
-.detail-content {
-  padding: 20rpx;
-}
-
-.section {
-  background-color: #fff;
-  border-radius: 16rpx;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
-}
-
-.section-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #333;
+.hero-card {
+  padding: 32rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #3f7cff 0%, #635bff 100%);
+  color: #ffffff;
   margin-bottom: 24rpx;
-  padding-left: 16rpx;
-  border-left: 6rpx solid #007aff;
 }
 
-.info-grid {
+.hero-main {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 20rpx;
 }
 
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
+.merchant-name {
+  display: block;
+  font-size: 38rpx;
+  font-weight: 600;
 }
 
-.info-label {
-  font-size: 26rpx;
-  color: #999;
+.merchant-meta {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  opacity: 0.92;
 }
 
-.info-value {
-  font-size: 28rpx;
-  color: #333;
+.merchant-status {
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 22rpx;
 }
 
-.status-open {
-  color: #52c41a;
-}
-
-.status-rest {
-  color: #fa8c16;
-}
-
-.status-closed {
-  color: #ff4d4f;
-}
-
-.image-section {
+.hero-summary {
+  display: grid;
+  gap: 12rpx;
   margin-top: 24rpx;
 }
 
-.image-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
-  margin-top: 12rpx;
-}
-
-.image-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.image-label {
+.hero-item {
   font-size: 24rpx;
-  color: #666;
-  text-align: center;
+  line-height: 1.6;
 }
 
-.preview-image {
-  width: 200rpx;
-  height: 200rpx;
-  border-radius: 12rpx;
-  background-color: #f0f0f0;
+.section-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
 }
 
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2329;
+  margin-bottom: 24rpx;
+}
+
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20rpx;
+}
+
+.asset-card {
+  padding: 24rpx;
+  border-radius: 20rpx;
+  background: #f7f8fa;
+}
+
+.asset-label {
+  display: block;
+  font-size: 24rpx;
+  color: #4e5969;
+  margin-bottom: 16rpx;
+}
+
+.asset-image {
+  width: 100%;
+  border-radius: 18rpx;
+  background: #ffffff;
+}
+
+.logo-image,
+.cover-image,
+.asset-placeholder {
+  height: 220rpx;
+}
+
+.asset-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18rpx;
+  background: #ffffff;
+  color: #86909c;
+  font-size: 24rpx;
+}
+
+.asset-btn {
+  margin-top: 16rpx;
+  width: 100%;
+  height: 72rpx;
+  line-height: 72rpx;
+  border: none;
+  border-radius: 16rpx;
+  background: #eef3ff;
+  color: #1677ff;
+  font-size: 24rpx;
+}
+
+.info-grid,
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24rpx;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20rpx;
 }
 
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12rpx;
-  padding: 24rpx;
-  background-color: #f8f8f8;
-  border-radius: 12rpx;
+.info-item,
+.stat-card {
+  padding: 22rpx 24rpx;
+  border-radius: 18rpx;
+  background: #f7f8fa;
 }
 
-.stat-value {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #007aff;
+.info-item.full-width {
+  grid-column: 1 / -1;
 }
 
+.info-label,
 .stat-label {
-  font-size: 24rpx;
-  color: #999;
+  display: block;
+  font-size: 22rpx;
+  color: #86909c;
+}
+
+.info-value,
+.stat-value {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: #1f2329;
+  word-break: break-all;
+}
+
+.info-value.success {
+  color: #389e0d;
+}
+
+.info-value.warning {
+  color: #d48806;
 }
 
 .action-bar {
   position: fixed;
-  bottom: 0;
   left: 0;
   right: 0;
-  display: flex;
-  gap: 16rpx;
-  padding: 20rpx 32rpx;
-  background-color: #fff;
-  box-shadow: 0 -2rpx 10rpx rgba(0, 0, 0, 0.05);
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12rpx;
+  padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: #ffffff;
+  box-shadow: 0 -8rpx 24rpx rgba(0, 0, 0, 0.06);
 }
 
 .action-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-  padding: 16rpx 0;
-  background-color: #f5f5f5;
+  margin: 0;
+  height: 76rpx;
+  line-height: 76rpx;
   border: none;
-  border-radius: 12rpx;
+  border-radius: 18rpx;
+  background: #f2f3f5;
+  color: #1f2329;
   font-size: 24rpx;
-}
-
-.action-btn::after {
-  border: none;
 }
 
 .action-btn.primary {
-  background: linear-gradient(135deg, #007aff, #0056cc);
-  color: #fff;
-}
-
-.action-icon {
-  font-size: 36rpx;
-}
-
-.action-text {
-  font-size: 24rpx;
+  background: #1677ff;
+  color: #ffffff;
 }
 
 .qrcode-modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  padding: 32rpx;
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .qrcode-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 32rpx;
-  padding: 48rpx;
-  background-color: #fff;
+  width: 100%;
+  max-width: 560rpx;
+  padding: 32rpx;
   border-radius: 24rpx;
-  margin: 40rpx;
+  background: #ffffff;
 }
 
 .qrcode-title {
-  font-size: 32rpx;
+  display: block;
+  font-size: 30rpx;
   font-weight: 600;
-  color: #333;
+  color: #1f2329;
+  text-align: center;
 }
 
 .qrcode-image {
-  width: 400rpx;
-  height: 400rpx;
+  width: 360rpx;
+  height: 360rpx;
+  display: block;
+  margin: 32rpx auto 0;
 }
 
-.qrcode-placeholder {
-  width: 400rpx;
-  height: 400rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f5f5f5;
-  border-radius: 12rpx;
-  color: #999;
-  font-size: 28rpx;
+.qrcode-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 28rpx;
 }
 
-.qrcode-close {
-  width: 100%;
-  height: 88rpx;
-  line-height: 88rpx;
-  background: linear-gradient(135deg, #007aff, #0056cc);
-  color: #fff;
-  border-radius: 44rpx;
-  font-size: 32rpx;
+.modal-btn {
+  margin: 0;
+  height: 76rpx;
+  line-height: 76rpx;
   border: none;
+  border-radius: 18rpx;
+  background: #f2f3f5;
+  color: #1f2329;
+  font-size: 26rpx;
 }
 
-.qrcode-close::after {
-  border: none;
+.modal-btn.primary {
+  background: #1677ff;
+  color: #ffffff;
 }
 </style>

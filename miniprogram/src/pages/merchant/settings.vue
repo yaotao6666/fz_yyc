@@ -70,6 +70,16 @@
 
     <view class="section">
       <view class="section-title">店铺运营</view>
+      <view class="setting-item" @click="goProfitSharingHistory">
+        <view class="setting-left">
+          <view class="setting-icon"><text>💰</text></view>
+          <view class="setting-info">
+            <view class="setting-label">分账历史</view>
+            <view class="setting-value">查看抽佣日期、金额、比例与状态</view>
+          </view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
       <view class="setting-item" @click="goNotificationSettings">
         <view class="setting-left">
           <view class="setting-icon"><text>🔔</text></view>
@@ -186,6 +196,10 @@ function goDeliverySettings() {
 
 function goNotificationSettings() {
   uni.navigateTo({ url: '/pages/merchant/notification-settings' })
+}
+
+function goProfitSharingHistory() {
+  uni.navigateTo({ url: '/pages/merchant/settlements/history' })
 }
 
 function goAnalytics() {

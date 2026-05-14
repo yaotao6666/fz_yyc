@@ -126,7 +126,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { getProducts, getCategories, productOnSale, productOffSale, deleteProduct as deleteProductApi, batchUpdateProductStatus } from '@api'
 import type { Product, Category } from '@types'
 
@@ -157,6 +157,13 @@ const selectedCategoryLabel = computed(() => {
 
 const isAllSelected = computed(() => {
   return products.value.length > 0 && selectedIds.value.length === products.value.length
+})
+
+onLoad((options: any) => {
+  const status = String(options?.status || '')
+  if (status === 'on_sale' || status === 'off_sale') {
+    filterStatus.value = status
+  }
 })
 
 onShow(() => {

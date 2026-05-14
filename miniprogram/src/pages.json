@@ -8,13 +8,6 @@
       }
     },
     {
-      "path": "pages/auth/register",
-      "style": {
-        "navigationBarTitleText": "商家入驻",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
       "path": "pages/sp/login",
       "style": {
         "navigationBarTitleText": "服务商登录",
@@ -29,20 +22,6 @@
       }
     },
     {
-      "path": "pages/sp/merchants/audit",
-      "style": {
-        "navigationBarTitleText": "待审核商家",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
-      "path": "pages/sp/merchants/audit-detail",
-      "style": {
-        "navigationBarTitleText": "审核详情",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
       "path": "pages/sp/merchants/list",
       "style": {
         "navigationBarTitleText": "商家列表",
@@ -53,6 +32,20 @@
       "path": "pages/sp/merchants/detail",
       "style": {
         "navigationBarTitleText": "商家详情",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/sp/merchants/edit",
+      "style": {
+        "navigationBarTitleText": "商家配置",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/sp/settlements/history",
+      "style": {
+        "navigationBarTitleText": "分账历史",
         "navigationBarBackgroundColor": "#FFFFFF"
       }
     },
@@ -141,6 +134,13 @@
       }
     },
     {
+      "path": "pages/merchant/settlements/history",
+      "style": {
+        "navigationBarTitleText": "分账历史",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
       "path": "pages/merchant/notification-settings",
       "style": {
         "navigationBarTitleText": "声音提醒管理",
@@ -158,13 +158,6 @@
       "path": "pages/merchant/delivery-settings",
       "style": {
         "navigationBarTitleText": "配送设置",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
-      "path": "pages/merchant/invite",
-      "style": {
-        "navigationBarTitleText": "邀请入驻",
         "navigationBarBackgroundColor": "#FFFFFF"
       }
     },

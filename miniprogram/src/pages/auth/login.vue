@@ -32,7 +32,6 @@
         <text v-if="errors.password" class="error-text">{{ errors.password }}</text>
       </view>
 
-      <view class="actions">
         <button
           class="btn-login"
           :disabled="loading"
@@ -47,8 +46,8 @@
         >
           {{ wechatLoading ? '登录中...' : '微信快捷登录' }}
         </button>
-        <view class="link-group">
-          <text class="link" @click="goRegister">商家入驻</text>
+        <view class="agreement-tip">
+          <text class="agreement-text">商家账号由服务商统一创建并分配，登录后即可进入经营后台。</text>
         </view>
       </view>
     </view>
@@ -138,10 +137,6 @@ async function handleWechatLogin() {
   }
 }
 
-// 跳转注册
-function goRegister() {
-  uni.navigateTo({ url: '/pages/auth/register' })
-}
 </script>
 
 <style>
@@ -258,15 +253,22 @@ function goRegister() {
   opacity: 0.6;
 }
 
-.link-group {
+.agreement-tip {
   display: flex;
   justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
   margin-top: 32rpx;
 }
 
-.link {
-  font-size: 28rpx;
+.agreement-text {
+  font-size: 24rpx;
+  color: #999999;
+}
+
+.agreement-link {
+  font-size: 24rpx;
   color: #007AFF;
-  padding: 16rpx;
+  padding: 12rpx 0 12rpx 8rpx;
 }
 </style>

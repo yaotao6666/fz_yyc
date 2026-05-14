@@ -92,9 +92,7 @@ func setupRoutes(r *gin.Engine) {
 			authGroup.POST("/user/wechat-login", user.WechatLogin)
 		}
 
-		v1.POST("/merchant/register", merchant.Register)
 		v1.POST("/user/auth/wechat-login", user.WechatLogin)
-		v1.GET("/user/merchant/status", user.GetMerchantStatus)
 
 		// 文件上传接口
 		uploadHandler := upload.NewUploadHandler()
@@ -147,15 +145,13 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.POST("/account/change-password", merchant.ChangePassword)
 			merchantGroup.POST("/account/wechat/bind", merchant.BindWechat)
 			merchantGroup.DELETE("/account/wechat/bind", merchant.UnbindWechat)
-			merchantGroup.PUT("/license", merchant.UpdateLicense)
-			merchantGroup.PUT("/bank-account", merchant.UpdateBankAccount)
 			merchantGroup.POST("/status", merchant.UpdateStatus)
-			merchantGroup.GET("/application/status", merchant.GetApplicationStatus)
 			merchantGroup.GET("/qrcode", merchant.GetQRCode)
 			merchantGroup.GET("/delivery-settings", merchant.GetDeliverySettings)
 			merchantGroup.PUT("/delivery-settings", merchant.UpdateDeliverySettings)
 			merchantGroup.GET("/subscriptions", merchant.GetSubscriptions)
 			merchantGroup.PUT("/subscriptions", merchant.UpdateSubscriptions)
+			merchantGroup.GET("/profit-sharing-records", sp.GetMerchantProfitSharingRecords)
 
 			// 员工管理
 			merchantGroup.GET("/staff", merchant.GetStaffList)
@@ -224,12 +220,13 @@ func setupRoutes(r *gin.Engine) {
 			{
 				spGroup.POST("/auth/logout", sp.Logout)
 				spGroup.GET("/dashboard", sp.GetDashboard)
-				spGroup.GET("/merchants/pending", sp.GetPendingMerchants)
+				spGroup.POST("/merchants", sp.CreateMerchant)
+				spGroup.PUT("/merchants/:merchant_id", sp.UpdateMerchant)
 				spGroup.GET("/merchants/:merchant_id", sp.GetMerchantDetail)
-				spGroup.POST("/merchants/:merchant_id/approve", sp.AuditMerchant)
+				spGroup.PUT("/merchants/:merchant_id/payment-config", sp.UpdateMerchantPaymentConfig)
+				spGroup.PUT("/merchants/:merchant_id/assets", sp.UpdateMerchantAssets)
 				spGroup.GET("/merchants/analytics/distribution", sp.GetMerchantDistribution)
 				spGroup.GET("/merchants/list", sp.GetMerchantList)
-				spGroup.GET("/merchants/audit-records", sp.GetAuditRecords)
 				spGroup.GET("/merchants/:merchant_id/fee", sp.GetMerchantFee)
 				spGroup.GET("/merchants/:merchant_id/rate", sp.GetMerchantRate)
 				spGroup.POST("/merchants/:merchant_id/rate", sp.SetMerchantRate)
@@ -238,6 +235,7 @@ func setupRoutes(r *gin.Engine) {
 				spGroup.GET("/amount/analytics", sp.GetAmountAnalytics)
 				spGroup.GET("/amount/top-merchants", sp.GetTopMerchants)
 				spGroup.GET("/orders/refunds", sp.GetRefunds)
+				spGroup.GET("/profit-sharing-records", sp.GetProfitSharingRecords)
 				spGroup.GET("/settings", sp.GetSettings)
 				spGroup.PUT("/settings", sp.UpdateSettings)
 				spGroup.POST("/account/change-password", sp.ChangePassword)
@@ -246,12 +244,6 @@ func setupRoutes(r *gin.Engine) {
 				spGroup.POST("/announcements", sp.CreateAnnouncement)
 				spGroup.PUT("/announcements/:id", sp.UpdateAnnouncement)
 				spGroup.DELETE("/announcements/:id", sp.DeleteAnnouncement)
-
-				// 商家进件管理
-				spGroup.GET("/merchant-applications", sp.GetMerchantApplications)
-				spGroup.GET("/merchant-applications/:id", sp.GetMerchantApplicationDetail)
-				spGroup.POST("/merchant-applications/:id/submit", sp.SubmitMerchantApplication)
-				spGroup.GET("/merchant-applications/:id/status", sp.GetMerchantApplicationStatus)
 
 				// 活动管理
 				spGroup.GET("/activities", sp.GetActivities)
@@ -268,13 +260,13 @@ func setupRoutes(r *gin.Engine) {
 		// 微信支付回调
 		notifyGroup := v1.Group("/notify")
 		{
-			notifyGroup.POST("/payment", admin.PaymentNotify)
+			notifyGroup.POST("/payment", sp.PaymentNotify)
 		}
 
 		// 微信支付回调（PRD口径）
 		callbackGroup := v1.Group("/callback")
 		{
-			callbackGroup.POST("/wechat", admin.PaymentNotify)
+			callbackGroup.POST("/wechat", sp.PaymentNotify)
 		}
 	}
 }

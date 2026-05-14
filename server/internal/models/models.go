@@ -107,6 +107,7 @@ type Merchant struct {
 	ServiceProviderID uint64           `gorm:"not null;index" json:"service_provider_id"`
 	Name              string           `gorm:"size:128;not null" json:"name"`
 	Logo              string           `gorm:"size:512" json:"logo"`
+	CoverImage        string           `gorm:"size:512" json:"cover_image"`
 	ContactName       string           `gorm:"size:64" json:"contact_name"`
 	ContactPhone      string           `gorm:"size:20" json:"contact_phone"`
 	ContactEmail      string           `gorm:"size:128" json:"contact_email"`
@@ -120,10 +121,9 @@ type Merchant struct {
 	TakeoutEnabled    bool             `gorm:"not null;default:true" json:"takeout_enabled"`
 	DineInEnabled     bool             `gorm:"not null;default:true" json:"dine_in_enabled"`
 	SubMchID          string           `gorm:"size:32" json:"sub_mch_id"`
-	SubMchStatus      uint8            `gorm:"not null;default:0" json:"sub_mch_status"`
-	ApplymentStatus   uint8            `gorm:"not null;default:0" json:"applyment_status"`
-	AuditStatus       uint8            `gorm:"not null;default:0" json:"audit_status"`
-	AuditRemark       string           `gorm:"size:256" json:"audit_remark"`
+	ProfitSharingEnabled bool          `gorm:"not null;default:false" json:"profit_sharing_enabled"`
+	ProfitSharingRatio   float64       `gorm:"type:decimal(5,2);not null;default:0" json:"profit_sharing_ratio"`
+	PaymentConfigStatus  uint8         `gorm:"not null;default:0" json:"payment_config_status"`
 	Status            uint8            `gorm:"not null;default:1" json:"status"`
 	Rating            float64          `gorm:"type:decimal(2,1);not null;default:5.0" json:"rating"`
 	SalesCount        uint             `gorm:"not null;default:0" json:"sales_count"`
@@ -135,33 +135,6 @@ type Merchant struct {
 
 func (Merchant) TableName() string {
 	return "merchants"
-}
-
-// ============================================
-// 商家进件申请表 (merchant_applications)
-// ============================================
-type MerchantApplication struct {
-	ID                  uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	MerchantID          uint64     `gorm:"not null;index" json:"merchant_id"`
-	MerchantName        string     `gorm:"size:128;not null" json:"merchant_name"`
-	BusinessLicenseInfo JSON       `gorm:"type:json" json:"business_license_info"`
-	LegalPersonInfo     JSON       `gorm:"type:json" json:"legal_person_info"`
-	BankAccountInfo     JSON       `gorm:"type:json" json:"bank_account_info"`
-	StoreInfo           JSON       `gorm:"type:json" json:"store_info"`
-	ContactInfo         JSON       `gorm:"type:json" json:"contact_info"`
-	ApplymentID         string     `gorm:"size:64" json:"applyment_id"`
-	SubMchID            string     `gorm:"size:32" json:"sub_mch_id"`
-	Status              uint8      `gorm:"not null;default:0" json:"status"`
-	AuditDetail         JSON       `gorm:"type:json" json:"audit_detail"`
-	SubmitTime          *time.Time `json:"submit_time"`
-	AuditTime           *time.Time `json:"audit_time"`
-	CreatedAt           time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt           time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
-	Merchant            *Merchant  `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
-}
-
-func (MerchantApplication) TableName() string {
-	return "merchant_applications"
 }
 
 // ============================================
@@ -181,30 +154,6 @@ type MerchantDeliverySettings struct {
 
 func (MerchantDeliverySettings) TableName() string {
 	return "merchant_delivery_settings"
-}
-
-// ============================================
-// 商家营业执照表 (merchant_licenses)
-// ============================================
-type MerchantLicense struct {
-	ID                 uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	MerchantID         uint64     `gorm:"uniqueIndex;not null" json:"merchant_id"`
-	LicenseNo          string     `gorm:"size:64" json:"license_no"`
-	LicenseName        string     `gorm:"size:128" json:"license_name"`
-	LicenseImage       string     `gorm:"size:512" json:"license_image"`
-	LegalPerson        string     `gorm:"size:64" json:"legal_person"`
-	LegalPersonID      string     `gorm:"size:32" json:"legal_person_id"`
-	LegalPersonIDFront string     `gorm:"size:512" json:"legal_person_id_front"`
-	LegalPersonIDBack  string     `gorm:"size:512" json:"legal_person_id_back"`
-	ValidFrom          *time.Time `gorm:"type:date" json:"valid_from"`
-	ValidTo            *time.Time `gorm:"type:date" json:"valid_to"`
-	Status             uint8      `gorm:"not null;default:1" json:"status"`
-	CreatedAt          time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt          time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
-}
-
-func (MerchantLicense) TableName() string {
-	return "merchant_licenses"
 }
 
 // ============================================
@@ -385,10 +334,16 @@ type Order struct {
 	VerifyCode       string      `gorm:"size:16" json:"verify_code"`
 	TransactionID    string      `gorm:"size:64" json:"transaction_id"`
 	PaidAt           *time.Time  `json:"paid_at"`
+	PayNotifyPayload JSON        `gorm:"type:json" json:"pay_notify_payload"`
 	CompletedAt      *time.Time  `json:"completed_at"`
 	CompletedByName  string      `gorm:"size:64" json:"completed_by_name"`
 	CancelledAt      *time.Time  `json:"cancelled_at"`
 	RefundedAt       *time.Time  `json:"refunded_at"`
+	ProfitSharingStatus  uint8      `gorm:"not null;default:0" json:"profit_sharing_status"`
+	ProfitSharingAmount  float64    `gorm:"type:decimal(10,2);not null;default:0" json:"profit_sharing_amount"`
+	ProfitSharingOrderNo string     `gorm:"size:64" json:"profit_sharing_order_no"`
+	ProfitSharingAt      *time.Time `json:"profit_sharing_at"`
+	ProfitSharingError   string     `gorm:"size:256" json:"profit_sharing_error"`
 	CreatedAt        time.Time   `gorm:"autoCreateTime;index" json:"created_at"`
 	UpdatedAt        time.Time   `gorm:"autoUpdateTime" json:"updated_at"`
 	User             *User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
@@ -446,24 +401,31 @@ func (Refund) TableName() string {
 }
 
 // ============================================
-// 邀请记录表 (invite_records)
+// 商家分账记录表 (merchant_profit_sharing_records)
 // ============================================
-type InviteRecord struct {
-	ID           uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	InviterID    uint64     `gorm:"not null;index" json:"inviter_id"`
-	InviteeID    uint64     `gorm:"index" json:"invitee_id"`
-	InviteCode   string     `gorm:"size:32;index" json:"invite_code"`
-	Status       uint8      `gorm:"not null;default:0" json:"status"`
-	RewardType   string     `gorm:"size:32" json:"reward_type"`
-	RewardStatus uint8      `gorm:"not null;default:0" json:"reward_status"`
-	CreatedAt    time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	CompletedAt  *time.Time `json:"completed_at"`
-	Inviter      *Merchant  `gorm:"foreignKey:InviterID" json:"inviter,omitempty"`
-	Invitee      *Merchant  `gorm:"foreignKey:InviteeID" json:"invitee,omitempty"`
+type MerchantProfitSharingRecord struct {
+	ID                    uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	ServiceProviderID     uint64     `gorm:"not null;index" json:"service_provider_id"`
+	MerchantID            uint64     `gorm:"not null;index" json:"merchant_id"`
+	OrderID               uint64     `gorm:"not null;index" json:"order_id"`
+	OrderNo               string     `gorm:"size:32;not null;index" json:"order_no"`
+	TransactionID         string     `gorm:"size:64;index" json:"transaction_id"`
+	ProfitSharingOrderNo  string     `gorm:"size:64;not null;index" json:"profit_sharing_order_no"`
+	ProfitSharingDate     time.Time  `gorm:"not null;index" json:"profit_sharing_date"`
+	PayAmount             float64    `gorm:"type:decimal(10,2);not null;default:0" json:"pay_amount"`
+	ProfitSharingRatio    float64    `gorm:"type:decimal(5,2);not null;default:0" json:"profit_sharing_ratio"`
+	ProfitSharingAmount   float64    `gorm:"type:decimal(10,2);not null;default:0" json:"profit_sharing_amount"`
+	MerchantReceivedAmount float64   `gorm:"type:decimal(10,2);not null;default:0" json:"merchant_received_amount"`
+	Status                uint8      `gorm:"not null;default:0;index" json:"status"`
+	ErrorMessage          string     `gorm:"size:256" json:"error_message"`
+	CreatedAt             time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt             time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	Order                 *Order     `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Merchant              *Merchant  `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
 }
 
-func (InviteRecord) TableName() string {
-	return "invite_records"
+func (MerchantProfitSharingRecord) TableName() string {
+	return "merchant_profit_sharing_records"
 }
 
 // ============================================
@@ -490,23 +452,6 @@ func (Activity) TableName() string {
 }
 
 // ============================================
-// 邀请奖励规则表 (invite_rewards)
-// ============================================
-type InviteReward struct {
-	ID          uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	Type        string    `gorm:"size:32;not null" json:"type"`
-	Condition   string    `gorm:"size:32;not null" json:"condition"`
-	Description string    `gorm:"size:256" json:"description"`
-	Enabled     bool      `gorm:"not null;default:true" json:"enabled"`
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
-}
-
-func (InviteReward) TableName() string {
-	return "invite_rewards"
-}
-
-// ============================================
 // 系统公告表 (announcements)
 // ============================================
 type Announcement struct {
@@ -522,25 +467,6 @@ type Announcement struct {
 
 func (Announcement) TableName() string {
 	return "announcements"
-}
-
-// ============================================
-// 商家审核记录表 (merchant_audit_records)
-// ============================================
-type MerchantAuditRecord struct {
-	ID           uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	MerchantID   uint64    `gorm:"not null;index" json:"merchant_id"`
-	AuditorID    uint64    `gorm:"not null;index" json:"auditor_id"`
-	Action       string    `gorm:"size:32;not null" json:"action"`
-	BeforeStatus uint8     `gorm:"not null" json:"before_status"`
-	AfterStatus  uint8     `gorm:"not null" json:"after_status"`
-	Remark       string    `gorm:"size:256" json:"remark"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
-	Merchant     *Merchant `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
-}
-
-func (MerchantAuditRecord) TableName() string {
-	return "merchant_audit_records"
 }
 
 // ============================================

@@ -135,20 +135,108 @@
       </view>
     </view>
 
-    <view class="section" v-if="stockAlerts.length > 0">
+    <view class="section">
       <view class="section-header">
-        <view class="section-title">库存预警</view>
-        <text class="warning-badge">{{ stockAlerts.length }}个商品</text>
-      </view>
-      <view class="stock-alerts">
-        <view
-          v-for="item in stockAlerts"
-          :key="item.product_id"
-          class="alert-item"
-        >
-          <view class="alert-name">{{ item.product_name }}</view>
-          <view class="alert-stock">剩余 {{ item.stock }}</view>
+        <view>
+          <view class="section-title">库存预警</view>
+          <view class="section-subtitle">仅统计当前已上架且库存小于等于 10 的商品</view>
         </view>
+        <text class="warning-badge">{{ stockAlertSummary.total }}个商品</text>
+      </view>
+
+      <view class="stock-overview-grid">
+        <view class="stock-overview-card">
+          <text class="stock-overview-label">预警商品</text>
+          <text class="stock-overview-value">{{ stockAlertSummary.total }}</text>
+        </view>
+        <view class="stock-overview-card danger">
+          <text class="stock-overview-label">紧急补货</text>
+          <text class="stock-overview-value">{{ stockAlertSummary.critical }}</text>
+        </view>
+        <view class="stock-overview-card warning">
+          <text class="stock-overview-label">建议关注</text>
+          <text class="stock-overview-value">{{ stockAlertSummary.warning }}</text>
+        </view>
+      </view>
+
+      <view v-if="stockAlerts.length > 0" class="stock-suggestion-card">
+        <view class="stock-suggestion-title">处理建议</view>
+        <view class="stock-suggestion-text">
+          优先处理库存小于等于 5 的商品，并尽快补充库存或下架缺货商品，避免影响下单体验。
+        </view>
+      </view>
+
+      <view v-if="criticalStockAlerts.length > 0" class="stock-group">
+        <view class="stock-group-header">
+          <text class="stock-group-title">紧急补货</text>
+          <text class="stock-group-count">{{ criticalStockAlerts.length }}个</text>
+        </view>
+        <view class="stock-alerts">
+          <view
+            v-for="item in criticalStockAlerts"
+            :key="item.product_id"
+            class="alert-item"
+            @click="goProductEdit(item.product_id)"
+          >
+            <view class="alert-main">
+              <image
+                class="alert-image"
+                :src="item.image || '/static/default-product.png'"
+                mode="aspectFill"
+              />
+              <view class="alert-content">
+                <view class="alert-name">{{ item.product_name || '未命名商品' }}</view>
+                <view class="alert-meta">点击可快速去补货</view>
+              </view>
+              <view class="alert-tag danger">库存紧张</view>
+            </view>
+            <view class="alert-actions">
+              <view class="alert-stock">剩余 {{ item.stock }}</view>
+              <view class="alert-action-btn danger">去补货</view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view v-if="warningStockAlerts.length > 0" class="stock-group">
+        <view class="stock-group-header">
+          <text class="stock-group-title">建议关注</text>
+          <text class="stock-group-count">{{ warningStockAlerts.length }}个</text>
+        </view>
+        <view class="stock-alerts">
+          <view
+            v-for="item in warningStockAlerts"
+            :key="item.product_id"
+            class="alert-item"
+            @click="goProductEdit(item.product_id)"
+          >
+            <view class="alert-main">
+              <image
+                class="alert-image"
+                :src="item.image || '/static/default-product.png'"
+                mode="aspectFill"
+              />
+              <view class="alert-content">
+                <view class="alert-name">{{ item.product_name || '未命名商品' }}</view>
+                <view class="alert-meta">点击可快速去补货</view>
+              </view>
+              <view class="alert-tag warning">即将售罄</view>
+            </view>
+            <view class="alert-actions">
+              <view class="alert-stock">剩余 {{ item.stock }}</view>
+              <view class="alert-action-btn warning">去补货</view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view v-if="stockAlerts.length === 0" class="stock-empty-state">
+        <text class="stock-empty-title">当前无库存预警</text>
+        <text class="stock-empty-text">已上架商品库存状态正常，继续保持当前补货节奏即可。</text>
+      </view>
+
+      <view class="stock-actions">
+        <view class="stock-action-btn" @click="goProducts">去商品管理</view>
       </view>
     </view>
   </view>
@@ -209,6 +297,13 @@ const trendChartData = computed(() =>
     submit_order_users: Number(item.submit_order_users ?? item.orders ?? 0)
   }))
 )
+const criticalStockAlerts = computed(() => stockAlerts.value.filter(item => Number(item.stock || 0) <= 5))
+const warningStockAlerts = computed(() => stockAlerts.value.filter(item => Number(item.stock || 0) > 5))
+const stockAlertSummary = computed(() => ({
+  total: stockAlerts.value.length,
+  critical: criticalStockAlerts.value.length,
+  warning: warningStockAlerts.value.length
+}))
 
 const maxTrendValue = computed(() => {
   const values = trendChartData.value.flatMap((item) => [item.visit_users, item.submit_order_users])
@@ -332,6 +427,18 @@ function getTrendLineStyle(currentValue: number, nextValue: number, type: 'brows
 function getRankClass(index: number): string {
   const classMap = ['gold', 'silver', 'bronze']
   return index < 3 ? classMap[index] : ''
+}
+
+function goProducts() {
+  uni.navigateTo({ url: '/pages/merchant/products/list?status=on_sale' })
+}
+
+function goProductEdit(productId: number) {
+  if (!productId) {
+    uni.showToast({ title: '未获取到商品信息', icon: 'none' })
+    return
+  }
+  uni.navigateTo({ url: `/pages/merchant/products/edit?id=${productId}` })
 }
 </script>
 
@@ -661,6 +768,82 @@ function getRankClass(index: number): string {
   border-radius: 8rpx;
 }
 
+.stock-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+}
+
+.stock-overview-card {
+  background: #f8fafc;
+  border-radius: 20rpx;
+  padding: 24rpx 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.stock-overview-card.danger {
+  background: #fff1f0;
+}
+
+.stock-overview-card.warning {
+  background: #fff7e6;
+}
+
+.stock-overview-label {
+  font-size: 24rpx;
+  color: #666666;
+}
+
+.stock-overview-value {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.stock-suggestion-card {
+  margin-top: 20rpx;
+  padding: 24rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(180deg, #fff8f0 0%, #ffffff 100%);
+}
+
+.stock-suggestion-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.stock-suggestion-text {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.8;
+  color: #666666;
+}
+
+.stock-group {
+  margin-top: 24rpx;
+}
+
+.stock-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.stock-group-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.stock-group-count {
+  font-size: 24rpx;
+  color: #999999;
+}
+
 .stock-alerts {
   display: flex;
   flex-direction: column;
@@ -670,21 +853,135 @@ function getRankClass(index: number): string {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid #f0f0f0;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
 }
 
 .alert-item:last-child {
   border-bottom: none;
 }
 
+.alert-main {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-image {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 16rpx;
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+
+.alert-content {
+  flex: 1;
+  min-width: 0;
+}
+
 .alert-name {
   font-size: 28rpx;
   color: #1a1a1a;
+  flex: 1;
+}
+
+.alert-meta {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #9aa4b2;
+}
+
+.alert-tag {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+}
+
+.alert-tag.danger {
+  color: #ff4d4f;
+  background: #fff1f0;
+}
+
+.alert-tag.warning {
+  color: #fa8c16;
+  background: #fff7e6;
 }
 
 .alert-stock {
   font-size: 26rpx;
   color: #ff4d4f;
+}
+
+.alert-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10rpx;
+  margin-left: 16rpx;
+}
+
+.alert-action-btn {
+  min-width: 108rpx;
+  height: 48rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alert-action-btn.danger {
+  color: #ff4d4f;
+  background: #fff1f0;
+}
+
+.alert-action-btn.warning {
+  color: #fa8c16;
+  background: #fff7e6;
+}
+
+.stock-empty-state {
+  margin-top: 24rpx;
+  padding: 40rpx 24rpx;
+  border-radius: 20rpx;
+  background: #fafafa;
+  text-align: center;
+}
+
+.stock-empty-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333333;
+}
+
+.stock-empty-text {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.8;
+  color: #999999;
+}
+
+.stock-actions {
+  margin-top: 24rpx;
+}
+
+.stock-action-btn {
+  height: 84rpx;
+  border-radius: 42rpx;
+  background: #f0f5ff;
+  color: #0056cc;
+  font-size: 28rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

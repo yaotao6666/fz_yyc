@@ -13,11 +13,9 @@ DELETE FROM `coupon_records`;
 DELETE FROM `coupons`;
 DELETE FROM `merchant_rates`;
 DELETE FROM `merchant_fees`;
-DELETE FROM `merchant_audit_records`;
+DELETE FROM `merchant_profit_sharing_records`;
 DELETE FROM `announcements`;
-DELETE FROM `invite_rewards`;
 DELETE FROM `activities`;
-DELETE FROM `invite_records`;
 DELETE FROM `refunds`;
 DELETE FROM `order_items`;
 DELETE FROM `orders`;
@@ -29,33 +27,19 @@ DELETE FROM `product_specs`;
 DELETE FROM `products`;
 DELETE FROM `categories`;
 DELETE FROM `merchant_staffs` WHERE `id` > 1;
-DELETE FROM `merchant_licenses` WHERE `merchant_id` > 1;
 DELETE FROM `merchant_delivery_settings` WHERE `merchant_id` > 1;
-DELETE FROM `merchant_applications`;
 DELETE FROM `merchants` WHERE `id` > 1;
 
-INSERT INTO `merchants` (`id`, `service_provider_id`, `name`, `logo`, `contact_name`, `contact_phone`, `contact_email`, `address`, `lat`, `lng`, `business_category`, `business_hours`, `announcement`, `min_order_amount`, `takeout_enabled`, `dine_in_enabled`, `sub_mch_id`, `sub_mch_status`, `applyment_status`, `audit_status`, `audit_remark`, `status`, `rating`, `sales_count`, `qrcode_url`, `created_at`, `updated_at`) VALUES
-(2, 1, '老城砂锅', 'https://example.com/images/merchant_logo_2.jpg', '王敏', '13700000002', 'wangmin@example.com', '北京市东城区东四北大街18号', 39.928200, 116.417400, '餐饮', '10:00-21:30', '砂锅现做，暖胃更暖心', 18.00, 1, 1, '1500000002', 2, 2, 0, '待服务商审核', 1, 4.8, 74, 'https://example.com/qrcode/merchant_2.png', '2026-04-02 10:00:00', '2026-05-11 09:00:00'),
-(3, 1, '轻食研究所', 'https://example.com/images/merchant_logo_3.jpg', '赵晴', '13700000003', 'zhaoqing@example.com', '北京市朝阳区望京街10号', 39.997100, 116.470600, '轻食', '08:00-20:30', '低卡轻食，健康一整天', 25.00, 1, 0, '1500000003', 1, 1, 1, '资质审核通过', 1, 4.9, 81, 'https://example.com/qrcode/merchant_3.png', '2026-04-03 10:00:00', '2026-05-11 09:00:00'),
-(4, 1, '一碗好面', 'https://example.com/images/merchant_logo_4.jpg', '孙岩', '13700000004', 'sunyan@example.com', '北京市海淀区中关村南大街27号', 39.959300, 116.317600, '面馆', '07:30-22:00', '手工劲道现煮现卖', 16.00, 1, 1, '1500000004', 2, 2, 1, '资质审核通过', 1, 4.7, 88, 'https://example.com/qrcode/merchant_4.png', '2026-04-04 10:00:00', '2026-05-11 09:00:00'),
-(5, 1, '甜心工坊', 'https://example.com/images/merchant_logo_5.jpg', '李茜', '13700000005', 'liqian@example.com', '北京市西城区金融大街9号', 39.915400, 116.366700, '烘焙', '09:00-21:00', '蛋糕甜点每日新鲜出炉', 28.00, 1, 1, '1500000005', 2, 2, 2, '门店资料不完整，已驳回一次', 1, 4.6, 95, 'https://example.com/qrcode/merchant_5.png', '2026-04-05 10:00:00', '2026-05-11 09:00:00'),
-(6, 1, '午后简餐', 'https://example.com/images/merchant_logo_6.jpg', '周航', '13700000006', 'zhouhang@example.com', '北京市丰台区马家堡西路36号', 39.851200, 116.377500, '简餐', '10:30-20:00', '打工人高效午餐选择', 20.00, 1, 1, '1500000006', 2, 2, 1, '资质审核通过', 1, 4.8, 102, 'https://example.com/qrcode/merchant_6.png', '2026-04-06 10:00:00', '2026-05-11 09:00:00'),
-(7, 1, '深夜烧烤铺', 'https://example.com/images/merchant_logo_7.jpg', '陈卓', '13700000007', 'chenzhuo@example.com', '北京市朝阳区工体北路6号', 39.933100, 116.447200, '烧烤', '17:00-02:00', '夜宵聚会就来这里', 30.00, 1, 1, '1500000007', 2, 2, 1, '资质审核通过', 0, 4.5, 109, 'https://example.com/qrcode/merchant_7.png', '2026-04-07 10:00:00', '2026-05-11 09:00:00'),
-(8, 1, '沸点火锅', 'https://example.com/images/merchant_logo_8.jpg', '何静', '13700000008', 'hejing@example.com', '北京市海淀区学院路甲5号', 39.982600, 116.352400, '火锅', '11:00-23:00', '单人锅底也能吃得很满足', 35.00, 1, 1, '1500000008', 2, 2, 0, '待审核：补充结算信息', 1, 4.9, 116, 'https://example.com/qrcode/merchant_8.png', '2026-04-08 10:00:00', '2026-05-11 09:00:00'),
-(9, 1, '町上寿司', 'https://example.com/images/merchant_logo_9.jpg', '高原', '13700000009', 'gaoyuan@example.com', '北京市朝阳区三里屯路19号', 39.935200, 116.454100, '日料', '10:00-22:00', '新鲜现做，寿司刺身都有', 32.00, 1, 1, '1500000009', 2, 2, 1, '资质审核通过', 1, 4.9, 123, 'https://example.com/qrcode/merchant_9.png', '2026-04-09 10:00:00', '2026-05-11 09:00:00'),
-(10, 1, '清晨早点铺', 'https://example.com/images/merchant_logo_10.jpg', '马静', '13700000010', 'majing@example.com', '北京市通州区新华西街58号', 39.906400, 116.657200, '早餐', '06:00-13:30', '热乎早点，开启元气一天', 12.00, 1, 1, '1500000010', 2, 2, 1, '资质审核通过', 1, 4.7, 130, 'https://example.com/qrcode/merchant_10.png', '2026-04-10 10:00:00', '2026-05-11 09:00:00');
-
-INSERT INTO `merchant_applications` (`id`, `merchant_id`, `merchant_name`, `business_license_info`, `legal_person_info`, `bank_account_info`, `store_info`, `contact_info`, `applyment_id`, `sub_mch_id`, `status`, `audit_detail`, `submit_time`, `audit_time`, `created_at`, `updated_at`) VALUES
-(1, 1, '美味餐厅', '{"license_no":"91110000000000001X"}', '{"name":"法人1"}', '{"bank_name":"招商银行","account_no":"6214****0001"}', '{"address":"美味餐厅门店"}', '{"phone":"13000000001"}', 'APPLY2026050001', '1500000001', 1, '{"result":"approved"}', '2026-04-12 12:00:00', '2026-04-22 12:00:00', '2026-04-12 12:00:00', '2026-05-11 09:00:00'),
-(2, 2, '老城砂锅', '{"license_no":"91110000000000002X"}', '{"name":"法人2"}', '{"bank_name":"招商银行","account_no":"6214****0002"}', '{"address":"老城砂锅门店"}', '{"phone":"13000000002"}', 'APPLY2026050002', NULL, 0, '{"result":"reviewing"}', '2026-04-13 12:00:00', NULL, '2026-04-13 12:00:00', '2026-05-11 09:00:00'),
-(3, 3, '轻食研究所', '{"license_no":"91110000000000003X"}', '{"name":"法人3"}', '{"bank_name":"招商银行","account_no":"6214****0003"}', '{"address":"轻食研究所门店"}', '{"phone":"13000000003"}', 'APPLY2026050003', '1500000003', 1, '{"result":"approved"}', '2026-04-14 12:00:00', '2026-04-24 12:00:00', '2026-04-14 12:00:00', '2026-05-11 09:00:00'),
-(4, 4, '一碗好面', '{"license_no":"91110000000000004X"}', '{"name":"法人4"}', '{"bank_name":"招商银行","account_no":"6214****0004"}', '{"address":"一碗好面门店"}', '{"phone":"13000000004"}', 'APPLY2026050004', '1500000004', 1, '{"result":"approved"}', '2026-04-15 12:00:00', '2026-04-25 12:00:00', '2026-04-15 12:00:00', '2026-05-11 09:00:00'),
-(5, 5, '甜心工坊', '{"license_no":"91110000000000005X"}', '{"name":"法人5"}', '{"bank_name":"招商银行","account_no":"6214****0005"}', '{"address":"甜心工坊门店"}', '{"phone":"13000000005"}', 'APPLY2026050005', '1500000005', 2, '{"result":"rejected","reason":"资料不完整"}', '2026-04-16 12:00:00', '2026-04-26 12:00:00', '2026-04-16 12:00:00', '2026-05-11 09:00:00'),
-(6, 6, '午后简餐', '{"license_no":"91110000000000006X"}', '{"name":"法人6"}', '{"bank_name":"招商银行","account_no":"6214****0006"}', '{"address":"午后简餐门店"}', '{"phone":"13000000006"}', 'APPLY2026050006', '1500000006', 1, '{"result":"approved"}', '2026-04-17 12:00:00', '2026-04-27 12:00:00', '2026-04-17 12:00:00', '2026-05-11 09:00:00'),
-(7, 7, '深夜烧烤铺', '{"license_no":"91110000000000007X"}', '{"name":"法人7"}', '{"bank_name":"招商银行","account_no":"6214****0007"}', '{"address":"深夜烧烤铺门店"}', '{"phone":"13000000007"}', 'APPLY2026050007', '1500000007', 1, '{"result":"approved"}', '2026-04-18 12:00:00', '2026-04-28 12:00:00', '2026-04-18 12:00:00', '2026-05-11 09:00:00'),
-(8, 8, '沸点火锅', '{"license_no":"91110000000000008X"}', '{"name":"法人8"}', '{"bank_name":"招商银行","account_no":"6214****0008"}', '{"address":"沸点火锅门店"}', '{"phone":"13000000008"}', 'APPLY2026050008', NULL, 0, '{"result":"reviewing"}', '2026-04-19 12:00:00', NULL, '2026-04-19 12:00:00', '2026-05-11 09:00:00'),
-(9, 9, '町上寿司', '{"license_no":"91110000000000009X"}', '{"name":"法人9"}', '{"bank_name":"招商银行","account_no":"6214****0009"}', '{"address":"町上寿司门店"}', '{"phone":"13000000009"}', 'APPLY2026050009', '1500000009', 1, '{"result":"approved"}', '2026-04-20 12:00:00', '2026-04-30 12:00:00', '2026-04-20 12:00:00', '2026-05-11 09:00:00'),
-(10, 10, '清晨早点铺', '{"license_no":"91110000000000010X"}', '{"name":"法人10"}', '{"bank_name":"招商银行","account_no":"6214****0010"}', '{"address":"清晨早点铺门店"}', '{"phone":"13000000010"}', 'APPLY2026050010', '1500000010', 1, '{"result":"approved"}', '2026-04-21 12:00:00', '2026-05-01 12:00:00', '2026-04-21 12:00:00', '2026-05-11 09:00:00');
+INSERT INTO `merchants` (`id`, `service_provider_id`, `name`, `logo`, `contact_name`, `contact_phone`, `contact_email`, `address`, `lat`, `lng`, `business_category`, `business_hours`, `announcement`, `min_order_amount`, `takeout_enabled`, `dine_in_enabled`, `sub_mch_id`, `profit_sharing_enabled`, `profit_sharing_ratio`, `payment_config_status`, `status`, `rating`, `sales_count`, `qrcode_url`, `created_at`, `updated_at`) VALUES
+(2, 1, '老城砂锅', 'https://example.com/images/merchant_logo_2.jpg', '王敏', '13700000002', 'wangmin@example.com', '北京市东城区东四北大街18号', 39.928200, 116.417400, '餐饮', '10:00-21:30', '砂锅现做，暖胃更暖心', 18.00, 1, 1, '1112649854', 1, 6.00, 1, 1, 4.8, 74, 'https://example.com/qrcode/merchant_2.png', '2026-04-02 10:00:00', '2026-05-11 09:00:00'),
+(3, 1, '轻食研究所', 'https://example.com/images/merchant_logo_3.jpg', '赵晴', '13700000003', 'zhaoqing@example.com', '北京市朝阳区望京街10号', 39.997100, 116.470600, '轻食', '08:00-20:30', '低卡轻食，健康一整天', 25.00, 1, 0, '1500000003', 1, 8.00, 1, 1, 4.9, 81, 'https://example.com/qrcode/merchant_3.png', '2026-04-03 10:00:00', '2026-05-11 09:00:00'),
+(4, 1, '一碗好面', 'https://example.com/images/merchant_logo_4.jpg', '孙岩', '13700000004', 'sunyan@example.com', '北京市海淀区中关村南大街27号', 39.959300, 116.317600, '面馆', '07:30-22:00', '手工劲道现煮现卖', 16.00, 1, 1, '1500000004', 1, 5.00, 1, 1, 4.7, 88, 'https://example.com/qrcode/merchant_4.png', '2026-04-04 10:00:00', '2026-05-11 09:00:00'),
+(5, 1, '甜心工坊', 'https://example.com/images/merchant_logo_5.jpg', '李茜', '13700000005', 'liqian@example.com', '北京市西城区金融大街9号', 39.915400, 116.366700, '烘焙', '09:00-21:00', '蛋糕甜点每日新鲜出炉', 28.00, 1, 1, '1500000005', 1, 12.00, 1, 1, 4.6, 95, 'https://example.com/qrcode/merchant_5.png', '2026-04-05 10:00:00', '2026-05-11 09:00:00'),
+(6, 1, '午后简餐', 'https://example.com/images/merchant_logo_6.jpg', '周航', '13700000006', 'zhouhang@example.com', '北京市丰台区马家堡西路36号', 39.851200, 116.377500, '简餐', '10:30-20:00', '打工人高效午餐选择', 20.00, 1, 1, '1500000006', 1, 4.50, 1, 1, 4.8, 102, 'https://example.com/qrcode/merchant_6.png', '2026-04-06 10:00:00', '2026-05-11 09:00:00'),
+(7, 1, '深夜烧烤铺', 'https://example.com/images/merchant_logo_7.jpg', '陈卓', '13700000007', 'chenzhuo@example.com', '北京市朝阳区工体北路6号', 39.933100, 116.447200, '烧烤', '17:00-02:00', '夜宵聚会就来这里', 30.00, 1, 1, '1500000007', 1, 10.00, 1, 0, 4.5, 109, 'https://example.com/qrcode/merchant_7.png', '2026-04-07 10:00:00', '2026-05-11 09:00:00'),
+(8, 1, '沸点火锅', 'https://example.com/images/merchant_logo_8.jpg', '何静', '13700000008', 'hejing@example.com', '北京市海淀区学院路甲5号', 39.982600, 116.352400, '火锅', '11:00-23:00', '单人锅底也能吃得很满足', 35.00, 1, 1, NULL, 0, 0.00, 0, 1, 4.9, 116, 'https://example.com/qrcode/merchant_8.png', '2026-04-08 10:00:00', '2026-05-11 09:00:00'),
+(9, 1, '町上寿司', 'https://example.com/images/merchant_logo_9.jpg', '高原', '13700000009', 'gaoyuan@example.com', '北京市朝阳区三里屯路19号', 39.935200, 116.454100, '日料', '10:00-22:00', '新鲜现做，寿司刺身都有', 32.00, 1, 1, '1500000009', 1, 7.00, 1, 1, 4.9, 123, 'https://example.com/qrcode/merchant_9.png', '2026-04-09 10:00:00', '2026-05-11 09:00:00'),
+(10, 1, '清晨早点铺', 'https://example.com/images/merchant_logo_10.jpg', '马静', '13700000010', 'majing@example.com', '北京市通州区新华西街58号', 39.906400, 116.657200, '早餐', '06:00-13:30', '热乎早点，开启元气一天', 12.00, 1, 1, '1500000010', 0, 0.00, 1, 1, 4.7, 130, 'https://example.com/qrcode/merchant_10.png', '2026-04-10 10:00:00', '2026-05-11 09:00:00');
 
 INSERT INTO `merchant_staffs` (`id`, `merchant_id`, `username`, `password`, `name`, `phone`, `openid`, `unionid`, `wechat_bound_at`, `role`, `notify_enabled`, `browse_notify_enabled`, `status`, `last_login_at`, `last_wechat_login_at`, `created_at`, `updated_at`) VALUES
 (2, 2, 'merchant2', '$2a$10$mP89UzDWaHy0LVxdDqWhheUJ/UN4tVkArcEhTqW7kqScW7lk.558W', '老城砂锅店长', '13900000002', NULL, NULL, NULL, 'owner', 1, 1, 1, NULL, NULL, '2026-04-02 10:00:00', '2026-05-11 09:00:00'),
@@ -87,17 +71,6 @@ INSERT INTO `merchant_delivery_settings` (`id`, `merchant_id`, `enabled`, `base_
 (8, 8, 1, 6.00, 69.00, 11, '[{"min_distance":0,"max_distance":2,"fee":0},{"min_distance":2,"max_distance":5,"fee":3},{"min_distance":5,"max_distance":10,"fee":6}]', '2026-04-08 10:00:00', '2026-05-11 09:00:00'),
 (9, 9, 1, 4.00, 72.00, 12, '[{"min_distance":0,"max_distance":2,"fee":0},{"min_distance":2,"max_distance":5,"fee":3},{"min_distance":5,"max_distance":10,"fee":6}]', '2026-04-09 10:00:00', '2026-05-11 09:00:00'),
 (10, 10, 1, 5.00, 75.00, 8, '[{"min_distance":0,"max_distance":2,"fee":0},{"min_distance":2,"max_distance":5,"fee":3},{"min_distance":5,"max_distance":10,"fee":6}]', '2026-04-10 10:00:00', '2026-05-11 09:00:00');
-INSERT INTO `merchant_licenses` (`id`, `merchant_id`, `license_no`, `license_name`, `license_image`, `legal_person`, `legal_person_id`, `legal_person_id_front`, `legal_person_id_back`, `valid_from`, `valid_to`, `status`, `created_at`, `updated_at`) VALUES
-(2, 2, '91110000000000002X', '老城砂锅有限公司', 'https://example.com/images/license_2.jpg', '法人2', '1101011990002011232', 'https://example.com/images/id_front_2.jpg', 'https://example.com/images/id_back_2.jpg', '2021-01-01', '2031-12-31', 1, '2026-04-02 10:00:00', '2026-05-11 09:00:00'),
-(3, 3, '91110000000000003X', '轻食研究所有限公司', 'https://example.com/images/license_3.jpg', '法人3', '1101011990003011233', 'https://example.com/images/id_front_3.jpg', 'https://example.com/images/id_back_3.jpg', '2021-01-01', '2031-12-31', 1, '2026-04-03 10:00:00', '2026-05-11 09:00:00'),
-(4, 4, '91110000000000004X', '一碗好面有限公司', 'https://example.com/images/license_4.jpg', '法人4', '1101011990004011234', 'https://example.com/images/id_front_4.jpg', 'https://example.com/images/id_back_4.jpg', '2021-01-01', '2031-12-31', 1, '2026-04-04 10:00:00', '2026-05-11 09:00:00'),
-(5, 5, '91110000000000005X', '甜心工坊有限公司', 'https://example.com/images/license_5.jpg', '法人5', '1101011990005011235', 'https://example.com/images/id_front_5.jpg', 'https://example.com/images/id_back_5.jpg', '2021-01-01', '2031-12-31', 1, '2026-04-05 10:00:00', '2026-05-11 09:00:00'),
-(6, 6, '91110000000000006X', '午后简餐有限公司', 'https://example.com/images/license_6.jpg', '法人6', '1101011990006011236', 'https://example.com/images/id_front_6.jpg', 'https://example.com/images/id_back_6.jpg', '2021-01-01', '2031-12-31', 1, '2026-04-06 10:00:00', '2026-05-11 09:00:00'),
-(7, 7, '91110000000000007X', '深夜烧烤铺有限公司', 'https://example.com/images/license_7.jpg', '法人7', '1101011990007011237', 'https://example.com/images/id_front_7.jpg', 'https://example.com/images/id_back_7.jpg', '2021-01-01', '2031-12-31', 1, '2026-04-07 10:00:00', '2026-05-11 09:00:00'),
-(8, 8, '91110000000000008X', '沸点火锅有限公司', 'https://example.com/images/license_8.jpg', '法人8', '1101011990008011238', 'https://example.com/images/id_front_8.jpg', 'https://example.com/images/id_back_8.jpg', '2021-01-01', '2031-12-31', 1, '2026-04-08 10:00:00', '2026-05-11 09:00:00'),
-(9, 9, '91110000000000009X', '町上寿司有限公司', 'https://example.com/images/license_9.jpg', '法人9', '1101011990009011239', 'https://example.com/images/id_front_9.jpg', 'https://example.com/images/id_back_9.jpg', '2021-01-01', '2031-12-31', 1, '2026-04-09 10:00:00', '2026-05-11 09:00:00'),
-(10, 10, '91110000000000010X', '清晨早点铺有限公司', 'https://example.com/images/license_10.jpg', '法人10', '1101011990010011230', 'https://example.com/images/id_front_10.jpg', 'https://example.com/images/id_back_10.jpg', '2021-01-01', '2031-12-31', 1, '2026-04-10 10:00:00', '2026-05-11 09:00:00');
-
 INSERT INTO `categories` (`id`, `merchant_id`, `name`, `sort`, `status`, `created_at`, `updated_at`) VALUES
 (1001, 1, '招牌菜', 1, 1, '2026-04-01 10:00:00', '2026-05-11 09:00:00'),
 (1002, 1, '热菜', 2, 1, '2026-04-01 10:00:00', '2026-05-11 09:00:00'),
@@ -938,6 +911,16 @@ INSERT INTO `orders` (`id`, `order_no`, `user_id`, `merchant_id`, `total_amount`
 (118, 'ORD2026051009', 7, 10, 51.40, 4.00, 0.00, 55.40, 2, 4.40, '到店自取', '收货人7', '13500000007', 3, '模拟订单118', 'VC1009', 'TXN1009007', '2026-05-11 08:43:00', '2026-05-11 10:33:00', NULL, NULL, '2026-05-11 08:33:00', '2026-05-11 09:00:00'),
 (119, 'ORD2026051010', 8, 10, 59.40, 4.00, 5.00, 58.40, 1, 1.20, '北京市配送地址8号', '收货人8', '13500000008', 2, '模拟订单119', NULL, 'TXN1010008', '2026-05-10 07:40:00', NULL, NULL, NULL, '2026-05-10 07:30:00', '2026-05-11 09:00:00'),
 (120, 'ORD2026051011', 9, 10, 108.20, 4.00, 0.00, 112.20, 1, 2.00, '北京市配送地址9号', '收货人9', '13500000009', 4, '模拟订单120', NULL, 'TXN1011009', '2026-05-09 06:37:00', NULL, NULL, '2026-05-09 11:27:00', '2026-05-09 06:27:00', '2026-05-11 09:00:00');
+
+UPDATE `orders` SET `profit_sharing_status` = 1, `profit_sharing_amount` = 2.90, `profit_sharing_order_no` = 'PS2026050101', `profit_sharing_at` = '2026-05-10 10:08:00', `profit_sharing_error` = '' WHERE `id` = 2;
+UPDATE `orders` SET `profit_sharing_status` = 2, `profit_sharing_amount` = 4.49, `profit_sharing_order_no` = 'PS2026050201', `profit_sharing_error` = '微信分账失败：余额不足' WHERE `id` = 14;
+UPDATE `orders` SET `profit_sharing_status` = 3, `profit_sharing_amount` = 0.00, `profit_sharing_order_no` = 'PS2026051001', `profit_sharing_at` = '2026-05-10 09:08:00', `profit_sharing_error` = '商家未开启分账' WHERE `id` = 110;
+
+INSERT INTO `merchant_profit_sharing_records` (`id`, `service_provider_id`, `merchant_id`, `order_id`, `order_no`, `transaction_id`, `profit_sharing_order_no`, `profit_sharing_date`, `pay_amount`, `profit_sharing_ratio`, `profit_sharing_amount`, `merchant_received_amount`, `status`, `error_message`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 2, 'ORD2026050101', 'TXN0101002', 'PS2026050101', '2026-05-10 10:08:00', 58.00, 5.00, 2.90, 55.10, 1, '', '2026-05-10 10:08:00', '2026-05-10 10:08:00'),
+(2, 1, 2, 14, 'ORD2026050201', 'TXN0201005', 'PS2026050201', '2026-05-10 09:08:00', 74.80, 6.00, 4.49, 70.31, 2, '微信分账失败：余额不足', '2026-05-10 09:08:00', '2026-05-10 09:09:00'),
+(3, 1, 10, 110, 'ORD2026051001', 'TXN1001029', 'PS2026051001', '2026-05-10 09:08:00', 74.00, 0.00, 0.00, 74.00, 3, '商家未开启分账', '2026-05-10 09:08:00', '2026-05-10 09:08:00');
+
 INSERT INTO `order_items` (`id`, `order_id`, `merchant_id`, `product_id`, `product_name`, `image`, `price`, `quantity`, `spec_info`, `subtotal`, `created_at`) VALUES
 (1, 1, 1, 2001, '美味餐厅商品A0', 'https://example.com/images/product_2001.jpg', 25.80, 1, '{"label":"标准"}', 25.80, '2026-05-11 11:00:00'),
 (2, 1, 1, 2004, '美味餐厅商品B0', 'https://example.com/images/product_2004.jpg', 20.80, 1, '{"label":"常规"}', 20.80, '2026-05-11 11:00:00'),
@@ -1201,43 +1184,18 @@ INSERT INTO `refunds` (`id`, `order_id`, `refund_no`, `refund_amount`, `refund_r
 (19, 114, 'REF2026051005', 90.88, '用户申请退款', 2, 'RID1005', '2026-05-06 09:45:00', '2026-05-06 08:45:00', '2026-05-11 09:00:00'),
 (20, 120, 'REF2026051011', 89.76, '用户申请退款', 2, 'RID1011', '2026-05-09 11:27:00', '2026-05-09 10:27:00', '2026-05-11 09:00:00');
 
-INSERT INTO `invite_records` (`id`, `inviter_id`, `invitee_id`, `invite_code`, `status`, `reward_type`, `reward_status`, `created_at`, `completed_at`) VALUES
-(1, 1, 2, 'XM2026050001', 1, 'rate_discount', 0, '2026-05-01 09:00:00', '2026-05-11 10:00:00'),
-(2, 2, 3, 'XM2026050002', 1, 'free_year', 1, '2026-05-02 09:00:00', '2026-05-12 10:00:00'),
-(3, 3, 4, 'XM2026050003', 0, 'rate_discount', 0, '2026-05-03 09:00:00', NULL),
-(4, 4, 5, 'XM2026050004', 1, 'free_year', 1, '2026-05-04 09:00:00', '2026-05-14 10:00:00'),
-(5, 5, 6, 'XM2026050005', 1, 'rate_discount', 0, '2026-05-05 09:00:00', '2026-05-15 10:00:00'),
-(6, 6, 7, 'XM2026050006', 0, 'free_year', 0, '2026-05-06 09:00:00', NULL),
-(7, 7, 8, 'XM2026050007', 1, 'rate_discount', 0, '2026-05-07 09:00:00', '2026-05-17 10:00:00'),
-(8, 8, 9, 'XM2026050008', 1, 'free_year', 1, '2026-05-08 09:00:00', '2026-05-18 10:00:00'),
-(9, 9, 10, 'XM2026050009', 0, 'rate_discount', 0, '2026-05-09 09:00:00', NULL);
 INSERT INTO `activities` (`id`, `type`, `title`, `content`, `image`, `link_type`, `link_value`, `sort`, `status`, `start_time`, `end_time`, `created_at`, `updated_at`) VALUES
 (1, 'banner', '夏日餐饮节', '平台联动活动，商家报名享扶持', 'https://example.com/images/activity_1.jpg', 'page', '/pages/activity/summer', 1, 1, '2026-05-01 00:00:00', '2026-06-30 23:59:59', '2026-05-01 08:00:00', '2026-05-11 09:00:00'),
 (2, 'announcement', '系统升级通知', '5月中旬将进行支付能力升级', 'https://example.com/images/activity_2.jpg', 'page', '/pages/notice/detail?id=2', 2, 1, '2026-05-05 00:00:00', '2026-05-31 23:59:59', '2026-05-05 09:00:00', '2026-05-11 09:00:00'),
-(3, 'banner', '商家招募计划', '邀请优质商家入驻可获得奖励', 'https://example.com/images/activity_3.jpg', 'page', '/pages/invite/index', 3, 1, '2026-04-20 00:00:00', '2026-07-31 23:59:59', '2026-04-20 09:00:00', '2026-05-11 09:00:00'),
+(3, 'banner', '支付配置指引', '服务商可直接为商家维护子商户号与分账比例', 'https://example.com/images/activity_3.jpg', 'page', '/pages/sp/merchants/list', 3, 1, '2026-04-20 00:00:00', '2026-07-31 23:59:59', '2026-04-20 09:00:00', '2026-05-11 09:00:00'),
 (4, 'announcement', '打印服务维护公告', '云打印服务预计今晚 23:00 维护', 'https://example.com/images/activity_4.jpg', 'page', '/pages/notice/detail?id=4', 4, 1, '2026-05-10 00:00:00', '2026-05-20 23:59:59', '2026-05-10 09:00:00', '2026-05-11 09:00:00');
-INSERT INTO `invite_rewards` (`id`, `type`, `condition`, `description`, `enabled`, `created_at`, `updated_at`) VALUES
-(1, 'free_year', 'invite_3', '邀请3家商家成功入驻，赠送一年服务费', 1, '2026-05-01 09:00:00', '2026-05-11 09:00:00'),
-(2, 'rate_discount', 'invite_1', '邀请1家商家成功入驻，手续费率下调至最低档', 1, '2026-05-01 09:00:00', '2026-05-11 09:00:00'),
-(3, 'coupon_package', 'invite_5', '邀请5家商家成功入驻，获推广券包', 0, '2026-05-01 09:00:00', '2026-05-11 09:00:00');
 INSERT INTO `announcements` (`id`, `service_provider_id`, `title`, `content`, `status`, `created_at`, `updated_at`) VALUES
 (1, 1, '五一活动复盘', '请各商家及时查看活动复盘和经营建议。', 1, '2026-05-02 10:00:00', '2026-05-11 09:00:00'),
 (2, 1, '新版打印模板上线', '支持堂食和外卖分模板打印。', 1, '2026-05-04 10:00:00', '2026-05-11 09:00:00'),
-(3, 1, '商家入驻资料规范', '请新商家按照最新模板补充结算资料。', 1, '2026-05-06 10:00:00', '2026-05-11 09:00:00'),
+(3, 1, '商家支付配置规范', '请为已进件商家及时回填子商户号与分账比例。', 1, '2026-05-06 10:00:00', '2026-05-11 09:00:00'),
 (4, 1, '系统维护通知', '本周日晚间将进行系统维护。', 0, '2026-05-08 10:00:00', '2026-05-11 09:00:00'),
 (5, 1, '经营建议周报', '系统已根据近期经营情况生成建议。', 1, '2026-05-10 10:00:00', '2026-05-11 09:00:00');
 
-INSERT INTO `merchant_audit_records` (`id`, `merchant_id`, `auditor_id`, `action`, `before_status`, `after_status`, `remark`, `created_at`) VALUES
-(1, 1, 1, 'approve', 0, 1, '审核通过', '2026-05-01 11:00:00'),
-(2, 2, 1, 'submit', 0, 0, '待审核中', '2026-05-02 11:00:00'),
-(3, 3, 1, 'approve', 0, 1, '审核通过', '2026-05-03 11:00:00'),
-(4, 4, 1, 'approve', 0, 1, '审核通过', '2026-05-04 11:00:00'),
-(5, 5, 1, 'reject', 0, 2, '驳回补充资料', '2026-05-05 11:00:00'),
-(6, 6, 1, 'approve', 0, 1, '审核通过', '2026-05-06 11:00:00'),
-(7, 7, 1, 'approve', 0, 1, '审核通过', '2026-05-07 11:00:00'),
-(8, 8, 1, 'submit', 0, 0, '待审核中', '2026-05-08 11:00:00'),
-(9, 9, 1, 'approve', 0, 1, '审核通过', '2026-05-09 11:00:00'),
-(10, 10, 1, 'approve', 0, 1, '审核通过', '2026-05-10 11:00:00');
 INSERT INTO `merchant_fees` (`id`, `merchant_id`, `year`, `amount`, `status`, `pay_time`, `free_reason`, `created_at`, `updated_at`) VALUES
 (1, 1, 2025, 2000.00, 'paid', '2025-01-10 10:00:00', NULL, '2025-01-01 00:00:00', '2026-05-11 09:00:00'),
 (2, 1, 2026, 2000.00, 'paid', '2026-01-12 10:00:00', NULL, '2026-01-01 00:00:00', '2026-05-11 09:00:00'),

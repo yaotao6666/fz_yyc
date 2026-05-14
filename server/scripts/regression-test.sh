@@ -255,11 +255,6 @@ show_status() {
         FROM ${DB_NAME}.orders
         UNION ALL
         SELECT
-            '邀请记录' AS 项目,
-            COUNT(*) AS 数量
-        FROM ${DB_NAME}.invite_records
-        UNION ALL
-        SELECT
             '系统公告' AS 项目,
             COUNT(*) AS 数量
         FROM ${DB_NAME}.announcements

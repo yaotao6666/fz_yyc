@@ -136,31 +136,36 @@
 
     <!-- 操作按钮 -->
     <view class="bottom-bar">
-      <template v-if="order.status === 2">
-        <button class="btn-verify" @click="showVerifyDialog">核销订单</button>
+      <template v-if="order.status === OrderStatus.PAID">
+        <button class="btn-verify" :disabled="verifying" @click="confirmVerify">
+          {{ verifying ? '核销中...' : '核销订单' }}
+        </button>
       </template>
-      <template v-if="order.status === 5">
-        <button class="btn-refund">处理退款</button>
+      <template v-if="canRefund">
+        <button class="btn-refund" :disabled="refunding" @click="showRefundDialog">
+          {{ refunding ? '提交中...' : '发起退款' }}
+        </button>
       </template>
     </view>
 
-    <!-- 核销弹窗 -->
-    <view v-if="showVerify" class="dialog-mask" @click="closeVerifyDialog">
+    <!-- 退款弹窗 -->
+    <view v-if="showRefund" class="dialog-mask" @click="closeRefundDialog">
       <view class="dialog-content" @click.stop>
-        <view class="dialog-title">订单核销</view>
-        <view class="verify-code-input">
-          <input
-            v-model="verifyCode"
-            type="text"
-            class="code-input"
-            placeholder="请输入核销码"
-            maxlength="6"
-          />
+        <view class="dialog-title">发起退款</view>
+        <view class="refund-summary">
+          <text class="refund-summary-text">订单号：{{ order.order_no }}</text>
+          <text class="refund-summary-text">退款金额：¥{{ order.pay_amount.toFixed(2) }}</text>
         </view>
+        <textarea
+          v-model="refundReason"
+          class="refund-textarea"
+          maxlength="120"
+          placeholder="请输入退款原因"
+        />
         <view class="dialog-actions">
-          <button class="btn-cancel" @click="closeVerifyDialog">取消</button>
-          <button class="btn-confirm" :disabled="verifying" @click="confirmVerify">
-            {{ verifying ? '核销中...' : '确认核销' }}
+          <button class="btn-cancel" @click="closeRefundDialog">取消</button>
+          <button class="btn-confirm" :disabled="refunding" @click="submitRefund">
+            {{ refunding ? '提交中...' : '确认退款' }}
           </button>
         </view>
       </view>
@@ -169,16 +174,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getOrder, completeOrder } from '@api'
+import { getOrder, completeOrder, refundOrder } from '@api'
 import { OrderStatus, OrderStatusText, DeliveryTypeText } from '@types'
 import type { Order } from '@types'
 
 const order = ref<Order | null>(null)
-const showVerify = ref(false)
-const verifyCode = ref('')
 const verifying = ref(false)
+const showRefund = ref(false)
+const refundReason = ref('')
+const refunding = ref(false)
+
+const canRefund = computed(() => {
+  return order.value?.status === OrderStatus.PAID || order.value?.status === OrderStatus.COMPLETED
+})
 
 onLoad((options: any) => {
   if (options.id) {
@@ -252,20 +262,10 @@ function copyVerifyCode() {
   })
 }
 
-function showVerifyDialog() {
-  verifyCode.value = order.value?.verify_code || ''
-  showVerify.value = true
-}
-
-function closeVerifyDialog() {
-  showVerify.value = false
-  verifyCode.value = ''
-}
-
 async function confirmVerify() {
-  const code = verifyCode.value.trim()
+  const code = order.value?.verify_code?.trim() || ''
   if (!code) {
-    return uni.showToast({ title: '请输入核销码', icon: 'none' })
+    return uni.showToast({ title: '未获取到核销码', icon: 'none' })
   }
 
   if (!/^\d{6}$/.test(code)) {
@@ -279,11 +279,40 @@ async function confirmVerify() {
   try {
     order.value = await completeOrder(order.value.id, code)
     uni.showToast({ title: '核销成功', icon: 'success' })
-    closeVerifyDialog()
   } catch (error: any) {
     uni.showToast({ title: error.message || '核销失败', icon: 'none' })
   } finally {
     verifying.value = false
+  }
+}
+
+function showRefundDialog() {
+  refundReason.value = ''
+  showRefund.value = true
+}
+
+function closeRefundDialog() {
+  showRefund.value = false
+  refundReason.value = ''
+}
+
+async function submitRefund() {
+  if (!order.value) return
+  refunding.value = true
+
+  try {
+    await refundOrder(order.value.id, {
+      reason: refundReason.value.trim(),
+      refund_amount: order.value.pay_amount
+    })
+    order.value.status = OrderStatus.REFUNDING
+    order.value.refunded_at = new Date().toISOString()
+    uni.showToast({ title: '退款已提交', icon: 'success' })
+    closeRefundDialog()
+  } catch (error: any) {
+    uni.showToast({ title: error.message || '退款失败', icon: 'none' })
+  } finally {
+    refunding.value = false
   }
 }
 </script>

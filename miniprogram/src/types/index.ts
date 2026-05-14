@@ -109,33 +109,30 @@ export interface SpSettings {
   created_at?: string
 }
 
-export enum MerchantAuditStatus {
-  PENDING = 0,
-  APPROVED = 1,
-  REJECTED = 2
+export enum PaymentConfigStatus {
+  INCOMPLETE = 0,
+  COMPLETED = 1
 }
 
-export const MerchantAuditStatusText: Record<number, string> = {
-  [MerchantAuditStatus.PENDING]: '待审核',
-  [MerchantAuditStatus.APPROVED]: '已通过',
-  [MerchantAuditStatus.REJECTED]: '已拒绝'
-}
-
-export interface MerchantApplication {
-  id: number
-  name: string
-  contact_name: string
-  contact_phone: string
-  business_category: string
-  applied_at: string
-  status: number
-  reject_reason?: string
+export const PaymentConfigStatusText: Record<number, string> = {
+  [PaymentConfigStatus.INCOMPLETE]: '待完善',
+  [PaymentConfigStatus.COMPLETED]: '已完成'
 }
 
 export interface MerchantListItem {
   id: number
   name: string
+  contact_name?: string
+  contact_phone?: string
+  contact_email?: string
+  address?: string
   business_category: string
+  business_hours?: string
+  announcement?: string
+  sub_mch_id?: string
+  profit_sharing_enabled?: boolean
+  profit_sharing_ratio?: number
+  payment_config_status?: number
   status: number
   created_at: string
   total_users: number
@@ -145,43 +142,129 @@ export interface MerchantListItem {
 
 export interface MerchantDetail extends MerchantListItem {
   address?: string
-  audit_status: number
-  audit_remark?: string
   qrcode_url?: string
-  store_name?: string
-  license?: any
-  settings?: {
-    bank_account?: any
-    store_images?: string[]
+  logo?: string
+  cover_image?: string
+}
+
+export interface SpMerchantFormData {
+  name: string
+  contact_name?: string
+  contact_phone?: string
+  contact_email?: string
+  address?: string
+  business_category?: string
+  business_hours?: string
+  announcement?: string
+  username: string
+  password: string
+  staff_name?: string
+  staff_phone?: string
+  sub_mch_id?: string
+  profit_sharing_enabled: boolean
+  profit_sharing_ratio: number
+}
+
+export interface UpdateSpMerchantFormData {
+  name?: string
+  contact_name?: string
+  contact_phone?: string
+  contact_email?: string
+  address?: string
+  business_category?: string
+  business_hours?: string
+  announcement?: string
+  status?: number
+}
+
+export interface MerchantPaymentConfigFormData {
+  sub_mch_id: string
+  profit_sharing_enabled: boolean
+  profit_sharing_ratio: number
+}
+
+export interface ProfitSharingRecord {
+  id: number
+  service_provider_id: number
+  merchant_id: number
+  order_id: number
+  order_no: string
+  transaction_id?: string
+  profit_sharing_order_no: string
+  profit_sharing_date: string
+  pay_amount: number
+  profit_sharing_ratio: number
+  profit_sharing_amount: number
+  merchant_received_amount: number
+  status: number
+  error_message?: string
+  created_at: string
+}
+
+export interface ProfitSharingRecordListResponse {
+  list: ProfitSharingRecord[]
+  pagination: {
+    total: number
+    page: number
+    page_size: number
   }
-  application?: {
-    business_license_info?: any
-    legal_person_info?: any
-    bank_account_info?: any
-    store_info?: any
-  }
+}
+
+export interface ProfitSharingRecordQuery extends PaginationParams {
+  merchant_id?: number
+  status?: number
+  start_date?: string
+  end_date?: string
+}
+
+export interface SpMerchantConversionItem {
+  merchant_id: number
+  merchant_name: string
+  merchant_logo?: string
+  visit_users: number
+  order_users: number
+  paid_orders: number
+  order_amount: number
+  avg_order_amount: number
+  visit_rate: number
+  order_rate: number
 }
 
 export interface MerchantDistributionData {
-  business: { category: string; count: number }[]
-  status: { status: string; count: number }[]
+  merchants: SpMerchantConversionItem[]
+  totals: {
+    merchant_count: number
+    visit_users: number
+    order_users: number
+    paid_orders: number
+    order_amount: number
+  }
 }
 
 export interface OrderAnalyticsData {
-  trends: { date: string; orders: number; amount: number }[]
-  total_orders: number
-  total_amount: number
+  day: { label: string; order_count: number }[]
+  week: { label: string; order_count: number }[]
+  month: { label: string; order_count: number }[]
+  year: { label: string; order_count: number }[]
 }
 
 export interface AmountAnalyticsData {
-  trends: { date: string; amount: number }[]
+  merchants: SpMerchantConversionItem[]
 }
 
 export interface TopMerchantRanking {
+  rank: number
+  metric: string
   merchant_id: number
   merchant_name: string
-  total_amount: number
-  order_count: number
+  merchant_logo?: string
+  visit_rate: number
+  order_rate: number
+  order_amount: number
+  avg_order_amount: number
+  visit_users: number
+  order_users: number
+  paid_orders: number
 }
 
 // ============ 商家相关 ============
@@ -209,26 +292,20 @@ export interface MerchantInfo {
   id: number
   name: string
   logo: string
+  cover_image?: string
   contact_name: string
   contact_phone: string
   address: string
   business_category: string
   status: number
-  license?: MerchantLicense
   settings?: MerchantSettings
   wechat_pay?: WechatPayInfo
+  sub_mch_id?: string
+  profit_sharing_enabled?: boolean
+  profit_sharing_ratio?: number
+  payment_config_status?: number
   qrcode_url?: string
   created_at: string
-}
-
-// 商家营业执照
-export interface MerchantLicense {
-  license_no: string
-  license_name: string
-  license_image: string
-  legal_person: string
-  valid_from: string
-  valid_to: string
 }
 
 // 商家设置
@@ -266,66 +343,7 @@ export interface DistanceRule {
 export interface WechatPayInfo {
   sub_mch_id: string
   status: string
-  applyment_status: number
-}
-
-// 商家入驻请求
-export interface MerchantRegisterRequest {
-  name: string
-  contact_name: string
-  contact_phone: string
-  contact_email?: string
-  address: string
-  business_category: string
-  invite_code?: string
-  license?: {
-    license_no: string
-    license_name: string
-    license_image: string
-    legal_person: string
-    legal_person_id: string
-    legal_person_id_front: string
-    legal_person_id_back: string
-    valid_from: string
-    valid_to: string
-  }
-  bank_account?: {
-    bank_name: string
-    bank_branch: string
-    account_no: string
-    account_name: string
-    account_type: number
-  }
-  store_info?: {
-    store_name: string
-    store_images: string[]
-  }
-}
-
-// 商家入驻响应
-export interface MerchantRegisterResponse {
-  merchant_id: number
-  application_id: number
-  status: string
-  invited_by?: {
-    name: string
-    reward_eligible: boolean
-  }
-}
-
-// 商家进件状态
-export interface MerchantApplicationStatus {
-  application_id: number
-  status: string
-  applyment_id?: string
-  sub_mch_id?: string
-  submit_time?: string
-  audit_time?: string
-  audit_detail?: {
-    legal_person_validation?: string
-    license_validation?: string
-    bank_account_validation?: string
-  }
+  payment_config_status?: number
 }
 
 // ============ 商品分类相关 ============
@@ -495,12 +513,12 @@ export interface OrderListResponse {
 // 订单统计
 export interface OrderStatistics {
   total_orders: number
-  total_sales: number
-  pending_payment: number
-  pending_complete: number
-  completed: number
-  refunded: number
-  cancelled: number
+  total_amount: number
+  today_orders: number
+  today_amount: number
+  pending_orders: number
+  completed_orders: number
+  refunded_amount: number
 }
 
 // 创建订单请求
@@ -635,6 +653,7 @@ export interface StockAlert {
   id?: number
   product_id: number
   product_name: string
+  image?: string
   stock: number
   status?: string | number
 }
@@ -706,51 +725,6 @@ export interface MerchantBehaviorEventRequest {
   order_id?: number
   source?: string
   payload?: Record<string, any>
-}
-
-// ============ 邀请入驻相关 ============
-
-// 邀请信息
-export interface InviteInfo {
-  invite_code: string
-  qrcode_url?: string
-  share_link?: string
-  poster_url?: string
-  expire_time?: string
-}
-
-// 我的邀请信息
-export interface MyInviteInfo {
-  invite_code: string
-  total_invites: number
-  completed_invites: number
-  pending_invites: number
-  rewards: {
-    free_year_count: number
-    lowest_rate_qualified: boolean
-  }
-}
-
-// 邀请记录
-export interface InviteRecord {
-  id: number
-  invitee_name: string
-  invitee_phone: string
-  invite_code: string
-  status: number
-  reward_type?: string
-  created_at: string
-  completed_at?: string
-}
-
-// 邀请记录列表响应
-export interface InviteRecordListResponse {
-  list: InviteRecord[]
-  pagination: {
-    total: number
-    page: number
-    page_size: number
-  }
 }
 
 // ============ 错误码 ============

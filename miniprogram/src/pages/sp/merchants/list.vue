@@ -1,36 +1,39 @@
 <template>
   <view class="merchant-list-container">
-    <!-- 搜索和筛选栏 -->
-    <view class="filter-bar">
-      <view class="search-box">
+    <view class="filter-card">
+      <view class="filter-header">
+        <view>
+          <view class="page-title">商家列表</view>
+          <view class="page-subtitle">统一查看商家资料、收款配置和分账比例</view>
+        </view>
+        <button class="create-btn" @click="goCreate">新增商家</button>
+      </view>
+
+      <view class="search-row">
         <input
           v-model="keyword"
           class="search-input"
           placeholder="搜索商家名称"
+          confirm-type="search"
           @confirm="handleSearch"
         />
-        <text class="search-btn" @click="handleSearch">搜索</text>
+        <button class="search-btn" @click="handleSearch">搜索</button>
       </view>
-      <picker
-        mode="selector"
-        :range="categoryOptions"
-        range-key="name"
-        :value="selectedCategoryIndex"
-        @change="onCategoryChange"
-      >
-        <view class="category-picker">
-          <text>{{ selectedCategoryLabel }}</text>
-          <text class="arrow">▼</text>
+
+      <view class="status-tabs">
+        <view
+          v-for="item in statusOptions"
+          :key="item.value"
+          class="status-tab"
+          :class="{ active: currentStatus === item.value }"
+          @click="changeStatus(item.value)"
+        >
+          {{ item.label }}
         </view>
-      </picker>
+      </view>
     </view>
 
-    <!-- 商家列表 -->
-    <scroll-view
-      class="merchant-list"
-      scroll-y
-      @scrolltolower="loadMore"
-    >
+    <scroll-view class="merchant-scroll" scroll-y @scrolltolower="loadMore">
       <view
         v-for="merchant in merchants"
         :key="merchant.id"
@@ -38,164 +41,152 @@
         @click="goDetail(merchant.id)"
       >
         <view class="merchant-header">
-          <view class="merchant-name">{{ merchant.name }}</view>
+          <view class="merchant-main">
+            <text class="merchant-name">{{ merchant.name }}</text>
+            <text class="merchant-meta">{{ merchant.contact_name || '未设置联系人' }} · {{ merchant.contact_phone || '未设置电话' }}</text>
+          </view>
           <view class="merchant-status" :class="getStatusClass(merchant.status)">
             {{ getStatusText(merchant.status) }}
           </view>
         </view>
 
-        <view class="merchant-info">
-          <view class="info-item">
-            <text class="label">行业分类：</text>
-            <text class="value">{{ merchant.business_category }}</text>
+        <view class="summary-grid">
+          <view class="summary-item">
+            <text class="summary-label">收款商户号</text>
+            <text class="summary-value">{{ merchant.sub_mch_id || '未配置' }}</text>
           </view>
-          <view class="info-item">
-            <text class="label">入驻时间：</text>
-            <text class="value">{{ formatDate(merchant.created_at) }}</text>
+          <view class="summary-item">
+            <text class="summary-label">支付配置</text>
+            <text class="summary-value" :class="getPaymentConfigClass(merchant.payment_config_status)">
+              {{ getPaymentConfigText(merchant.payment_config_status) }}
+            </text>
+          </view>
+          <view class="summary-item">
+            <text class="summary-label">分账配置</text>
+            <text class="summary-value">
+              {{ merchant.profit_sharing_enabled ? `已开启 ${formatRatio(merchant.profit_sharing_ratio)}` : '未开启' }}
+            </text>
+          </view>
+          <view class="summary-item">
+            <text class="summary-label">行业分类</text>
+            <text class="summary-value">{{ merchant.business_category || '未设置' }}</text>
           </view>
         </view>
 
-        <view class="merchant-stats">
-          <view class="stat-item">
-            <view class="stat-value">{{ merchant.total_users || 0 }}</view>
-            <view class="stat-label">用户数</view>
+        <view class="stats-row">
+          <view class="stat-box">
+            <text class="stat-value">{{ merchant.total_users || 0 }}</text>
+            <text class="stat-label">用户数</text>
           </view>
-          <view class="stat-item">
-            <view class="stat-value">{{ merchant.total_orders || 0 }}</view>
-            <view class="stat-label">累计订单</view>
+          <view class="stat-box">
+            <text class="stat-value">{{ merchant.total_orders || 0 }}</text>
+            <text class="stat-label">订单数</text>
           </view>
-          <view class="stat-item">
-            <view class="stat-value">¥{{ formatAmount(merchant.total_amount) }}</view>
-            <view class="stat-label">累计金额</view>
+          <view class="stat-box">
+            <text class="stat-value">¥{{ formatAmount(merchant.total_amount) }}</text>
+            <text class="stat-label">累计金额</text>
           </view>
         </view>
+
+        <view class="created-at">创建时间：{{ formatDate(merchant.created_at) }}</view>
       </view>
 
-      <view v-if="loading" class="loading">加载中...</view>
-      <view v-if="noMore && merchants.length > 0" class="no-more">没有更多了</view>
-      <view v-if="!loading && merchants.length === 0" class="empty">
-        <text class="empty-icon">🏪</text>
-        <text class="empty-text">暂无商家</text>
-        <text class="empty-hint">试试调整搜索条件</text>
+      <view v-if="loading" class="list-state">加载中...</view>
+      <view v-else-if="merchants.length === 0" class="empty-state">
+        <text class="empty-title">暂无商家</text>
+        <text class="empty-desc">可以直接新增商家并配置收款账户与分账比例</text>
       </view>
+      <view v-else-if="noMore" class="list-state">没有更多了</view>
     </scroll-view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getMerchantList, getCategories } from '@api'
-import type { MerchantListItem, Category } from '@types'
+import { getMerchantList } from '@api'
+import type { MerchantListItem, PaymentConfigStatus } from '@types'
+import { PaymentConfigStatusText } from '@types'
 
-// 搜索和筛选
+const statusOptions = [
+  { label: '全部', value: '' },
+  { label: '营业中', value: '1' },
+  { label: '休息中', value: '2' },
+  { label: '已关闭', value: '3' }
+]
+
 const keyword = ref('')
-const selectedCategoryId = ref<number | null>(null)
-const categoryOptions = ref<{ id: number | null; name: string }[]>([])
-const selectedCategoryIndex = ref(0)
-
-// 列表数据
+const currentStatus = ref('')
 const merchants = ref<MerchantListItem[]>([])
 const loading = ref(false)
 const noMore = ref(false)
 const page = ref(1)
 const pageSize = 10
 
-// 选中的分类标签
-const selectedCategoryLabel = computed(() => {
-  if (selectedCategoryIndex.value === 0) {
-    return '全部分类'
-  }
-  return categoryOptions.value[selectedCategoryIndex.value]?.name || '全部分类'
-})
-
 onShow(() => {
-  loadCategories()
   loadMerchants(true)
 })
 
-async function loadCategories() {
-  try {
-    const categories = await getCategories()
-    categoryOptions.value = [
-      { id: null, name: '全部分类' },
-      ...categories.map((c: Category) => ({ id: c.id, name: c.name }))
-    ]
-  } catch (error) {
-    console.error('加载分类失败:', error)
-  }
-}
-
 async function loadMerchants(reset = false) {
+  if (loading.value || (!reset && noMore.value)) {
+    return
+  }
+
   if (reset) {
     page.value = 1
     noMore.value = false
     merchants.value = []
   }
 
-  if (noMore.value || loading.value) return
-
   loading.value = true
-
   try {
-    const params: any = {
+    const response = await getMerchantList({
       page: page.value,
-      page_size: pageSize
-    }
+      page_size: pageSize,
+      keyword: keyword.value.trim() || undefined,
+      status: currentStatus.value || undefined
+    })
 
-    if (keyword.value) {
-      params.keyword = keyword.value
-    }
-
-    if (selectedCategoryId.value !== null) {
-      params.category_id = selectedCategoryId.value
-    }
-
-    const res = await getMerchantList(params)
-
-    if (reset) {
-      merchants.value = res.list
-    } else {
-      merchants.value.push(...res.list)
-    }
-
-    if (res.list.length < pageSize) {
+    merchants.value = reset ? response.list : merchants.value.concat(response.list)
+    if (response.list.length < pageSize) {
       noMore.value = true
     } else {
-      page.value++
+      page.value += 1
     }
-  } catch (error) {
-    console.error('加载商家列表失败:', error)
+  } catch (requestError) {
+    console.error('加载商家列表失败:', requestError)
+    uni.showToast({ title: '加载商家列表失败', icon: 'none' })
   } finally {
     loading.value = false
   }
-}
-
-function loadMore() {
-  loadMerchants()
 }
 
 function handleSearch() {
   loadMerchants(true)
 }
 
-function onCategoryChange(e: any) {
-  const index = e.detail.value
-  selectedCategoryIndex.value = index
-  selectedCategoryId.value = categoryOptions.value[index]?.id || null
+function changeStatus(status: string) {
+  if (currentStatus.value === status) {
+    return
+  }
+  currentStatus.value = status
   loadMerchants(true)
 }
 
-function getStatusText(status: number): string {
+function loadMore() {
+  loadMerchants()
+}
+
+function getStatusText(status: number) {
   const statusMap: Record<number, string> = {
     1: '营业中',
     2: '休息中',
     3: '已关闭'
   }
-  return statusMap[status] || '未知'
+  return statusMap[status] || '未知状态'
 }
 
-function getStatusClass(status: number): string {
+function getStatusClass(status: number) {
   const classMap: Record<number, string> = {
     1: 'open',
     2: 'rest',
@@ -204,16 +195,31 @@ function getStatusClass(status: number): string {
   return classMap[status] || ''
 }
 
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+function getPaymentConfigText(status?: number) {
+  return PaymentConfigStatusText[(status ?? 0) as PaymentConfigStatus] || '待完善'
 }
 
-function formatAmount(amount: number): string {
-  if (amount >= 10000) {
-    return (amount / 10000).toFixed(1) + '万'
+function getPaymentConfigClass(status?: number) {
+  return Number(status || 0) === 1 ? 'success' : 'warning'
+}
+
+function formatAmount(amount = 0) {
+  return Number(amount || 0).toFixed(2)
+}
+
+function formatRatio(ratio = 0) {
+  return `${Number(ratio || 0).toFixed(2)}%`
+}
+
+function formatDate(value?: string) {
+  if (!value) {
+    return '-'
   }
-  return amount.toFixed(2)
+  return value.slice(0, 10)
+}
+
+function goCreate() {
+  uni.navigateTo({ url: '/pages/sp/merchants/edit' })
 }
 
 function goDetail(merchantId: number) {
@@ -225,39 +231,244 @@ function goDetail(merchantId: number) {
 .merchant-list-container {
   min-height: 100vh;
   background: #f5f5f5;
-}
-
-.filter-bar {
-  background: #ffffff;
   padding: 24rpx;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  box-sizing: border-box;
 }
 
-.search-box {
+.filter-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.page-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.page-subtitle {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #86909c;
+}
+
+.create-btn {
+  margin: 0;
+  min-width: 180rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  border: none;
+  border-radius: 999rpx;
+  background: #1677ff;
+  color: #ffffff;
+  font-size: 26rpx;
+}
+
+.search-row {
   display: flex;
   gap: 16rpx;
-  margin-bottom: 20rpx;
+  margin-top: 24rpx;
 }
 
 .search-input {
   flex: 1;
-  height: 72rpx;
-  background: #f8f9fa;
-  border-radius: 36rpx;
-  padding: 0 32rpx;
+  height: 76rpx;
+  padding: 0 28rpx;
+  border-radius: 18rpx;
+  background: #f7f8fa;
   font-size: 28rpx;
 }
 
 .search-btn {
-  width: 120rpx;
-  height: 72rpx;
-  background: #007AFF;
-  color: #ffffff;
-  border-radius: 36rpx;
+  margin: 0;
+  width: 150rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+  border: none;
+  border-radius: 18rpx;
+  background: #eef3ff;
+  color: #1677ff;
+  font-size: 26rpx;
+}
+
+.status-tabs {
   display: flex;
-  align-items: center;
+  gap: 16rpx;
+  flex-wrap: wrap;
+  margin-top: 24rpx;
+}
+
+.status-tab {
+  padding: 14rpx 24rpx;
+  border-radius: 999rpx;
+  background: #f7f8fa;
+  font-size: 24rpx;
+  color: #4e5969;
+}
+
+.status-tab.active {
+  background: #e8f3ff;
+  color: #1677ff;
+}
+
+.merchant-scroll {
+  height: calc(100vh - 292rpx);
+}
+
+.merchant-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.merchant-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.merchant-main {
+  flex: 1;
+}
+
+.merchant-name {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.merchant-meta {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #86909c;
+}
+
+.merchant-status {
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+}
+
+.merchant-status.open {
+  color: #1677ff;
+  background: #e8f3ff;
+}
+
+.merchant-status.rest {
+  color: #d48806;
+  background: #fff7e6;
+}
+
+.merchant-status.closed {
+  color: #cf1322;
+  background: #fff1f0;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20rpx;
+  margin-top: 24rpx;
+  padding: 24rpx;
+  border-radius: 20rpx;
+  background: #f7f8fa;
+}
+
+.summary-item {
+  min-width: 0;
+}
+
+.summary-label {
+  display: block;
+  font-size: 22rpx;
+  color: #86909c;
+}
+
+.summary-value {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  line-height: 1.5;
+  color: #1f2329;
+  word-break: break-all;
+}
+
+.summary-value.success {
+  color: #389e0d;
+}
+
+.summary-value.warning {
+  color: #d48806;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.stat-box {
+  padding: 24rpx 18rpx;
+  border-radius: 18rpx;
+  background: #f7f8fa;
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.stat-label {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #86909c;
+}
+
+.created-at {
+  margin-top: 20rpx;
+  font-size: 23rpx;
+  color: #86909c;
+}
+
+.list-state,
+.empty-state {
+  padding: 40rpx 24rpx;
+  text-align: center;
+  color: #86909c;
+}
+
+.empty-title {
+  display: block;
+  font-size: 30rpx;
+  color: #1f2329;
+}
+
+.empty-desc {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+</style>
   justify-content: center;
   font-size: 28rpx;
 }

@@ -69,13 +69,15 @@
           <view class="stat-value">¥{{ formatAmount(statistics.today_sales || 0) }}</view>
           <view class="stat-label">今日销售额</view>
         </view>
-        <view class="stat-card">
+        <view class="stat-card stat-card-clickable" @click="goOrders(OrderStatus.PAID)">
           <view class="stat-value">{{ statistics.pending_orders || 0 }}</view>
-          <view class="stat-label">待处理订单</view>
+          <view class="stat-label">待核销订单</view>
+          <view class="stat-subtitle">点击查看待核销订单</view>
         </view>
-        <view class="stat-card">
+        <view class="stat-card stat-card-clickable" @click="goProducts('on_sale')">
           <view class="stat-value">{{ statistics.total_products || 0 }}</view>
-          <view class="stat-label">商品数量</view>
+          <view class="stat-label">上架商品数</view>
+          <view class="stat-subtitle">点击查看已上架商品</view>
         </view>
       </view>
     </view>
@@ -84,23 +86,17 @@
     <view class="menu-section">
       <view class="section-title">快捷功能</view>
       <view class="menu-grid">
-        <view class="menu-item" @click="goCategories">
-          <view class="menu-icon" style="background: #fff7e6;">
-            <image src="/static/icons/category.png" />
+        <view
+          v-for="item in quickMenuItems"
+          :key="item.title"
+          class="menu-item"
+          @click="item.action"
+        >
+          <view class="menu-icon" :style="{ background: item.background }">
+            <image class="menu-icon-image" :src="item.icon" mode="aspectFit" />
           </view>
-          <text class="menu-text">分类管理</text>
-        </view>
-        <view class="menu-item" @click="goProducts">
-          <view class="menu-icon" style="background: #e6f7ff;">
-            <image src="/static/icons/product.png" />
-          </view>
-          <text class="menu-text">商品管理</text>
-        </view>
-        <view class="menu-item" @click="openQuickVerifyDialog">
-          <view class="menu-icon" style="background: #f6ffed;">
-            <image src="/static/icons/order.png" />
-          </view>
-          <text class="menu-text">快速核销</text>
+          <text class="menu-text">{{ item.title }}</text>
+          <text class="menu-subtext">{{ item.subtitle }}</text>
         </view>
       </view>
     </view>
@@ -109,17 +105,17 @@
     <view class="todo-section" v-if="hasPendingItems">
       <view class="section-title">待处理事项</view>
       <view class="todo-list">
-        <view class="todo-item" v-if="statistics.pending_orders > 0" @click="goOrders('paid')">
+        <view class="todo-item" v-if="statistics.pending_orders > 0" @click="goOrders(OrderStatus.PAID)">
           <view class="todo-left">
             <view class="todo-icon order"></view>
-            <text class="todo-text">有待处理订单</text>
+            <text class="todo-text">有待核销订单</text>
           </view>
           <view class="todo-right">
             <text class="todo-count">{{ statistics.pending_orders }}</text>
             <text class="arrow">›</text>
           </view>
         </view>
-        <view class="todo-item" v-if="hasLowStock" @click="goProducts">
+        <view class="todo-item" v-if="hasLowStock" @click="goProducts()">
           <view class="todo-left">
             <view class="todo-icon stock"></view>
             <text class="todo-text">库存预警</text>
@@ -166,14 +162,16 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getMerchantQrcode, getMerchantAnnouncements, getSalesOverview, quickCompleteOrder } from '@api'
-import type { Announcement, Order } from '../../types'
+import { OrderStatus } from '../../types'
+import type { Announcement, Order, OrderStatistics } from '../../types'
 import { BrandAsset } from '../../utils/constants'
 
 const authStore = useAuthStore()
+const ORDER_LIST_ROUTE_STATE_KEY = 'merchant_order_list_route_state'
 
 const merchantInfo = ref(authStore.merchantInfo)
 const merchantQrcode = ref<string>('')
-const statistics = ref<any>({
+const statistics = ref({
   today_orders: 0,
   today_sales: 0,
   pending_orders: 0,
@@ -220,6 +218,29 @@ const lastSocketMessageText = computed(() => {
 
   return message.type || '未知消息'
 })
+const quickMenuItems = computed(() => [
+  {
+    title: '分类管理',
+    subtitle: '维护分类结构',
+    icon: '/static/icons/category.png',
+    background: '#fff7e6',
+    action: () => goCategories()
+  },
+  {
+    title: '商品管理',
+    subtitle: '查看上架商品',
+    icon: '/static/icons/product.png',
+    background: '#e6f7ff',
+    action: () => goProducts()
+  },
+  {
+    title: '快速核销',
+    subtitle: '扫码或输码核销',
+    icon: '/static/icons/order.png',
+    background: '#f6ffed',
+    action: () => openQuickVerifyDialog()
+  }
+])
 
 onShow(() => {
   loadData()
@@ -295,22 +316,25 @@ async function loadMerchantInfo() {
 
 async function loadStatistics() {
   try {
-    // 获取订单统计
-    const [orderStats, overview] = await Promise.all([
+    const [orderStats, overview, productRes] = await Promise.all([
       getOrderStatistics(),
-      getSalesOverview({ period: 'today' })
+      getSalesOverview({ period: 'today' }),
+      getProducts({ status: '1', page: 1, page_size: 1 })
     ])
-    
-    statistics.value = {
-      today_orders: overview.total_orders || orderStats.pending_payment + orderStats.completed,
-      today_sales: overview.total_sales || 0,
-      pending_orders: orderStats.pending_payment + orderStats.pending_complete,
-      total_products: 0
+
+    const normalizedOrderStats = orderStats as unknown as Partial<OrderStatistics> & {
+      today_orders?: number
+      pending_orders?: number
+      completed_orders?: number
     }
 
-    // 获取商品数量
-    const productRes = await getProducts({ page: 1, page_size: 1 })
-    statistics.value.total_products = productRes.total
+    statistics.value = {
+      today_orders: overview.total_orders || normalizedOrderStats.today_orders || 0,
+      today_sales: overview.total_sales || 0,
+      // 首页待处理口径统一按待核销订单展示，避免与待支付订单混用。
+      pending_orders: normalizedOrderStats.pending_orders || 0,
+      total_products: productRes.total || 0
+    }
   } catch (error) {
     console.error('加载统计数据失败:', error)
   }
@@ -328,7 +352,6 @@ async function loadLowStockCount() {
 
 async function toggleShopStatus() {
   const newStatus = merchantInfo.value?.status === 1 ? 0 : 1
-  const actionText = newStatus === 1 ? '开始营业' : '暂停营业'
   const confirmContent = newStatus === 1
     ? '开始营业后用户可继续下单，当前在线连接会继续保持。'
     : '休息后将停止接收新订单，但仍保持在线并继续接收顾客浏览提醒。'
@@ -370,17 +393,24 @@ function formatAmount(amount: number): string {
   return amount.toFixed(2)
 }
 
-function goProducts() {
-  uni.navigateTo({ url: '/pages/merchant/products/list' })
+function goProducts(filterStatus?: 'on_sale' | 'off_sale') {
+  const url = filterStatus
+    ? `/pages/merchant/products/list?status=${filterStatus}`
+    : '/pages/merchant/products/list'
+  uni.navigateTo({ url })
 }
 
 function goCategories() {
   uni.navigateTo({ url: '/pages/merchant/categories' })
 }
 
-function goOrders(status?: string) {
-  const url = status ? `/pages/merchant/orders/list?status=${status}` : '/pages/merchant/orders/list'
-  uni.navigateTo({ url })
+function goOrders(status?: number) {
+  if (typeof status === 'number' && status > 0) {
+    uni.setStorageSync(ORDER_LIST_ROUTE_STATE_KEY, JSON.stringify({ status }))
+  } else {
+    uni.removeStorageSync(ORDER_LIST_ROUTE_STATE_KEY)
+  }
+  uni.switchTab({ url: '/pages/merchant/orders/list' })
 }
 
 function openQuickVerifyDialog() {
@@ -701,6 +731,14 @@ function formatDateTime(time: string): string {
   text-align: center;
 }
 
+.stat-card-clickable {
+  position: relative;
+}
+
+.stat-card-clickable:active {
+  opacity: 0.75;
+}
+
 .stat-value {
   font-size: 40rpx;
   font-weight: 600;
@@ -711,6 +749,12 @@ function formatDateTime(time: string): string {
 .stat-label {
   font-size: 24rpx;
   color: #999999;
+}
+
+.stat-subtitle {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #b0b0b0;
 }
 
 .menu-section {
@@ -756,9 +800,23 @@ function formatDateTime(time: string): string {
   height: 48rpx;
 }
 
+.menu-icon-image {
+  width: 48rpx;
+  height: 48rpx;
+}
+
 .menu-text {
   font-size: 26rpx;
-  color: #666666;
+  color: #333333;
+  font-weight: 600;
+}
+
+.menu-subtext {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #999999;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .todo-section {

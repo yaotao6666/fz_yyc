@@ -22,9 +22,7 @@ DROP TABLE IF EXISTS `merchant_rates`;
 DROP TABLE IF EXISTS `merchant_fees`;
 DROP TABLE IF EXISTS `merchant_audit_records`;
 DROP TABLE IF EXISTS `announcements`;
-DROP TABLE IF EXISTS `invite_rewards`;
 DROP TABLE IF EXISTS `activities`;
-DROP TABLE IF EXISTS `invite_records`;
 DROP TABLE IF EXISTS `refunds`;
 DROP TABLE IF EXISTS `order_items`;
 DROP TABLE IF EXISTS `orders`;
@@ -38,6 +36,7 @@ DROP TABLE IF EXISTS `merchant_staffs`;
 DROP TABLE IF EXISTS `merchant_licenses`;
 DROP TABLE IF EXISTS `merchant_delivery_settings`;
 DROP TABLE IF EXISTS `merchant_applications`;
+DROP TABLE IF EXISTS `merchant_profit_sharing_records`;
 DROP TABLE IF EXISTS `merchants`;
 DROP TABLE IF EXISTS `service_provider_admins`;
 DROP TABLE IF EXISTS `service_providers`;
@@ -88,6 +87,7 @@ CREATE TABLE `merchants` (
     `service_provider_id` BIGINT UNSIGNED NOT NULL,
     `name` VARCHAR(128) NOT NULL,
     `logo` VARCHAR(512) DEFAULT NULL,
+    `cover_image` VARCHAR(512) DEFAULT NULL,
     `contact_name` VARCHAR(64) DEFAULT NULL,
     `contact_phone` VARCHAR(20) DEFAULT NULL,
     `contact_email` VARCHAR(128) DEFAULT NULL,
@@ -101,10 +101,9 @@ CREATE TABLE `merchants` (
     `takeout_enabled` TINYINT(1) NOT NULL DEFAULT 1,
     `dine_in_enabled` TINYINT(1) NOT NULL DEFAULT 1,
     `sub_mch_id` VARCHAR(32) DEFAULT NULL,
-    `sub_mch_status` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    `applyment_status` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    `audit_status` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    `audit_remark` VARCHAR(256) DEFAULT NULL,
+    `profit_sharing_enabled` TINYINT(1) NOT NULL DEFAULT 0,
+    `profit_sharing_ratio` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    `payment_config_status` TINYINT UNSIGNED NOT NULL DEFAULT 0,
     `status` TINYINT UNSIGNED NOT NULL DEFAULT 1,
     `rating` DECIMAL(2,1) NOT NULL DEFAULT 5.0,
     `sales_count` INT UNSIGNED NOT NULL DEFAULT 0,
@@ -114,39 +113,13 @@ CREATE TABLE `merchants` (
     PRIMARY KEY (`id`),
     KEY `idx_merchants_sp_id` (`service_provider_id`),
     KEY `idx_merchants_sub_mch_id` (`sub_mch_id`),
-    KEY `idx_merchants_audit_status` (`audit_status`),
+    KEY `idx_merchants_payment_config_status` (`payment_config_status`),
     KEY `idx_merchants_status` (`status`),
     KEY `idx_merchants_location` (`lat`, `lng`),
     CONSTRAINT `fk_merchants_sp` FOREIGN KEY (`service_provider_id`) REFERENCES `service_providers` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家表';
 
--- 4. 商家进件申请表
-CREATE TABLE `merchant_applications` (
-    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `merchant_id` BIGINT UNSIGNED NOT NULL,
-    `merchant_name` VARCHAR(128) NOT NULL,
-    `business_license_info` JSON DEFAULT NULL,
-    `legal_person_info` JSON DEFAULT NULL,
-    `bank_account_info` JSON DEFAULT NULL,
-    `store_info` JSON DEFAULT NULL,
-    `contact_info` JSON DEFAULT NULL,
-    `applyment_id` VARCHAR(64) DEFAULT NULL,
-    `sub_mch_id` VARCHAR(32) DEFAULT NULL,
-    `status` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    `audit_detail` JSON DEFAULT NULL,
-    `submit_time` DATETIME DEFAULT NULL,
-    `audit_time` DATETIME DEFAULT NULL,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `idx_merchant_applications_merchant_id` (`merchant_id`),
-    KEY `idx_merchant_applications_applyment_id` (`applyment_id`),
-    KEY `idx_merchant_applications_sub_mch_id` (`sub_mch_id`),
-    KEY `idx_merchant_applications_status` (`status`),
-    CONSTRAINT `fk_merchant_applications_merchant` FOREIGN KEY (`merchant_id`) REFERENCES `merchants` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家进件申请表';
-
--- 5. 商家配送设置表
+-- 4. 商家配送设置表
 CREATE TABLE `merchant_delivery_settings` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `merchant_id` BIGINT UNSIGNED NOT NULL,
@@ -161,27 +134,6 @@ CREATE TABLE `merchant_delivery_settings` (
     UNIQUE KEY `uk_merchant_delivery_settings_merchant_id` (`merchant_id`),
     CONSTRAINT `fk_merchant_delivery_settings_merchant` FOREIGN KEY (`merchant_id`) REFERENCES `merchants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家配送设置表';
-
--- 6. 商家营业执照表
-CREATE TABLE `merchant_licenses` (
-    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `merchant_id` BIGINT UNSIGNED NOT NULL,
-    `license_no` VARCHAR(64) DEFAULT NULL,
-    `license_name` VARCHAR(128) DEFAULT NULL,
-    `license_image` VARCHAR(512) DEFAULT NULL,
-    `legal_person` VARCHAR(64) DEFAULT NULL,
-    `legal_person_id` VARCHAR(32) DEFAULT NULL,
-    `legal_person_id_front` VARCHAR(512) DEFAULT NULL,
-    `legal_person_id_back` VARCHAR(512) DEFAULT NULL,
-    `valid_from` DATE DEFAULT NULL,
-    `valid_to` DATE DEFAULT NULL,
-    `status` TINYINT UNSIGNED NOT NULL DEFAULT 1,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_merchant_licenses_merchant_id` (`merchant_id`),
-    CONSTRAINT `fk_merchant_licenses_merchant` FOREIGN KEY (`merchant_id`) REFERENCES `merchants` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家营业执照表';
 
 -- 7. 商家员工表
 CREATE TABLE `merchant_staffs` (
@@ -371,10 +323,16 @@ CREATE TABLE `orders` (
     `verify_code` VARCHAR(16) DEFAULT NULL,
     `transaction_id` VARCHAR(64) DEFAULT NULL,
     `paid_at` DATETIME DEFAULT NULL,
+    `pay_notify_payload` JSON DEFAULT NULL,
     `completed_at` DATETIME DEFAULT NULL,
     `completed_by_name` VARCHAR(64) DEFAULT NULL,
     `cancelled_at` DATETIME DEFAULT NULL,
     `refunded_at` DATETIME DEFAULT NULL,
+    `profit_sharing_status` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `profit_sharing_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `profit_sharing_order_no` VARCHAR(64) DEFAULT NULL,
+    `profit_sharing_at` DATETIME DEFAULT NULL,
+    `profit_sharing_error` VARCHAR(256) DEFAULT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
@@ -430,26 +388,7 @@ CREATE TABLE `refunds` (
     CONSTRAINT `fk_refunds_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='退款记录表';
 
--- 18. 邀请记录表
-CREATE TABLE `invite_records` (
-    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `inviter_id` BIGINT UNSIGNED NOT NULL,
-    `invitee_id` BIGINT UNSIGNED DEFAULT NULL,
-    `invite_code` VARCHAR(32) DEFAULT NULL,
-    `status` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    `reward_type` VARCHAR(32) DEFAULT NULL,
-    `reward_status` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `completed_at` DATETIME DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    KEY `idx_invite_records_inviter_id` (`inviter_id`),
-    KEY `idx_invite_records_invitee_id` (`invitee_id`),
-    KEY `idx_invite_records_invite_code` (`invite_code`),
-    CONSTRAINT `fk_invite_records_inviter` FOREIGN KEY (`inviter_id`) REFERENCES `merchants` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_invite_records_invitee` FOREIGN KEY (`invitee_id`) REFERENCES `merchants` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邀请记录表';
-
--- 19. 平台活动表
+-- 18. 平台活动表
 CREATE TABLE `activities` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `type` VARCHAR(16) NOT NULL,
@@ -470,19 +409,7 @@ CREATE TABLE `activities` (
     KEY `idx_activities_sort` (`sort`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='平台活动表';
 
--- 20. 邀请奖励规则表
-CREATE TABLE `invite_rewards` (
-    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `type` VARCHAR(32) NOT NULL,
-    `condition` VARCHAR(32) NOT NULL,
-    `description` VARCHAR(256) DEFAULT NULL,
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邀请奖励规则表';
-
--- 21. 系统公告表
+-- 19. 系统公告表
 CREATE TABLE `announcements` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `service_provider_id` BIGINT UNSIGNED NOT NULL,
@@ -497,23 +424,7 @@ CREATE TABLE `announcements` (
     CONSTRAINT `fk_announcements_sp` FOREIGN KEY (`service_provider_id`) REFERENCES `service_providers` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统公告表';
 
--- 22. 商家审核记录表
-CREATE TABLE `merchant_audit_records` (
-    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `merchant_id` BIGINT UNSIGNED NOT NULL,
-    `auditor_id` BIGINT UNSIGNED NOT NULL,
-    `action` VARCHAR(32) NOT NULL,
-    `before_status` TINYINT UNSIGNED NOT NULL,
-    `after_status` TINYINT UNSIGNED NOT NULL,
-    `remark` VARCHAR(256) DEFAULT NULL,
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    KEY `idx_merchant_audit_records_merchant_id` (`merchant_id`),
-    KEY `idx_merchant_audit_records_auditor_id` (`auditor_id`),
-    CONSTRAINT `fk_merchant_audit_records_merchant` FOREIGN KEY (`merchant_id`) REFERENCES `merchants` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家审核记录表';
-
--- 23. 商家年费表
+-- 22. 商家年费表
 CREATE TABLE `merchant_fees` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `merchant_id` BIGINT UNSIGNED NOT NULL,
@@ -529,7 +440,7 @@ CREATE TABLE `merchant_fees` (
     CONSTRAINT `fk_merchant_fees_merchant` FOREIGN KEY (`merchant_id`) REFERENCES `merchants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家年费表';
 
--- 24. 商家手续费率表
+-- 23. 商家手续费率表
 CREATE TABLE `merchant_rates` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `merchant_id` BIGINT UNSIGNED NOT NULL,
@@ -546,6 +457,36 @@ CREATE TABLE `merchant_rates` (
     KEY `idx_merchant_rates_status` (`status`),
     CONSTRAINT `fk_merchant_rates_merchant` FOREIGN KEY (`merchant_id`) REFERENCES `merchants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家手续费率表';
+
+-- 24. 商家分账记录表
+CREATE TABLE `merchant_profit_sharing_records` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `service_provider_id` BIGINT UNSIGNED NOT NULL,
+    `merchant_id` BIGINT UNSIGNED NOT NULL,
+    `order_id` BIGINT UNSIGNED NOT NULL,
+    `order_no` VARCHAR(32) NOT NULL,
+    `transaction_id` VARCHAR(64) DEFAULT NULL,
+    `profit_sharing_order_no` VARCHAR(64) NOT NULL,
+    `profit_sharing_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `pay_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `profit_sharing_ratio` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    `profit_sharing_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `merchant_received_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `status` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `error_message` VARCHAR(256) DEFAULT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_merchant_profit_sharing_records_sp_id` (`service_provider_id`),
+    KEY `idx_merchant_profit_sharing_records_merchant_id` (`merchant_id`),
+    KEY `idx_merchant_profit_sharing_records_order_id` (`order_id`),
+    KEY `idx_merchant_profit_sharing_records_order_no` (`order_no`),
+    KEY `idx_merchant_profit_sharing_records_status` (`status`),
+    KEY `idx_merchant_profit_sharing_records_date` (`profit_sharing_date`),
+    CONSTRAINT `fk_merchant_profit_sharing_records_sp` FOREIGN KEY (`service_provider_id`) REFERENCES `service_providers` (`id`) ON DELETE RESTRICT,
+    CONSTRAINT `fk_merchant_profit_sharing_records_merchant` FOREIGN KEY (`merchant_id`) REFERENCES `merchants` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_merchant_profit_sharing_records_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家分账记录表';
 
 -- 25. 优惠券表
 CREATE TABLE `coupons` (
@@ -645,12 +586,12 @@ INSERT INTO `service_provider_admins` (
 INSERT INTO `merchants` (
     `id`, `service_provider_id`, `name`, `logo`, `contact_name`, `contact_phone`, `contact_email`, `address`,
     `lat`, `lng`, `business_category`, `business_hours`, `announcement`, `min_order_amount`, `takeout_enabled`,
-    `dine_in_enabled`, `sub_mch_id`, `sub_mch_status`, `applyment_status`, `audit_status`, `audit_remark`,
+    `dine_in_enabled`, `sub_mch_id`, `profit_sharing_enabled`, `profit_sharing_ratio`, `payment_config_status`,
     `status`, `rating`, `sales_count`, `qrcode_url`, `created_at`, `updated_at`
 ) VALUES (
     1, 1, '美味餐厅', 'https://example.com/images/merchant_logo_1.jpg', '李四', '13900139000',
     'lisi@example.com', '北京市朝阳区建国路88号', 39.908823, 116.407470, '餐饮', '09:00-22:00',
-    '欢迎光临！', 20.00, 1, 1, '1500000001', 2, 2, 1, '资质审核通过', 1, 5.0, 0,
+    '欢迎光临！', 20.00, 1, 1, '1500000001', 1, 5.00, 1, 1, 5.0, 0,
     'https://example.com/qrcode/merchant_1.png', NOW(), NOW()
 );
 
@@ -668,15 +609,6 @@ INSERT INTO `merchant_delivery_settings` (
     1, 1, 1, 5.00, 50.00, 10,
     '[{"min_distance":0,"max_distance":2,"fee":0},{"min_distance":2,"max_distance":5,"fee":3},{"min_distance":5,"max_distance":10,"fee":6}]',
     NOW(), NOW()
-);
-
-INSERT INTO `merchant_licenses` (
-    `id`, `merchant_id`, `license_no`, `license_name`, `license_image`, `legal_person`, `legal_person_id`,
-    `legal_person_id_front`, `legal_person_id_back`, `valid_from`, `valid_to`, `status`, `created_at`, `updated_at`
-) VALUES (
-    1, 1, '91110000000000001X', '美味餐厅有限公司', 'https://example.com/images/license_1.jpg',
-    '李四', '110101199001011234', 'https://example.com/images/id_front_1.jpg',
-    'https://example.com/images/id_back_1.jpg', '2020-01-01', '2030-12-31', 1, NOW(), NOW()
 );
 
 SET FOREIGN_KEY_CHECKS = 1;

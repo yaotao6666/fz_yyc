@@ -10,10 +10,7 @@ import type {
   MerchantLoginResponse,
   ServiceProviderLoginRequest,
   ServiceProviderLoginResponse,
-  MerchantRegisterRequest,
-  MerchantRegisterResponse,
   SpSettings,
-  MerchantApplication,
   MerchantListItem,
   MerchantDetail,
   AnnouncementStatus,
@@ -23,7 +20,6 @@ import type {
   TopMerchantRanking,
   MerchantInfo,
   MerchantWechatLoginRequest,
-  MerchantApplicationStatus,
   MerchantSettings,
   MerchantStaffListResponse,
   CreateMerchantStaffRequest,
@@ -37,9 +33,6 @@ import type {
   Order,
   OrderListResponse,
   OrderStatistics,
-  InviteInfo,
-  MyInviteInfo,
-  InviteRecordListResponse,
   StockAlert,
   ProductRanking,
   HourlyAnalysis,
@@ -54,6 +47,11 @@ import type {
   MerchantBehaviorEventRequest,
   Announcement,
   AnnouncementListResponse,
+  SpMerchantFormData,
+  UpdateSpMerchantFormData,
+  MerchantPaymentConfigFormData,
+  ProfitSharingRecordListResponse,
+  ProfitSharingRecordQuery,
 } from '../types'
 import type { ApiResponse } from '../types'
 
@@ -169,16 +167,16 @@ export function changeSpPassword(data: { old_password: string; new_password: str
   return post<{ message: string }>('/api/v1/sp/account/change-password', data)
 }
 
-export function getSpMerchantsPending(params?: {
-  page?: number
-  page_size?: number
-  status?: number
-  keyword?: string
-}) {
-  return get<{ list: MerchantApplication[]; pagination: { total: number; page: number; page_size: number } }>(
-    '/api/v1/sp/merchants/pending',
-    params
-  )
+export function createSpMerchant(data: SpMerchantFormData) {
+  return post<MerchantDetail>('/api/v1/sp/merchants', data)
+}
+
+export function updateSpMerchant(merchantId: number, data: UpdateSpMerchantFormData) {
+  return put<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}`, data)
+}
+
+export function updateSpMerchantPaymentConfig(merchantId: number, data: MerchantPaymentConfigFormData) {
+  return put<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}/payment-config`, data)
 }
 
 export async function getMerchantList(params?: any) {
@@ -199,6 +197,18 @@ export async function getMerchantList(params?: any) {
 
 export function getMerchantDetail(merchantId: number) {
   return get<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}`)
+}
+
+export function getSpProfitSharingRecords(params?: ProfitSharingRecordQuery) {
+  return get<ProfitSharingRecordListResponse>('/api/v1/sp/profit-sharing-records', params).then(normalizeListField)
+}
+
+export function getMerchantProfitSharingRecords(params?: Omit<ProfitSharingRecordQuery, 'merchant_id'>) {
+  return get<ProfitSharingRecordListResponse>('/api/v1/merchant/profit-sharing-records', params).then(normalizeListField)
+}
+
+export function updateSpMerchantAssets(merchantId: number, data: { logo?: string; cover_image?: string }) {
+  return put<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}/assets`, data)
 }
 
 export async function getAnnouncements(params?: { page?: number; page_size?: number }) {
@@ -240,7 +250,7 @@ export function getAmountAnalytics(params?: { days?: number }) {
   return get<AmountAnalyticsData>('/api/v1/sp/amount/analytics', params)
 }
 
-export function getTopMerchants(params?: { limit?: number }) {
+export function getTopMerchants(params?: { limit?: number; metric?: string }) {
   return get<TopMerchantRanking[] | null>('/api/v1/sp/amount/top-merchants', params).then(normalizeArrayResponse)
 }
 
@@ -249,20 +259,6 @@ export function getTopMerchants(params?: { limit?: number }) {
  */
 export async function getMerchantProfile() {
   return get<MerchantInfo>('/api/v1/merchant/profile')
-}
-
-/**
- * 商家入驻申请
- */
-export async function merchantRegister(data: MerchantRegisterRequest) {
-  return post<{ application_id: number }>('/api/v1/merchant/register', data)
-}
-
-/**
- * 获取商家入驻状态
- */
-export async function getMerchantApplicationStatus() {
-  return get<MerchantApplicationStatus>('/api/v1/merchant/application/status')
 }
 
 // ============ 商家设置相关 ============
@@ -471,6 +467,18 @@ function normalizeProduct(product: any): Product {
   } as Product
 }
 
+function normalizeStockAlertItem(item: any): StockAlert {
+  const normalizedImages = normalizeStringArray(item?.images).map(normalizeImageUrl)
+  return {
+    id: typeof item?.id === 'number' ? item.id : Number(item?.id || 0) || undefined,
+    product_id: Number(item?.product_id || item?.id || 0),
+    product_name: String(item?.product_name || item?.name || ''),
+    image: normalizeImageUrl(item?.image || normalizedImages[0] || ''),
+    stock: Number(item?.stock || 0),
+    status: item?.status
+  }
+}
+
 /**
  * 获取商品列表
  */
@@ -608,8 +616,8 @@ export function quickCompleteOrder(verifyCode: string) {
 /**
  * 退款订单
  */
-export function refundOrder(orderId: number, reason?: string) {
-  return post<null>(`/api/v1/merchant/orders/${orderId}/refund`, { reason })
+export function refundOrder(orderId: number, data: { reason?: string; refund_amount?: number }) {
+  return post<null>(`/api/v1/merchant/orders/${orderId}/refund`, data)
 }
 
 /**
@@ -654,7 +662,9 @@ export function getHourlyAnalysis(params: { date: string }) {
  */
 export function getStockAlert(params?: { threshold?: number }) {
   // 后端无预警数据时可能返回 null，这里统一兜底为空数组，避免页面直接读取 length 报错。
-  return get<StockAlert[] | null>('/api/v1/merchant/analytics/stock-alert', params).then(normalizeArrayResponse)
+  return get<StockAlert[] | null>('/api/v1/merchant/analytics/stock-alert', params)
+    .then(normalizeArrayResponse)
+    .then(list => list.map(normalizeStockAlertItem))
 }
 
 /**
@@ -691,29 +701,6 @@ export function resetMerchantStaffPassword(staffId: number, newPassword: string)
   return post<{ message: string }>(`/api/v1/merchant/staff/${staffId}/reset-password`, {
     new_password: newPassword
   })
-}
-
-// ============ 邀请入驻相关 ============
-
-/**
- * 生成邀请码
- */
-export function generateInviteCode() {
-  return post<{ invite_code: string }>('/api/v1/merchant/invite/generate')
-}
-
-/**
- * 获取我的邀请信息
- */
-export function getMyInviteInfo() {
-  return get<MyInviteInfo>('/api/v1/merchant/invite/info')
-}
-
-/**
- * 获取邀请记录
- */
-export function getInviteRecords(params?: { page?: number; page_size?: number }) {
-  return get<InviteRecordListResponse>('/api/v1/merchant/invite/records', params).then(normalizeListField)
 }
 
 // ============ 文件上传相关 ============
@@ -876,8 +863,11 @@ export default {
   merchantLogin,
   merchantWechatLogin,
   getMerchantProfile,
-  merchantRegister,
-  getMerchantApplicationStatus,
+  createSpMerchant,
+  updateSpMerchant,
+  updateSpMerchantPaymentConfig,
+  getSpProfitSharingRecords,
+  getMerchantProfitSharingRecords,
   // 商家设置
   updateMerchantProfile,
   getMerchantSettings,
@@ -925,10 +915,6 @@ export default {
   getStockAlert,
   getCustomerAnalysis,
   getCustomerTrend,
-  // 邀请入驻
-  generateInviteCode,
-  getMyInviteInfo,
-  getInviteRecords,
   // 文件上传
   getUploadToken,
   uploadImage,

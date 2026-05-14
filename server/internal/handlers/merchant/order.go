@@ -211,7 +211,7 @@ func QuickCompleteOrder(c *gin.Context) {
 }
 
 type RefundRequest struct {
-	RefundAmount float64 `json:"refund_amount" binding:"required"`
+	RefundAmount float64 `json:"refund_amount"`
 	Reason       string  `json:"reason"`
 }
 
@@ -237,11 +237,20 @@ func RefundOrder(c *gin.Context) {
 		return
 	}
 
+	refundAmount := req.RefundAmount
+	if refundAmount <= 0 {
+		refundAmount = order.PayAmount
+	}
+	if refundAmount <= 0 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "退款金额不正确")
+		return
+	}
+
 	refundNo := strconv.FormatInt(time.Now().UnixNano(), 10)
 	refund := models.Refund{
 		OrderID:      id,
 		RefundNo:     refundNo,
-		RefundAmount: req.RefundAmount,
+		RefundAmount: refundAmount,
 		RefundReason: req.Reason,
 		Status:       0,
 	}

@@ -1,5 +1,6 @@
 <template>
-  <view class="merchant-stats-container">
+  <MerchantStatsPanel />
+  <view v-if="false" class="merchant-stats-container">
     <!-- Tab 标签切换 -->
     <view class="tab-bar">
       <view
@@ -306,6 +307,7 @@
 </template>
 
 <script setup lang="ts">
+import MerchantStatsPanel from './MerchantStatsPanel.vue'
 import { ref, reactive, onMounted } from 'vue'
 import {
   getMerchantDistribution,

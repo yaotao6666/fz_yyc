@@ -46,6 +46,10 @@ func InitDB(cfg *config.Database) error {
 		return fmt.Errorf("初始化订单扩展字段失败: %w", ensureErr)
 	}
 
+	if ensureErr := ensureMerchantColumns(DB); ensureErr != nil {
+		return fmt.Errorf("初始化商家扩展字段失败: %w", ensureErr)
+	}
+
 	// 获取底层 sql.DB
 	sqlDB, err := DB.DB()
 	if err != nil {
@@ -169,14 +173,51 @@ func ensureUserTables(db *gorm.DB) error {
 }
 
 func ensureOrderColumns(db *gorm.DB) error {
+	orderColumns := map[string]string{
+		"completed_by_name":      "ADD COLUMN completed_by_name VARCHAR(64) DEFAULT NULL COMMENT '核销人' AFTER completed_at",
+		"pay_notify_payload":     "ADD COLUMN pay_notify_payload JSON DEFAULT NULL COMMENT '支付回调原始数据' AFTER paid_at",
+		"profit_sharing_status":  "ADD COLUMN profit_sharing_status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '分账状态' AFTER refunded_at",
+		"profit_sharing_amount":  "ADD COLUMN profit_sharing_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '分账金额' AFTER profit_sharing_status",
+		"profit_sharing_order_no":"ADD COLUMN profit_sharing_order_no VARCHAR(64) DEFAULT NULL COMMENT '分账单号' AFTER profit_sharing_amount",
+		"profit_sharing_at":      "ADD COLUMN profit_sharing_at DATETIME DEFAULT NULL COMMENT '分账时间' AFTER profit_sharing_order_no",
+		"profit_sharing_error":   "ADD COLUMN profit_sharing_error VARCHAR(256) DEFAULT NULL COMMENT '分账错误信息' AFTER profit_sharing_at",
+	}
+
+	for columnName, addSQL := range orderColumns {
+		if err := ensureTableColumn(db, "orders", columnName, addSQL); err != nil {
+			return err
+		}
+	}
+
+	return db.AutoMigrate(&models.MerchantProfitSharingRecord{})
+}
+
+func ensureMerchantColumns(db *gorm.DB) error {
+	merchantColumns := map[string]string{
+		"cover_image":             "ADD COLUMN cover_image VARCHAR(512) DEFAULT NULL COMMENT '商家背景图' AFTER logo",
+		"profit_sharing_enabled":  "ADD COLUMN profit_sharing_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否开启分账' AFTER sub_mch_id",
+		"profit_sharing_ratio":    "ADD COLUMN profit_sharing_ratio DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT '分账比例' AFTER profit_sharing_enabled",
+		"payment_config_status":   "ADD COLUMN payment_config_status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '支付配置状态' AFTER profit_sharing_ratio",
+	}
+
+	for columnName, addSQL := range merchantColumns {
+		if err := ensureTableColumn(db, "merchants", columnName, addSQL); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func ensureTableColumn(db *gorm.DB, tableName, columnName, addSQL string) error {
 	var count int64
 	queryErr := db.Raw(`
 		SELECT COUNT(*)
 		FROM INFORMATION_SCHEMA.COLUMNS
 		WHERE TABLE_SCHEMA = DATABASE()
-		  AND TABLE_NAME = 'orders'
-		  AND COLUMN_NAME = 'completed_by_name'
-	`).Scan(&count).Error
+		  AND TABLE_NAME = ?
+		  AND COLUMN_NAME = ?
+	`, tableName, columnName).Scan(&count).Error
 	if queryErr != nil {
 		return queryErr
 	}
@@ -185,9 +226,7 @@ func ensureOrderColumns(db *gorm.DB) error {
 		return nil
 	}
 
-	return db.Exec(
-		"ALTER TABLE orders ADD COLUMN completed_by_name VARCHAR(64) DEFAULT NULL COMMENT '核销人' AFTER completed_at",
-	).Error
+	return db.Exec("ALTER TABLE " + tableName + " " + addSQL).Error
 }
 
 // GetDB 获取数据库实例

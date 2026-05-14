@@ -1,206 +1,268 @@
 package sp
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"encoding/base64"
+	"context"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
-	"io"
+	"fz_yyc_api/internal/config"
+	"math"
 	"net/http"
+	"time"
 
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/pkg/database"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-type WechatPayNotify struct {
-	ReturnCode    string `xml:"return_code"`
-	ReturnMsg     string `xml:"return_msg"`
-	ResultCode    string `xml:"result_code"`
-	TransactionID string `xml:"transaction_id"`
-	OrderID       string `xml:"out_trade_no"`
-	TimeEnd       string `xml:"time_end"`
-}
-
-type WechatPayNotifyResponse struct {
-	ReturnCode string `xml:"return_code"`
-	ReturnMsg  string `xml:"return_msg"`
-}
-
-type DecryptedNotifyData struct {
-	TransactionID string `json:"transaction_id"`
-	Amount        struct {
-		Total         int    `json:"total"`
-		PayerTotal    int    `json:"payer_total"`
-		Currency      string `json:"currency"`
-		PayerCurrency string `json:"payer_currency"`
-	} `json:"amount"`
-	OutTradeNo  string `json:"out_trade_no"`
-	PayerOpenID string `json:"payer.openid"`
-	TradeState  string `json:"trade_state"`
-	TradeType   string `json:"trade_type"`
-	Attach      string `json:"attach"`
-	SuccessTime string `json:"success_time"`
-}
+const (
+	profitSharingPending uint8 = 0
+	profitSharingSuccess uint8 = 1
+	profitSharingFailed  uint8 = 2
+	profitSharingSkipped uint8 = 3
+)
 
 func PaymentNotify(c *gin.Context) {
-	body, err := io.ReadAll(c.Request.Body)
+	client, err := wechatpay.NewServiceProviderClient()
 	if err != nil {
-		c.XML(http.StatusBadRequest, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "读取请求失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": "FAIL", "message": err.Error()})
 		return
 	}
 
-	fmt.Printf("微信支付回调原始数据: %s\n", string(body))
-
-	contentType := c.GetHeader("Content-Type")
-	if contentType == "application/json" {
-		handleV3Notify(c, body)
-	} else {
-		handleV2Notify(c, body)
+	body, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "FAIL", "message": "读取回调内容失败"})
+		return
 	}
+
+	notifyResult, err := client.ParseAndVerifyNotify(c.Request.Header, body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "FAIL", "message": err.Error()})
+		return
+	}
+
+	if notifyResult.TradeState != "SUCCESS" {
+		c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "忽略非成功支付通知"})
+		return
+	}
+
+	if err := processPaymentSuccess(context.Background(), client, notifyResult); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": "FAIL", "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "成功"})
 }
 
-func handleV3Notify(c *gin.Context, body []byte) {
-	var notifyReq struct {
-		EventType    string `json:"event_type"`
-		ResourceType string `json:"resource_type"`
-		Resource     struct {
-			Algorithm      string `json:"algorithm"`
-			ciphertext     string `json:"ciphertext"`
-			OriginalBytes  string `json:"original_bytes"`
-			Nonce          string `json:"nonce"`
-			AssociatedData string `json:"associated_data"`
-		} `json:"resource"`
-	}
-
-	if err := json.Unmarshal(body, &notifyReq); err != nil {
-		c.XML(http.StatusBadRequest, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "JSON解析失败"})
-		return
-	}
-
-	apiV3Key := []byte("C4856B4B9E5A4E5E9F5A4B5C6D7E8F9A")
-
-	ciphertext, err := base64.StdEncoding.DecodeString(notifyReq.Resource.ciphertext)
-	if err != nil {
-		c.XML(http.StatusBadRequest, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "ciphertext解码失败"})
-		return
-	}
-
-	block, err := aes.NewCipher(apiV3Key)
-	if err != nil {
-		c.XML(http.StatusBadRequest, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "创建cipher失败"})
-		return
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		c.XML(http.StatusBadRequest, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "创建GCM失败"})
-		return
-	}
-
-	nonce := []byte(notifyReq.Resource.Nonce)
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, []byte(notifyReq.Resource.AssociatedData))
-	if err != nil {
-		fmt.Printf("GCM解密失败，尝试AES-CBC: %v\n", err)
-		plaintext = tryAESCBC(apiV3Key, nonce, ciphertext)
-		if plaintext == nil {
-			c.XML(http.StatusBadRequest, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "解密失败"})
-			return
+func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProviderClient, notifyResult *wechatpay.NotifyResult) error {
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var order models.Order
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("order_no = ?", notifyResult.OrderNo).
+			First(&order).Error; err != nil {
+			return fmt.Errorf("订单不存在: %w", err)
 		}
-	}
 
-	var notifyData DecryptedNotifyData
-	if err := json.Unmarshal(plaintext, &notifyData); err != nil {
-		fmt.Printf("解析解密数据失败: %v\n", err)
-		fmt.Printf("解密数据: %s\n", string(plaintext))
-		c.XML(http.StatusBadRequest, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "解析解密数据失败"})
-		return
-	}
+		var merchant models.Merchant
+		if err := tx.First(&merchant, order.MerchantID).Error; err != nil {
+			return fmt.Errorf("商家不存在: %w", err)
+		}
 
-	fmt.Printf("V3支付回调解密数据: %+v\n", notifyData)
+		rawPayload, _ := json.Marshal(notifyResult)
+		paySuccessAt := notifyResult.SuccessTime
+		if paySuccessAt.IsZero() {
+			paySuccessAt = time.Now()
+		}
 
-	if err := processPaymentSuccess(notifyData.OutTradeNo, notifyData.TransactionID); err != nil {
-		c.XML(http.StatusInternalServerError, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "处理失败"})
-		return
-	}
+		payUpdates := map[string]any{
+			"transaction_id":     notifyResult.TransactionID,
+			"pay_notify_payload": models.JSON(rawPayload),
+		}
+		if order.Status < 2 {
+			payUpdates["status"] = 2
+			payUpdates["paid_at"] = paySuccessAt
+		} else if order.PaidAt == nil {
+			payUpdates["paid_at"] = paySuccessAt
+		}
+		if err := tx.Model(&order).Updates(payUpdates).Error; err != nil {
+			return fmt.Errorf("更新订单支付状态失败: %w", err)
+		}
+		order.TransactionID = notifyResult.TransactionID
 
-	c.XML(http.StatusOK, WechatPayNotifyResponse{ReturnCode: "SUCCESS", ReturnMsg: "OK"})
-}
-
-func handleV2Notify(c *gin.Context, body []byte) {
-	var notify WechatPayNotify
-	if err := xml.Unmarshal(body, &notify); err != nil {
-		c.XML(http.StatusBadRequest, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "XML解析失败"})
-		return
-	}
-
-	fmt.Printf("V2支付回调数据: %+v\n", notify)
-
-	if notify.ReturnCode != "SUCCESS" || notify.ResultCode != "SUCCESS" {
-		c.XML(http.StatusOK, WechatPayNotifyResponse{ReturnCode: "SUCCESS", ReturnMsg: "OK"})
-		return
-	}
-
-	if err := processPaymentSuccess(notify.OrderID, notify.TransactionID); err != nil {
-		c.XML(http.StatusInternalServerError, WechatPayNotifyResponse{ReturnCode: "FAIL", ReturnMsg: "处理失败"})
-		return
-	}
-
-	c.XML(http.StatusOK, WechatPayNotifyResponse{ReturnCode: "SUCCESS", ReturnMsg: "OK"})
-}
-
-func tryAESCBC(key, nonce, ciphertext []byte) []byte {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil
-	}
-
-	plaintext := make([]byte, len(ciphertext))
-	dec := cipher.NewCBCDecrypter(block, nonce)
-	dec.CryptBlocks(plaintext, ciphertext)
-
-	padding := int(plaintext[len(plaintext)-1])
-	if padding > aes.BlockSize || padding < 1 {
-		return nil
-	}
-
-	end := len(plaintext) - padding
-	plaintext = plaintext[:end]
-
-	for i := end; i < len(plaintext); i++ {
-		if plaintext[i] != byte(padding) {
+		if order.ProfitSharingStatus == profitSharingSuccess || order.ProfitSharingStatus == profitSharingSkipped {
 			return nil
 		}
-	}
 
-	return plaintext
+		// 以订单维度锁定并复用已有记录，避免重复回调再次发起分账。
+		var existingRecord models.MerchantProfitSharingRecord
+		recordErr := tx.Where("order_id = ?", order.ID).First(&existingRecord).Error
+		if recordErr == nil {
+			return syncOrderProfitSharingFromRecord(tx, &order, &existingRecord)
+		}
+		if recordErr != nil && recordErr != gorm.ErrRecordNotFound {
+			return fmt.Errorf("查询分账记录失败: %w", recordErr)
+		}
+
+		ratio := merchant.ProfitSharingRatio
+		profitSharingOrderNo := fmt.Sprintf("ps_%s_%d", order.OrderNo, time.Now().Unix())
+		profitSharingAmount := roundAmount(order.PayAmount * ratio / 100)
+		merchantReceivedAmount := roundAmount(order.PayAmount - profitSharingAmount)
+
+		if !merchant.ProfitSharingEnabled || ratio <= 0 {
+			return createSkippedProfitSharingRecord(tx, &order, &merchant, notifyResult.TransactionID, profitSharingOrderNo, "商家未开启分账")
+		}
+		if profitSharingAmount <= 0 {
+			return createSkippedProfitSharingRecord(tx, &order, &merchant, notifyResult.TransactionID, profitSharingOrderNo, "分账金额为0，已跳过")
+		}
+		if merchant.SubMchID == "" {
+			return createSkippedProfitSharingRecord(tx, &order, &merchant, notifyResult.TransactionID, profitSharingOrderNo, "商家未配置子商户号")
+		}
+
+		record := models.MerchantProfitSharingRecord{
+			ServiceProviderID:       merchant.ServiceProviderID,
+			MerchantID:              merchant.ID,
+			OrderID:                 order.ID,
+			OrderNo:                 order.OrderNo,
+			TransactionID:           notifyResult.TransactionID,
+			ProfitSharingOrderNo:    profitSharingOrderNo,
+			ProfitSharingDate:       time.Now(),
+			PayAmount:               order.PayAmount,
+			ProfitSharingRatio:      ratio,
+			ProfitSharingAmount:     profitSharingAmount,
+			MerchantReceivedAmount:  merchantReceivedAmount,
+			Status:                  profitSharingPending,
+		}
+		if err := tx.Create(&record).Error; err != nil {
+			return fmt.Errorf("创建分账记录失败: %w", err)
+		}
+		if err := tx.Model(&order).Updates(map[string]any{
+			"profit_sharing_status":   profitSharingPending,
+			"profit_sharing_amount":   profitSharingAmount,
+			"profit_sharing_order_no": profitSharingOrderNo,
+			"profit_sharing_at":       nil,
+			"profit_sharing_error":    "",
+		}).Error; err != nil {
+			return fmt.Errorf("写入订单待分账状态失败: %w", err)
+		}
+
+		result, err := client.CreateProfitSharingOrder(ctx, wechatpay.ProfitSharingRequest{
+			AppID:         config.Config.Wechat.AppID,
+			SubMchID:      merchant.SubMchID,
+			TransactionID: notifyResult.TransactionID,
+			OrderNo:       profitSharingOrderNo,
+			Receivers: []wechatpay.ProfitSharingReceiver{
+				{
+					Type:        "MERCHANT_ID",
+					Account:     client.GetSPMchID(),
+					Amount:      amountToCents(profitSharingAmount),
+					Description: "服务商抽佣",
+				},
+			},
+		})
+		if err != nil {
+			updateErr := tx.Model(&order).Updates(map[string]any{
+				"profit_sharing_status":   profitSharingFailed,
+				"profit_sharing_amount":   profitSharingAmount,
+				"profit_sharing_order_no": profitSharingOrderNo,
+				"profit_sharing_error":    err.Error(),
+			}).Error
+			if updateErr != nil {
+				return fmt.Errorf("分账失败且写入订单状态失败: %v, %w", updateErr, err)
+			}
+			_ = tx.Model(&record).Updates(map[string]any{
+				"status":        profitSharingFailed,
+				"error_message": err.Error(),
+			}).Error
+			return nil
+		}
+
+		now := time.Now()
+		if err := tx.Model(&order).Updates(map[string]any{
+			"profit_sharing_status":   profitSharingSuccess,
+			"profit_sharing_amount":   profitSharingAmount,
+			"profit_sharing_order_no": result.OrderID,
+			"profit_sharing_at":       now,
+			"profit_sharing_error":    "",
+		}).Error; err != nil {
+			return fmt.Errorf("更新订单分账状态失败: %w", err)
+		}
+
+		if err := tx.Model(&record).Updates(map[string]any{
+			"status":                  profitSharingSuccess,
+			"profit_sharing_order_no": result.OrderID,
+			"profit_sharing_date":     now,
+			"error_message":           "",
+		}).Error; err != nil {
+			return fmt.Errorf("更新分账记录失败: %w", err)
+		}
+		return nil
+	})
 }
 
-func processPaymentSuccess(orderID, transactionID string) error {
-	var order models.Order
-	if err := database.DB.Where("order_no = ?", orderID).First(&order).Error; err != nil {
-		fmt.Printf("订单不存在: %s\n", orderID)
-		return nil
-	}
+func roundAmount(amount float64) float64 {
+	return math.Round(amount*100) / 100
+}
 
-	if order.Status == 2 {
-		fmt.Printf("订单已支付: %s\n", orderID)
-		return nil
-	}
+func amountToCents(amount float64) int64 {
+	return int64(math.Round(amount * 100))
+}
 
-	updates := map[string]interface{}{
-		"status":         "paid",
-		"pay_time":       database.DB.NowFunc(),
-		"transaction_id": transactionID,
+func createSkippedProfitSharingRecord(
+	tx *gorm.DB,
+	order *models.Order,
+	merchant *models.Merchant,
+	transactionID string,
+	profitSharingOrderNo string,
+	reason string,
+) error {
+	now := time.Now()
+	record := models.MerchantProfitSharingRecord{
+		ServiceProviderID:      merchant.ServiceProviderID,
+		MerchantID:             merchant.ID,
+		OrderID:                order.ID,
+		OrderNo:                order.OrderNo,
+		TransactionID:          transactionID,
+		ProfitSharingOrderNo:   profitSharingOrderNo,
+		ProfitSharingDate:      now,
+		PayAmount:              order.PayAmount,
+		ProfitSharingRatio:     merchant.ProfitSharingRatio,
+		ProfitSharingAmount:    0,
+		MerchantReceivedAmount: order.PayAmount,
+		Status:                 profitSharingSkipped,
+		ErrorMessage:           reason,
 	}
-
-	if err := database.DB.Model(&order).Updates(updates).Error; err != nil {
-		return fmt.Errorf("更新订单状态失败: %v", err)
+	if err := tx.Create(&record).Error; err != nil {
+		return fmt.Errorf("创建跳过分账记录失败: %w", err)
 	}
+	if err := tx.Model(order).Updates(map[string]any{
+		"profit_sharing_status":   profitSharingSkipped,
+		"profit_sharing_amount":   0,
+		"profit_sharing_order_no": profitSharingOrderNo,
+		"profit_sharing_at":       now,
+		"profit_sharing_error":    reason,
+	}).Error; err != nil {
+		return fmt.Errorf("更新订单跳过分账状态失败: %w", err)
+	}
+	return nil
+}
 
-	fmt.Printf("订单支付成功: %s, 微信交易号: %s\n", orderID, transactionID)
+func syncOrderProfitSharingFromRecord(tx *gorm.DB, order *models.Order, record *models.MerchantProfitSharingRecord) error {
+	updates := map[string]any{
+		"profit_sharing_status":   record.Status,
+		"profit_sharing_amount":   record.ProfitSharingAmount,
+		"profit_sharing_order_no": record.ProfitSharingOrderNo,
+		"profit_sharing_error":    record.ErrorMessage,
+	}
+	if record.Status == profitSharingSuccess || record.Status == profitSharingSkipped {
+		updates["profit_sharing_at"] = record.ProfitSharingDate
+	} else {
+		updates["profit_sharing_at"] = nil
+	}
+	if err := tx.Model(order).Updates(updates).Error; err != nil {
+		return fmt.Errorf("同步订单分账状态失败: %w", err)
+	}
 	return nil
 }

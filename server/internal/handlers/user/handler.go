@@ -1,10 +1,13 @@
 package user
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"fz_yyc_api/internal/config"
 	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
@@ -497,6 +500,11 @@ func CreateOrder(c *gin.Context) {
 		}
 	}
 
+var currentUser models.User
+if userID > 0 {
+	_ = database.DB.First(&currentUser, userID).Error
+}
+
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -713,7 +721,26 @@ func CreateOrder(c *gin.Context) {
 	if payAmount > 0 {
 		var merchant models.Merchant
 		if err := database.DB.First(&merchant, order.MerchantID).Error; err == nil {
-			payParams = createWechatPayOrder(merchant.SubMchID, order.OrderNo, int64(payAmount*100), config.Config.Wechat.AppID)
+			client, clientErr := wechatpay.NewServiceProviderClient()
+			if clientErr != nil {
+				response.Fail(c, http.StatusInternalServerError, response.CodeServerError, clientErr.Error())
+				return
+			}
+
+			payResponse, payErr := createWechatPayOrder(context.Background(), client, &merchant, order, int64(payAmount*100), config.Config.Wechat.AppID, currentUser.OpenID)
+			if payErr != nil {
+				response.Fail(c, http.StatusBadRequest, response.CodeParamError, payErr.Error())
+				return
+			}
+			payParams = gin.H{
+				"appId":     payResponse.AppID,
+				"timeStamp": payResponse.TimeStamp,
+				"nonceStr":  payResponse.NonceStr,
+				"package":   payResponse.Package,
+				"signType":  payResponse.SignType,
+				"paySign":   payResponse.PaySign,
+				"prepay_id": payResponse.PrepayID,
+			}
 		}
 	}
 
@@ -723,19 +750,42 @@ func CreateOrder(c *gin.Context) {
 	})
 }
 
-func createWechatPayOrder(subMchID, orderNo string, totalAmount int64, appID string) gin.H {
-	// 服务商模式微信支付统一下单
-	// 实际项目中需要调用微信支付API
-	// 这里返回模拟支付参数用于测试
-
-	return gin.H{
-		"appId":     appID,
-		"timeStamp": strconv.FormatInt(time.Now().Unix(), 10),
-		"nonceStr":  strconv.FormatInt(time.Now().UnixNano(), 10),
-		"package":   "prepay_id=wx" + orderNo,
-		"signType":  "MD5",
-		"paySign":   "",
+func createWechatPayOrder(
+	ctx context.Context,
+	client *wechatpay.ServiceProviderClient,
+	merchant *models.Merchant,
+	order models.Order,
+	totalAmount int64,
+	appID string,
+	openID string,
+) (*wechatpay.JSAPIPayResponse, error) {
+	if merchant == nil {
+		return nil, fmt.Errorf("商家不存在")
 	}
+	if merchant.SubMchID == "" {
+		return nil, fmt.Errorf("商家尚未配置收款商户号")
+	}
+	if merchant.PaymentConfigStatus != 1 {
+		return nil, fmt.Errorf("商家支付配置未完成，请联系服务商")
+	}
+	if openID == "" {
+		return nil, fmt.Errorf("缺少用户支付标识")
+	}
+
+	notifyURL := config.Config.WechatPay.CallbackURL
+	if notifyURL == "" {
+		return nil, fmt.Errorf("服务商支付回调地址未配置")
+	}
+
+	return client.CreatePartnerJSAPIPayOrder(ctx, wechatpay.JSAPIPayRequest{
+		AppID:       appID,
+		OpenID:      openID,
+		SubMchID:    merchant.SubMchID,
+		OrderNo:     order.OrderNo,
+		Description: fmt.Sprintf("%s订单支付", merchant.Name),
+		TotalAmount: totalAmount,
+		NotifyURL:   notifyURL,
+	})
 }
 
 func GetOrders(c *gin.Context) {
