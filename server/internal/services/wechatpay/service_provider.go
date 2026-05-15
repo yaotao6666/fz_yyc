@@ -79,6 +79,22 @@ type ProfitSharingResponse struct {
 	UpdateTime string `json:"update_time"`
 }
 
+type RefundRequest struct {
+	SubMchID      string
+	OrderNo       string
+	RefundNo      string
+	Reason        string
+	NotifyURL     string
+	RefundAmount  int64
+	TotalAmount   int64
+}
+
+type RefundResponse struct {
+	RefundID     string `json:"refund_id"`
+	Status       string `json:"status"`
+	SuccessTime  string `json:"success_time"`
+}
+
 type NotifyResult struct {
 	EventType     string
 	OrderNo       string
@@ -180,10 +196,45 @@ func (c *ServiceProviderClient) CreateProfitSharingOrder(ctx context.Context, re
 	return &result, nil
 }
 
-func (c *ServiceProviderClient) ParseAndVerifyNotify(headers http.Header, body []byte) (*NotifyResult, error) {
+func (c *ServiceProviderClient) CreatePartnerRefund(ctx context.Context, req RefundRequest) (*RefundResponse, error) {
+	if req.OrderNo == "" || req.RefundNo == "" {
+		return nil, fmt.Errorf("缺少退款单号")
+	}
+	if req.TotalAmount <= 0 || req.RefundAmount <= 0 {
+		return nil, fmt.Errorf("退款金额不正确")
+	}
+	if req.NotifyURL == "" {
+		return nil, fmt.Errorf("缺少退款回调地址")
+	}
+
+	payload := map[string]any{
+		"out_trade_no":  req.OrderNo,
+		"out_refund_no": req.RefundNo,
+		"notify_url":    req.NotifyURL,
+		"amount": map[string]any{
+			"refund":   req.RefundAmount,
+			"total":    req.TotalAmount,
+			"currency": "CNY",
+		},
+	}
+	if strings.TrimSpace(req.Reason) != "" {
+		payload["reason"] = req.Reason
+	}
+	if strings.TrimSpace(req.SubMchID) != "" {
+		payload["sub_mchid"] = req.SubMchID
+	}
+
+	var result RefundResponse
+	if err := c.doJSONRequest(ctx, http.MethodPost, "/v3/refund/domestic/refunds", payload, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *ServiceProviderClient) ParseAndVerifyNotifyEvent(headers http.Header, body []byte) (string, []byte, error) {
 	if c.publicKey != nil {
 		if err := c.verifyNotifySignature(headers, body); err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	}
 
@@ -197,10 +248,19 @@ func (c *ServiceProviderClient) ParseAndVerifyNotify(headers http.Header, body [
 		} `json:"resource"`
 	}
 	if err := json.Unmarshal(body, &notifyReq); err != nil {
-		return nil, fmt.Errorf("解析支付回调失败: %w", err)
+		return "", nil, fmt.Errorf("解析微信支付回调失败: %w", err)
 	}
 
 	plaintext, err := decryptResource(c.config.APIV3Key, notifyReq.Resource.AssociatedData, notifyReq.Resource.Nonce, notifyReq.Resource.Ciphertext)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return notifyReq.EventType, plaintext, nil
+}
+
+func (c *ServiceProviderClient) ParseAndVerifyNotify(headers http.Header, body []byte) (*NotifyResult, error) {
+	eventType, plaintext, err := c.ParseAndVerifyNotifyEvent(headers, body)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +280,7 @@ func (c *ServiceProviderClient) ParseAndVerifyNotify(headers http.Header, body [
 
 	successTime, _ := time.Parse(time.RFC3339, resource.SuccessTime)
 	return &NotifyResult{
-		EventType:     notifyReq.EventType,
+		EventType:     eventType,
 		OrderNo:       resource.OutTradeNo,
 		TransactionID: resource.TransactionID,
 		TradeState:    resource.TradeState,

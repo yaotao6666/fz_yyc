@@ -4,7 +4,7 @@
  */
 
 import { trackStoreBehaviorEvent } from '../api'
-import { API_BASE_URL } from '../config/env'
+import { post } from './request'
 import { useAuth } from './useAuth'
 
 interface VisitParams {
@@ -23,51 +23,36 @@ interface TrackEventParams {
 }
 
 export function useAnalytics() {
-  const { getOpenid, ensureAuth } = useAuth()
+  const { ensureAuth, getOpenid } = useAuth()
 
   let authPromise: Promise<boolean> | null = null
 
-  async function getOrEnsureOpenid(): Promise<string> {
-    const existing = getOpenid()
-    if (existing) return existing
-
+  async function ensureAuthed(): Promise<boolean> {
     if (!authPromise) {
       authPromise = ensureAuth().finally(() => {
         authPromise = null
       })
     }
-
-    await authPromise
-    return getOpenid()
+    return await authPromise
   }
 
   const trackVisit = async (params: VisitParams): Promise<boolean> => {
     try {
-      const openid = await getOrEnsureOpenid()
-
-      if (!openid) {
-        console.log('Analytics: 用户未登录，跳过访问埋点')
+      const authed = await ensureAuthed()
+      if (!authed) {
         return false
       }
 
-      const res = await uni.request({
-        url: `${API_BASE_URL}/api/v1/store/${params.merchant_id}/visit`,
-        method: 'POST',
-        data: {
-          openid,
+      const res = await post<{ user_id: number; visit_count: number }>(
+        `/api/v1/store/${params.merchant_id}/visit`,
+        {
+          openid: getOpenid(),
           source: params.source || 'scan'
         },
-        header: {
-          'Content-Type': 'application/json'
-        }
-      }) as unknown as { data: { code: number; data: { user_id: number; visit_count: number } } }
+        { loading: false, showErrorToast: false }
+      )
 
-      if (res.data?.code === 0) {
-        return true
-      }
-
-      console.error('Analytics: 访问埋点记录失败', res.data)
-      return false
+      return !!res
     } catch (error) {
       console.error('Analytics: 访问埋点异常', error)
       return false
@@ -76,15 +61,13 @@ export function useAnalytics() {
 
   const trackEvent = async (params: TrackEventParams): Promise<boolean> => {
     try {
-      const openid = await getOrEnsureOpenid()
-
-      if (!openid) {
-        console.log('Analytics: 用户未登录，跳过事件埋点')
+      const authed = await ensureAuthed()
+      if (!authed) {
         return false
       }
 
       await trackStoreBehaviorEvent(params.merchant_id, {
-        openid,
+        openid: getOpenid(),
         event_type: params.event,
         page: params.page,
         product_id: params.product_id,

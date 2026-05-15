@@ -72,7 +72,7 @@ func setupRoutes(r *gin.Engine) {
 	v1 := r.Group("/api/v1")
 	{
 		wsGroup := v1.Group("/ws")
-		wsGroup.Use(middleware.JWTAuth())
+		wsGroup.Use(middleware.JWTAuth(), middleware.MerchantAuth())
 		{
 			wsGroup.GET("/merchant", wsHandler.MerchantWS)
 		}
@@ -92,7 +92,14 @@ func setupRoutes(r *gin.Engine) {
 			authGroup.POST("/user/wechat-login", user.WechatLogin)
 		}
 
-		v1.POST("/user/auth/wechat-login", user.WechatLogin)
+		// 管理员接口
+		adminGroup := v1.Group("/admin")
+		adminGroup.Use(middleware.JWTAuth(), middleware.AdminAuth())
+		{
+			adminGroup.GET("/profile", admin.GetAdminProfile)
+			adminGroup.PUT("/profile", admin.UpdateAdminProfile)
+			adminGroup.POST("/change-password", admin.ChangeAdminPassword)
+		}
 
 		// 文件上传接口
 		uploadHandler := upload.NewUploadHandler()
@@ -107,21 +114,27 @@ func setupRoutes(r *gin.Engine) {
 			}
 		}
 
-		// C端店铺公开接口（无需登录即可访问）
+		// C端店铺接口
 		storeGroup := v1.Group("/store/:merchant_id")
+		storeGroup.Use(middleware.OptionalJWTAuth())
 		{
 			storeGroup.GET("/home", user.GetStoreHome)
 			storeGroup.GET("/products", user.GetProducts)
 			storeGroup.GET("/products/:product_id", user.GetProductDetail)
 			storeGroup.GET("/delivery-rules", user.GetDeliveryRules)
-			storeGroup.POST("/orders", user.CreateOrder)
 			storeGroup.POST("/visit", user.RecordUserVisit)
 			storeGroup.POST("/event", user.RecordBehaviorEvent)
+
+			storeAuthedGroup := storeGroup.Group("")
+			storeAuthedGroup.Use(middleware.JWTAuth(), middleware.UserAuth())
+			{
+				storeAuthedGroup.POST("/orders", user.CreateOrder)
+			}
 		}
 
 		// C端用户接口（需要登录）
 		userGroup := v1.Group("/user")
-		userGroup.Use(middleware.JWTAuth())
+		userGroup.Use(middleware.JWTAuth(), middleware.UserAuth())
 		{
 			userGroup.GET("/orders", user.GetOrders)
 			userGroup.GET("/orders/:order_id", user.GetOrderDetail)
@@ -135,7 +148,7 @@ func setupRoutes(r *gin.Engine) {
 
 		// 商家管理员接口
 		merchantGroup := v1.Group("/merchant")
-		merchantGroup.Use(middleware.JWTAuth())
+		merchantGroup.Use(middleware.JWTAuth(), middleware.MerchantAuth())
 		{
 			// 商家信息
 			merchantGroup.GET("/profile", merchant.GetProfile)
@@ -216,7 +229,7 @@ func setupRoutes(r *gin.Engine) {
 			spPublicGroup.POST("/auth/login", sp.Login)
 
 			spGroup := spPublicGroup.Group("")
-			spGroup.Use(middleware.JWTAuth())
+			spGroup.Use(middleware.JWTAuth(), middleware.AdminAuth())
 			{
 				spGroup.POST("/auth/logout", sp.Logout)
 				spGroup.GET("/dashboard", sp.GetDashboard)

@@ -69,8 +69,8 @@
           <template v-if="order.status === 2">
             <view class="action-btn verify" @click="showVerifyCode(order)">核销码</view>
           </template>
-          <template v-if="order.status === 2 || order.status === 5">
-            <view class="action-btn refund" @click="handleApplyRefund(order)">申请退款</view>
+          <template v-if="order.status === 2">
+            <view class="action-btn refund" @click="contactMerchantForRefund(order)">联系商家退款</view>
           </template>
           <view class="action-btn primary" @click="goDetail(order.id)">查看详情</view>
         </view>
@@ -97,36 +97,17 @@
       </view>
     </view>
 
-    <!-- 退款原因弹窗 -->
-    <view v-if="showRefund" class="dialog-mask" @click="closeRefundDialog">
-      <view class="dialog-content" @click.stop>
-        <view class="dialog-title">申请退款</view>
-        <view class="refund-reason">
-          <textarea
-            v-model="refundReason"
-            class="reason-input"
-            placeholder="请输入退款原因"
-            maxlength="200"
-          />
-        </view>
-        <view class="dialog-actions">
-          <button class="btn-cancel" @click="closeRefundDialog">取消</button>
-          <button class="btn-confirm" :disabled="submitting" @click="confirmRefund">
-            {{ submitting ? '提交中...' : '确认提交' }}
-          </button>
-        </view>
-      </view>
-    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getMyOrders, cancelMyOrder, applyRefund } from '@api'
+import { getMyOrders, cancelMyOrder } from '@api'
 import { OrderStatus, OrderStatusText } from '@types'
 import type { Order } from '@types'
 import { BrandAsset } from '../../utils/constants'
+import { useAuth } from '../../utils/useAuth'
 
 const statusTabs = [
   { label: '全部', value: 0 },
@@ -147,19 +128,26 @@ const merchantName = ref<string>('') // 当前商家名称
 const showVerify = ref(false)
 const currentOrder = ref<Order | null>(null)
 
-const showRefund = ref(false)
-const refundReason = ref('')
-const submitting = ref(false)
-const refundOrderId = ref<number | null>(null)
-
-onShow(() => {
+onShow(async () => {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
   const mid = currentPage?.options?.merchant_id
   const status = currentPage?.options?.status
 
+  const { ensureAuth } = useAuth()
+  await ensureAuth()
+
   if (status) {
-    currentStatus.value = Number(status)
+    const parsed = Number(status)
+    if (Number.isFinite(parsed)) {
+      currentStatus.value = parsed
+    } else if (status === 'paid') {
+      currentStatus.value = OrderStatus.PAID
+    } else if (status === 'pending') {
+      currentStatus.value = OrderStatus.PENDING_PAYMENT
+    } else {
+      currentStatus.value = 0
+    }
   }
 
   if (mid) {
@@ -199,7 +187,7 @@ async function loadOrders(reset = false) {
     const res = await getMyOrders(params)
 
     if (merchantId.value > 0) {
-      const filteredOrders = res.list.filter(order => order.merchant?.id === merchantId.value || order.merchant_id === merchantId.value)
+      const filteredOrders = res.list.filter(order => order.merchant?.id === merchantId.value || (order as any).merchant_id === merchantId.value)
       if (reset) {
         orders.value = filteredOrders
       } else {
@@ -259,11 +247,12 @@ function formatTime(time: string): string {
 }
 
 function goDetail(orderId: number) {
-  uni.navigateTo({ url: `/pages/merchant/orders/detail?id=${orderId}` })
+  uni.navigateTo({ url: `/pages/store/order-detail?id=${orderId}` })
 }
 
 function goShopping() {
-  uni.navigateTo({ url: '/pages/store/home' })
+  const targetMerchantId = merchantId.value || currentOrder.value?.merchant?.id || orders.value[0]?.merchant?.id || 1
+  uni.navigateTo({ url: `/pages/store/home?merchant_id=${targetMerchantId}` })
 }
 
 function cancelOrder(order: Order) {
@@ -296,41 +285,31 @@ function closeVerifyDialog() {
   showVerify.value = false
 }
 
-function handleApplyRefund(order: Order) {
-  refundOrderId.value = order.id
-  refundReason.value = ''
-  showRefund.value = true
-}
+function contactMerchantForRefund(order: Order) {
+  const phone = order.merchant?.phone?.trim()
+  const merchantName = order.merchant?.name || '商家'
 
-function closeRefundDialog() {
-  showRefund.value = false
-  refundReason.value = ''
-}
-
-async function confirmRefund() {
-  if (!refundReason.value.trim()) {
-    return uni.showToast({ title: '请输入退款原因', icon: 'none' })
+  if (!phone) {
+    uni.showModal({
+      title: '联系商家退款',
+      content: `请联系${merchantName}协助处理退款。`,
+      showCancel: false,
+      confirmText: '我知道了'
+    })
+    return
   }
 
-  if (!refundOrderId.value) return
-
-  submitting.value = true
-
-  try {
-    await applyRefund(refundOrderId.value, { refund_reason: refundReason.value })
-    
-    const index = orders.value.findIndex(o => o.id === refundOrderId.value)
-    if (index !== -1) {
-      orders.value[index].status = OrderStatus.REFUNDING
+  uni.showModal({
+    title: '联系商家退款',
+    content: `请联系${merchantName}退款\n联系电话：${phone}`,
+    confirmText: '拨打电话',
+    cancelText: '取消',
+    success: (res) => {
+      if (res.confirm) {
+        uni.makePhoneCall({ phoneNumber: phone })
+      }
     }
-
-    uni.showToast({ title: '退款申请已提交', icon: 'success' })
-    closeRefundDialog()
-  } catch (error: any) {
-    uni.showToast({ title: error.message || '申请失败', icon: 'none' })
-  } finally {
-    submitting.value = false
-  }
+  })
 }
 </script>
 

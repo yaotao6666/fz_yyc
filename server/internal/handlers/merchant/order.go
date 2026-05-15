@@ -1,8 +1,11 @@
 package merchant
 
 import (
+	"context"
+	"fz_yyc_api/internal/config"
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
 	"net/http"
@@ -232,8 +235,17 @@ func RefundOrder(c *gin.Context) {
 		return
 	}
 
-	if order.Status != 2 && order.Status != 3 {
+	if order.Status == 6 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单已退款")
+		return
+	}
+
+	if order.Status != 2 && order.Status != 3 && order.Status != 5 {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单状态不正确")
+		return
+	}
+	if strings.TrimSpace(order.TransactionID) == "" {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单尚未完成支付回调")
 		return
 	}
 
@@ -246,33 +258,104 @@ func RefundOrder(c *gin.Context) {
 		return
 	}
 
-	refundNo := strconv.FormatInt(time.Now().UnixNano(), 10)
-	refund := models.Refund{
-		OrderID:      id,
-		RefundNo:     refundNo,
-		RefundAmount: refundAmount,
-		RefundReason: req.Reason,
-		Status:       0,
-	}
-
-	now := time.Now()
-	tx := database.DB.Begin()
-	if err := tx.Create(&refund).Error; err != nil {
-		tx.Rollback()
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建退款记录失败")
+	var merchant models.Merchant
+	if err := database.DB.First(&merchant, merchantID).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeMerchantNotFound, "商家不存在")
 		return
 	}
 
-	if err := tx.Model(&order).Updates(map[string]interface{}{
-		"status":      5,
-		"refunded_at": now,
-	}).Error; err != nil {
-		tx.Rollback()
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新订单状态失败")
+	var refund models.Refund
+	refundQuery := database.DB.Where("order_id = ? AND status IN (0, 1)", id).Order("created_at DESC")
+	if err := refundQuery.First(&refund).Error; err != nil {
+		refundNo := strconv.FormatInt(time.Now().UnixNano(), 10)
+		refund = models.Refund{
+			OrderID:      id,
+			RefundNo:     refundNo,
+			RefundAmount: refundAmount,
+			RefundReason: req.Reason,
+			Status:       0,
+		}
+		if err := database.DB.Create(&refund).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建退款记录失败")
+			return
+		}
+	} else {
+		updates := map[string]any{
+			"refund_amount": refundAmount,
+			"refund_reason": req.Reason,
+		}
+		if err := database.DB.Model(&refund).Updates(updates).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新退款记录失败")
+			return
+		}
+	}
+
+	notifyURL := config.Config.WechatPay.CallbackURL
+	if notifyURL == "" {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "服务商支付回调地址未配置")
 		return
 	}
 
-	tx.Commit()
+	client, err := wechatpay.NewServiceProviderClient()
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, err.Error())
+		return
+	}
+
+	refundResp, err := client.CreatePartnerRefund(context.Background(), wechatpay.RefundRequest{
+		SubMchID:     merchant.SubMchID,
+		OrderNo:      order.OrderNo,
+		RefundNo:     refund.RefundNo,
+		Reason:       req.Reason,
+		NotifyURL:    notifyURL,
+		RefundAmount: int64(refundAmount * 100),
+		TotalAmount:  int64(order.PayAmount * 100),
+	})
+	if err != nil {
+		_ = database.DB.Model(&refund).Updates(map[string]any{
+			"status": 3,
+		}).Error
+		response.Fail(c, http.StatusBadRequest, response.CodeRefundFailed, err.Error())
+		return
+	}
+
+	refundID := strings.TrimSpace(refundResp.RefundID)
+	refundStatus := strings.ToUpper(strings.TrimSpace(refundResp.Status))
+
+	refundUpdates := map[string]any{
+		"refund_id": refundID,
+	}
+
+	orderUpdates := map[string]any{}
+	switch refundStatus {
+	case "SUCCESS":
+		now := time.Now()
+		if refundResp.SuccessTime != "" {
+			if parsed, parseErr := time.Parse(time.RFC3339, refundResp.SuccessTime); parseErr == nil {
+				now = parsed
+			}
+		}
+		refundUpdates["status"] = 2
+		refundUpdates["refunded_at"] = now
+		orderUpdates["status"] = 6
+		orderUpdates["refunded_at"] = now
+	case "CLOSED", "ABNORMAL":
+		refundUpdates["status"] = 3
+	default:
+		refundUpdates["status"] = 1
+		orderUpdates["status"] = 5
+	}
+
+	if err := database.DB.Model(&refund).Updates(refundUpdates).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新退款状态失败")
+		return
+	}
+	if len(orderUpdates) > 0 {
+		if err := database.DB.Model(&order).Updates(orderUpdates).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新订单退款状态失败")
+			return
+		}
+	}
 
 	response.Success(c, refund)
 }

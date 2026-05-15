@@ -267,6 +267,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { getStoreHome, getStoreProducts, getStoreProduct } from '@api'
 import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
+import { useAuth } from '../../utils/useAuth'
 import type { StoreHomeInfo, Product, SpecOption } from '@types'
 import { BrandAsset } from '../../utils/constants'
 
@@ -302,22 +303,32 @@ const primaryActionText = computed(() => {
   return isStoreOpen.value ? '去结算' : '去购物车'
 })
 
-onShow(async () => {
-  const pages = getCurrentPages()
-  const currentPage = pages[pages.length - 1] as any
-  const merchantId = Number(currentPage?.options?.merchant_id) || 1
-  const source = currentPage?.options?.scene || 'scan'
+let showPromise: Promise<void> | null = null
 
-  currentMerchantId.value = merchantId
+onShow(() => {
+  if (showPromise) return
 
-  const guideKey = `storeHomeGuideShown:${merchantId}`
-  showGuide.value = !uni.getStorageSync(guideKey)
+  showPromise = (async () => {
+    const pages = getCurrentPages()
+    const currentPage = pages[pages.length - 1] as any
+    const merchantId = Number(currentPage?.options?.merchant_id) || 1
+    const source = currentPage?.options?.scene || 'scan'
 
-  // 记录用户访问埋点
-  await trackVisit({ merchant_id: merchantId, source })
-  await trackPageView('store_home', merchantId, source)
+    currentMerchantId.value = merchantId
 
-  loadStoreHome(merchantId)
+    const guideKey = `storeHomeGuideShown:${merchantId}`
+    showGuide.value = !uni.getStorageSync(guideKey)
+
+    const { ensureAuth } = useAuth()
+    await ensureAuth()
+
+    await trackVisit({ merchant_id: merchantId, source })
+    await trackPageView('store_home', merchantId, source)
+
+    loadStoreHome(merchantId)
+  })().finally(() => {
+    showPromise = null
+  })
 })
 
 async function loadStoreHome(merchantId: number) {

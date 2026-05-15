@@ -45,6 +45,12 @@ function getToken(url: string): string {
   if (url.startsWith('/api/v1/sp/')) {
     return uni.getStorageSync('sp_token') || ''
   }
+  if (url.startsWith('/api/v1/user/')) {
+    return uni.getStorageSync('user_token') || ''
+  }
+  if (url.startsWith('/api/v1/store/')) {
+    return uni.getStorageSync('user_token') || ''
+  }
   return uni.getStorageSync('token') || ''
 }
 
@@ -109,17 +115,24 @@ function request<T = any>(options: RequestOptions): Promise<T> {
 
   const isSpRequest = url.startsWith('/api/v1/sp/')
   const isMerchantRequest = url.startsWith('/api/v1/merchant/')
+  const isUserRequest = url.startsWith('/api/v1/user/')
+  const isStoreRequest = url.startsWith('/api/v1/store/')
+
+  const requestToken = getToken(url)
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...header
+  }
+  if (requestToken) {
+    headers['Authorization'] = `Bearer ${requestToken}`
+  }
 
   return new Promise((resolve, reject) => {
     uni.request({
       url: `${API_BASE_URL}${url}`,
       method,
       data,
-      header: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getToken(url)}`,
-        ...header
-      },
+      header: headers,
       success: (res) => {
         if (loading) {
           uni.hideLoading()
@@ -133,7 +146,6 @@ function request<T = any>(options: RequestOptions): Promise<T> {
           if (apiResponse.code === ResponseCode.SUCCESS) {
             resolve(apiResponse.data)
           } else if (apiResponse.code === ResponseCode.UNAUTHORIZED) {
-            // Token 过期，跳转登录
             if (isSpRequest) {
               uni.removeStorageSync('sp_token')
               uni.removeStorageSync('sp_id')
@@ -148,6 +160,11 @@ function request<T = any>(options: RequestOptions): Promise<T> {
               uni.$emit('merchant-session-expired')
               uni.showToast({ title: '登录已失效，请重新登录', icon: 'none' })
               uni.reLaunch({ url: '/pages/auth/login' })
+            } else if (isUserRequest || isStoreRequest) {
+              uni.removeStorageSync('user_token')
+              uni.removeStorageSync('userInfo')
+              uni.removeStorageSync('openid')
+              uni.showToast({ title: '登录已过期，请重新进入', icon: 'none' })
             } else {
               uni.removeStorageSync('token')
               uni.removeStorageSync('userInfo')
@@ -176,6 +193,34 @@ function request<T = any>(options: RequestOptions): Promise<T> {
           // 非 200 时优先透传后端给出的错误码与错误信息，避免丢失排查线索。
           const errorMessage = getResponseMessage(response, `请求失败(${statusCode})`)
           const errorCode = getResponseCode(response)
+          if (statusCode === 401 && errorCode === ResponseCode.UNAUTHORIZED) {
+            if (isSpRequest) {
+              uni.removeStorageSync('sp_token')
+              uni.removeStorageSync('sp_id')
+              uni.removeStorageSync('sp_info')
+              uni.showToast({ title: '请先登录', icon: 'none' })
+              uni.reLaunch({ url: '/pages/sp/login' })
+            } else if (isMerchantRequest) {
+              uni.removeStorageSync('token')
+              uni.removeStorageSync('merchantId')
+              uni.removeStorageSync('staff')
+              uni.removeStorageSync('merchantInfo')
+              uni.$emit('merchant-session-expired')
+              uni.showToast({ title: '登录已失效，请重新登录', icon: 'none' })
+              uni.reLaunch({ url: '/pages/auth/login' })
+            } else if (isUserRequest || isStoreRequest) {
+              uni.removeStorageSync('user_token')
+              uni.removeStorageSync('userInfo')
+              uni.removeStorageSync('openid')
+              uni.showToast({ title: '登录已过期，请重新进入', icon: 'none' })
+            } else {
+              uni.removeStorageSync('token')
+              uni.removeStorageSync('userInfo')
+              uni.removeStorageSync('openid')
+              uni.showToast({ title: '请先登录', icon: 'none' })
+              uni.reLaunch({ url: '/pages/auth/login' })
+            }
+          }
           if (showErrorToast) {
             uni.showToast({ title: errorMessage, icon: 'none' })
           }

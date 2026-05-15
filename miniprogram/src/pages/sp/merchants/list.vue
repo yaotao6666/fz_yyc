@@ -467,10 +467,7 @@ function goDetail(merchantId: number) {
   margin-top: 12rpx;
   font-size: 24rpx;
   line-height: 1.6;
-}
-</style>
-  justify-content: center;
-  font-size: 28rpx;
+  color: #86909c;
 }
 
 .category-picker {

@@ -66,6 +66,7 @@
 - `pages/store/cart`：购物车
 - `pages/store/confirm`：确认订单
 - `pages/store/my-orders`：我的订单
+- `pages/store/order-detail`：订单详情
 - `pages/store/order-sound-test`：商家 WebSocket 联调测试页
 
 ### 3.3 服务商端页面

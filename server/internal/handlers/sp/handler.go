@@ -247,7 +247,12 @@ func UpdateMerchantAssets(c *gin.Context) {
 }
 
 func GetMerchantDistribution(c *gin.Context) {
-	metrics, totals := buildSpMerchantMetrics()
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+	metrics, totals := buildSpMerchantMetrics(serviceProviderID)
 	response.Success(c, gin.H{
 		"merchants": metrics,
 		"totals":    totals,
@@ -303,6 +308,12 @@ func GetMerchantList(c *gin.Context) {
 }
 
 func GetOrderAnalytics(c *gin.Context) {
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	location := time.Now().Location()
 	now := time.Now().In(location)
 
@@ -311,7 +322,7 @@ func GetOrderAnalytics(c *gin.Context) {
 			start := time.Date(base.Year(), base.Month(), base.Day(), 0, 0, 0, 0, location).AddDate(0, 0, -(6 - offset))
 			end := start.Add(24 * time.Hour)
 			return start, end, start.Format("01-02")
-		}),
+		}, serviceProviderID),
 		"week":  buildSpOrderBuckets(now, 8, func(base time.Time, offset int) (time.Time, time.Time, string) {
 			weekdayOffset := (int(base.Weekday()) + 6) % 7
 			weekStart := time.Date(base.Year(), base.Month(), base.Day(), 0, 0, 0, 0, location).AddDate(0, 0, -weekdayOffset)
@@ -319,23 +330,33 @@ func GetOrderAnalytics(c *gin.Context) {
 			end := start.AddDate(0, 0, 7)
 			year, week := start.ISOWeek()
 			return start, end, fmt.Sprintf("%d-W%02d", year, week)
-		}),
+		}, serviceProviderID),
 		"month": buildSpOrderBuckets(now, 12, func(base time.Time, offset int) (time.Time, time.Time, string) {
 			start := time.Date(base.Year(), base.Month(), 1, 0, 0, 0, 0, location).AddDate(0, -(11 - offset), 0)
 			end := start.AddDate(0, 1, 0)
 			return start, end, start.Format("2006-01")
-		}),
+		}, serviceProviderID),
 		"year":  buildSpOrderBuckets(now, 5, func(base time.Time, offset int) (time.Time, time.Time, string) {
 			start := time.Date(base.Year()-(4-offset), 1, 1, 0, 0, 0, 0, location)
 			end := start.AddDate(1, 0, 0)
 			return start, end, start.Format("2006")
-		}),
+		}, serviceProviderID),
 	})
 }
 
 func GetAmountAnalytics(c *gin.Context) {
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	days := c.DefaultQuery("days", "7")
 	daysInt, _ := strconv.Atoi(days)
+
+	merchantIDsQuery := database.DB.Model(&models.Merchant{}).
+		Where("service_provider_id = ?", serviceProviderID).
+		Select("id")
 
 	var trends []struct {
 		Date   string  `json:"date"`
@@ -345,7 +366,9 @@ func GetAmountAnalytics(c *gin.Context) {
 	for i := daysInt - 1; i >= 0; i-- {
 		date := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
 		var amount float64
-		database.DB.Model(&models.Order{}).Where("DATE(created_at) = ? AND status >= 2", date).Select("COALESCE(SUM(pay_amount), 0)").Scan(&amount)
+		database.DB.Model(&models.Order{}).
+			Where("merchant_id IN (?) AND DATE(created_at) = ? AND status >= 2", merchantIDsQuery, date).
+			Select("COALESCE(SUM(pay_amount), 0)").Scan(&amount)
 		trends = append(trends, struct {
 			Date   string  `json:"date"`
 			Amount float64 `json:"amount"`
@@ -358,6 +381,12 @@ func GetAmountAnalytics(c *gin.Context) {
 }
 
 func GetTopMerchants(c *gin.Context) {
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	limit := c.DefaultQuery("limit", "10")
 	limitInt, _ := strconv.Atoi(limit)
 	if limitInt <= 0 {
@@ -365,7 +394,7 @@ func GetTopMerchants(c *gin.Context) {
 	}
 	metric := c.DefaultQuery("metric", "order_amount")
 
-	metrics, _ := buildSpMerchantMetrics()
+	metrics, _ := buildSpMerchantMetrics(serviceProviderID)
 	sort.Slice(metrics, func(i, j int) bool {
 		left := getSpMerchantMetricValue(metrics[i], metric)
 		right := getSpMerchantMetricValue(metrics[j], metric)
@@ -400,9 +429,9 @@ func GetTopMerchants(c *gin.Context) {
 	response.Success(c, list)
 }
 
-func buildSpMerchantMetrics() ([]gin.H, gin.H) {
+func buildSpMerchantMetrics(serviceProviderID uint64) ([]gin.H, gin.H) {
 	var merchants []models.Merchant
-	database.DB.Order("created_at DESC").Find(&merchants)
+	database.DB.Where("service_provider_id = ?", serviceProviderID).Order("created_at DESC").Find(&merchants)
 
 	totalVisitUsers := int64(0)
 	totalOrderUsers := int64(0)
@@ -497,13 +526,17 @@ func buildSpOrderBuckets(
 	base time.Time,
 	count int,
 	rangeBuilder func(base time.Time, offset int) (time.Time, time.Time, string),
+	serviceProviderID uint64,
 ) []gin.H {
+	merchantIDsQuery := database.DB.Model(&models.Merchant{}).
+		Where("service_provider_id = ?", serviceProviderID).
+		Select("id")
 	result := make([]gin.H, 0, count)
 	for index := 0; index < count; index++ {
 		start, end, label := rangeBuilder(base, index)
 		var orderCount int64
 		database.DB.Model(&models.Order{}).
-			Where("status >= 2 AND created_at >= ? AND created_at < ?", start, end).
+			Where("merchant_id IN (?) AND status >= 2 AND created_at >= ? AND created_at < ?", merchantIDsQuery, start, end).
 			Count(&orderCount)
 		result = append(result, gin.H{
 			"label":       label,
@@ -517,8 +550,14 @@ func GetMerchantFee(c *gin.Context) {
 	merchantID := c.Param("merchant_id")
 	id, _ := strconv.ParseUint(merchantID, 10, 64)
 
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	var merchant models.Merchant
-	if err := database.DB.First(&merchant, id).Error; err != nil {
+	if err := database.DB.Where("id = ? AND service_provider_id = ?", id, serviceProviderID).First(&merchant).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
 		return
 	}
@@ -535,6 +574,18 @@ func GetMerchantFee(c *gin.Context) {
 func GetMerchantRate(c *gin.Context) {
 	merchantID := c.Param("merchant_id")
 	id, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
+	var merchant models.Merchant
+	if err := database.DB.Where("id = ? AND service_provider_id = ?", id, serviceProviderID).First(&merchant).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
+		return
+	}
 
 	var rates []models.MerchantRate
 	database.DB.Where("merchant_id = ?", id).Order("effective_time DESC").Find(&rates)
@@ -555,6 +606,18 @@ type SetRateRequest struct {
 func SetMerchantRate(c *gin.Context) {
 	merchantID := c.Param("merchant_id")
 	id, _ := strconv.ParseUint(merchantID, 10, 64)
+
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
+	var merchant models.Merchant
+	if err := database.DB.Where("id = ? AND service_provider_id = ?", id, serviceProviderID).First(&merchant).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
+		return
+	}
 
 	var req SetRateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -590,8 +653,14 @@ func GetMerchantQRCode(c *gin.Context) {
 	merchantID := c.Param("merchant_id")
 	id, _ := strconv.ParseUint(merchantID, 10, 64)
 
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	var merchant models.Merchant
-	if err := database.DB.Select("id", "name").First(&merchant, id).Error; err != nil {
+	if err := database.DB.Where("id = ? AND service_provider_id = ?", id, serviceProviderID).Select("id", "name").First(&merchant).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
 		return
 	}
@@ -607,6 +676,12 @@ func GetMerchantQRCode(c *gin.Context) {
 }
 
 func GetRefunds(c *gin.Context) {
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	merchantID := c.Query("merchant_id")
@@ -619,11 +694,17 @@ func GetRefunds(c *gin.Context) {
 		pageSize = 10
 	}
 
-	query := database.DB.Model(&models.Refund{}).Preload("Order")
+	merchantIDsQuery := database.DB.Model(&models.Merchant{}).
+		Where("service_provider_id = ?", serviceProviderID).
+		Select("id")
+
+	query := database.DB.Model(&models.Refund{}).Preload("Order").
+		Joins("JOIN orders ON orders.id = refunds.order_id").
+		Where("orders.merchant_id IN (?)", merchantIDsQuery)
 
 	if merchantID != "" {
 		id, _ := strconv.ParseUint(merchantID, 10, 64)
-		query = query.Joins("JOIN orders ON orders.id = refunds.order_id").Where("orders.merchant_id = ?", id)
+		query = query.Where("orders.merchant_id = ?", id)
 	}
 	if status != "" {
 		query = query.Where("refunds.status = ?", status)
@@ -782,11 +863,17 @@ func ChangePassword(c *gin.Context) {
 }
 
 func GetActivities(c *gin.Context) {
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	var banners []models.Activity
 	var announcements []models.Activity
 
-	database.DB.Where("type = ? AND status = ?", "banner", 1).Order("sort ASC, created_at DESC").Find(&banners)
-	database.DB.Where("type = ? AND status = ?", "announcement", 1).Order("sort ASC, created_at DESC").Find(&announcements)
+	database.DB.Where("type = ? AND status = ? AND service_provider_id = ?", "banner", 1, serviceProviderID).Order("sort ASC, created_at DESC").Find(&banners)
+	database.DB.Where("type = ? AND status = ? AND service_provider_id = ?", "announcement", 1, serviceProviderID).Order("sort ASC, created_at DESC").Find(&announcements)
 
 	response.Success(c, gin.H{
 		"banners":       banners,
@@ -806,6 +893,12 @@ type CreateActivityRequest struct {
 }
 
 func CreateActivity(c *gin.Context) {
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	var req CreateActivityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -813,14 +906,15 @@ func CreateActivity(c *gin.Context) {
 	}
 
 	activity := models.Activity{
-		Type:      req.Type,
-		Title:     req.Title,
-		Content:   req.Content,
-		Image:     req.Image,
-		LinkType:  req.LinkType,
-		LinkValue: req.LinkValue,
-		Sort:      req.Sort,
-		Status:    1,
+		ServiceProviderID: serviceProviderID,
+		Type:              req.Type,
+		Title:             req.Title,
+		Content:           req.Content,
+		Image:             req.Image,
+		LinkType:          req.LinkType,
+		LinkValue:         req.LinkValue,
+		Sort:              req.Sort,
+		Status:            1,
 	}
 	if req.Status > 0 {
 		activity.Status = req.Status
@@ -838,6 +932,12 @@ func UpdateActivity(c *gin.Context) {
 	id := c.Param("id")
 	activityID, _ := strconv.ParseUint(id, 10, 64)
 
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	var req CreateActivityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -845,7 +945,7 @@ func UpdateActivity(c *gin.Context) {
 	}
 
 	var activity models.Activity
-	if err := database.DB.First(&activity, activityID).Error; err != nil {
+	if err := database.DB.Where("id = ? AND service_provider_id = ?", activityID, serviceProviderID).First(&activity).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "活动不存在")
 		return
 	}
@@ -889,8 +989,14 @@ func DeleteActivity(c *gin.Context) {
 	id := c.Param("id")
 	activityID, _ := strconv.ParseUint(id, 10, 64)
 
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	var activity models.Activity
-	if err := database.DB.First(&activity, activityID).Error; err != nil {
+	if err := database.DB.Where("id = ? AND service_provider_id = ?", activityID, serviceProviderID).First(&activity).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "活动不存在")
 		return
 	}
@@ -913,8 +1019,14 @@ type WechatConfig struct {
 }
 
 func GetWechatConfig(c *gin.Context) {
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	var sp models.ServiceProvider
-	if err := database.DB.First(&sp).Error; err != nil {
+	if err := database.DB.First(&sp, serviceProviderID).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}
@@ -940,6 +1052,12 @@ type UpdateWechatConfigRequest struct {
 }
 
 func UpdateWechatConfig(c *gin.Context) {
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
 	var req UpdateWechatConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -947,7 +1065,7 @@ func UpdateWechatConfig(c *gin.Context) {
 	}
 
 	var sp models.ServiceProvider
-	if err := database.DB.First(&sp).Error; err != nil {
+	if err := database.DB.First(&sp, serviceProviderID).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}

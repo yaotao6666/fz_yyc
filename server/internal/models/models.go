@@ -301,8 +301,8 @@ type UserBehaviorEvent struct {
 	OpenID     string    `gorm:"column:openid;size:64;index" json:"openid"`
 	EventType  string    `gorm:"size:32;not null;index" json:"event_type"`
 	Page       string    `gorm:"size:64" json:"page"`
-	ProductID  uint64    `gorm:"index" json:"product_id"`
-	OrderID    uint64    `gorm:"index" json:"order_id"`
+	ProductID  *uint64   `gorm:"index" json:"product_id"`
+	OrderID    *uint64   `gorm:"index" json:"order_id"`
 	Source     string    `gorm:"size:32" json:"source"`
 	Payload    JSON      `gorm:"type:json" json:"payload"`
 	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
@@ -432,19 +432,20 @@ func (MerchantProfitSharingRecord) TableName() string {
 // 平台活动表 (activities)
 // ============================================
 type Activity struct {
-	ID        uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	Type      string     `gorm:"size:16;not null" json:"type"`
-	Title     string     `gorm:"size:128" json:"title"`
-	Content   string     `gorm:"type:text" json:"content"`
-	Image     string     `gorm:"size:512" json:"image"`
-	LinkType  string     `gorm:"size:16" json:"link_type"`
-	LinkValue string     `gorm:"size:256" json:"link_value"`
-	Sort      uint       `gorm:"not null;default:0" json:"sort"`
-	Status    uint8      `gorm:"not null;default:1" json:"status"`
-	StartTime *time.Time `json:"start_time"`
-	EndTime   *time.Time `json:"end_time"`
-	CreatedAt time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID                uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	ServiceProviderID uint64     `gorm:"not null;index" json:"service_provider_id"`
+	Type              string     `gorm:"size:16;not null" json:"type"`
+	Title             string     `gorm:"size:128" json:"title"`
+	Content           string     `gorm:"type:text" json:"content"`
+	Image             string     `gorm:"size:512" json:"image"`
+	LinkType          string     `gorm:"size:16" json:"link_type"`
+	LinkValue         string     `gorm:"size:256" json:"link_value"`
+	Sort              uint       `gorm:"not null;default:0" json:"sort"`
+	Status            uint8      `gorm:"not null;default:1" json:"status"`
+	StartTime         *time.Time `json:"start_time"`
+	EndTime           *time.Time `json:"end_time"`
+	CreatedAt         time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt         time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (Activity) TableName() string {

@@ -137,6 +137,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { createOrder, getStoreDeliveryRules } from '@api'
 import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
+import { useAuth } from '../../utils/useAuth'
 import type { CreateOrderRequest } from '@types'
 
 const cartStore = useCartStore()
@@ -167,10 +168,13 @@ const deliveryConfig = ref({
 // 配送档位选项
 const deliveryRules = ref<{ distance: number; fee: number; label: string }[]>([])
 
-onShow(() => {
+onShow(async () => {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
   merchantId.value = Number(currentPage?.options?.merchant_id) || 1
+
+  const { ensureAuth } = useAuth()
+  await ensureAuth()
 
   // 加载配送规则
   loadDeliveryRules()
@@ -235,6 +239,12 @@ const totalAmount = computed(() => {
 })
 
 async function submitOrder() {
+  const { ensureAuth } = useAuth()
+  const authed = await ensureAuth()
+  if (!authed) {
+    return uni.showToast({ title: '登录失败，请重试', icon: 'none' })
+  }
+
   if (deliveryType.value === 1) {
     if (!deliveryConfig.value.enabled) {
       return uni.showToast({ title: '商家暂未开启配送', icon: 'none' })
@@ -307,7 +317,7 @@ async function submitOrder() {
           
           setTimeout(() => {
             uni.redirectTo({
-              url: `/pages/store/my-orders?status=paid`
+              url: `/pages/store/my-orders?merchant_id=${merchantId.value}&status=2`
             })
           }, 1500)
         },
@@ -318,7 +328,7 @@ async function submitOrder() {
             
             setTimeout(() => {
               uni.redirectTo({
-                url: `/pages/store/my-orders?status=pending`
+                url: `/pages/store/my-orders?merchant_id=${merchantId.value}&status=1`
               })
             }, 1500)
           } else {
@@ -334,7 +344,7 @@ async function submitOrder() {
       
       setTimeout(() => {
         uni.redirectTo({
-          url: `/pages/store/my-orders`
+          url: `/pages/store/my-orders?merchant_id=${merchantId.value}`
         })
       }, 1500)
     }

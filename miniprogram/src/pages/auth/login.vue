@@ -47,7 +47,24 @@
           {{ wechatLoading ? '登录中...' : '微信快捷登录' }}
         </button>
         <view class="agreement-tip">
-          <text class="agreement-text">商家账号由服务商统一创建并分配，登录后即可进入经营后台。</text>
+          <text class="agreement-text">登录即表示同意</text>
+          <text class="agreement-link" @click="showAgreement('service')">《商家服务协议》</text>
+          <text class="agreement-text">和</text>
+          <text class="agreement-link" @click="showAgreement('privacy')">《隐私政策》</text>
+        </view>
+      </view>
+
+    <view v-if="agreementVisible" class="agreement-dialog-mask" @click="closeAgreement">
+      <view class="agreement-dialog" @click.stop>
+        <view class="agreement-dialog-header">
+          <text class="agreement-dialog-title">{{ agreementTitle }}</text>
+          <text class="agreement-dialog-close" @click="closeAgreement">×</text>
+        </view>
+        <scroll-view class="agreement-dialog-body" scroll-y>
+          <rich-text :nodes="agreementContent"></rich-text>
+        </scroll-view>
+        <view class="agreement-dialog-footer">
+          <view class="agreement-dialog-btn" @click="closeAgreement">我已知晓</view>
         </view>
       </view>
     </view>
@@ -73,6 +90,65 @@ const errors = reactive({
 
 const loading = ref(false)
 const wechatLoading = ref(false)
+const agreementVisible = ref(false)
+const agreementTitle = ref('')
+const agreementContent = ref('')
+
+const serviceAgreement = `
+<h3>一、服务条款</h3>
+<p>1.1 本协议是您与寻梦私域管家平台之间关于使用商家管理服务所订立的协议。请您仔细阅读本协议，在确认充分理解并同意后再开始使用。</p>
+<p>1.2 商家账号由服务商统一创建并分配，您应妥善保管账号和密码，因您个人原因导致的账号泄露由您自行承担相关责任。</p>
+<h3>二、服务内容</h3>
+<p>2.1 平台为商家提供商品管理、订单管理、数据分析、配送管理等经营辅助服务。</p>
+<p>2.2 平台有权根据业务发展需要调整、变更服务内容，并将及时通知商家。</p>
+<h3>三、商家义务</h3>
+<p>3.1 商家应确保所售商品符合国家法律法规要求，不得销售违禁、假冒伪劣商品。</p>
+<p>3.2 商家应保证商品信息真实、准确，不得进行虚假宣传。</p>
+<p>3.3 商家应及时处理订单，保障消费者合法权益。</p>
+<h3>四、费用与结算</h3>
+<p>4.1 平台服务费用及结算规则由服务商与商家另行约定。</p>
+<p>4.2 商家应按照约定及时缴纳相关服务费用。</p>
+<h3>五、违约责任</h3>
+<p>5.1 任何一方违反本协议约定，应承担相应的违约责任。</p>
+<p>5.2 如商家存在严重违规行为，平台有权暂停或终止服务。</p>
+<h3>六、协议变更</h3>
+<p>6.1 平台有权根据需要修改本协议条款，修改后的协议将在平台公示后生效。</p>
+`
+
+const privacyPolicy = `
+<h3>一、信息收集</h3>
+<p>1.1 我们将收集您在使用服务时主动提供的信息，包括但不限于：商家名称、联系方式、经营地址等。</p>
+<p>1.2 我们会自动收集您的设备信息、操作日志等用于保障服务安全和提升用户体验。</p>
+<h3>二、信息使用</h3>
+<p>2.1 我们收集的信息将用于：为您提供商家管理服务、处理订单交易、改进产品功能、保障账户安全。</p>
+<p>2.2 未经您的同意，我们不会将您的信息用于本协议约定以外的用途。</p>
+<h3>三、信息保护</h3>
+<p>3.1 我们采用业界通行的安全技术手段保护您的个人信息安全。</p>
+<p>3.2 我们将对员工接触个人信息进行严格限制，并要求相关员工保密。</p>
+<h3>四、信息共享</h3>
+<p>4.1 未经您的同意，我们不会向第三方共享您的个人信息，法律法规另有规定的除外。</p>
+<p>4.2 为完成交易需要，我们会在必要范围内向支付机构、物流服务商等共享订单相关信息。</p>
+<h3>五、您的权利</h3>
+<p>5.1 您有权访问、更正您的个人信息，也有权撤回授权同意或删除账号。</p>
+<p>5.2 如您发现个人信息被违规使用，可联系我们进行处理。</p>
+<h3>六、未成年人保护</h3>
+<p>6.1 我们不会主动收集未成年人个人信息。如发现误收集，将及时删除。</p>
+`
+
+function showAgreement(type: string) {
+  if (type === 'service') {
+    agreementTitle.value = '商家服务协议'
+    agreementContent.value = serviceAgreement
+  } else {
+    agreementTitle.value = '隐私政策'
+    agreementContent.value = privacyPolicy
+  }
+  agreementVisible.value = true
+}
+
+function closeAgreement() {
+  agreementVisible.value = false
+}
 
 // 表单验证
 function validateUsername() {
@@ -269,6 +345,86 @@ async function handleWechatLogin() {
 .agreement-link {
   font-size: 24rpx;
   color: #007AFF;
-  padding: 12rpx 0 12rpx 8rpx;
+  padding: 12rpx 0 12rpx 4rpx;
+}
+
+.agreement-dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.agreement-dialog {
+  width: 640rpx;
+  max-height: 80vh;
+  background: #ffffff;
+  border-radius: 24rpx;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.agreement-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx 32rpx 20rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.agreement-dialog-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.agreement-dialog-close {
+  font-size: 44rpx;
+  color: #999999;
+  padding: 0 8rpx;
+  line-height: 1;
+}
+
+.agreement-dialog-body {
+  padding: 24rpx 32rpx;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.agreement-dialog-body h3 {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333333;
+  margin: 20rpx 0 12rpx;
+}
+
+.agreement-dialog-body p {
+  font-size: 26rpx;
+  color: #666666;
+  line-height: 1.8;
+  margin-bottom: 8rpx;
+}
+
+.agreement-dialog-footer {
+  padding: 20rpx 32rpx 32rpx;
+}
+
+.agreement-dialog-btn {
+  height: 80rpx;
+  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  border-radius: 40rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

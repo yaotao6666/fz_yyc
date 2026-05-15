@@ -24,6 +24,41 @@
 - 登录态字段、缓存字段、角色标识必须在前后端统一。
 - 商家退出登录后，前端需要主动断开 WebSocket 连接。
 
+#### C 端微信登录
+
+- **接口**：`POST /api/v1/auth/user/wechat-login`
+- **请求**：`{ code: string }`
+- **成功响应**：
+  - `code`: `0`
+  - `message`: `success`
+  - `data.token`: C 端用户 token
+  - `data.user`：
+    - `id`
+    - `openid`
+    - `nickname`
+- **前端缓存字段**：
+  - `user_token`：对应 `data.token`
+  - `userInfo`：对应 `data.user`
+  - `openid`：对应 `data.user.openid`
+- **鉴权使用**：
+  - `Authorization: Bearer {user_token}` 用于 `GET/POST /api/v1/user/*`
+  - `Authorization: Bearer {user_token}` 用于 `POST /api/v1/store/:merchant_id/orders`（下单）
+  - `/api/v1/store/:merchant_id/home`、`/products`、`/products/:product_id`、`/delivery-rules` 为公开接口，不要求登录
+
+#### C 端访问与埋点
+
+- **访问埋点**：`POST /api/v1/store/:merchant_id/visit`
+  - 请求：`{ openid: string, source?: string }`
+- **行为埋点**：`POST /api/v1/store/:merchant_id/event`
+  - 请求：
+    - `openid: string`
+    - `event_type: page_view | product_view | submit_order | pay_success`
+    - `page?: string`
+    - `product_id?: number`
+    - `order_id?: number`
+    - `source?: string`
+    - `payload?: object`
+
 ### 2.2 服务商接口
 
 - 仪表盘
@@ -112,6 +147,10 @@
   - `reason`
   - `refund_amount`
 - 商家退款接口在未传 `refund_amount` 或传入 `<= 0` 时，默认按订单实付金额处理。
+- **退款状态口径**：
+  - 订单 `status=5`：退款中（已发起退款流程，等待微信退款结果）
+  - 订单 `status=6`：已退款（收到微信退款成功回调后写入）
+  - `refunded_at`：在订单进入 `status=6` 时写入
 - 支付成功后，订单需回写：
   - `transaction_id`
   - `pay_notify_payload`
@@ -132,6 +171,7 @@
 - 微信支付回调入口：
   - `/api/v1/notify/payment`
   - `/api/v1/callback/wechat`
+  - 支付与退款均使用同一回调入口，按 `event_type` 区分支付（TRANSACTION）与退款（REFUND）
 
 当前重点约束：
 

@@ -108,6 +108,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { getStoreProduct } from '@api'
 import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
+import { useAuth } from '../../utils/useAuth'
 import type { Product, SpecOption } from '@types'
 
 const cartStore = useCartStore()
@@ -153,11 +154,15 @@ const selectedStock = computed(() => {
   return product.value.stock
 })
 
-onShow(() => {
+onShow(async () => {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
   merchantId.value = Number(currentPage?.options?.merchant_id) || 1
   productId.value = Number(currentPage?.options?.product_id) || 1
+
+  const { ensureAuth } = useAuth()
+  await ensureAuth()
+
   loadProduct()
 })
 

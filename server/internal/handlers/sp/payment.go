@@ -7,6 +7,7 @@ import (
 	"fz_yyc_api/internal/config"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"fz_yyc_api/internal/models"
@@ -38,15 +39,49 @@ func PaymentNotify(c *gin.Context) {
 		return
 	}
 
-	notifyResult, err := client.ParseAndVerifyNotify(c.Request.Header, body)
+	eventType, plaintext, err := client.ParseAndVerifyNotifyEvent(c.Request.Header, body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": "FAIL", "message": err.Error()})
 		return
 	}
 
-	if notifyResult.TradeState != "SUCCESS" {
+	if strings.Contains(eventType, "REFUND") {
+		if err := processRefundNotify(context.Background(), plaintext); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"code": "FAIL", "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "成功"})
+		return
+	}
+
+	var resource struct {
+		OutTradeNo    string `json:"out_trade_no"`
+		TransactionID string `json:"transaction_id"`
+		TradeState    string `json:"trade_state"`
+		SuccessTime   string `json:"success_time"`
+		Amount        struct {
+			PayerTotal int64 `json:"payer_total"`
+		} `json:"amount"`
+	}
+	if err := json.Unmarshal(plaintext, &resource); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "FAIL", "message": "解析支付回调资源失败"})
+		return
+	}
+
+	if resource.TradeState != "SUCCESS" {
 		c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "忽略非成功支付通知"})
 		return
+	}
+
+	successTime, _ := time.Parse(time.RFC3339, resource.SuccessTime)
+	notifyResult := &wechatpay.NotifyResult{
+		EventType:     eventType,
+		OrderNo:       resource.OutTradeNo,
+		TransactionID: resource.TransactionID,
+		TradeState:    resource.TradeState,
+		SuccessTime:   successTime,
+		PayAmount:     resource.Amount.PayerTotal,
+		RawPayload:    plaintext,
 	}
 
 	if err := processPaymentSuccess(context.Background(), client, notifyResult); err != nil {
@@ -199,6 +234,66 @@ func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProvide
 			return fmt.Errorf("更新分账记录失败: %w", err)
 		}
 		return nil
+	})
+}
+
+func processRefundNotify(ctx context.Context, plaintext []byte) error {
+	var resource struct {
+		OutRefundNo  string `json:"out_refund_no"`
+		RefundID     string `json:"refund_id"`
+		RefundStatus string `json:"refund_status"`
+		SuccessTime  string `json:"success_time"`
+	}
+	if err := json.Unmarshal(plaintext, &resource); err != nil {
+		return fmt.Errorf("解析退款回调资源失败: %w", err)
+	}
+	if resource.OutRefundNo == "" {
+		return fmt.Errorf("退款回调缺少退款单号")
+	}
+
+	now := time.Now()
+	if resource.SuccessTime != "" {
+		if parsed, err := time.Parse(time.RFC3339, resource.SuccessTime); err == nil {
+			now = parsed
+		}
+	}
+
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var refund models.Refund
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("refund_no = ?", resource.OutRefundNo).
+			First(&refund).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return nil
+			}
+			return err
+		}
+
+		refundUpdates := map[string]any{
+			"refund_id": resource.RefundID,
+		}
+
+		switch strings.ToUpper(resource.RefundStatus) {
+		case "SUCCESS":
+			refundUpdates["status"] = 2
+			refundUpdates["refunded_at"] = now
+			if err := tx.Model(&refund).Updates(refundUpdates).Error; err != nil {
+				return err
+			}
+			return tx.Model(&models.Order{}).Where("id = ?", refund.OrderID).Updates(map[string]any{
+				"status":      6,
+				"refunded_at": now,
+			}).Error
+		case "CLOSED", "ABNORMAL":
+			refundUpdates["status"] = 3
+			if err := tx.Model(&refund).Updates(refundUpdates).Error; err != nil {
+				return err
+			}
+			return nil
+		default:
+			refundUpdates["status"] = 1
+			return tx.Model(&refund).Updates(refundUpdates).Error
+		}
 	})
 }
 

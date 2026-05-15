@@ -52,6 +52,7 @@ import type {
   MerchantPaymentConfigFormData,
   ProfitSharingRecordListResponse,
   ProfitSharingRecordQuery,
+  UserAddress,
 } from '../types'
 import type { ApiResponse } from '../types'
 
@@ -74,6 +75,10 @@ export const ResponseCode = {
 
 function getToken(): string {
   return uni.getStorageSync('token') || ''
+}
+
+function getUserToken(): string {
+  return uni.getStorageSync('user_token') || ''
 }
 
 function parseDistanceRules(value: unknown): { min_distance: number; max_distance: number; fee: number }[] {
@@ -196,7 +201,11 @@ export async function getMerchantList(params?: any) {
 }
 
 export function getMerchantDetail(merchantId: number) {
-  return get<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}`)
+  return get<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}`).then(data => {
+    if (data?.logo) data.logo = normalizeImageUrl(data.logo)
+    if (data?.cover_image) data.cover_image = normalizeImageUrl(data.cover_image)
+    return data
+  })
 }
 
 export function getSpProfitSharingRecords(params?: ProfitSharingRecordQuery) {
@@ -258,7 +267,11 @@ export function getTopMerchants(params?: { limit?: number; metric?: string }) {
  * 获取商家信息
  */
 export async function getMerchantProfile() {
-  return get<MerchantInfo>('/api/v1/merchant/profile')
+  return get<MerchantInfo>('/api/v1/merchant/profile').then(data => {
+    if (data?.logo) data.logo = normalizeImageUrl(data.logo)
+    if (data?.cover_image) data.cover_image = normalizeImageUrl(data.cover_image)
+    return data
+  })
 }
 
 // ============ 商家设置相关 ============
@@ -776,21 +789,38 @@ export async function uploadImage(filePath: string): Promise<{ url: string; key:
  * 获取店铺首页信息
  */
 export function getStoreHome(merchantId: number) {
-  return get<StoreHomeInfo>(`/api/v1/store/${merchantId}/home`)
+  return get<StoreHomeInfo>(`/api/v1/store/${merchantId}/home`).then(data => {
+    if (data?.hot_products) {
+      data.hot_products = data.hot_products.map((p: any) => normalizeProduct(p))
+    }
+    if (data?.merchant?.images) {
+      data.merchant.images = normalizeStringArray(data.merchant.images).map(normalizeImageUrl)
+    }
+    if (data?.merchant?.logo) {
+      data.merchant.logo = normalizeImageUrl(data.merchant.logo)
+    }
+    if (data?.merchant?.cover_image) {
+      data.merchant.cover_image = normalizeImageUrl(data.merchant.cover_image)
+    }
+    return data
+  })
 }
 
 /**
  * 获取店铺商品列表
  */
 export function getStoreProducts(merchantId: number, params?: { category_id?: number }) {
-  return get<ProductListResponse>(`/api/v1/store/${merchantId}/products`, params).then(normalizeListField)
+  return get<ProductListResponse>(`/api/v1/store/${merchantId}/products`, params).then(res => {
+    const normalized = normalizeListField(res)
+    return { ...normalized, list: normalized.list.map(normalizeProduct) }
+  })
 }
 
 /**
  * 获取店铺商品详情
  */
 export function getStoreProduct(merchantId: number, productId: number) {
-  return get<Product>(`/api/v1/store/${merchantId}/products/${productId}`)
+  return get<Product>(`/api/v1/store/${merchantId}/products/${productId}`).then(normalizeProduct)
 }
 
 /**
@@ -803,7 +833,7 @@ export function getStoreDeliveryRules(merchantId: number) {
     free_delivery_amount: number
     max_distance: number
     distance_rules: { min_distance: number; max_distance: number; fee: number }[]
-  }>(`/api/v1/store/${merchantId}/delivery-rules`)
+  }>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeDeliverySettings)
 }
 
 // ============ C端订单相关 ============
@@ -845,7 +875,7 @@ export function cancelMyOrder(orderId: number) {
 /**
  * 申请退款
  */
-export function applyRefund(orderId: number, data: { refund_reason: string }) {
+export function applyRefund(orderId: number, data: { reason: string }) {
   return post<any>(`/api/v1/user/orders/${orderId}/refund`, data)
 }
 
@@ -856,6 +886,84 @@ export function applyRefund(orderId: number, data: { refund_reason: string }) {
  */
 export function getPrintLogs(params?: { page?: number; page_size?: number; start_date?: string; end_date?: string }) {
   return get<any>('/api/v1/merchant/print-logs', params)
+}
+
+// ============ C端订单详情 ============
+
+export function getMyOrderDetail(orderId: number) {
+  return get<Order>(`/api/v1/user/orders/${orderId}`)
+}
+
+// ============ C端地址管理 ============
+
+export function getUserAddresses() {
+  return get<UserAddress[]>('/api/v1/user/addresses')
+}
+
+export function createUserAddress(data: Partial<UserAddress>) {
+  return post<UserAddress>('/api/v1/user/addresses', data)
+}
+
+export function updateUserAddress(addressId: number, data: Partial<UserAddress>) {
+  return put<UserAddress>(`/api/v1/user/addresses/${addressId}`, data)
+}
+
+export function deleteUserAddress(addressId: number) {
+  return del<null>(`/api/v1/user/addresses/${addressId}`)
+}
+
+// ============ SP端缺失API ============
+
+export function updateSpSettings(data: Partial<SpSettings>) {
+  return put<SpSettings>('/api/v1/sp/settings', data)
+}
+
+export function deleteAnnouncement(announcementId: number) {
+  return del<null>(`/api/v1/sp/announcements/${announcementId}`)
+}
+
+export function getMerchantFee(merchantId: number) {
+  return get<any>(`/api/v1/sp/merchants/${merchantId}/fee`)
+}
+
+export function getMerchantRate(merchantId: number) {
+  return get<any>(`/api/v1/sp/merchants/${merchantId}/rate`)
+}
+
+export function setMerchantRate(merchantId: number, data: any) {
+  return post<any>(`/api/v1/sp/merchants/${merchantId}/rate`, data)
+}
+
+export function getSpMerchantQrcode(merchantId: number) {
+  return get<{ qrcode_url: string }>(`/api/v1/sp/merchants/${merchantId}/qrcode`)
+}
+
+export function getSpRefunds(params?: any) {
+  return get<any>('/api/v1/sp/orders/refunds', params)
+}
+
+export function getSpActivities(params?: any) {
+  return get<any>('/api/v1/sp/activities', params)
+}
+
+export function createSpActivity(data: any) {
+  return post<any>('/api/v1/sp/activities', data)
+}
+
+export function updateSpActivity(activityId: number, data: any) {
+  return put<any>(`/api/v1/sp/activities/${activityId}`, data)
+}
+
+export function deleteSpActivity(activityId: number) {
+  return del<any>(`/api/v1/sp/activities/${activityId}`)
+}
+
+export function getSpWechatConfig() {
+  return get<any>('/api/v1/sp/wechat-config')
+}
+
+export function updateSpWechatConfig(data: any) {
+  return put<any>('/api/v1/sp/wechat-config', data)
 }
 
 export default {
@@ -931,4 +1039,25 @@ export default {
   applyRefund,
   // 云打印
   getPrintLogs,
+  // C端订单详情
+  getMyOrderDetail,
+  // C端地址管理
+  getUserAddresses,
+  createUserAddress,
+  updateUserAddress,
+  deleteUserAddress,
+  // SP端缺失API
+  updateSpSettings,
+  deleteAnnouncement,
+  getMerchantFee,
+  getMerchantRate,
+  setMerchantRate,
+  getSpMerchantQrcode,
+  getSpRefunds,
+  getSpActivities,
+  createSpActivity,
+  updateSpActivity,
+  deleteSpActivity,
+  getSpWechatConfig,
+  updateSpWechatConfig,
 }

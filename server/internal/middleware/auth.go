@@ -88,6 +88,26 @@ func JWTAuth() gin.HandlerFunc {
 	}
 }
 
+// OptionalJWTAuth 可选JWT认证中间件
+// 有token则解析用户信息存入Context，无token也不拒绝请求
+func OptionalJWTAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				claims, err := ParseToken(parts[1])
+				if err == nil && claims != nil {
+					c.Set("user_id", claims.UserID)
+					c.Set("user_type", claims.UserType)
+					c.Set("username", claims.Username)
+				}
+			}
+		}
+		c.Next()
+	}
+}
+
 // AdminAuth 管理员认证中间件
 func AdminAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {

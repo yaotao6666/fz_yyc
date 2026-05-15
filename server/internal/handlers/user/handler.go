@@ -12,6 +12,7 @@ import (
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -55,16 +56,6 @@ type StoreProductResponse struct {
 	UpdatedAt     time.Time                  `json:"updated_at"`
 }
 
-type RecordBehaviorEventRequest struct {
-	OpenID    string                 `json:"openid" binding:"required"`
-	EventType string                 `json:"event_type" binding:"required"`
-	Page      string                 `json:"page"`
-	ProductID uint64                 `json:"product_id"`
-	OrderID   uint64                 `json:"order_id"`
-	Source    string                 `json:"source"`
-	Payload   map[string]interface{} `json:"payload"`
-}
-
 func getOrCreateStoreUser(openID string, now time.Time) (*models.User, bool, error) {
 	var user models.User
 	result := database.DB.Where("openid = ?", openID).First(&user)
@@ -90,7 +81,7 @@ func getOrCreateStoreUser(openID string, now time.Time) (*models.User, bool, err
 	return &user, false, nil
 }
 
-func recordUserBehaviorEvent(merchantID uint64, userID uint64, openID string, eventType string, page string, productID uint64, orderID uint64, source string, payload map[string]interface{}) {
+func recordUserBehaviorEvent(merchantID uint64, userID uint64, openID string, eventType string, page string, productID *uint64, orderID *uint64, source string, payload map[string]interface{}) {
 	var payloadJSON models.JSON
 	if len(payload) > 0 {
 		if raw, err := json.Marshal(payload); err == nil {
@@ -198,17 +189,25 @@ func WechatLogin(c *gin.Context) {
 		return
 	}
 
-	// 使用code生成openid(实际项目中应调用微信API获取真实openid)
-	openID := "wx_" + req.Code
+	if req.Code == "" {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "授权码不能为空")
+		return
+	}
 
-	// 查找或创建用户
+	openID, unionID, err := getWechatOpenID(req.Code)
+	if err != nil {
+		log.Printf("获取微信openid失败: %v", err)
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "微信登录失败")
+		return
+	}
+
 	var user models.User
 	result := database.DB.Where("openid = ?", openID).First(&user)
 
 	if result.Error == gorm.ErrRecordNotFound {
-		// 首次登录,创建用户
 		user = models.User{
 			OpenID:   openID,
+			UnionID:  unionID,
 			Nickname: "微信用户",
 			Status:   1,
 		}
@@ -221,10 +220,18 @@ func WechatLogin(c *gin.Context) {
 		return
 	}
 
-	// 生成JWT token
+	now := time.Now()
+	updates := map[string]interface{}{
+		"last_visit_at": now,
+		"visit_count":   gorm.Expr("visit_count + 1"),
+	}
+	if user.FirstVisitAt == nil {
+		updates["first_visit_at"] = now
+	}
+	database.DB.Model(&user).Updates(updates)
+
 	token, _ := utils.GenerateToken(user.ID, "user", user.Nickname)
 
-	// 返回完整用户信息
 	response.Success(c, gin.H{
 		"token": token,
 		"user": gin.H{
@@ -233,6 +240,40 @@ func WechatLogin(c *gin.Context) {
 			"nickname": user.Nickname,
 		},
 	})
+}
+
+func getWechatOpenID(code string) (string, string, error) {
+	appID := config.Config.Wechat.AppID
+	appSecret := config.Config.Wechat.AppSecret
+
+	url := fmt.Sprintf(
+		"https://api.weixin.qq.com/sns/jscode2session?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code",
+		appID, appSecret, code,
+	)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", "", fmt.Errorf("请求微信API失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		OpenID     string `json:"openid"`
+		SessionKey string `json:"session_key"`
+		UnionID    string `json:"unionid"`
+		ErrCode    int    `json:"errcode"`
+		ErrMsg     string `json:"errmsg"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", fmt.Errorf("解析微信响应失败: %w", err)
+	}
+
+	if result.ErrCode != 0 {
+		return "", "", fmt.Errorf("微信API错误: code=%d, msg=%s", result.ErrCode, result.ErrMsg)
+	}
+
+	return result.OpenID, result.UnionID, nil
 }
 
 func GetStoreHome(c *gin.Context) {
@@ -375,13 +416,10 @@ func RecordUserVisit(c *gin.Context) {
 	mid, _ := strconv.ParseUint(merchantID, 10, 64)
 
 	var req struct {
-		OpenID string `json:"openid" binding:"required"`
+		OpenID string `json:"openid"`
 		Source string `json:"source"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "缺少openid")
-		return
-	}
+	_ = c.ShouldBindJSON(&req)
 
 	if req.Source == "" {
 		req.Source = "scan"
@@ -389,37 +427,51 @@ func RecordUserVisit(c *gin.Context) {
 
 	now := time.Now()
 
-	user, created, err := getOrCreateStoreUser(req.OpenID, now)
-	if err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询用户失败")
-		return
+	userID := utils.GetUserID(c)
+	var user *models.User
+	if userID > 0 {
+		var current models.User
+		if err := database.DB.First(&current, userID).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询用户失败")
+			return
+		}
+		user = &current
+	} else {
+		if req.OpenID == "" {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "缺少openid")
+			return
+		}
+		current, _, err := getOrCreateStoreUser(req.OpenID, now)
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询用户失败")
+			return
+		}
+		user = current
 	}
 
-	if !created {
-		updates := map[string]interface{}{
-			"last_visit_at": now,
-			"visit_count":   gorm.Expr("visit_count + 1"),
-		}
-		if user.FirstVisitAt == nil {
-			updates["first_visit_at"] = now
-		}
-		database.DB.Model(user).Updates(updates)
-		user.VisitCount += 1
+	user.VisitCount += 1
+	updates := map[string]interface{}{
+		"last_visit_at": now,
+		"visit_count":   gorm.Expr("visit_count + 1"),
 	}
+	if user.FirstVisitAt == nil {
+		updates["first_visit_at"] = now
+	}
+	database.DB.Model(&user).Updates(updates)
 
 	visit := models.UserVisit{
 		UserID:     user.ID,
 		MerchantID: mid,
-		OpenID:     req.OpenID,
+		OpenID:     user.OpenID,
 		VisitTime:  now,
 		Source:     req.Source,
 	}
 	database.DB.Create(&visit)
 
-	recordUserBehaviorEvent(mid, user.ID, req.OpenID, "store_visit", "store_home", 0, 0, req.Source, map[string]interface{}{
+	recordUserBehaviorEvent(mid, user.ID, user.OpenID, "store_visit", "store_home", nil, nil, req.Source, map[string]interface{}{
 		"source": req.Source,
 	})
-	wsHandler.BroadcastStoreVisitNotify(mid, req.OpenID, req.Source)
+	wsHandler.BroadcastStoreVisitNotify(mid, user.OpenID, req.Source)
 
 	response.Success(c, gin.H{
 		"user_id":     user.ID,
@@ -431,10 +483,41 @@ func RecordBehaviorEvent(c *gin.Context) {
 	merchantID := c.Param("merchant_id")
 	mid, _ := strconv.ParseUint(merchantID, 10, 64)
 
-	var req RecordBehaviorEventRequest
+	var req struct {
+		OpenID    string                 `json:"openid"`
+		EventType string                 `json:"event_type" binding:"required"`
+		Page      string                 `json:"page"`
+		ProductID *uint64                `json:"product_id"`
+		OrderID   *uint64                `json:"order_id"`
+		Source    string                 `json:"source"`
+		Payload   map[string]interface{} `json:"payload"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
+	}
+
+	now := time.Now()
+	userID := utils.GetUserID(c)
+	var user *models.User
+	if userID > 0 {
+		var current models.User
+		if err := database.DB.First(&current, userID).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询用户失败")
+			return
+		}
+		user = &current
+	} else {
+		if req.OpenID == "" {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "缺少openid")
+			return
+		}
+		current, _, err := getOrCreateStoreUser(req.OpenID, now)
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询用户失败")
+			return
+		}
+		user = current
 	}
 
 	switch req.EventType {
@@ -444,14 +527,7 @@ func RecordBehaviorEvent(c *gin.Context) {
 		return
 	}
 
-	now := time.Now()
-	user, _, err := getOrCreateStoreUser(req.OpenID, now)
-	if err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询用户失败")
-		return
-	}
-
-	recordUserBehaviorEvent(mid, user.ID, req.OpenID, req.EventType, req.Page, req.ProductID, req.OrderID, req.Source, req.Payload)
+	recordUserBehaviorEvent(mid, user.ID, user.OpenID, req.EventType, req.Page, req.ProductID, req.OrderID, req.Source, req.Payload)
 	response.Success(c, gin.H{"message": "记录成功"})
 }
 
@@ -474,36 +550,6 @@ type CreateOrderRequest struct {
 func CreateOrder(c *gin.Context) {
 	merchantID := c.Param("merchant_id")
 	pathMerchantID, _ := strconv.ParseUint(merchantID, 10, 64)
-	userID := utils.GetUserID(c)
-
-	if userID == 0 {
-		var body map[string]interface{}
-		if err := c.ShouldBindJSON(&body); err == nil {
-			if code, ok := body["code"].(string); ok && code != "" {
-				openID := "mock_openid_" + code
-				var user models.User
-				result := database.DB.Where("openid = ?", openID).First(&user)
-				if result.Error == gorm.ErrRecordNotFound {
-					user = models.User{
-						OpenID:   openID,
-						Nickname: "微信用户",
-						Status:   1,
-					}
-					database.DB.Create(&user)
-				}
-				userID = user.ID
-			}
-		}
-
-		if userID == 0 {
-			userID = 1
-		}
-	}
-
-var currentUser models.User
-if userID > 0 {
-	_ = database.DB.First(&currentUser, userID).Error
-}
 
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -512,6 +558,15 @@ if userID > 0 {
 	}
 
 	req.MerchantID = pathMerchantID
+
+	userID := utils.GetUserID(c)
+	if userID == 0 {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "请先登录")
+		return
+	}
+
+	var currentUser models.User
+	_ = database.DB.First(&currentUser, userID).Error
 
 	var merchant models.Merchant
 	if err := database.DB.First(&merchant, req.MerchantID).Error; err != nil {
@@ -569,7 +624,12 @@ if userID > 0 {
 
 		var specInfo models.JSON
 		if item.SpecInfo != "" {
-			specInfo = models.JSON(item.SpecInfo)
+			if json.Valid([]byte(item.SpecInfo)) {
+				specInfo = models.JSON(item.SpecInfo)
+			} else {
+				wrapped, _ := json.Marshal(item.SpecInfo)
+				specInfo = models.JSON(wrapped)
+			}
 		}
 
 		price := product.Price
@@ -701,7 +761,7 @@ if userID > 0 {
 		"total_spent":  gorm.Expr("total_spent + ?", payAmount),
 	})
 
-	recordUserBehaviorEvent(req.MerchantID, userID, "", "submit_order", "store_confirm", 0, order.ID, "store", map[string]interface{}{
+	recordUserBehaviorEvent(req.MerchantID, userID, "", "submit_order", "store_confirm", nil, &order.ID, "store", map[string]interface{}{
 		"delivery_type":     req.DeliveryType,
 		"delivery_distance": req.DeliveryDistance,
 		"pay_amount":        payAmount,
@@ -901,9 +961,17 @@ func ApplyRefund(c *gin.Context) {
 		return
 	}
 
-	if order.Status >= 5 {
+	if order.Status == 6 {
 		response.Fail(c, http.StatusBadRequest, response.CodeOrderCancelled, "订单已退款")
 		return
+	}
+
+	if order.Status == 5 {
+		var existing models.Refund
+		if err := database.DB.Where("order_id = ? AND status IN (0, 1)", id).Order("created_at DESC").First(&existing).Error; err == nil {
+			response.Success(c, existing)
+			return
+		}
 	}
 
 	refundNo := strconv.FormatInt(time.Now().UnixNano(), 10)
@@ -915,10 +983,23 @@ func ApplyRefund(c *gin.Context) {
 		Status:       0,
 	}
 
-	if err := database.DB.Create(&refund).Error; err != nil {
+	tx := database.DB.Begin()
+	if err := tx.Create(&refund).Error; err != nil {
+		tx.Rollback()
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "申请退款失败")
 		return
 	}
+
+	if err := tx.Model(&order).Updates(map[string]interface{}{
+		"status":      5,
+		"refunded_at": nil,
+	}).Error; err != nil {
+		tx.Rollback()
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新订单状态失败")
+		return
+	}
+
+	tx.Commit()
 
 	response.Success(c, refund)
 }

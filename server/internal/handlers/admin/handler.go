@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
@@ -45,8 +46,104 @@ func Login(c *gin.Context) {
 	})
 }
 
-func PaymentNotify(c *gin.Context) {
-	// 微信支付回调处理
-	// 具体实现待完成
-	response.Success(c, gin.H{"message": "回调处理成功"})
+func GetAdminProfile(c *gin.Context) {
+	adminID := middleware.GetUserID(c)
+
+	var admin models.ServiceProviderAdmin
+	if err := database.DB.First(&admin, adminID).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "管理员不存在")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"id":       admin.ID,
+		"username": admin.Username,
+		"name":     admin.Name,
+		"phone":    admin.Phone,
+		"role":     admin.Role,
+	})
+}
+
+type UpdateAdminProfileRequest struct {
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+}
+
+func UpdateAdminProfile(c *gin.Context) {
+	adminID := middleware.GetUserID(c)
+
+	var req UpdateAdminProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var admin models.ServiceProviderAdmin
+	if err := database.DB.First(&admin, adminID).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "管理员不存在")
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.Phone != "" {
+		updates["phone"] = req.Phone
+	}
+
+	if len(updates) > 0 {
+		if err := database.DB.Model(&admin).Updates(updates).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新失败")
+			return
+		}
+	}
+
+	database.DB.First(&admin, adminID)
+	response.Success(c, gin.H{
+		"id":       admin.ID,
+		"username": admin.Username,
+		"name":     admin.Name,
+		"phone":    admin.Phone,
+		"role":     admin.Role,
+	})
+}
+
+type ChangeAdminPasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
+}
+
+func ChangeAdminPassword(c *gin.Context) {
+	adminID := middleware.GetUserID(c)
+
+	var req ChangeAdminPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var admin models.ServiceProviderAdmin
+	if err := database.DB.First(&admin, adminID).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "修改失败")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(req.OldPassword)); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "旧密码错误")
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "修改失败")
+		return
+	}
+
+	if err := database.DB.Model(&admin).Update("password", string(hashed)).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "修改失败")
+		return
+	}
+
+	response.Success(c, gin.H{"message": "修改成功"})
 }

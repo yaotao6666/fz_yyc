@@ -564,6 +564,20 @@ export interface UserInfo {
   status: number
 }
 
+export interface UserAddress {
+  id?: number
+  user_id?: number
+  name: string
+  phone: string
+  province?: string
+  city?: string
+  district?: string
+  address: string
+  lat?: number
+  lng?: number
+  is_default?: boolean
+}
+
 // ============ 店铺相关 ============
 
 // 店铺首页信息
@@ -718,7 +732,6 @@ export interface MerchantWechatLoginRequest {
 }
 
 export interface MerchantBehaviorEventRequest {
-  openid: string
   event_type: 'page_view' | 'product_view' | 'submit_order' | 'pay_success'
   page?: string
   product_id?: number

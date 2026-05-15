@@ -6,22 +6,14 @@
 
 import { ref } from 'vue'
 import { API_BASE_URL } from '../config/env'
+import type { ApiResponse, WechatLoginResponse } from '../types'
 
-const token = ref(uni.getStorageSync('token') || '')
+const userToken = ref(uni.getStorageSync('user_token') || '')
 const userInfo = ref(uni.getStorageSync('userInfo') || null)
 const openid = ref(uni.getStorageSync('openid') || '')
-const isLoggedIn = ref(!!token.value && !!openid.value)
+const isLoggedIn = ref(!!userToken.value && !!openid.value)
 
 let loginPromise: Promise<LoginResult> | null = null
-
-interface LoginResponse {
-  token: string
-  user: {
-    id: number
-    openid: string
-    nickname: string
-  }
-}
 
 interface LoginResult {
   success: boolean
@@ -31,6 +23,26 @@ interface LoginResult {
 }
 
 export function useAuth() {
+  const syncStateFromStorage = () => {
+    const storedToken = uni.getStorageSync('user_token') || ''
+    const storedUserInfo = uni.getStorageSync('userInfo') || null
+    const storedOpenid = uni.getStorageSync('openid') || ''
+
+    if (storedToken !== userToken.value) {
+      userToken.value = storedToken
+    }
+
+    if (storedUserInfo !== userInfo.value) {
+      userInfo.value = storedUserInfo
+    }
+
+    if (storedOpenid !== openid.value) {
+      openid.value = storedOpenid
+    }
+
+    isLoggedIn.value = !!userToken.value && !!openid.value
+  }
+
   const login = async (): Promise<LoginResult> => {
     if (loginPromise) {
       return loginPromise
@@ -38,10 +50,12 @@ export function useAuth() {
 
     loginPromise = (async () => {
     try {
+      syncStateFromStorage()
+
       // 已登录则直接返回
-      if (token.value && openid.value) {
-        console.log('useAuth: 已登录,token:', token.value)
-        return { success: true, token: token.value, user: userInfo.value }
+      if (userToken.value && openid.value) {
+        console.log('useAuth: 已登录,token:', userToken.value)
+        return { success: true, token: userToken.value, user: userInfo.value }
       }
 
       // 获取微信授权码
@@ -75,52 +89,45 @@ export function useAuth() {
         header: {
           'Content-Type': 'application/json'
         }
-      }) as unknown as { data: LoginResponse }
+      }) as unknown as { data: ApiResponse<WechatLoginResponse> | WechatLoginResponse | unknown }
 
-      if (res.data?.token) {
-        token.value = res.data.token
-        userInfo.value = res.data.user
-        openid.value = res.data.user.openid
+      const responseData = res.data as any
+
+      if (typeof responseData?.code === 'number' && responseData.code !== 0) {
+        const errorMessage = typeof responseData?.message === 'string' && responseData.message.trim()
+          ? responseData.message
+          : '登录失败'
+        console.error('useAuth: 登录失败', responseData)
+        return { success: false, error: errorMessage }
+      }
+
+      const payload: WechatLoginResponse | undefined = responseData?.data ?? responseData
+      const token = payload?.token
+      const user = payload?.user
+
+      if (token && user?.openid) {
+        userToken.value = token
+        userInfo.value = user
+        openid.value = user.openid
         isLoggedIn.value = true
 
-        // 保存到本地存储
-        uni.setStorageSync('token', res.data.token)
-        uni.setStorageSync('userInfo', res.data.user)
-        uni.setStorageSync('openid', res.data.user.openid)
+        uni.setStorageSync('user_token', token)
+        uni.setStorageSync('userInfo', user)
+        uni.setStorageSync('openid', user.openid)
 
-        console.log('useAuth: 登录成功,token:', res.data.token)
-        console.log('useAuth: 用户信息:', res.data.user)
+        console.log('useAuth: 登录成功,token:', token)
+        console.log('useAuth: 用户信息:', user)
 
-        return { success: true, token: res.data.token, user: res.data.user }
+        return { success: true, token, user }
       }
 
-      console.error('useAuth: 登录失败,无token')
-      return { success: false, error: '登录失败' }
+      const errorMessage = typeof responseData?.message === 'string' && responseData.message.trim()
+        ? responseData.message
+        : '登录失败'
+      console.error('useAuth: 登录失败', responseData)
+      return { success: false, error: errorMessage }
     } catch (error: any) {
       console.error('useAuth: 登录异常', error)
-
-      // #ifndef MP-WEIXIN
-      // 非微信环境联调时，后端不可用则退回到模拟登录，保证店铺页可继续验证链路。
-      const mockToken = 'dev_token_' + Date.now()
-      const mockUser = {
-        id: 1,
-        openid: 'mock_openid_dev',
-        nickname: '测试用户'
-      }
-
-      token.value = mockToken
-      userInfo.value = mockUser
-      openid.value = mockUser.openid
-      isLoggedIn.value = true
-
-      uni.setStorageSync('token', mockToken)
-      uni.setStorageSync('userInfo', mockUser)
-      uni.setStorageSync('openid', mockUser.openid)
-
-      console.log('useAuth: 开发环境模拟登录成功')
-
-      return { success: true, token: mockToken, user: mockUser }
-      // #endif
 
       return { success: false, error: error.message || '登录异常' }
     }
@@ -132,12 +139,12 @@ export function useAuth() {
   }
 
   const logout = () => {
-    token.value = ''
+    userToken.value = ''
     userInfo.value = null
     openid.value = ''
     isLoggedIn.value = false
 
-    uni.removeStorageSync('token')
+    uni.removeStorageSync('user_token')
     uni.removeStorageSync('userInfo')
     uni.removeStorageSync('openid')
 
@@ -145,6 +152,8 @@ export function useAuth() {
   }
 
   const ensureAuth = async (): Promise<boolean> => {
+    syncStateFromStorage()
+
     if (!isAuthenticated()) {
       const result = await login()
       return result.success
@@ -153,19 +162,23 @@ export function useAuth() {
   }
 
   const getToken = (): string => {
-    return token.value || uni.getStorageSync('token') || ''
+    syncStateFromStorage()
+    return userToken.value || ''
   }
 
   const getUserInfo = () => {
-    return userInfo.value || uni.getStorageSync('userInfo')
+    syncStateFromStorage()
+    return userInfo.value
   }
 
   const getOpenid = (): string => {
-    return openid.value || uni.getStorageSync('openid') || ''
+    syncStateFromStorage()
+    return openid.value || ''
   }
 
   const isAuthenticated = (): boolean => {
-    return !!token.value && !!openid.value
+    syncStateFromStorage()
+    return !!userToken.value && !!openid.value
   }
 
   const refreshLogin = async (): Promise<boolean> => {
@@ -175,7 +188,7 @@ export function useAuth() {
   }
 
   return {
-    token,
+    token: userToken,
     userInfo,
     openid,
     isLoggedIn,
