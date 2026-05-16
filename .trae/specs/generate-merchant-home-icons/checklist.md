@@ -1,0 +1,7 @@
+- [x] `pages/merchant/home` 顶部“暂停营业/开始营业”图标已使用正式资源
+- [x] `pages/merchant/home` 顶部“店铺二维码”图标已使用正式资源
+- [x] `pages/merchant/home` 快捷功能“分类管理”图标已使用正式资源
+- [x] `pages/merchant/home` 快捷功能“商品管理”图标已使用正式资源
+- [x] `pages/merchant/home` 快捷功能“快速核销”图标已使用正式资源
+- [x] 5 个图标在当前页面中显示正常，无破图、无明显拉伸
+- [x] 5 个图标风格一致，符合商家端首页语义
