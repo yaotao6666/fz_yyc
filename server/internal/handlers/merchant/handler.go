@@ -8,6 +8,7 @@ import (
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
+	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
 	"net/http"
 	"sort"
@@ -62,7 +63,18 @@ func GetProfile(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, merchant)
+	qiniuService := qiniu.GetService()
+	if qiniuService != nil {
+		merchant.Logo = qiniuService.BuildPrivateURL(merchant.Logo)
+		merchant.CoverImage = qiniuService.BuildPrivateURL(merchant.CoverImage)
+	}
+
+	staff, _ := getCurrentMerchantStaff(c)
+
+	response.Success(c, gin.H{
+		"staff":    staff,
+		"merchant": merchant,
+	})
 }
 
 type UpdateProfileRequest struct {

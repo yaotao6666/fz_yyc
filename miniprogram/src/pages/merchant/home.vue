@@ -1,9 +1,10 @@
 <template>
   <view class="home-container">
     <!-- 顶部商家信息卡片 -->
-    <view class="merchant-card">
+    <view class="merchant-card" :style="merchantCardStyle">
+      <view class="merchant-card-mask"></view>
       <view class="merchant-info">
-        <image class="merchant-logo" :src="merchantInfo?.logo || BrandAsset.DEFAULT_MERCHANT_LOGO" mode="aspectFill" />
+        <image class="merchant-logo" :src="merchantLogo || BrandAsset.DEFAULT_MERCHANT_LOGO" mode="aspectFill" />
         <view class="merchant-detail">
           <view class="merchant-name">{{ merchantInfo?.name || '加载中...' }}</view>
           <view class="merchant-status">
@@ -165,12 +166,15 @@ import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProduc
 import { OrderStatus } from '../../types'
 import type { Announcement, Order, OrderStatistics } from '../../types'
 import { BrandAsset } from '../../utils/constants'
+import { getCachedImagePath, cacheImage } from '@utils/imageCache'
 
 const authStore = useAuthStore()
 const ORDER_LIST_ROUTE_STATE_KEY = 'merchant_order_list_route_state'
 
 const merchantInfo = ref(authStore.merchantInfo)
 const merchantQrcode = ref<string>('')
+const merchantLogo = ref('')
+const merchantCover = ref('')
 const statistics = ref({
   today_orders: 0,
   today_sales: 0,
@@ -191,6 +195,17 @@ const marqueeDuration = computed(() => {
 
 const hasPendingItems = computed(() => {
   return statistics.value.pending_orders > 0 || lowStockCount.value > 0
+})
+
+const merchantCardStyle = computed(() => {
+  if (merchantCover.value) {
+    return {
+      backgroundImage: `url(${merchantCover.value})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center'
+    }
+  }
+  return {}
 })
 
 const hasLowStock = computed(() => lowStockCount.value > 0)
@@ -243,6 +258,9 @@ const quickMenuItems = computed(() => [
 ])
 
 onShow(() => {
+  if (authStore.merchantInfo) {
+    cacheMerchantImages(authStore.merchantInfo)
+  }
   loadData()
 })
 
@@ -309,8 +327,38 @@ async function loadMerchantInfo() {
     const info = await getMerchantProfile()
     merchantInfo.value = info
     authStore.updateMerchantInfo(info)
+    cacheMerchantImages(info)
   } catch (error) {
     console.error('加载商家信息失败:', error)
+  }
+}
+
+function cacheMerchantImages(info: any) {
+  const logo = info?.logo
+  const cover = info?.cover_image
+
+  if (logo) {
+    const cached = getCachedImagePath(logo)
+    if (cached) {
+      merchantLogo.value = cached
+    } else {
+      merchantLogo.value = logo
+      cacheImage(logo).then((path) => {
+        merchantLogo.value = path
+      })
+    }
+  }
+
+  if (cover) {
+    const cached = getCachedImagePath(cover)
+    if (cached) {
+      merchantCover.value = cached
+    } else {
+      merchantCover.value = cover
+      cacheImage(cover).then((path) => {
+        merchantCover.value = path
+      })
+    }
   }
 }
 
@@ -576,14 +624,28 @@ function formatDateTime(time: string): string {
 }
 
 .merchant-card {
+  position: relative;
   background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
   padding: 32rpx;
   margin: 24rpx;
   border-radius: 24rpx;
   color: #ffffff;
+  overflow: hidden;
+}
+
+.merchant-card-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(0, 86, 204, 0.3) 0%, rgba(0, 86, 204, 0.7) 100%);
+  pointer-events: none;
 }
 
 .merchant-info {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   margin-bottom: 32rpx;
@@ -627,6 +689,8 @@ function formatDateTime(time: string): string {
 }
 
 .quick-actions {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 24rpx;
 }
