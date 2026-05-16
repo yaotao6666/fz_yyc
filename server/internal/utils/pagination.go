@@ -101,7 +101,7 @@ func CalculateDeliveryFee(totalAmount, baseFee, freeDeliveryAmount float64, dist
 		if !okMin || !okMax || !okFee {
 			continue
 		}
-		if distance >= minDist && distance < maxDist {
+		if distance >= minDist && distance <= maxDist {
 			return fee
 		}
 	}

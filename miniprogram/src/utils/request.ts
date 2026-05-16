@@ -94,6 +94,24 @@ function createRequestError(params: {
   return error
 }
 
+let _loadingCount = 0
+
+function showLoading(title: string) {
+  _loadingCount++
+  if (_loadingCount === 1) {
+    uni.showLoading({ title, mask: true })
+  }
+}
+
+function hideLoading() {
+  if (_loadingCount > 0) {
+    _loadingCount--
+  }
+  if (_loadingCount === 0) {
+    uni.hideLoading()
+  }
+}
+
 function sanitizeGetParams(data: unknown) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return data
@@ -128,7 +146,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
 
   // 显示加载中
   if (loading) {
-    uni.showLoading({ title: loadingText, mask: true })
+    showLoading(loadingText)
   }
 
   const isSpRequest = url.startsWith('/api/v1/sp/')
@@ -154,7 +172,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
       header: headers,
       success: (res) => {
         if (loading) {
-          uni.hideLoading()
+          hideLoading()
         }
 
         const { statusCode, data: response } = res
@@ -253,7 +271,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
       },
       fail: (err) => {
         if (loading) {
-          uni.hideLoading()
+          hideLoading()
         }
         uni.showToast({ title: '网络请求失败', icon: 'none' })
         reject(err)

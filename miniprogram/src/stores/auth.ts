@@ -313,7 +313,7 @@ export const useAuthStore = defineStore('auth', {
                 }
                 playAudio(browseAudio)
               }
-              uni.showToast({ title: '有顾客正在浏览店铺', icon: 'none' })
+              //uni.showToast({ title: '有顾客正在浏览店铺', icon: 'none' })
             }
           } catch (e) {
           }

@@ -301,7 +301,7 @@ function contactMerchant() {
 
 .detail-scroll {
   height: calc(100vh - 136rpx);
-  width: calc(100% - 48rpx);
+  /* width: calc(100% - 48rpx); */
   padding: 24rpx;
   box-sizing: border-box;
 }

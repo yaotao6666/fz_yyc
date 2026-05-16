@@ -517,6 +517,10 @@ async function submitRefund() {
 .order-list-container {
   min-height: 100vh;
   background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
 }
 
 .filter-header-card {
@@ -525,6 +529,7 @@ async function submitRefund() {
   border-radius: 24rpx;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   box-shadow: 0 12rpx 32rpx rgba(0, 86, 204, 0.06);
+  flex-shrink: 0;
 }
 
 .filter-header-top {
@@ -729,6 +734,8 @@ async function submitRefund() {
 .order-list {
   width: calc(100% - 48rpx);
   padding: 24rpx 24rpx 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .order-card {

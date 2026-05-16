@@ -843,7 +843,7 @@ export function createOrder(merchantId: number, data: CreateOrderRequest) {
 }
 
 export function trackStoreBehaviorEvent(merchantId: number, data: MerchantBehaviorEventRequest) {
-  return post<{ message: string }>(`/api/v1/store/${merchantId}/event`, data)
+  return post<{ message: string }>(`/api/v1/store/${merchantId}/event`, data, { loading: false, showErrorToast: false })
 }
 
 /**
