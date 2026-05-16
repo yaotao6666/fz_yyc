@@ -189,9 +189,7 @@ func mergeConfig() {
 	if viper.IsSet("WECHAT_PAY_SP_MCH_ID") {
 		Config.WechatPay.SPMchID = viper.GetString("WECHAT_PAY_SP_MCH_ID")
 	}
-	if viper.IsSet("WECHAT_PAY_MCH_ID") && Config.WechatPay.SPMchID == "" {
-		Config.WechatPay.SPMchID = viper.GetString("WECHAT_PAY_MCH_ID")
-	}
+
 	if viper.IsSet("WECHAT_PAY_SP_API_V3_KEY") {
 		Config.WechatPay.APIV3Key = viper.GetString("WECHAT_PAY_SP_API_V3_KEY")
 	}
@@ -218,9 +216,6 @@ func mergeConfig() {
 	}
 	if viper.IsSet("WECHAT_PAY_SP_CALLBACK_URL") {
 		Config.WechatPay.CallbackURL = viper.GetString("WECHAT_PAY_SP_CALLBACK_URL")
-	}
-	if viper.IsSet("WECHAT_PAY_CALLBACK_URL") && Config.WechatPay.CallbackURL == "" {
-		Config.WechatPay.CallbackURL = viper.GetString("WECHAT_PAY_CALLBACK_URL")
 	}
 
 	if viper.IsSet("QINIU_ACCESS_KEY") {
@@ -328,8 +323,6 @@ func mergeEnvConfig() {
 
 	if env := os.Getenv("WECHAT_PAY_SP_MCH_ID"); env != "" {
 		Config.WechatPay.SPMchID = env
-	} else if env := os.Getenv("WECHAT_PAY_MCH_ID"); env != "" {
-		Config.WechatPay.SPMchID = env
 	}
 	if env := os.Getenv("WECHAT_PAY_SP_API_V3_KEY"); env != "" {
 		Config.WechatPay.APIV3Key = env
@@ -352,8 +345,6 @@ func mergeEnvConfig() {
 		Config.WechatPay.PublicKey = env
 	}
 	if env := os.Getenv("WECHAT_PAY_SP_CALLBACK_URL"); env != "" {
-		Config.WechatPay.CallbackURL = env
-	} else if env := os.Getenv("WECHAT_PAY_CALLBACK_URL"); env != "" {
 		Config.WechatPay.CallbackURL = env
 	}
 

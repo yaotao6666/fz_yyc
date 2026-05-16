@@ -37,11 +37,7 @@ WECHAT_APP_SECRET=你的小程序AppSecret
 - 方式B：填写服务器上的文件路径（如 `/app/certs/apiclient_key.pem`）
 
 ### 步骤2：更新 `docker-compose.yml` 传递新版环境变量
-
-当前 `docker-compose.yml` 只传递了旧版 `WECHAT_PAY_MCH_ID`、`WECHAT_PAY_API_KEY`、`WECHAT_PAY_CALLBACK_URL`，缺少新版 `SP_` 前缀变量和证书相关变量。
-
-需要补充以下环境变量传递：
-
+  
 ```yaml
 WECHAT_PAY_SP_MCH_ID: ${WECHAT_PAY_SP_MCH_ID:-}
 WECHAT_PAY_SP_API_V3_KEY: ${WECHAT_PAY_SP_API_V3_KEY:-}

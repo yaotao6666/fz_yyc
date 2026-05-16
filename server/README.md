@@ -251,7 +251,7 @@ curl http://127.0.0.1:8080/health
 - `APP_ENV=production`
 - `APP_DEBUG=false`
 - `JWT_SECRET` 必须改为强随机
-- `WECHAT_PAY_CALLBACK_URL` 必须是生产 HTTPS 回调地址
+- `WECHAT_PAY_SP_CALLBACK_URL` 必须是生产 HTTPS 回调地址
 
 #### 3) 编译并部署二进制
 
