@@ -168,7 +168,7 @@ init_database() {
     print_info "开始初始化数据库（最小模式）..."
     import_sql_file "$INIT_SQL_FILE" "最小初始化脚本"
     print_info "测试账号信息："
-    echo "  服务商管理员: admin / admin123"
+    echo "  服务商: sp / tm666666"
     echo "  商家管理员:   merchant / merchant123"
 }
 
@@ -232,7 +232,7 @@ show_status() {
         SELECT 
             '服务商账号' AS 项目,
             COUNT(*) AS 数量
-        FROM ${DB_NAME}.service_provider_admins
+        FROM ${DB_NAME}.service_provider_sps
         UNION ALL
         SELECT 
             '商家账号' AS 项目,
@@ -273,10 +273,10 @@ run_tests() {
     local API_HOST="http://localhost:8080"
     
     # 测试1：服务商登录
-    print_info "测试1：服务商管理员登录..."
-    local SP_TOKEN=$(curl -s -X POST "${API_HOST}/api/v1/auth/admin/login" \
+    print_info "测试1：服务商登录..."
+    local SP_TOKEN=$(curl -s -X POST "${API_HOST}/api/v1/sp/auth/login" \
         -H "Content-Type: application/json" \
-        -d '{"username":"admin","password":"admin123"}' | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+        -d '{"username":"sp","password":"tm666666"}' | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
     
     if [ -n "$SP_TOKEN" ]; then
         print_success "服务商登录成功"
@@ -349,7 +349,7 @@ clean_data() {
         DELETE FROM merchant_applications;
         DELETE FROM merchant_audit_records;
         DELETE FROM announcements;
-        DELETE FROM service_provider_admins;
+        DELETE FROM service_provider_sps;
         DELETE FROM service_providers;
         
         ALTER TABLE order_items AUTO_INCREMENT = 1;
@@ -364,7 +364,7 @@ clean_data() {
         ALTER TABLE merchant_applications AUTO_INCREMENT = 1;
         ALTER TABLE merchant_audit_records AUTO_INCREMENT = 1;
         ALTER TABLE announcements AUTO_INCREMENT = 1;
-        ALTER TABLE service_provider_admins AUTO_INCREMENT = 1;
+        ALTER TABLE service_provider_sps AUTO_INCREMENT = 1;
         ALTER TABLE service_providers AUTO_INCREMENT = 1;
 EOF
     

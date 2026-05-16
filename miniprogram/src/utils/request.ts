@@ -94,6 +94,24 @@ function createRequestError(params: {
   return error
 }
 
+function sanitizeGetParams(data: unknown) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return data
+  }
+
+  const sanitizedEntries = Object.entries(data).filter(([, value]) => {
+    if (value === undefined || value === null) {
+      return false
+    }
+    if (typeof value === 'string' && value.trim() === '') {
+      return false
+    }
+    return true
+  })
+
+  return Object.fromEntries(sanitizedEntries)
+}
+
 /**
  * 请求核心方法
  */
@@ -117,6 +135,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
   const isMerchantRequest = url.startsWith('/api/v1/merchant/')
   const isUserRequest = url.startsWith('/api/v1/user/')
   const isStoreRequest = url.startsWith('/api/v1/store/')
+  const requestData = method === 'GET' ? sanitizeGetParams(data) : data
 
   const requestToken = getToken(url)
   const headers: Record<string, string> = {
@@ -131,7 +150,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
     uni.request({
       url: `${API_BASE_URL}${url}`,
       method,
-      data,
+      data: requestData,
       header: headers,
       success: (res) => {
         if (loading) {

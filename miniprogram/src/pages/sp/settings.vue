@@ -21,8 +21,8 @@
         </view>
 
         <view class="info-item">
-          <view class="info-label">管理员姓名</view>
-          <view class="info-value">{{ spInfo.admin_name || '未设置' }}</view>
+          <view class="info-label">服务商姓名</view>
+          <view class="info-value">{{ spInfo.sp_name || '未设置' }}</view>
         </view>
 
         <view class="info-item">
@@ -150,7 +150,7 @@ const showPasswordModal = ref(false)
 
 const spInfo = ref<SpSettings>({
   name: '',
-  admin_name: '',
+  sp_name: '',
   contact_phone: '',
   contact_email: '',
   created_at: ''

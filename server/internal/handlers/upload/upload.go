@@ -24,8 +24,8 @@ func (h *UploadHandler) GetToken(c *gin.Context) {
 	prefix := "uploads/common"
 	if userType == "merchant" {
 		prefix = fmt.Sprintf("uploads/merchant/%d", userID)
-	} else if userType == "admin" {
-		prefix = "uploads/admin"
+	} else if userType == "sp" {
+		prefix = "uploads/sp"
 	}
 
 	token, err := qiniu.GetService().GetUploadToken()

@@ -38,7 +38,7 @@ DROP TABLE IF EXISTS `merchant_delivery_settings`;
 DROP TABLE IF EXISTS `merchant_applications`;
 DROP TABLE IF EXISTS `merchant_profit_sharing_records`;
 DROP TABLE IF EXISTS `merchants`;
-DROP TABLE IF EXISTS `service_provider_admins`;
+DROP TABLE IF EXISTS `service_provider_sps`;
 DROP TABLE IF EXISTS `service_providers`;
 
 -- 1. 服务商表
@@ -62,8 +62,8 @@ CREATE TABLE `service_providers` (
     KEY `idx_service_providers_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服务商表';
 
--- 2. 服务商管理员表
-CREATE TABLE `service_provider_admins` (
+-- 2. 服务商账号表
+CREATE TABLE `service_provider_sps` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `service_provider_id` BIGINT UNSIGNED NOT NULL,
     `username` VARCHAR(64) NOT NULL,
@@ -76,10 +76,10 @@ CREATE TABLE `service_provider_admins` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_service_provider_admins_username` (`username`),
-    KEY `idx_service_provider_admins_sp_id` (`service_provider_id`),
-    CONSTRAINT `fk_service_provider_admins_sp` FOREIGN KEY (`service_provider_id`) REFERENCES `service_providers` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服务商管理员表';
+    UNIQUE KEY `uk_service_provider_sps_username` (`username`),
+    KEY `idx_service_provider_sps_sp_id` (`service_provider_id`),
+    CONSTRAINT `fk_service_provider_sps_sp` FOREIGN KEY (`service_provider_id`) REFERENCES `service_providers` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服务商账号表';
 
 -- 3. 商家表
 CREATE TABLE `merchants` (
@@ -576,11 +576,11 @@ INSERT INTO `service_providers` (
     'mock_public_key', 'https://example.com/notify/payment', 1, NOW(), NOW()
 );
 
-INSERT INTO `service_provider_admins` (
+INSERT INTO `service_provider_sps` (
     `id`, `service_provider_id`, `username`, `password`, `name`, `phone`, `role`, `status`, `last_login_at`, `created_at`, `updated_at`
 ) VALUES (
-    1, 1, 'admin', '$2a$10$GCgIm2gqB7yPpx/w.pEVDeBj.xUzjOGFmsZdAZh2xLDr4RgYj2z6e',
-    '超级管理员', '13800138000', 'admin', 1, NULL, NOW(), NOW()
+    1, 1, 'sp', '$2a$10$FD5KRv2ER/jSpSCkEU/PMeMA4kRjqdv0tN6RlmRCY2ReaNFibmPre',
+    '服务商', '13800138000', 'sp', 1, NULL, NOW(), NOW()
 );
 
 INSERT INTO `merchants` (

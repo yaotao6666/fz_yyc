@@ -6,6 +6,7 @@ import (
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
+	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
 	"net/http"
 	"sort"
@@ -41,6 +42,15 @@ func parseStringSlice(value any) []string {
 	return result
 }
 
+func buildAccessibleMerchantAsset(resource string) string {
+	service := qiniu.GetService()
+	if service == nil {
+		return resource
+	}
+
+	return service.BuildPrivateURL(resource)
+}
+
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
@@ -53,39 +63,39 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	var admin models.ServiceProviderAdmin
-	if err := database.DB.Where("username = ? AND status = ?", req.Username, 1).First(&admin).Error; err != nil {
+	var spUser models.ServiceProviderSp
+	if err := database.DB.Where("username = ? AND status = ?", req.Username, 1).First(&spUser).Error; err != nil {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户名或密码错误")
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(spUser.Password), []byte(req.Password)); err != nil {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户名或密码错误")
 		return
 	}
 
 	now := time.Now()
-	database.DB.Model(&admin).Update("last_login_at", now)
+	database.DB.Model(&spUser).Update("last_login_at", now)
 
-	token, _ := utils.GenerateToken(admin.ID, "sp", admin.Username)
-	database.DB.Preload("ServiceProvider").First(&admin, admin.ID)
+	token, _ := utils.GenerateToken(spUser.ID, "sp", spUser.Username)
+	database.DB.Preload("ServiceProvider").First(&spUser, spUser.ID)
 	serviceProviderName := ""
-	if admin.ServiceProvider != nil {
-		serviceProviderName = admin.ServiceProvider.Name
+	if spUser.ServiceProvider != nil {
+		serviceProviderName = spUser.ServiceProvider.Name
 	}
 	if serviceProviderName == "" {
-		serviceProviderName = admin.Username
+		serviceProviderName = spUser.Username
 	}
-	adminName := admin.Name
-	if adminName == "" {
-		adminName = admin.Username
+	spName := spUser.Name
+	if spName == "" {
+		spName = spUser.Username
 	}
 	response.Success(c, gin.H{
 		"token": token,
 		"service_provider": gin.H{
-			"id":         admin.ServiceProviderID,
-			"name":       serviceProviderName,
-			"admin_name": adminName,
+			"id":      spUser.ServiceProviderID,
+			"name":    serviceProviderName,
+			"sp_name": spName,
 		},
 	})
 }
@@ -182,8 +192,8 @@ func GetMerchantDetail(c *gin.Context) {
 	response.Success(c, gin.H{
 		"id":                     merchant.ID,
 		"name":                   merchant.Name,
-		"logo":                   merchant.Logo,
-		"cover_image":            merchant.CoverImage,
+		"logo":                   buildAccessibleMerchantAsset(merchant.Logo),
+		"cover_image":            buildAccessibleMerchantAsset(merchant.CoverImage),
 		"contact_name":           merchant.ContactName,
 		"contact_phone":          merchant.ContactPhone,
 		"contact_email":          merchant.ContactEmail,
@@ -318,12 +328,12 @@ func GetOrderAnalytics(c *gin.Context) {
 	now := time.Now().In(location)
 
 	response.Success(c, gin.H{
-		"day":   buildSpOrderBuckets(now, 7, func(base time.Time, offset int) (time.Time, time.Time, string) {
+		"day": buildSpOrderBuckets(now, 7, func(base time.Time, offset int) (time.Time, time.Time, string) {
 			start := time.Date(base.Year(), base.Month(), base.Day(), 0, 0, 0, 0, location).AddDate(0, 0, -(6 - offset))
 			end := start.Add(24 * time.Hour)
 			return start, end, start.Format("01-02")
 		}, serviceProviderID),
-		"week":  buildSpOrderBuckets(now, 8, func(base time.Time, offset int) (time.Time, time.Time, string) {
+		"week": buildSpOrderBuckets(now, 8, func(base time.Time, offset int) (time.Time, time.Time, string) {
 			weekdayOffset := (int(base.Weekday()) + 6) % 7
 			weekStart := time.Date(base.Year(), base.Month(), base.Day(), 0, 0, 0, 0, location).AddDate(0, 0, -weekdayOffset)
 			start := weekStart.AddDate(0, 0, -7*(7-offset))
@@ -336,7 +346,7 @@ func GetOrderAnalytics(c *gin.Context) {
 			end := start.AddDate(0, 1, 0)
 			return start, end, start.Format("2006-01")
 		}, serviceProviderID),
-		"year":  buildSpOrderBuckets(now, 5, func(base time.Time, offset int) (time.Time, time.Time, string) {
+		"year": buildSpOrderBuckets(now, 5, func(base time.Time, offset int) (time.Time, time.Time, string) {
 			start := time.Date(base.Year()-(4-offset), 1, 1, 0, 0, 0, 0, location)
 			end := start.AddDate(1, 0, 0)
 			return start, end, start.Format("2006")
@@ -474,7 +484,7 @@ func buildSpMerchantMetrics(serviceProviderID uint64) ([]gin.H, gin.H) {
 		metrics = append(metrics, gin.H{
 			"merchant_id":      merchant.ID,
 			"merchant_name":    merchant.Name,
-			"merchant_logo":    merchant.Logo,
+			"merchant_logo":    buildAccessibleMerchantAsset(merchant.Logo),
 			"visit_users":      visitUsers,
 			"order_users":      orderUsers,
 			"paid_orders":      paidOrders,
@@ -736,34 +746,34 @@ func GetSettings(c *gin.Context) {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
 		return
 	}
-	adminID, ok := userIDValue.(uint64)
+	spUserID, ok := userIDValue.(uint64)
 	if !ok {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
 		return
 	}
 
-	var admin models.ServiceProviderAdmin
-	if err := database.DB.Preload("ServiceProvider").First(&admin, adminID).Error; err != nil {
+	var spUser models.ServiceProviderSp
+	if err := database.DB.Preload("ServiceProvider").First(&spUser, spUserID).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}
-	if admin.ServiceProvider == nil {
+	if spUser.ServiceProvider == nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}
 
-	adminName := admin.Name
-	if adminName == "" {
-		adminName = admin.Username
+	spName := spUser.Name
+	if spName == "" {
+		spName = spUser.Username
 	}
 
 	response.Success(c, gin.H{
-		"service_provider_id": admin.ServiceProvider.ID,
-		"name":                admin.ServiceProvider.Name,
-		"admin_name":          adminName,
-		"contact_phone":       admin.ServiceProvider.ContactPhone,
+		"service_provider_id": spUser.ServiceProvider.ID,
+		"name":                spUser.ServiceProvider.Name,
+		"sp_name":             spName,
+		"contact_phone":       spUser.ServiceProvider.ContactPhone,
 		"contact_email":       "",
-		"created_at":          admin.ServiceProvider.CreatedAt,
+		"created_at":          spUser.ServiceProvider.CreatedAt,
 	})
 }
 
@@ -773,22 +783,22 @@ func UpdateSettings(c *gin.Context) {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
 		return
 	}
-	adminID, ok := userIDValue.(uint64)
+	spUserID, ok := userIDValue.(uint64)
 	if !ok {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
 		return
 	}
 
-	var admin models.ServiceProviderAdmin
-	if err := database.DB.Preload("ServiceProvider").First(&admin, adminID).Error; err != nil {
+	var spUser models.ServiceProviderSp
+	if err := database.DB.Preload("ServiceProvider").First(&spUser, spUserID).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}
-	if admin.ServiceProvider == nil {
+	if spUser.ServiceProvider == nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取服务商信息失败")
 		return
 	}
-	sp := admin.ServiceProvider
+	sp := spUser.ServiceProvider
 
 	var req struct {
 		ContactName  string `json:"contact_name"`
@@ -825,7 +835,7 @@ func ChangePassword(c *gin.Context) {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
 		return
 	}
-	adminID, ok := userIDValue.(uint64)
+	spUserID, ok := userIDValue.(uint64)
 	if !ok {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "未登录")
 		return
@@ -837,13 +847,13 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
-	var admin models.ServiceProviderAdmin
-	if err := database.DB.First(&admin, adminID).Error; err != nil {
+	var spUser models.ServiceProviderSp
+	if err := database.DB.First(&spUser, spUserID).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "修改失败")
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(req.OldPassword)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(spUser.Password), []byte(req.OldPassword)); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "旧密码错误")
 		return
 	}
@@ -854,7 +864,7 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&admin).Update("password", string(hashed)).Error; err != nil {
+	if err := database.DB.Model(&spUser).Update("password", string(hashed)).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "修改失败")
 		return
 	}

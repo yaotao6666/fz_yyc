@@ -90,11 +90,11 @@ init_database() {
     fi
     
     print_info "验证数据..."
-    local count=$(docker exec fz_yyc_mysql mysql -uroot -proot123456 fz_yyc_api -N -e "SELECT COUNT(*) FROM service_provider_admins;" 2>&1 | grep -v "Warning")
+    local count=$(docker exec fz_yyc_mysql mysql -uroot -proot123456 fz_yyc_api -N -e "SELECT COUNT(*) FROM service_provider_sps;" 2>&1 | grep -v "Warning")
     
     if [ "$count" = "1" ]; then
         print_success "数据验证成功"
-        print_info "服务商管理员: admin / admin123"
+        print_info "服务商: sp / tm666666"
         print_info "商家员工: merchant / merchant123"
     else
         print_warn "数据可能未正确导入"
@@ -118,9 +118,9 @@ run_full_test() {
     
     echo ""
     print_info "步骤 2/3: 测试服务商登录..."
-    local response=$(curl -s -X POST http://localhost:8080/api/v1/auth/admin/login \
+    local response=$(curl -s -X POST http://localhost:8080/api/v1/sp/auth/login \
         -H "Content-Type: application/json" \
-        -d '{"username":"admin","password":"admin123"}')
+        -d '{"username":"sp","password":"tm666666"}')
     
     if echo "$response" | grep -q '"code":0'; then
         print_success "服务商登录测试通过"
@@ -133,7 +133,7 @@ run_full_test() {
     echo ""
     print_info "步骤 3/3: 检查数据库状态..."
     docker exec fz_yyc_mysql mysql -uroot -proot123456 fz_yyc_api -e \
-        "SELECT 'Service Providers' as type, COUNT(*) as count FROM service_provider_admins
+        "SELECT 'Service Providers' as type, COUNT(*) as count FROM service_provider_sps
          UNION ALL SELECT 'Merchants', COUNT(*) FROM merchant_staffs
          UNION ALL SELECT 'Products', COUNT(*) FROM products
          UNION ALL SELECT 'Users', COUNT(*) FROM users
@@ -150,9 +150,9 @@ test_sp_api() {
     print_info "测试服务商登录..."
     echo ""
     
-    local response=$(curl -s -X POST http://localhost:8080/api/v1/auth/admin/login \
+    local response=$(curl -s -X POST http://localhost:8080/api/v1/sp/auth/login \
         -H "Content-Type: application/json" \
-        -d '{"username":"admin","password":"admin123"}')
+        -d '{"username":"sp","password":"tm666666"}')
     
     if echo "$response" | grep -q '"code":0'; then
         print_success "登录成功"
@@ -178,7 +178,7 @@ show_db_status() {
     print_info "数据库统计:"
     docker exec fz_yyc_mysql mysql -uroot -proot123456 fz_yyc_api -e \
         "SELECT 'Tables' as item, COUNT(*) as count FROM information_schema.tables WHERE table_schema = 'fz_yyc_api'
-         UNION ALL SELECT 'Service Providers', COUNT(*) FROM service_provider_admins
+         UNION ALL SELECT 'Service Providers', COUNT(*) FROM service_provider_sps
          UNION ALL SELECT 'Merchants', COUNT(*) FROM merchant_staffs
          UNION ALL SELECT 'Products', COUNT(*) FROM products
          UNION ALL SELECT 'Users', COUNT(*) FROM users
@@ -190,12 +190,12 @@ show_accounts() {
     print_title "测试账号信息"
     
     echo ""
-    echo -e "  ${CYAN}服务商管理员${NC}"
+    echo -e "  ${CYAN}服务商${NC}"
     echo "  ───────────────────────────────────"
-    echo "  用户名: admin"
-    echo "  密码:   admin123"
-    echo "  角色:   超级管理员"
-    echo "  路径:   POST /api/v1/auth/admin/login"
+    echo "  用户名: sp"
+    echo "  密码:   tm666666"
+    echo "  角色:   服务商"
+    echo "  路径:   POST /api/v1/sp/auth/login"
     
     echo ""
     echo -e "  ${CYAN}商家员工${NC}"

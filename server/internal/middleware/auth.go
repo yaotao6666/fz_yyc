@@ -14,7 +14,7 @@ import (
 // Claims JWT Claims
 type Claims struct {
 	UserID   uint64 `json:"user_id"`
-	UserType string `json:"user_type"` // admin, merchant, user
+	UserType string `json:"user_type"` // sp, merchant, user
 	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
@@ -108,12 +108,12 @@ func OptionalJWTAuth() gin.HandlerFunc {
 	}
 }
 
-// AdminAuth 管理员认证中间件
-func AdminAuth() gin.HandlerFunc {
+// SpAuth 服务商认证中间件
+func SpAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userType, exists := c.Get("user_type")
-		if !exists || userType != "admin" {
-			response.Forbidden(c, "需要管理员权限")
+		if !exists || userType != "sp" {
+			response.Forbidden(c, "需要服务商权限")
 			c.Abort()
 			return
 		}

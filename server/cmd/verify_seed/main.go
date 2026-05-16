@@ -26,18 +26,18 @@ func main() {
 
 	fmt.Println("✓ 数据库连接成功")
 
-	// 验证服务商管理员密码
-	var adminPwd string
-	queryErr := db.QueryRow("SELECT password FROM service_provider_admins WHERE username = ?", "admin").Scan(&adminPwd)
+	// 验证服务商账号密码
+	var spPwd string
+	queryErr := db.QueryRow("SELECT password FROM service_provider_sps WHERE username = ?", "sp").Scan(&spPwd)
 	if queryErr != nil {
-		log.Fatal("查询服务商管理员失败:", queryErr)
+		log.Fatal("查询服务商账号失败:", queryErr)
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(adminPwd), []byte("admin123"))
+	err = bcrypt.CompareHashAndPassword([]byte(spPwd), []byte("tm666666"))
 	if err != nil {
-		fmt.Println("✗ 服务商管理员密码验证失败: admin123")
+		fmt.Println("✗ 服务商账号密码验证失败: tm666666")
 	} else {
-		fmt.Println("✓ 服务商管理员密码验证成功: admin123")
+		fmt.Println("✓ 服务商账号密码验证成功: tm666666")
 	}
 
 	// 验证商家员工密码
@@ -64,7 +64,7 @@ func main() {
 
 	checks := []countCheck{
 		{label: "服务商数量", query: "SELECT COUNT(*) FROM service_providers", minCount: 1},
-		{label: "服务商管理员数量", query: "SELECT COUNT(*) FROM service_provider_admins", minCount: 1},
+		{label: "服务商账号数量", query: "SELECT COUNT(*) FROM service_provider_sps", minCount: 1},
 		{label: "商家数量", query: "SELECT COUNT(*) FROM merchants", minCount: 10},
 		{label: "商家员工数量", query: "SELECT COUNT(*) FROM merchant_staffs", minCount: 19},
 		{label: "配送设置数量", query: "SELECT COUNT(*) FROM merchant_delivery_settings", minCount: 10},

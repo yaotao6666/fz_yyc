@@ -95,7 +95,7 @@
             :key="index"
             class="image-item"
           >
-            <image :src="img" mode="aspectFill" />
+            <image :src="getImagePreviewSrc(img)" mode="aspectFill" />
             <view class="delete-btn" @click="removeImage(index)">×</view>
           </view>
           <view
@@ -185,6 +185,7 @@ const productId = ref<number | null>(null)
 const categories = ref<Category[]>([])
 const categoryIndex = ref(-1)
 const submitting = ref(false)
+const imagePreviewMap = ref<Record<string, string>>({})
 
 type ProductLoadError = {
   message?: string
@@ -287,6 +288,7 @@ async function loadProduct(id: number) {
     formData.stock = product.stock
     formData.unit = product.unit || '份'
     formData.images = product.images || []
+    imagePreviewMap.value = {}
     formData.specs = product.specs || []
     formData.sort = product.sort || 0
 
@@ -325,6 +327,7 @@ function chooseImage() {
         for (const tempFilePath of res.tempFilePaths) {
           const result = await uploadImage(tempFilePath)
           formData.images.push(result.url)
+          imagePreviewMap.value[result.url] = tempFilePath
         }
       } catch (error) {
         uni.showToast({ title: '上传失败', icon: 'none' })
@@ -336,7 +339,14 @@ function chooseImage() {
 }
 
 function removeImage(index: number) {
-  formData.images.splice(index, 1)
+  const [removedImage] = formData.images.splice(index, 1)
+  if (removedImage) {
+    delete imagePreviewMap.value[removedImage]
+  }
+}
+
+function getImagePreviewSrc(imageUrl: string) {
+  return imagePreviewMap.value[imageUrl] || imageUrl
 }
 
 function addSpec() {

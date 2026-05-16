@@ -1,6 +1,6 @@
 $BASE_URL = "http://localhost:8080/api/v1"
 $results = @()
-$adminToken = ""
+$spToken = ""
 $merchantToken = ""
 $userToken = ""
 $productId = $null
@@ -25,13 +25,13 @@ function Test-API {
     }
 }
 
-# Test 1: Admin Login
-$result = Test-API "Admin Login" {
-    $body = @{username="admin"; password="admin123"} | ConvertTo-Json
-    $resp = Invoke-RestMethod -Uri "$BASE_URL/auth/admin/login" -Method Post -Body $body -ContentType "application/json"
+# Test 1: Service Provider Login
+$result = Test-API "Service Provider Login" {
+    $body = @{username="sp"; password="tm666666"} | ConvertTo-Json
+    $resp = Invoke-RestMethod -Uri "$BASE_URL/sp/auth/login" -Method Post -Body $body -ContentType "application/json"
     Write-Host "Response: $($resp | ConvertTo-Json -Depth 10)"
-    $script:adminToken = $resp.data.token
-    @{Name="Admin Login"; Status=($resp.code -eq 0); Detail=$resp.message}
+    $script:spToken = $resp.data.token
+    @{Name="Service Provider Login"; Status=($resp.code -eq 0); Detail=$resp.message}
 }
 
 # Test 2: Merchant Login (verify merchant_id fix)
@@ -213,8 +213,8 @@ if ($userToken -and $productId) {
 
 # Test 9: Get Service Provider Config
 $result = Test-API "Get Service Provider Config" {
-    $headers = @{Authorization="Bearer $adminToken"}
-    $resp = Invoke-RestMethod -Uri "$BASE_URL/admin/service-provider" -Method Get -Headers $headers
+    $headers = @{Authorization="Bearer $spToken"}
+    $resp = Invoke-RestMethod -Uri "$BASE_URL/sp/settings" -Method Get -Headers $headers
     Write-Host "Response: $($resp | ConvertTo-Json -Depth 10)"
     @{Name="Get Service Provider"; Status=($resp.code -eq 0); Detail=$resp.message}
 }

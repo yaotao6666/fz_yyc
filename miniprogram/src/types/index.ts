@@ -71,7 +71,7 @@ export interface ServiceProviderLoginResponse {
   service_provider: {
     id: number
     name: string
-    admin_name?: string
+    sp_name?: string
   }
 }
 
@@ -90,8 +90,8 @@ export interface WechatLoginResponse {
 
 // ============ 服务商相关 ============
 
-// 服务商管理员
-export interface ServiceProviderAdmin {
+// 服务商账号
+export interface ServiceProviderSp {
   id: number
   service_provider_id: number
   username: string
@@ -103,7 +103,7 @@ export interface ServiceProviderAdmin {
 
 export interface SpSettings {
   name: string
-  admin_name: string
+  sp_name: string
   contact_phone: string
   contact_email?: string
   created_at?: string

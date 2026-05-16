@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"fz_yyc_api/internal/config"
-	"fz_yyc_api/internal/handlers/admin"
 	"fz_yyc_api/internal/handlers/merchant"
 	"fz_yyc_api/internal/handlers/sp"
 	"fz_yyc_api/internal/handlers/upload"
@@ -86,19 +85,9 @@ func setupRoutes(r *gin.Engine) {
 		// 认证相关
 		authGroup := v1.Group("/auth")
 		{
-			authGroup.POST("/admin/login", admin.Login)
 			authGroup.POST("/merchant/login", merchant.Login)
 			authGroup.POST("/merchant/wechat-login", merchant.WechatQuickLogin)
 			authGroup.POST("/user/wechat-login", user.WechatLogin)
-		}
-
-		// 管理员接口
-		adminGroup := v1.Group("/admin")
-		adminGroup.Use(middleware.JWTAuth(), middleware.AdminAuth())
-		{
-			adminGroup.GET("/profile", admin.GetAdminProfile)
-			adminGroup.PUT("/profile", admin.UpdateAdminProfile)
-			adminGroup.POST("/change-password", admin.ChangeAdminPassword)
 		}
 
 		// 文件上传接口
@@ -229,7 +218,7 @@ func setupRoutes(r *gin.Engine) {
 			spPublicGroup.POST("/auth/login", sp.Login)
 
 			spGroup := spPublicGroup.Group("")
-			spGroup.Use(middleware.JWTAuth(), middleware.AdminAuth())
+			spGroup.Use(middleware.JWTAuth(), middleware.SpAuth())
 			{
 				spGroup.POST("/auth/logout", sp.Logout)
 				spGroup.GET("/dashboard", sp.GetDashboard)

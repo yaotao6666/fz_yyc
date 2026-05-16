@@ -4,11 +4,11 @@ Write-Host "============================================================"
 Write-Host "API Test Script"
 Write-Host "============================================================"
 
-# Test 1: Admin Login
+# Test 1: Service Provider Login
 Write-Host ""
-Write-Host "[Test 1] Admin Login..."
-$body = @{"username"="admin"; "password"="admin123"} | ConvertTo-Json
-$resp = Invoke-RestMethod -Uri "$BASE_URL/auth/admin/login" -Method Post -Body $body -ContentType "application/json"
+Write-Host "[Test 1] Service Provider Login..."
+$body = @{"username"="sp"; "password"="tm666666"} | ConvertTo-Json
+$resp = Invoke-RestMethod -Uri "$BASE_URL/sp/auth/login" -Method Post -Body $body -ContentType "application/json"
 $resp | ConvertTo-Json -Depth 10
 
 # Test 2: Merchant Login

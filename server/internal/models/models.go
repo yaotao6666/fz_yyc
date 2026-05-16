@@ -78,9 +78,9 @@ func (ServiceProvider) TableName() string {
 }
 
 // ============================================
-// 服务商管理员表 (service_provider_admins)
+// 服务商账号表 (service_provider_sps)
 // ============================================
-type ServiceProviderAdmin struct {
+type ServiceProviderSp struct {
 	ID                uint64           `gorm:"primaryKey;autoIncrement" json:"id"`
 	ServiceProviderID uint64           `gorm:"not null;index" json:"service_provider_id"`
 	Username          string           `gorm:"size:64;uniqueIndex" json:"username"`
@@ -95,42 +95,42 @@ type ServiceProviderAdmin struct {
 	ServiceProvider   *ServiceProvider `gorm:"foreignKey:ServiceProviderID" json:"service_provider,omitempty"`
 }
 
-func (ServiceProviderAdmin) TableName() string {
-	return "service_provider_admins"
+func (ServiceProviderSp) TableName() string {
+	return "service_provider_sps"
 }
 
 // ============================================
 // 商家表 (merchants)
 // ============================================
 type Merchant struct {
-	ID                uint64           `gorm:"primaryKey;autoIncrement" json:"id"`
-	ServiceProviderID uint64           `gorm:"not null;index" json:"service_provider_id"`
-	Name              string           `gorm:"size:128;not null" json:"name"`
-	Logo              string           `gorm:"size:512" json:"logo"`
-	CoverImage        string           `gorm:"size:512" json:"cover_image"`
-	ContactName       string           `gorm:"size:64" json:"contact_name"`
-	ContactPhone      string           `gorm:"size:20" json:"contact_phone"`
-	ContactEmail      string           `gorm:"size:128" json:"contact_email"`
-	Address           string           `gorm:"size:256" json:"address"`
-	Lat               float64          `gorm:"type:decimal(10,6)" json:"lat"`
-	Lng               float64          `gorm:"type:decimal(10,6)" json:"lng"`
-	BusinessCategory  string           `gorm:"size:64" json:"business_category"`
-	BusinessHours     string           `gorm:"size:64" json:"business_hours"`
-	Announcement      string           `gorm:"type:text" json:"announcement"`
-	MinOrderAmount    float64          `gorm:"type:decimal(10,2);not null;default:0" json:"min_order_amount"`
-	TakeoutEnabled    bool             `gorm:"not null;default:true" json:"takeout_enabled"`
-	DineInEnabled     bool             `gorm:"not null;default:true" json:"dine_in_enabled"`
-	SubMchID          string           `gorm:"size:32" json:"sub_mch_id"`
-	ProfitSharingEnabled bool          `gorm:"not null;default:false" json:"profit_sharing_enabled"`
-	ProfitSharingRatio   float64       `gorm:"type:decimal(5,2);not null;default:0" json:"profit_sharing_ratio"`
-	PaymentConfigStatus  uint8         `gorm:"not null;default:0" json:"payment_config_status"`
-	Status            uint8            `gorm:"not null;default:1" json:"status"`
-	Rating            float64          `gorm:"type:decimal(2,1);not null;default:5.0" json:"rating"`
-	SalesCount        uint             `gorm:"not null;default:0" json:"sales_count"`
-	QRCodeURL         string           `gorm:"size:512" json:"qrcode_url"`
-	CreatedAt         time.Time        `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt         time.Time        `gorm:"autoUpdateTime" json:"updated_at"`
-	ServiceProvider   *ServiceProvider `gorm:"foreignKey:ServiceProviderID" json:"service_provider,omitempty"`
+	ID                   uint64           `gorm:"primaryKey;autoIncrement" json:"id"`
+	ServiceProviderID    uint64           `gorm:"not null;index" json:"service_provider_id"`
+	Name                 string           `gorm:"size:128;not null" json:"name"`
+	Logo                 string           `gorm:"size:512" json:"logo"`
+	CoverImage           string           `gorm:"size:512" json:"cover_image"`
+	ContactName          string           `gorm:"size:64" json:"contact_name"`
+	ContactPhone         string           `gorm:"size:20" json:"contact_phone"`
+	ContactEmail         string           `gorm:"size:128" json:"contact_email"`
+	Address              string           `gorm:"size:256" json:"address"`
+	Lat                  float64          `gorm:"type:decimal(10,6)" json:"lat"`
+	Lng                  float64          `gorm:"type:decimal(10,6)" json:"lng"`
+	BusinessCategory     string           `gorm:"size:64" json:"business_category"`
+	BusinessHours        string           `gorm:"size:64" json:"business_hours"`
+	Announcement         string           `gorm:"type:text" json:"announcement"`
+	MinOrderAmount       float64          `gorm:"type:decimal(10,2);not null;default:0" json:"min_order_amount"`
+	TakeoutEnabled       bool             `gorm:"not null;default:true" json:"takeout_enabled"`
+	DineInEnabled        bool             `gorm:"not null;default:true" json:"dine_in_enabled"`
+	SubMchID             string           `gorm:"size:32" json:"sub_mch_id"`
+	ProfitSharingEnabled bool             `gorm:"not null;default:false" json:"profit_sharing_enabled"`
+	ProfitSharingRatio   float64          `gorm:"type:decimal(5,2);not null;default:0" json:"profit_sharing_ratio"`
+	PaymentConfigStatus  uint8            `gorm:"not null;default:0" json:"payment_config_status"`
+	Status               uint8            `gorm:"not null;default:1" json:"status"`
+	Rating               float64          `gorm:"type:decimal(2,1);not null;default:5.0" json:"rating"`
+	SalesCount           uint             `gorm:"not null;default:0" json:"sales_count"`
+	QRCodeURL            string           `gorm:"size:512" json:"qrcode_url"`
+	CreatedAt            time.Time        `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt            time.Time        `gorm:"autoUpdateTime" json:"updated_at"`
+	ServiceProvider      *ServiceProvider `gorm:"foreignKey:ServiceProviderID" json:"service_provider,omitempty"`
 }
 
 func (Merchant) TableName() string {
@@ -316,39 +316,39 @@ func (UserBehaviorEvent) TableName() string {
 // 订单表 (orders)
 // ============================================
 type Order struct {
-	ID               uint64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderNo          string      `gorm:"size:32;uniqueIndex;not null" json:"order_no"`
-	UserID           uint64      `gorm:"not null;index" json:"user_id"`
-	MerchantID       uint64      `gorm:"not null;index" json:"merchant_id"`
-	TotalAmount      float64     `gorm:"type:decimal(10,2);not null;default:0" json:"total_amount"`
-	DeliveryFee      float64     `gorm:"type:decimal(10,2);not null;default:0" json:"delivery_fee"`
-	DiscountAmount   float64     `gorm:"type:decimal(10,2);not null;default:0" json:"discount_amount"`
-	PayAmount        float64     `gorm:"type:decimal(10,2);not null;default:0" json:"pay_amount"`
-	DeliveryType     uint8       `gorm:"not null;default:1" json:"delivery_type"`
-	DeliveryDistance float64     `gorm:"type:decimal(5,2)" json:"delivery_distance"`
-	DeliveryAddress  string      `gorm:"size:256" json:"delivery_address"`
-	ContactName      string      `gorm:"size:64" json:"contact_name"`
-	ContactPhone     string      `gorm:"size:20" json:"contact_phone"`
-	Status           uint8       `gorm:"not null;default:1" json:"status"`
-	Remark           string      `gorm:"size:256" json:"remark"`
-	VerifyCode       string      `gorm:"size:16" json:"verify_code"`
-	TransactionID    string      `gorm:"size:64" json:"transaction_id"`
-	PaidAt           *time.Time  `json:"paid_at"`
-	PayNotifyPayload JSON        `gorm:"type:json" json:"pay_notify_payload"`
-	CompletedAt      *time.Time  `json:"completed_at"`
-	CompletedByName  string      `gorm:"size:64" json:"completed_by_name"`
-	CancelledAt      *time.Time  `json:"cancelled_at"`
-	RefundedAt       *time.Time  `json:"refunded_at"`
-	ProfitSharingStatus  uint8      `gorm:"not null;default:0" json:"profit_sharing_status"`
-	ProfitSharingAmount  float64    `gorm:"type:decimal(10,2);not null;default:0" json:"profit_sharing_amount"`
-	ProfitSharingOrderNo string     `gorm:"size:64" json:"profit_sharing_order_no"`
-	ProfitSharingAt      *time.Time `json:"profit_sharing_at"`
-	ProfitSharingError   string     `gorm:"size:256" json:"profit_sharing_error"`
-	CreatedAt        time.Time   `gorm:"autoCreateTime;index" json:"created_at"`
-	UpdatedAt        time.Time   `gorm:"autoUpdateTime" json:"updated_at"`
-	User             *User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Merchant         *Merchant   `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
-	Items            []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
+	ID                   uint64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderNo              string      `gorm:"size:32;uniqueIndex;not null" json:"order_no"`
+	UserID               uint64      `gorm:"not null;index" json:"user_id"`
+	MerchantID           uint64      `gorm:"not null;index" json:"merchant_id"`
+	TotalAmount          float64     `gorm:"type:decimal(10,2);not null;default:0" json:"total_amount"`
+	DeliveryFee          float64     `gorm:"type:decimal(10,2);not null;default:0" json:"delivery_fee"`
+	DiscountAmount       float64     `gorm:"type:decimal(10,2);not null;default:0" json:"discount_amount"`
+	PayAmount            float64     `gorm:"type:decimal(10,2);not null;default:0" json:"pay_amount"`
+	DeliveryType         uint8       `gorm:"not null;default:1" json:"delivery_type"`
+	DeliveryDistance     float64     `gorm:"type:decimal(5,2)" json:"delivery_distance"`
+	DeliveryAddress      string      `gorm:"size:256" json:"delivery_address"`
+	ContactName          string      `gorm:"size:64" json:"contact_name"`
+	ContactPhone         string      `gorm:"size:20" json:"contact_phone"`
+	Status               uint8       `gorm:"not null;default:1" json:"status"`
+	Remark               string      `gorm:"size:256" json:"remark"`
+	VerifyCode           string      `gorm:"size:16" json:"verify_code"`
+	TransactionID        string      `gorm:"size:64" json:"transaction_id"`
+	PaidAt               *time.Time  `json:"paid_at"`
+	PayNotifyPayload     JSON        `gorm:"type:json" json:"pay_notify_payload"`
+	CompletedAt          *time.Time  `json:"completed_at"`
+	CompletedByName      string      `gorm:"size:64" json:"completed_by_name"`
+	CancelledAt          *time.Time  `json:"cancelled_at"`
+	RefundedAt           *time.Time  `json:"refunded_at"`
+	ProfitSharingStatus  uint8       `gorm:"not null;default:0" json:"profit_sharing_status"`
+	ProfitSharingAmount  float64     `gorm:"type:decimal(10,2);not null;default:0" json:"profit_sharing_amount"`
+	ProfitSharingOrderNo string      `gorm:"size:64" json:"profit_sharing_order_no"`
+	ProfitSharingAt      *time.Time  `json:"profit_sharing_at"`
+	ProfitSharingError   string      `gorm:"size:256" json:"profit_sharing_error"`
+	CreatedAt            time.Time   `gorm:"autoCreateTime;index" json:"created_at"`
+	UpdatedAt            time.Time   `gorm:"autoUpdateTime" json:"updated_at"`
+	User                 *User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Merchant             *Merchant   `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
+	Items                []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
 }
 
 func (Order) TableName() string {
@@ -404,24 +404,24 @@ func (Refund) TableName() string {
 // 商家分账记录表 (merchant_profit_sharing_records)
 // ============================================
 type MerchantProfitSharingRecord struct {
-	ID                    uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	ServiceProviderID     uint64     `gorm:"not null;index" json:"service_provider_id"`
-	MerchantID            uint64     `gorm:"not null;index" json:"merchant_id"`
-	OrderID               uint64     `gorm:"not null;index" json:"order_id"`
-	OrderNo               string     `gorm:"size:32;not null;index" json:"order_no"`
-	TransactionID         string     `gorm:"size:64;index" json:"transaction_id"`
-	ProfitSharingOrderNo  string     `gorm:"size:64;not null;index" json:"profit_sharing_order_no"`
-	ProfitSharingDate     time.Time  `gorm:"not null;index" json:"profit_sharing_date"`
-	PayAmount             float64    `gorm:"type:decimal(10,2);not null;default:0" json:"pay_amount"`
-	ProfitSharingRatio    float64    `gorm:"type:decimal(5,2);not null;default:0" json:"profit_sharing_ratio"`
-	ProfitSharingAmount   float64    `gorm:"type:decimal(10,2);not null;default:0" json:"profit_sharing_amount"`
+	ID                     uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	ServiceProviderID      uint64    `gorm:"not null;index" json:"service_provider_id"`
+	MerchantID             uint64    `gorm:"not null;index" json:"merchant_id"`
+	OrderID                uint64    `gorm:"not null;index" json:"order_id"`
+	OrderNo                string    `gorm:"size:32;not null;index" json:"order_no"`
+	TransactionID          string    `gorm:"size:64;index" json:"transaction_id"`
+	ProfitSharingOrderNo   string    `gorm:"size:64;not null;index" json:"profit_sharing_order_no"`
+	ProfitSharingDate      time.Time `gorm:"not null;index" json:"profit_sharing_date"`
+	PayAmount              float64   `gorm:"type:decimal(10,2);not null;default:0" json:"pay_amount"`
+	ProfitSharingRatio     float64   `gorm:"type:decimal(5,2);not null;default:0" json:"profit_sharing_ratio"`
+	ProfitSharingAmount    float64   `gorm:"type:decimal(10,2);not null;default:0" json:"profit_sharing_amount"`
 	MerchantReceivedAmount float64   `gorm:"type:decimal(10,2);not null;default:0" json:"merchant_received_amount"`
-	Status                uint8      `gorm:"not null;default:0;index" json:"status"`
-	ErrorMessage          string     `gorm:"size:256" json:"error_message"`
-	CreatedAt             time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt             time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
-	Order                 *Order     `gorm:"foreignKey:OrderID" json:"order,omitempty"`
-	Merchant              *Merchant  `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
+	Status                 uint8     `gorm:"not null;default:0;index" json:"status"`
+	ErrorMessage           string    `gorm:"size:256" json:"error_message"`
+	CreatedAt              time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt              time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	Order                  *Order    `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Merchant               *Merchant `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
 }
 
 func (MerchantProfitSharingRecord) TableName() string {

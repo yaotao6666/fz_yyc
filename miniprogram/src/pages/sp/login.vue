@@ -3,7 +3,7 @@
     <view class="login-header">
       <image class="logo" :src="BrandAsset.APP_LOGO" mode="aspectFit" />
       <text class="title">寻梦私域管家</text>
-      <text class="subtitle">服务商管理平台</text>
+      <text class="subtitle">服务商管理端</text>
     </view>
 
     <view class="login-form">

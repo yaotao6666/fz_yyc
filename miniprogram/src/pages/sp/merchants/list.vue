@@ -34,69 +34,71 @@
     </view>
 
     <scroll-view class="merchant-scroll" scroll-y @scrolltolower="loadMore">
-      <view
-        v-for="merchant in merchants"
-        :key="merchant.id"
-        class="merchant-card"
-        @click="goDetail(merchant.id)"
-      >
-        <view class="merchant-header">
-          <view class="merchant-main">
-            <text class="merchant-name">{{ merchant.name }}</text>
-            <text class="merchant-meta">{{ merchant.contact_name || '未设置联系人' }} · {{ merchant.contact_phone || '未设置电话' }}</text>
+      <view class="merchant-scroll-content">
+        <view
+          v-for="merchant in merchants"
+          :key="merchant.id"
+          class="merchant-card"
+          @click="goDetail(merchant.id)"
+        >
+          <view class="merchant-header">
+            <view class="merchant-main">
+              <text class="merchant-name">{{ merchant.name }}</text>
+              <text class="merchant-meta">{{ merchant.contact_name || '未设置联系人' }} · {{ merchant.contact_phone || '未设置电话' }}</text>
+            </view>
+            <view class="merchant-status" :class="getStatusClass(merchant.status)">
+              {{ getStatusText(merchant.status) }}
+            </view>
           </view>
-          <view class="merchant-status" :class="getStatusClass(merchant.status)">
-            {{ getStatusText(merchant.status) }}
+
+          <view class="summary-grid">
+            <view class="summary-item">
+              <text class="summary-label">收款商户号</text>
+              <text class="summary-value">{{ merchant.sub_mch_id || '未配置' }}</text>
+            </view>
+            <view class="summary-item">
+              <text class="summary-label">支付配置</text>
+              <text class="summary-value" :class="getPaymentConfigClass(merchant.payment_config_status)">
+                {{ getPaymentConfigText(merchant.payment_config_status) }}
+              </text>
+            </view>
+            <view class="summary-item">
+              <text class="summary-label">分账配置</text>
+              <text class="summary-value">
+                {{ merchant.profit_sharing_enabled ? `已开启 ${formatRatio(merchant.profit_sharing_ratio)}` : '未开启' }}
+              </text>
+            </view>
+            <view class="summary-item">
+              <text class="summary-label">行业分类</text>
+              <text class="summary-value">{{ merchant.business_category || '未设置' }}</text>
+            </view>
           </view>
+
+          <view class="stats-row">
+            <view class="stat-box">
+              <text class="stat-value">{{ merchant.total_users || 0 }}</text>
+              <text class="stat-label">用户数</text>
+            </view>
+            <view class="stat-box">
+              <text class="stat-value">{{ merchant.total_orders || 0 }}</text>
+              <text class="stat-label">订单数</text>
+            </view>
+            <view class="stat-box">
+              <text class="stat-value">¥{{ formatAmount(merchant.total_amount) }}</text>
+              <text class="stat-label">累计金额</text>
+            </view>
+          </view>
+
+          <view class="created-at">创建时间：{{ formatDate(merchant.created_at) }}</view>
         </view>
 
-        <view class="summary-grid">
-          <view class="summary-item">
-            <text class="summary-label">收款商户号</text>
-            <text class="summary-value">{{ merchant.sub_mch_id || '未配置' }}</text>
-          </view>
-          <view class="summary-item">
-            <text class="summary-label">支付配置</text>
-            <text class="summary-value" :class="getPaymentConfigClass(merchant.payment_config_status)">
-              {{ getPaymentConfigText(merchant.payment_config_status) }}
-            </text>
-          </view>
-          <view class="summary-item">
-            <text class="summary-label">分账配置</text>
-            <text class="summary-value">
-              {{ merchant.profit_sharing_enabled ? `已开启 ${formatRatio(merchant.profit_sharing_ratio)}` : '未开启' }}
-            </text>
-          </view>
-          <view class="summary-item">
-            <text class="summary-label">行业分类</text>
-            <text class="summary-value">{{ merchant.business_category || '未设置' }}</text>
-          </view>
+        <view v-if="loading" class="list-state">加载中...</view>
+        <view v-else-if="merchants.length === 0" class="empty-state">
+          <text class="empty-title">暂无商家</text>
+          <text class="empty-desc">可以直接新增商家并配置收款账户与分账比例</text>
         </view>
-
-        <view class="stats-row">
-          <view class="stat-box">
-            <text class="stat-value">{{ merchant.total_users || 0 }}</text>
-            <text class="stat-label">用户数</text>
-          </view>
-          <view class="stat-box">
-            <text class="stat-value">{{ merchant.total_orders || 0 }}</text>
-            <text class="stat-label">订单数</text>
-          </view>
-          <view class="stat-box">
-            <text class="stat-value">¥{{ formatAmount(merchant.total_amount) }}</text>
-            <text class="stat-label">累计金额</text>
-          </view>
-        </view>
-
-        <view class="created-at">创建时间：{{ formatDate(merchant.created_at) }}</view>
+        <view v-else-if="noMore" class="list-state">没有更多了</view>
       </view>
-
-      <view v-if="loading" class="list-state">加载中...</view>
-      <view v-else-if="merchants.length === 0" class="empty-state">
-        <text class="empty-title">暂无商家</text>
-        <text class="empty-desc">可以直接新增商家并配置收款账户与分账比例</text>
-      </view>
-      <view v-else-if="noMore" class="list-state">没有更多了</view>
     </scroll-view>
   </view>
 </template>
@@ -132,6 +134,9 @@ async function loadMerchants(reset = false) {
     return
   }
 
+  const normalizedKeyword = normalizeKeyword(keyword.value)
+  keyword.value = normalizedKeyword
+
   if (reset) {
     page.value = 1
     noMore.value = false
@@ -143,8 +148,8 @@ async function loadMerchants(reset = false) {
     const response = await getMerchantList({
       page: page.value,
       page_size: pageSize,
-      keyword: keyword.value.trim() || undefined,
-      status: currentStatus.value || undefined
+      keyword: normalizedKeyword,
+      status: currentStatus.value
     })
 
     merchants.value = reset ? response.list : merchants.value.concat(response.list)
@@ -161,7 +166,8 @@ async function loadMerchants(reset = false) {
   }
 }
 
-function handleSearch() {
+function handleSearch(event?: unknown) {
+  keyword.value = normalizeKeyword(event ?? keyword.value) || normalizeKeyword(keyword.value)
   loadMerchants(true)
 }
 
@@ -225,11 +231,30 @@ function goCreate() {
 function goDetail(merchantId: number) {
   uni.navigateTo({ url: `/pages/sp/merchants/detail?id=${merchantId}` })
 }
+
+function normalizeKeyword(value: unknown) {
+  if (typeof value === 'string') {
+    return value.trim()
+  }
+
+  if (value && typeof value === 'object') {
+    const detailValue = (value as { detail?: { value?: unknown } }).detail?.value
+    if (typeof detailValue === 'string') {
+      return detailValue.trim()
+    }
+  }
+
+  return ''
+}
 </script>
 
 <style scoped>
 .merchant-list-container {
   min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #f5f5f5;
   padding: 24rpx;
   box-sizing: border-box;
@@ -322,7 +347,14 @@ function goDetail(merchantId: number) {
 }
 
 .merchant-scroll {
-  height: calc(100vh - 292rpx);
+  flex: 1;
+  min-height: 0;
+}
+
+.merchant-scroll-content {
+  min-height: 100%;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 .merchant-card {

@@ -14,7 +14,7 @@
 
 ### 2.1 默认最小初始化账号
 
-- 管理员：`admin / admin123`
+- 服务商：`sp / tm666666`
 - 商家：`merchant / merchant123`
 
 ### 2.2 可选 Mock 数据

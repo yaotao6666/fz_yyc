@@ -1,11 +1,13 @@
 <template>
-  <scroll-view class="merchant-edit-container" scroll-y>
-    <view class="page-tip">
+  <view class="merchant-edit-page">
+    <scroll-view class="merchant-edit-container" scroll-y>
+      <view class="merchant-edit-content">
+        <view class="page-tip">
       <text class="page-tip-title">{{ isEditMode ? '编辑商家配置' : '新增商家' }}</text>
       <text class="page-tip-desc">服务商直接维护商家基础信息、管理员账号、收款商户号和分账比例。</text>
-    </view>
+        </view>
 
-    <view class="section-card">
+        <view class="section-card">
       <view class="section-title">基础信息</view>
       <view class="form-item">
         <text class="form-label">商家名称</text>
@@ -102,8 +104,10 @@
       >
         {{ isEditMode ? '保存支付配置' : '请先创建商家后再保存支付配置' }}
       </button>
-    </view>
-  </scroll-view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
 </template>
 
 <script setup lang="ts">
@@ -315,10 +319,21 @@ function onProfitSharingChange(event: any) {
 </script>
 
 <style scoped>
-.merchant-edit-container {
+.merchant-edit-page {
   min-height: 100vh;
+  height: 100vh;
+  background: #f5f5f5;
+}
+
+.merchant-edit-container {
+  height: 100%;
+}
+
+.merchant-edit-content {
+  min-height: 100%;
   background: #f5f5f5;
   padding: 24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 

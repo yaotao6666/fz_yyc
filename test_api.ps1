@@ -22,13 +22,13 @@ function Test-API {
     }
 }
 
-# 测试1: 服务商管理员登录
-$result = Test-API "服务商管理员登录" {
-    $body = @{username="admin"; password="admin123"} | ConvertTo-Json
-    $resp = Invoke-RestMethod -Uri "$BASE_URL/auth/admin/login" -Method Post -Body $body -ContentType "application/json"
+# 测试1: 服务商登录
+$result = Test-API "服务商登录" {
+    $body = @{username="sp"; password="tm666666"} | ConvertTo-Json
+    $resp = Invoke-RestMethod -Uri "$BASE_URL/sp/auth/login" -Method Post -Body $body -ContentType "application/json"
     Write-Host "状态码: 200"
     Write-Host "响应: $($resp | ConvertTo-Json -Depth 10)"
-    $script:adminToken = $resp.data.token
+    $script:spToken = $resp.data.token
     @{Name="服务商登录"; Status=($resp.code -eq 0); Detail=$resp.message}
 }
 
@@ -227,8 +227,8 @@ if ($userToken -and $productId) {
 
 # 测试9: 获取服务商配置
 $result = Test-API "获取服务商配置" {
-    $headers = @{Authorization="Bearer $adminToken"}
-    $resp = Invoke-RestMethod -Uri "$BASE_URL/admin/service-provider" -Method Get -Headers $headers
+    $headers = @{Authorization="Bearer $spToken"}
+    $resp = Invoke-RestMethod -Uri "$BASE_URL/sp/settings" -Method Get -Headers $headers
     Write-Host "响应: $($resp | ConvertTo-Json -Depth 10)"
     @{Name="获取服务商配置"; Status=($resp.code -eq 0); Detail=$resp.message}
 }

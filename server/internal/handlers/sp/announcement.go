@@ -15,16 +15,16 @@ func getCurrentServiceProviderID(c *gin.Context) (uint64, bool) {
 	if !exists {
 		return 0, false
 	}
-	adminID, ok := userIDValue.(uint64)
+	spUserID, ok := userIDValue.(uint64)
 	if !ok {
 		return 0, false
 	}
 
-	var admin models.ServiceProviderAdmin
-	if err := database.DB.Select("service_provider_id").First(&admin, adminID).Error; err != nil {
+	var spUser models.ServiceProviderSp
+	if err := database.DB.Select("service_provider_id").First(&spUser, spUserID).Error; err != nil {
 		return 0, false
 	}
-	return admin.ServiceProviderID, true
+	return spUser.ServiceProviderID, true
 }
 
 func GetAnnouncements(c *gin.Context) {

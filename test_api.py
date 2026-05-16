@@ -6,26 +6,26 @@ BASE_URL = "http://localhost:8080/api/v1"
 def test_api():
     results = []
 
-    # 1. 测试服务商管理员登录
+    # 1. 测试服务商登录
     print("=" * 60)
-    print("测试1: 服务商管理员登录")
+    print("测试1: 服务商登录")
     print("=" * 60)
     try:
-        resp = requests.post(f"{BASE_URL}/auth/admin/login", json={
-            "username": "admin",
-            "password": "admin123"
+        resp = requests.post(f"{BASE_URL}/sp/auth/login", json={
+            "username": "sp",
+            "password": "tm666666"
         })
         data = resp.json()
         print(f"状态码: {resp.status_code}")
         print(f"响应: {json.dumps(data, ensure_ascii=False, indent=2)}")
-        admin_token = data.get("data", {}).get("token", "")
+        sp_token = data.get("data", {}).get("token", "")
         results.append(("服务商登录", resp.status_code == 200, data.get("code") == 0))
     except Exception as e:
         print(f"请求失败: {e}")
         results.append(("服务商登录", False, False))
-        admin_token = ""
+        sp_token = ""
 
-    if not admin_token:
+    if not sp_token:
         print("无法获取token，跳过后续测试")
         return results
 
@@ -274,8 +274,8 @@ def test_api():
     print("测试9: 获取服务商配置")
     print("=" * 60)
     try:
-        resp = requests.get(f"{BASE_URL}/admin/service-provider", headers={
-            "Authorization": f"Bearer {admin_token}"
+        resp = requests.get(f"{BASE_URL}/sp/settings", headers={
+            "Authorization": f"Bearer {sp_token}"
         })
         data = resp.json()
         print(f"状态码: {resp.status_code}")

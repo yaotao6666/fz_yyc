@@ -7,7 +7,7 @@ import (
 
 func main() {
 	// 生成 bcrypt 哈希
-	passwords := []string{"admin123", "merchant123"}
+	passwords := []string{"tm666666", "merchant123"}
 
 	for _, pwd := range passwords {
 		hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
@@ -24,7 +24,7 @@ func main() {
 		password string
 		hash     string
 	}{
-		{"admin123", "$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqJ7Q9A1vU7.F7.F7.F7.F7.F7.F7"},
+		{"tm666666", "$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqJ7Q9A1vU7.F7.F7.F7.F7.F7.F7"},
 		{"merchant123", "$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqJ7Q9A1vU7.F7.F7.F7.F7.F7.F7"},
 	}
 

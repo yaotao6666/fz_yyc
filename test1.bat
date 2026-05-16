@@ -5,8 +5,8 @@ echo API Test Script
 echo ============================================================
 echo.
 
-echo [1/9] Test Admin Login...
-curl -s -X POST http://localhost:8080/api/v1/auth/admin/login -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"admin123\"}"
+echo [1/9] Test Service Provider Login...
+curl -s -X POST http://localhost:8080/api/v1/sp/auth/login -H "Content-Type: application/json" -d "{\"username\":\"sp\",\"password\":\"tm666666\"}"
 echo.
 echo.
 

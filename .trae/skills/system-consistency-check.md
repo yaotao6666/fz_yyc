@@ -2,7 +2,7 @@
 
 ## 概述
 
-对"凡在云厨"项目进行全链路一致性检测，覆盖 PRD 文档、数据库表结构、后端接口模型、前端页面接入四个层面，输出差异清单并生成修复脚本。
+对"私域助手"项目进行全链路一致性检测，覆盖 PRD 文档、数据库表结构、后端接口模型、前端页面接入四个层面，输出差异清单并生成修复脚本。
 
 **适用场景**：
 - 新项目启动前的完整检测
@@ -143,8 +143,7 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
 | C端店铺 | /api/v1/store/:merchant_id | 无 | user |
 | C端用户 | /api/v1/user | JWT | user |
 | 商家管理 | /api/v1/merchant | JWT | merchant |
-| 服务商(旧) | /api/v1/admin | JWT | sp |
-| 服务商(新) | /api/v1/sp | JWT | sp |
+| 服务商 | /api/v1/sp | JWT | sp |
 | WebSocket | /api/v1/ws | JWT | ws |
 | 支付回调 | /api/v1/notify | 无 | admin |
 
