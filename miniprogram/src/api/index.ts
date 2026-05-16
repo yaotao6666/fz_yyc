@@ -267,11 +267,11 @@ export function getTopMerchants(params?: { limit?: number; metric?: string }) {
  * 获取商家信息
  */
 export async function getMerchantProfile() {
-  return get<MerchantInfo>('/api/v1/merchant/profile').then(data => {
-    if (data?.logo) data.logo = normalizeImageUrl(data.logo)
-    if (data?.cover_image) data.cover_image = normalizeImageUrl(data.cover_image)
-    return data
-  })
+  const res = await get<any>('/api/v1/merchant/profile')
+  const merchant = res?.merchant || res
+  if (merchant?.logo) merchant.logo = normalizeImageUrl(merchant.logo)
+  if (merchant?.cover_image) merchant.cover_image = normalizeImageUrl(merchant.cover_image)
+  return merchant as MerchantInfo
 }
 
 // ============ 商家设置相关 ============

@@ -8,7 +8,7 @@
  * - http:// -> ws://
  */
 
-const DEFAULT_API_BASE_URL = 'http://localhost:8080'
+const DEFAULT_API_BASE_URL = 'http://192.168.10.6:8080'
 
 function trimTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '')

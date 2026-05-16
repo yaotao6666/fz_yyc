@@ -99,6 +99,13 @@
           <text class="menu-text">{{ item.title }}</text>
           <text class="menu-subtext">{{ item.subtitle }}</text>
         </view>
+        <button class="menu-item share-menu-item" open-type="share">
+          <view class="menu-icon" style="background: #fff0f6">
+            <image class="menu-icon-image" src="/static/icons/share.png" mode="aspectFit" />
+          </view>
+          <text class="menu-text">快速分享</text>
+          <text class="menu-subtext">分享给微信好友</text>
+        </button>
       </view>
     </view>
 
@@ -161,6 +168,7 @@
 
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import { onShareAppMessage } from '@dcloudio/uni-app'
 import { useAuthStore } from '../../stores/auth'
 import { getMerchantProfile, updateMerchantStatus, getOrderStatistics, getProducts, getMerchantQrcode, getMerchantAnnouncements, getSalesOverview, quickCompleteOrder } from '@api'
 import { OrderStatus } from '../../types'
@@ -256,6 +264,17 @@ const quickMenuItems = computed(() => [
     action: () => openQuickVerifyDialog()
   }
 ])
+
+onShareAppMessage(() => {
+  const merchantId = authStore.merchantId || 0
+  const name = merchantInfo.value?.name || '我的店铺'
+  const logo = merchantLogo.value || merchantInfo.value?.logo || ''
+  return {
+    title: `${name} - 欢迎光临`,
+    path: `/pages/store/home?merchant_id=${merchantId}`,
+    imageUrl: logo
+  }
+})
 
 onShow(() => {
   if (authStore.merchantInfo) {
@@ -847,6 +866,17 @@ function formatDateTime(time: string): string {
 
 .menu-item:active {
   opacity: 0.7;
+}
+
+.share-menu-item {
+  border: none;
+  outline: none;
+  line-height: normal;
+  font-size: inherit;
+}
+
+.share-menu-item::after {
+  border: none;
 }
 
 .menu-icon {
