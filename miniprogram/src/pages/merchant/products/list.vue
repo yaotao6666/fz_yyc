@@ -434,6 +434,7 @@ function goAdd() {
 }
 
 .product-list {
+  width: calc(100% - 48rpx);
   padding: 24rpx;
 }
 

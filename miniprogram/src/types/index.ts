@@ -586,7 +586,7 @@ export interface StoreHomeInfo {
     id: number
     name: string
     logo: string
-    images: string[]
+    cover_image: string
     address: string
     contact_phone?: string
     business_hours: string

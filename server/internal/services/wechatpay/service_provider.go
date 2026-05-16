@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -80,19 +81,25 @@ type ProfitSharingResponse struct {
 }
 
 type RefundRequest struct {
-	SubMchID      string
-	OrderNo       string
-	RefundNo      string
-	Reason        string
-	NotifyURL     string
-	RefundAmount  int64
-	TotalAmount   int64
+	SubMchID     string
+	OrderNo      string
+	RefundNo     string
+	Reason       string
+	NotifyURL    string
+	RefundAmount int64
+	TotalAmount  int64
 }
 
 type RefundResponse struct {
-	RefundID     string `json:"refund_id"`
-	Status       string `json:"status"`
-	SuccessTime  string `json:"success_time"`
+	RefundID    string `json:"refund_id"`
+	Status      string `json:"status"`
+	SuccessTime string `json:"success_time"`
+}
+
+type RefundStatusResponse struct {
+	RefundID    string `json:"refund_id"`
+	Status      string `json:"status"`
+	SuccessTime string `json:"success_time"`
 }
 
 type NotifyResult struct {
@@ -134,12 +141,12 @@ func NewServiceProviderClient() (*ServiceProviderClient, error) {
 
 func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(ctx context.Context, req JSAPIPayRequest) (*JSAPIPayResponse, error) {
 	payload := map[string]any{
-		"sp_appid":    req.AppID,
-		"sp_mchid":    c.config.SPMchID,
-		"sub_mchid":   req.SubMchID,
-		"description": req.Description,
+		"sp_appid":     req.AppID,
+		"sp_mchid":     c.config.SPMchID,
+		"sub_mchid":    req.SubMchID,
+		"description":  req.Description,
 		"out_trade_no": req.OrderNo,
-		"notify_url":  req.NotifyURL,
+		"notify_url":   req.NotifyURL,
 		"amount": map[string]any{
 			"total":    req.TotalAmount,
 			"currency": "CNY",
@@ -181,11 +188,11 @@ func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(ctx context.Context, 
 
 func (c *ServiceProviderClient) CreateProfitSharingOrder(ctx context.Context, req ProfitSharingRequest) (*ProfitSharingResponse, error) {
 	payload := map[string]any{
-		"appid":          req.AppID,
-		"sub_mchid":      req.SubMchID,
-		"transaction_id": req.TransactionID,
-		"out_order_no":   req.OrderNo,
-		"receivers":      req.Receivers,
+		"appid":            req.AppID,
+		"sub_mchid":        req.SubMchID,
+		"transaction_id":   req.TransactionID,
+		"out_order_no":     req.OrderNo,
+		"receivers":        req.Receivers,
 		"unfreeze_unsplit": false,
 	}
 
@@ -226,6 +233,20 @@ func (c *ServiceProviderClient) CreatePartnerRefund(ctx context.Context, req Ref
 
 	var result RefundResponse
 	if err := c.doJSONRequest(ctx, http.MethodPost, "/v3/refund/domestic/refunds", payload, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *ServiceProviderClient) QueryPartnerRefundByRefundNo(ctx context.Context, refundNo string) (*RefundStatusResponse, error) {
+	refundNo = strings.TrimSpace(refundNo)
+	if refundNo == "" {
+		return nil, fmt.Errorf("缺少退款单号")
+	}
+
+	var result RefundStatusResponse
+	path := "/v3/refund/domestic/refunds/" + url.PathEscape(refundNo)
+	if err := c.doJSONRequest(ctx, http.MethodGet, path, nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -291,12 +312,23 @@ func (c *ServiceProviderClient) ParseAndVerifyNotify(headers http.Header, body [
 }
 
 func (c *ServiceProviderClient) doJSONRequest(ctx context.Context, method, path string, payload any, target any) error {
-	bodyBytes, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("编码请求失败: %w", err)
+	var (
+		bodyBytes []byte
+		err       error
+	)
+	if payload != nil {
+		bodyBytes, err = json.Marshal(payload)
+		if err != nil {
+			return fmt.Errorf("编码请求失败: %w", err)
+		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, bytes.NewReader(bodyBytes))
+	var bodyReader io.Reader
+	if len(bodyBytes) > 0 {
+		bodyReader = bytes.NewReader(bodyBytes)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, bodyReader)
 	if err != nil {
 		return fmt.Errorf("创建微信支付请求失败: %w", err)
 	}
@@ -413,7 +445,7 @@ func parsePrivateKey(raw string) (*rsa.PrivateKey, error) {
 		return nil, fmt.Errorf("未找到私钥 PEM 块")
 	}
 
-	if privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+	if privateKey, parseErr := x509.ParsePKCS1PrivateKey(block.Bytes); parseErr == nil {
 		return privateKey, nil
 	}
 
@@ -440,9 +472,9 @@ func parsePublicKey(raw string) (*rsa.PublicKey, error) {
 	}
 
 	if strings.Contains(block.Type, "CERTIFICATE") {
-		certificate, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return nil, err
+		certificate, parseErr := x509.ParseCertificate(block.Bytes)
+		if parseErr != nil {
+			return nil, parseErr
 		}
 		publicKey, ok := certificate.PublicKey.(*rsa.PublicKey)
 		if !ok {

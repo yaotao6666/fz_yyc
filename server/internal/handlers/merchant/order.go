@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type CompleteOrderRequest struct {
@@ -48,6 +49,110 @@ func getCompleterName(c *gin.Context, merchantID uint64) string {
 	}
 
 	return username
+}
+
+func parseRefundSuccessTime(successTime string) time.Time {
+	now := time.Now()
+	if strings.TrimSpace(successTime) == "" {
+		return now
+	}
+	if parsed, err := time.Parse(time.RFC3339, successTime); err == nil {
+		return parsed
+	}
+	return now
+}
+
+func buildOrderStatusAfterRefundFailure(order *models.Order) uint8 {
+	if order == nil {
+		return 2
+	}
+	if order.CompletedAt != nil {
+		return 3
+	}
+	if order.PaidAt != nil || strings.TrimSpace(order.TransactionID) != "" {
+		return 2
+	}
+	return order.Status
+}
+
+func syncRefundAndOrderStatus(
+	tx *gorm.DB,
+	order *models.Order,
+	refund *models.Refund,
+	refundStatus string,
+	refundID string,
+	successTime string,
+) error {
+	if tx == nil || order == nil || refund == nil {
+		return nil
+	}
+
+	normalizedStatus := strings.ToUpper(strings.TrimSpace(refundStatus))
+	trimmedRefundID := strings.TrimSpace(refundID)
+	refundUpdates := map[string]any{}
+	if trimmedRefundID != "" {
+		refundUpdates["refund_id"] = trimmedRefundID
+	}
+
+	orderUpdates := map[string]any{}
+	switch normalizedStatus {
+	case "SUCCESS":
+		refundedAt := parseRefundSuccessTime(successTime)
+		refundUpdates["status"] = 2
+		refundUpdates["refunded_at"] = refundedAt
+		orderUpdates["status"] = 6
+		orderUpdates["refunded_at"] = refundedAt
+	case "CLOSED", "ABNORMAL":
+		refundUpdates["status"] = 3
+		orderUpdates["status"] = buildOrderStatusAfterRefundFailure(order)
+		orderUpdates["refunded_at"] = nil
+	default:
+		refundUpdates["status"] = 1
+		orderUpdates["status"] = 5
+	}
+
+	if len(refundUpdates) > 0 {
+		if err := tx.Model(refund).Updates(refundUpdates).Error; err != nil {
+			return err
+		}
+	}
+	if len(orderUpdates) > 0 {
+		if err := tx.Model(order).Updates(orderUpdates).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func refreshMerchantOrderRefundStatus(ctx context.Context, client *wechatpay.ServiceProviderClient, order *models.Order) {
+	if client == nil || order == nil || order.Status != 5 {
+		return
+	}
+
+	var refund models.Refund
+	if err := database.DB.
+		Where("order_id = ? AND status IN (0, 1)", order.ID).
+		Order("created_at DESC").
+		First(&refund).Error; err != nil {
+		return
+	}
+	if strings.TrimSpace(refund.RefundNo) == "" {
+		return
+	}
+
+	refundStatus, queryErr := client.QueryPartnerRefundByRefundNo(ctx, refund.RefundNo)
+	if queryErr != nil {
+		return
+	}
+	if err := syncRefundAndOrderStatus(database.DB, order, &refund, refundStatus.Status, refundStatus.RefundID, refundStatus.SuccessTime); err != nil {
+		return
+	}
+
+	refreshedOrder, err := loadMerchantOrderByID(order.MerchantID, order.ID)
+	if err != nil {
+		return
+	}
+	*order = *refreshedOrder
 }
 
 func completeMerchantOrder(c *gin.Context, order *models.Order, verifyCode string) {
@@ -125,6 +230,13 @@ func GetOrders(c *gin.Context) {
 		return
 	}
 
+	client, err := wechatpay.NewServiceProviderClient()
+	if err == nil {
+		for index := range orders {
+			refreshMerchantOrderRefundStatus(c.Request.Context(), client, &orders[index])
+		}
+	}
+
 	response.Success(c, gin.H{
 		"list": orders,
 		"pagination": gin.H{
@@ -144,6 +256,11 @@ func GetOrderDetail(c *gin.Context) {
 	if err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
 		return
+	}
+
+	client, clientErr := wechatpay.NewServiceProviderClient()
+	if clientErr == nil {
+		refreshMerchantOrderRefundStatus(c.Request.Context(), client, order)
 	}
 
 	response.Success(c, order)
@@ -320,41 +437,25 @@ func RefundOrder(c *gin.Context) {
 	}
 
 	refundID := strings.TrimSpace(refundResp.RefundID)
-	refundStatus := strings.ToUpper(strings.TrimSpace(refundResp.Status))
-
-	refundUpdates := map[string]any{
-		"refund_id": refundID,
-	}
-
-	orderUpdates := map[string]any{}
-	switch refundStatus {
-	case "SUCCESS":
-		now := time.Now()
-		if refundResp.SuccessTime != "" {
-			if parsed, parseErr := time.Parse(time.RFC3339, refundResp.SuccessTime); parseErr == nil {
-				now = parsed
-			}
-		}
-		refundUpdates["status"] = 2
-		refundUpdates["refunded_at"] = now
-		orderUpdates["status"] = 6
-		orderUpdates["refunded_at"] = now
-	case "CLOSED", "ABNORMAL":
-		refundUpdates["status"] = 3
-	default:
-		refundUpdates["status"] = 1
-		orderUpdates["status"] = 5
-	}
-
-	if err := database.DB.Model(&refund).Updates(refundUpdates).Error; err != nil {
+	if err := syncRefundAndOrderStatus(database.DB, &order, &refund, refundResp.Status, refundID, refundResp.SuccessTime); err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新退款状态失败")
 		return
 	}
-	if len(orderUpdates) > 0 {
-		if err := database.DB.Model(&order).Updates(orderUpdates).Error; err != nil {
-			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新订单退款状态失败")
-			return
+
+	refundStatus := strings.ToUpper(strings.TrimSpace(refundResp.Status))
+	if refundStatus != "SUCCESS" {
+		refreshedStatus, queryErr := client.QueryPartnerRefundByRefundNo(context.Background(), refund.RefundNo)
+		if queryErr == nil {
+			if err := syncRefundAndOrderStatus(database.DB, &order, &refund, refreshedStatus.Status, refreshedStatus.RefundID, refreshedStatus.SuccessTime); err != nil {
+				response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "同步退款状态失败")
+				return
+			}
 		}
+	}
+
+	if err := database.DB.First(&refund, refund.ID).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "加载退款记录失败")
+		return
 	}
 
 	response.Success(c, refund)

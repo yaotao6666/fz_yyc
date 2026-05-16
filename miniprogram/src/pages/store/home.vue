@@ -4,14 +4,14 @@
     <view class="store-header">
       <image
         class="store-banner"
-        :src="storeInfo?.merchant?.images?.[0] || '/static/store-banner.png'"
+        :src="merchantCover || '/static/store-banner.png'"
         mode="aspectFill"
       />
       <view class="store-mask"></view>
       <view class="store-info">
         <image
           class="store-logo"
-          :src="storeInfo?.merchant?.logo || BrandAsset.DEFAULT_MERCHANT_LOGO"
+          :src="merchantLogo || BrandAsset.DEFAULT_MERCHANT_LOGO"
           mode="aspectFill"
         />
         <view class="store-detail">
@@ -266,12 +266,15 @@ import { ref, computed, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { getStoreHome, getStoreProducts, getStoreProduct } from '@api'
 import { useCartStore } from '../../stores/cart'
+import { useStoreCacheStore } from '../../stores/storeCache'
 import { useAnalytics } from '@utils/analytics'
 import { useAuth } from '../../utils/useAuth'
+import { getCachedImagePath, cacheImage } from '@utils/imageCache'
 import type { StoreHomeInfo, Product, SpecOption } from '@types'
 import { BrandAsset } from '../../utils/constants'
 
 const cartStore = useCartStore()
+const storeCache = useStoreCacheStore()
 const { trackVisit, trackPageView } = useAnalytics()
 
 const storeInfo = ref<StoreHomeInfo | null>(null)
@@ -279,6 +282,8 @@ const currentMerchantId = ref(1)
 const currentCategoryIndex = ref(0)
 const currentProducts = ref<Product[]>([])
 const loadingProducts = ref(false)
+const merchantLogo = ref('')
+const merchantCover = ref('')
 const showGuide = ref(false) // 控制操作指引弹窗显示
 
 const showAddDialog = ref(false)
@@ -322,38 +327,93 @@ onShow(() => {
     const { ensureAuth } = useAuth()
     await ensureAuth()
 
-    await trackVisit({ merchant_id: merchantId, source })
-    await trackPageView('store_home', merchantId, source)
+    trackVisit({ merchant_id: merchantId, source })
+    trackPageView('store_home', merchantId, source)
 
-    loadStoreHome(merchantId)
+    if (storeCache.hasCache(merchantId)) {
+      storeInfo.value = storeCache.storeInfo!
+      currentCategoryIndex.value = storeCache.currentCategoryIndex
+      cacheMerchantImages(storeCache.storeInfo!)
+      const catId = storeCache.storeInfo?.categories?.[currentCategoryIndex.value]?.id
+      if (catId && storeCache.categoryProducts[catId]) {
+        currentProducts.value = storeCache.categoryProducts[catId]
+      }
+      loadStoreHome(merchantId, true)
+    } else {
+      loadStoreHome(merchantId)
+    }
   })().finally(() => {
     showPromise = null
   })
 })
 
-async function loadStoreHome(merchantId: number) {
+async function loadStoreHome(merchantId: number, silent = false) {
   try {
     const res = await getStoreHome(merchantId)
     storeInfo.value = res
-    
+    storeCache.setStoreInfo(merchantId, res)
+
+    cacheMerchantImages(res)
+
     if (res.categories?.length) {
-      loadCategoryProducts(res.categories[0].id)
+      const catId = res.categories[currentCategoryIndex.value]?.id || res.categories[0].id
+      if (storeCache.categoryProducts[catId]) {
+        loadCategoryProducts(catId, true)
+      } else {
+        loadCategoryProducts(catId)
+      }
     }
   } catch (error) {
-    console.error('加载店铺信息失败:', error)
-    uni.showToast({ title: '加载失败', icon: 'none' })
+    if (!silent) {
+      console.error('加载店铺信息失败:', error)
+      uni.showToast({ title: '加载失败', icon: 'none' })
+    }
   }
 }
 
-async function loadCategoryProducts(categoryId: number) {
-  loadingProducts.value = true
+function cacheMerchantImages(info: StoreHomeInfo) {
+  const logo = info?.merchant?.logo
+  const cover = info?.merchant?.cover_image
+
+  if (logo) {
+    const cached = getCachedImagePath(logo)
+    if (cached) {
+      merchantLogo.value = cached
+    } else {
+      merchantLogo.value = logo
+      cacheImage(logo).then((path) => {
+        merchantLogo.value = path
+      })
+    }
+  }
+
+  if (cover) {
+    const cached = getCachedImagePath(cover)
+    if (cached) {
+      merchantCover.value = cached
+    } else {
+      merchantCover.value = cover
+      cacheImage(cover).then((path) => {
+        merchantCover.value = path
+      })
+    }
+  }
+}
+
+async function loadCategoryProducts(categoryId: number, silent = false) {
+  if (!silent) {
+    loadingProducts.value = true
+  }
 
   try {
     const merchantId = storeInfo.value?.merchant?.id || 1
     const res = await getStoreProducts(merchantId, { category_id: categoryId })
     currentProducts.value = res.list || []
+    storeCache.setCategoryProducts(categoryId, res.list || [])
   } catch (error) {
-    console.error('加载商品失败:', error)
+    if (!silent) {
+      console.error('加载商品失败:', error)
+    }
   } finally {
     loadingProducts.value = false
   }
@@ -361,9 +421,16 @@ async function loadCategoryProducts(categoryId: number) {
 
 function selectCategory(index: number) {
   currentCategoryIndex.value = index
-  
+  storeCache.setCurrentCategoryIndex(index)
+
   if (storeInfo.value?.categories?.[index]) {
-    loadCategoryProducts(storeInfo.value.categories[index].id)
+    const catId = storeInfo.value.categories[index].id
+    if (storeCache.categoryProducts[catId]) {
+      currentProducts.value = storeCache.categoryProducts[catId]
+      loadCategoryProducts(catId, true)
+    } else {
+      loadCategoryProducts(catId)
+    }
   }
 }
 
@@ -753,6 +820,7 @@ function goMyOrders() {
 
 .product-list {
   flex: 1;
+  width: calc(100% - 48rpx);
   padding: 24rpx;
 }
 

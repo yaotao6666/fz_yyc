@@ -286,6 +286,12 @@ func GetStoreHome(c *gin.Context) {
 		return
 	}
 
+	qiniuService := qiniu.GetService()
+	if qiniuService != nil {
+		merchant.Logo = qiniuService.BuildPrivateURL(merchant.Logo)
+		merchant.CoverImage = qiniuService.BuildPrivateURL(merchant.CoverImage)
+	}
+
 	var categories []models.Category
 	database.DB.Where("merchant_id = ? AND status = 1", id).Order("sort ASC").Find(&categories)
 

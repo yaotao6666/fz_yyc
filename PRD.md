@@ -72,7 +72,7 @@
   - 本轮接口、功能、测试结论已同步到拆分文档。
   - 完整回归结果单独沉淀在 `docs/prd/完整链路测试报告-20260513.md`。
   - C 端微信登录接口返回结构统一为 `code/message/data.token/data.user`，前端缓存字段为 `user_token/userInfo/openid`，下单接口使用 `user_token` 鉴权。
-  - C 端订单退款状态口径统一为：`status=5` 退款中、`status=6` 已退款；收到微信退款成功回调后由 5 更新为 6。
+-  - C 端订单退款状态口径统一为：`status=5` 退款中、`status=6` 已退款；商家退款接口会在收到微信退款响应后主动同步一次退款状态，若仍未拿到最终结果则继续等待微信退款成功回调把 5 更新为 6。
   - C 端访问/行为埋点接口使用 `openid` 作为用户唯一标识（`/api/v1/store/:merchant_id/visit`、`/api/v1/store/:merchant_id/event`）。
   - C 端订单详情已独立为 `pages/store/order-detail`，支付完成、取消支付与“去购物”均保留当前 `merchant_id`，避免返回错误商家店铺。
 

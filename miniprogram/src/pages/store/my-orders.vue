@@ -355,6 +355,7 @@ function contactMerchantForRefund(order: Order) {
 }
 
 .order-list {
+  width: calc(100% - 48rpx);
   padding: 24rpx;
 }
 

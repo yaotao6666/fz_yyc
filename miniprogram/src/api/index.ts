@@ -793,9 +793,6 @@ export function getStoreHome(merchantId: number) {
     if (data?.hot_products) {
       data.hot_products = data.hot_products.map((p: any) => normalizeProduct(p))
     }
-    if (data?.merchant?.images) {
-      data.merchant.images = normalizeStringArray(data.merchant.images).map(normalizeImageUrl)
-    }
     if (data?.merchant?.logo) {
       data.merchant.logo = normalizeImageUrl(data.merchant.logo)
     }

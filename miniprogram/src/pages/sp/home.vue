@@ -174,6 +174,7 @@ onShow(() => {
 <style scoped>
 .sp-home-container {
   min-height: 100vh;
+  width: calc(100% - 48rpx);
   background: #f5f5f5;
   padding: 24rpx;
   box-sizing: border-box;

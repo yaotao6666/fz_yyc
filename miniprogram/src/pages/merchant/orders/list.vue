@@ -727,6 +727,7 @@ async function submitRefund() {
 }
 
 .order-list {
+  width: calc(100% - 48rpx);
   padding: 24rpx 24rpx 0;
 }
 
