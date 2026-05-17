@@ -3,10 +3,12 @@
     <!-- 店铺头部 -->
     <view class="store-header">
       <image
+        v-if="merchantCover"
         class="store-banner"
-        :src="merchantCover || '/static/store-banner.png'"
+        :src="merchantCover"
         mode="aspectFill"
       />
+      <view v-else class="store-banner store-banner-placeholder"></view>
       <view class="store-mask"></view>
       <view class="store-info">
         <image
@@ -38,59 +40,111 @@
       当前店铺休息中，可继续浏览商品；新订单暂不支持提交。
     </view>
 
-    <view class="quick-entry-bar">
-      <view class="quick-entry-card" @click="goMyOrders">
-        <view class="quick-entry-icon">📋</view>
-        <view class="quick-entry-content">
-          <view class="quick-entry-title">我的订单</view>
-          <view class="quick-entry-desc">查看当前店铺订单与退款进度</view>
-        </view>
-        <view class="quick-entry-arrow">›</view>
+    <view v-if="isInitialLoading" class="page-state-card">
+      <view class="page-state-title">正在加载店铺信息</view>
+      <view class="page-state-desc">首次进入或下拉刷新时会重新拉取商家数据，请稍候。</view>
+      <view class="page-state-loading">
+        <view class="page-state-loading-bar"></view>
+        <view class="page-state-loading-bar short"></view>
       </view>
     </view>
 
-    <!-- 分类和商品 -->
-    <view class="main-content">
-      <!-- 左侧分类 -->
-      <scroll-view class="category-sidebar" scroll-y>
-        <view
-          v-for="(category, index) in storeInfo?.categories"
-          :key="category.id"
-          class="category-item"
-          :class="{ active: currentCategoryIndex === index }"
-          @click="selectCategory(index)"
-        >
-          <text class="category-name">{{ category.name }}</text>
-          <text class="category-count" v-if="category.product_count">{{ category.product_count }}</text>
-        </view>
-      </scroll-view>
+    <view v-else-if="showPageError" class="page-state-card error">
+      <view class="page-state-title">店铺加载失败</view>
+      <view class="page-state-desc">{{ pageErrorMessage }}</view>
+      <view class="page-state-actions">
+        <view class="page-state-btn primary" @click="retryLoadStoreHome">重新加载</view>
+      </view>
+    </view>
 
-      <!-- 右侧商品 -->
-      <scroll-view class="product-list" scroll-y @scrolltolower="loadMoreProducts">
-        <!-- 分类标题 -->
-        <view class="category-title" v-if="currentCategory">
-          {{ currentCategory.name }}
+    <template v-else-if="storeInfo">
+      <view class="quick-entry-bar">
+        <view class="quick-entry-card" @click="goMyOrders">
+          <view class="quick-entry-icon">📋</view>
+          <view class="quick-entry-content">
+            <view class="quick-entry-title">我的订单</view>
+            <view class="quick-entry-desc">查看当前店铺订单与退款进度</view>
+          </view>
+          <view class="quick-entry-arrow">›</view>
         </view>
+      </view>
 
-        <!-- 热销推荐 -->
-        <view class="hot-products" v-if="!currentCategoryIndex && storeInfo?.hot_products?.length">
-          <view class="hot-title">🔥 热销推荐</view>
-          <view class="product-grid">
+      <!-- 分类和商品 -->
+      <view class="main-content">
+        <!-- 左侧分类 -->
+        <scroll-view class="category-sidebar" scroll-y>
+          <view v-if="!hasCategories" class="category-empty">
+            暂无分类
+          </view>
+          <view
+            v-for="(category, index) in storeInfo.categories"
+            :key="category.id"
+            class="category-item"
+            :class="{ active: currentCategoryIndex === index }"
+            @click="selectCategory(index)"
+          >
+            <text class="category-name">{{ category.name }}</text>
+            <text class="category-count" v-if="category.product_count">{{ category.product_count }}</text>
+          </view>
+        </scroll-view>
+
+        <!-- 右侧商品 -->
+        <scroll-view class="product-list" scroll-y @scrolltolower="loadMoreProducts">
+          <!-- 分类标题 -->
+          <view class="category-title" v-if="currentCategory">
+            {{ currentCategory.name }}
+          </view>
+
+          <!-- 热销推荐 -->
+          <view class="hot-products" v-if="showHotProducts">
+            <view class="hot-title">🔥 热销推荐</view>
+            <view class="product-grid">
+              <view
+                v-for="product in storeInfo.hot_products"
+                :key="product.id"
+                class="product-card"
+                @click="goProductDetail(product.id)"
+              >
+                <image
+                  class="product-image"
+                  :src="getHotProductImage(product)"
+                  mode="aspectFill"
+                />
+                <view class="product-info">
+                  <view class="product-name">{{ product.name }}</view>
+                  <view class="product-bottom">
+                    <view class="product-price">
+                      <text class="price">¥{{ product.price.toFixed(2) }}</text>
+                      <text v-if="product.original_price" class="original-price">
+                        ¥{{ product.original_price.toFixed(2) }}
+                      </text>
+                    </view>
+                    <view class="add-btn" @click.stop="addToCart(product)">+</view>
+                  </view>
+                  <view class="product-sales">已售 {{ product.sales || 0 }}</view>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <!-- 分类商品列表 -->
+          <view class="product-list-items">
             <view
-              v-for="product in storeInfo.hot_products"
+              v-for="product in currentProducts"
               :key="product.id"
-              class="product-card"
+              class="product-list-item"
               @click="goProductDetail(product.id)"
             >
               <image
-                class="product-image"
-                :src="getHotProductImage(product)"
+                class="item-image"
+                :src="getProductImage(product)"
                 mode="aspectFill"
               />
-              <view class="product-info">
-                <view class="product-name">{{ product.name }}</view>
-                <view class="product-bottom">
-                  <view class="product-price">
+              <view class="item-info">
+                <view class="item-name">{{ product.name }}</view>
+                <view class="item-desc" v-if="product.description">{{ product.description }}</view>
+                <view class="item-bottom">
+                  <view class="item-price">
                     <text class="price">¥{{ product.price.toFixed(2) }}</text>
                     <text v-if="product.original_price" class="original-price">
                       ¥{{ product.original_price.toFixed(2) }}
@@ -98,69 +152,46 @@
                   </view>
                   <view class="add-btn" @click.stop="addToCart(product)">+</view>
                 </view>
-                <view class="product-sales">已售 {{ product.sales || 0 }}</view>
               </view>
+            </view>
+          </view>
+
+          <view v-if="loadingProducts" class="loading">加载中...</view>
+          <view v-else-if="showProductEmpty" class="product-empty">
+            <view class="product-empty-title">当前暂无可展示商品</view>
+            <view class="product-empty-desc">可以下拉刷新试试，或稍后再来看看商家上新。</view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <view class="cart-bar">
+        <view class="cart-area" :class="{ disabled: isCartEmpty }" @click="goCart">
+          <view :class="isCartEmpty ? 'cart-icon-empty' : 'cart-icon'">
+            <text>🛒</text>
+            <view class="cart-badge" v-if="cartCount > 0">{{ cartCount > 99 ? '99+' : cartCount }}</view>
+          </view>
+          <view class="cart-info">
+            <view class="cart-amount">
+              {{ isCartEmpty ? '未选购商品' : `¥${cartAmount.toFixed(2)}` }}
+            </view>
+            <view class="cart-desc">
+              {{ isCartEmpty ? '点击商品上的 + 加入购物车' : '点击购物车查看已选商品' }}
             </view>
           </view>
         </view>
 
-        <!-- 分类商品列表 -->
-        <view class="product-list-items">
-          <view
-            v-for="product in currentProducts"
-            :key="product.id"
-            class="product-list-item"
-            @click="goProductDetail(product.id)"
-          >
-            <image
-              class="item-image"
-              :src="product.images?.[0] || '/static/default-product.png'"
-              mode="aspectFill"
-            />
-            <view class="item-info">
-              <view class="item-name">{{ product.name }}</view>
-              <view class="item-desc" v-if="product.description">{{ product.description }}</view>
-              <view class="item-bottom">
-                <view class="item-price">
-                  <text class="price">¥{{ product.price.toFixed(2) }}</text>
-                  <text v-if="product.original_price" class="original-price">
-                    ¥{{ product.original_price.toFixed(2) }}
-                  </text>
-                </view>
-                <view class="add-btn" @click.stop="addToCart(product)">+</view>
-              </view>
-            </view>
-          </view>
-        </view>
-
-        <view v-if="loadingProducts" class="loading">加载中...</view>
-      </scroll-view>
-    </view>
-
-    <view class="cart-bar">
-      <view class="cart-area" :class="{ disabled: isCartEmpty }" @click="goCart">
-        <view :class="isCartEmpty ? 'cart-icon-empty' : 'cart-icon'">
-          <text>🛒</text>
-          <view class="cart-badge" v-if="cartCount > 0">{{ cartCount > 99 ? '99+' : cartCount }}</view>
-        </view>
-        <view class="cart-info">
-          <view class="cart-amount">
-            {{ isCartEmpty ? '未选购商品' : `¥${cartAmount.toFixed(2)}` }}
-          </view>
-          <view class="cart-desc">
-            {{ isCartEmpty ? '点击商品上的 + 加入购物车' : '点击购物车查看已选商品' }}
-          </view>
+        <view
+          class="cart-btn"
+          :class="{ disabled: isCartEmpty }"
+          @click="handlePrimaryAction"
+        >
+          {{ primaryActionText }}
         </view>
       </view>
 
-      <view
-        class="cart-btn"
-        :class="{ disabled: isCartEmpty }"
-        @click="handlePrimaryAction"
-      >
-        {{ primaryActionText }}
-      </view>
-    </view>
+      <!-- 底部占位 -->
+      <view class="bottom-placeholder"></view>
+    </template>
 
     <view v-if="showAddDialog" class="add-dialog-mask" @click="closeAddDialog">
       <view class="add-dialog" @click.stop>
@@ -256,25 +287,21 @@
       </view>
     </view>
 
-    <!-- 底部占位 -->
-    <view class="bottom-placeholder"></view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
-import { getStoreHome, getStoreProducts, getStoreProduct } from '@api'
+import { onLoad, onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import { getStoreHome, getStoreProducts, getStoreProduct } from '../../api/store'
 import { useCartStore } from '../../stores/cart'
-import { useStoreCacheStore } from '../../stores/storeCache'
 import { useAnalytics } from '@utils/analytics'
-import { useAuth } from '../../utils/useAuth'
 import { getCachedImagePath, cacheImage } from '@utils/imageCache'
+import { parseStoreEntryOptions } from '@utils/storeEntry'
 import type { StoreHomeInfo, Product, SpecOption } from '@types'
 import { BrandAsset } from '../../utils/constants'
 
 const cartStore = useCartStore()
-const storeCache = useStoreCacheStore()
 const { trackVisit, trackPageView } = useAnalytics()
 
 const storeInfo = ref<StoreHomeInfo | null>(null)
@@ -285,6 +312,9 @@ const loadingProducts = ref(false)
 const merchantLogo = ref('')
 const merchantCover = ref('')
 const showGuide = ref(false) // 控制操作指引弹窗显示
+const entrySource = ref('scan')
+const isInitialLoading = ref(false)
+const pageErrorMessage = ref('')
 
 const showAddDialog = ref(false)
 const addDialogLoading = ref(false)
@@ -295,6 +325,10 @@ const addDialogSelectedSpecs = reactive<Record<string, string>>({})
 const currentCategory = computed(() => {
   return storeInfo.value?.categories?.[currentCategoryIndex.value] || null
 })
+const hasCategories = computed(() => !!storeInfo.value?.categories?.length)
+const showHotProducts = computed(() => !currentCategoryIndex.value && !!storeInfo.value?.hot_products?.length)
+const showProductEmpty = computed(() => !loadingProducts.value && !currentProducts.value.length && !showHotProducts.value)
+const showPageError = computed(() => !!pageErrorMessage.value && !storeInfo.value)
 
 const cartCount = computed(() => cartStore.totalCount)
 const cartAmount = computed(() => cartStore.totalAmount)
@@ -309,6 +343,44 @@ const primaryActionText = computed(() => {
 })
 
 let showPromise: Promise<void> | null = null
+let _loadRetryCount = 0
+
+function resetStoreHomeState() {
+  storeInfo.value = null
+  currentCategoryIndex.value = 0
+  currentProducts.value = []
+  merchantLogo.value = ''
+  merchantCover.value = ''
+  pageErrorMessage.value = ''
+  showAddDialog.value = false
+  addDialogLoading.value = false
+  addDialogProduct.value = null
+}
+
+function parseEntryOptions(options?: Record<string, any>) {
+  return parseStoreEntryOptions(options, currentMerchantId.value)
+}
+
+function applyEntryOptions(options?: Record<string, any>) {
+  const { merchantId, source } = parseEntryOptions(options)
+  const merchantChanged = currentMerchantId.value !== merchantId
+
+  currentMerchantId.value = merchantId
+  entrySource.value = source
+
+  if (merchantChanged) {
+    _loadRetryCount = 0
+    resetStoreHomeState()
+  }
+}
+
+onLoad((options) => {
+  applyEntryOptions(options as Record<string, any> | undefined)
+})
+
+onPullDownRefresh(async () => {
+  await refreshStoreHome()
+})
 
 onShow(() => {
   if (showPromise) return
@@ -316,31 +388,17 @@ onShow(() => {
   showPromise = (async () => {
     const pages = getCurrentPages()
     const currentPage = pages[pages.length - 1] as any
-    const merchantId = Number(currentPage?.options?.merchant_id) || 1
-    const source = currentPage?.options?.scene || 'scan'
-
-    currentMerchantId.value = merchantId
+    applyEntryOptions(currentPage?.options)
+    const merchantId = currentMerchantId.value
+    const source = entrySource.value
 
     const guideKey = `storeHomeGuideShown:${merchantId}`
     showGuide.value = !uni.getStorageSync(guideKey)
 
-    const { ensureAuth } = useAuth()
-    await ensureAuth()
-
-    trackVisit({ merchant_id: merchantId, source })
-    trackPageView('store_home', merchantId, source)
-
-    if (storeCache.hasCache(merchantId)) {
-      storeInfo.value = storeCache.storeInfo!
-      currentCategoryIndex.value = storeCache.currentCategoryIndex
-      cacheMerchantImages(storeCache.storeInfo!)
-      const catId = storeCache.storeInfo?.categories?.[currentCategoryIndex.value]?.id
-      if (catId && storeCache.categoryProducts[catId]) {
-        currentProducts.value = storeCache.categoryProducts[catId]
-      }
-      loadStoreHome(merchantId, true)
-    } else {
-      loadStoreHome(merchantId)
+    const loaded = await loadStoreHome(merchantId)
+    if (loaded) {
+      void trackVisit({ merchant_id: merchantId, source })
+      void trackPageView('store_home', merchantId, source)
     }
   })().finally(() => {
     showPromise = null
@@ -348,27 +406,54 @@ onShow(() => {
 })
 
 async function loadStoreHome(merchantId: number, silent = false) {
+  if (!silent && !storeInfo.value) {
+    isInitialLoading.value = true
+  }
+  pageErrorMessage.value = ''
+
   try {
     const res = await getStoreHome(merchantId)
+    _loadRetryCount = 0
     storeInfo.value = res
-    storeCache.setStoreInfo(merchantId, res)
 
     cacheMerchantImages(res)
 
     if (res.categories?.length) {
       const catId = res.categories[currentCategoryIndex.value]?.id || res.categories[0].id
-      if (storeCache.categoryProducts[catId]) {
-        loadCategoryProducts(catId, true)
-      } else {
-        loadCategoryProducts(catId)
-      }
+      await loadCategoryProducts(catId, silent)
+    } else {
+      currentProducts.value = []
     }
+    return true
   } catch (error) {
     if (!silent) {
       console.error('加载店铺信息失败:', error)
-      uni.showToast({ title: '加载失败', icon: 'none' })
+      if (error instanceof TypeError && _loadRetryCount < 2) {
+        _loadRetryCount++
+        console.log(`加载店铺信息重试 (${_loadRetryCount}/2)`)
+        await new Promise(resolve => setTimeout(resolve, 600))
+        return loadStoreHome(merchantId, silent)
+      }
+      pageErrorMessage.value = error instanceof Error ? error.message || '请重新进入后重试' : '请重新进入后重试'
+      uni.showToast({ title: '加载失败，请重新进入', icon: 'none' })
     }
+    return false
+  } finally {
+    isInitialLoading.value = false
   }
+}
+
+async function refreshStoreHome() {
+  const merchantId = currentMerchantId.value
+  const loaded = await loadStoreHome(merchantId, true)
+  uni.stopPullDownRefresh()
+  if (!loaded) {
+    uni.showToast({ title: '刷新失败，请稍后重试', icon: 'none' })
+  }
+}
+
+function retryLoadStoreHome() {
+  void loadStoreHome(currentMerchantId.value)
 }
 
 function cacheMerchantImages(info: StoreHomeInfo) {
@@ -409,7 +494,6 @@ async function loadCategoryProducts(categoryId: number, silent = false) {
     const merchantId = storeInfo.value?.merchant?.id || 1
     const res = await getStoreProducts(merchantId, { category_id: categoryId })
     currentProducts.value = res.list || []
-    storeCache.setCategoryProducts(categoryId, res.list || [])
   } catch (error) {
     if (!silent) {
       console.error('加载商品失败:', error)
@@ -421,16 +505,10 @@ async function loadCategoryProducts(categoryId: number, silent = false) {
 
 function selectCategory(index: number) {
   currentCategoryIndex.value = index
-  storeCache.setCurrentCategoryIndex(index)
 
   if (storeInfo.value?.categories?.[index]) {
     const catId = storeInfo.value.categories[index].id
-    if (storeCache.categoryProducts[catId]) {
-      currentProducts.value = storeCache.categoryProducts[catId]
-      loadCategoryProducts(catId, true)
-    } else {
-      loadCategoryProducts(catId)
-    }
+    loadCategoryProducts(catId)
   }
 }
 
@@ -443,7 +521,15 @@ function getHotProductImage(product: any) {
     return product.images[0]
   }
 
-  return product?.image || '/static/default-product.png'
+  return getProductImage(product)
+}
+
+function getProductImage(product: any) {
+  if (Array.isArray(product?.images) && product.images.length > 0) {
+    return product.images[0]
+  }
+
+  return product?.image || BrandAsset.DEFAULT_PRODUCT_IMAGE
 }
 
 function goProductDetail(productId: number) {
@@ -638,6 +724,13 @@ function goMyOrders() {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
+.store-banner-placeholder {
+  background:
+    radial-gradient(circle at top right, rgba(255,255,255,0.24), transparent 38%),
+    radial-gradient(circle at bottom left, rgba(255,255,255,0.18), transparent 30%),
+    linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
 .store-mask {
   position: absolute;
   top: 0;
@@ -736,6 +829,69 @@ function goMyOrders() {
   padding: 20rpx 24rpx 0;
 }
 
+.page-state-card {
+  margin: 24rpx;
+  padding: 36rpx 32rpx;
+  background: #ffffff;
+  border-radius: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.05);
+}
+
+.page-state-card.error {
+  border: 1rpx solid rgba(255, 77, 79, 0.18);
+}
+
+.page-state-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.page-state-desc {
+  margin-top: 14rpx;
+  font-size: 26rpx;
+  color: #666666;
+  line-height: 1.6;
+}
+
+.page-state-loading {
+  margin-top: 28rpx;
+}
+
+.page-state-loading-bar {
+  height: 22rpx;
+  border-radius: 12rpx;
+  background: linear-gradient(90deg, #f2f3f5 0%, #e9ecef 50%, #f2f3f5 100%);
+  background-size: 200% 100%;
+  animation: loadingShimmer 1.2s linear infinite;
+}
+
+.page-state-loading-bar.short {
+  width: 60%;
+  margin-top: 18rpx;
+}
+
+.page-state-actions {
+  margin-top: 28rpx;
+}
+
+.page-state-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 220rpx;
+  height: 84rpx;
+  padding: 0 28rpx;
+  border-radius: 42rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.page-state-btn.primary {
+  color: #ffffff;
+  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+}
+
 .quick-entry-card {
   display: flex;
   align-items: center;
@@ -789,6 +945,14 @@ function goMyOrders() {
 .category-sidebar {
   width: 180rpx;
   background: #f8f9fa;
+}
+
+.category-empty {
+  padding: 48rpx 20rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #999999;
+  line-height: 1.5;
 }
 
 .category-item {
@@ -968,6 +1132,27 @@ function goMyOrders() {
   padding: 24rpx;
   font-size: 26rpx;
   color: #999999;
+}
+
+.product-empty {
+  margin-top: 24rpx;
+  padding: 48rpx 24rpx;
+  background: #f8f9fa;
+  border-radius: 20rpx;
+  text-align: center;
+}
+
+.product-empty-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333333;
+}
+
+.product-empty-desc {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #888888;
+  line-height: 1.6;
 }
 
 .cart-bar {
@@ -1288,6 +1473,11 @@ function goMyOrders() {
 @keyframes slideUp {
   from { transform: translateY(50rpx); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes loadingShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .guide-title {

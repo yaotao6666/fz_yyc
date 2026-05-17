@@ -3334,6 +3334,9 @@ GET /api/v1/store/{merchant_id}/home
 
 > 用户扫描商家二维码后，小程序调用此接口获取店铺首页数据
 
+- `pages/store/home`、`pages/store/product`、`pages/store/confirm` 统一支持从 `merchant_id` 或 `scene` 解析商家入口参数。
+- 店铺首页公开数据请求进入页面后立即发起，不依赖先完成登录。
+
 **响应：**
 
 ```json
@@ -3495,6 +3498,8 @@ GET /api/v1/store/{merchant_id}/delivery-rules
 ```
 
 > **说明**：获取商家的配送费规则，前端基于商家返回的配送档位供用户手动选择，实际配送费仍以后端创建订单时的校验和计算结果为准。
+
+- `pages/store/confirm` 进入页面后先加载配送规则，再执行登录与埋点流程。
 
 **响应：**
 
@@ -4965,6 +4970,7 @@ miniprogram/                    # 微信小程序
 | 参数名          | 类型     | 必填 | 说明                 |
 | ------------ | ------ | -- | ------------------ |
 | merchant\_id | number | 是  | 商家ID，用于加载对应商家的店铺数据 |
+| scene | string | 否 | 扫码场景值，支持解析 `merchant_id` 与业务扩展参数 |
 
 ##### 使用示例
 

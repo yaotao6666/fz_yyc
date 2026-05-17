@@ -152,7 +152,7 @@ const form = reactive<SpMerchantFormData>({
 })
 
 const paymentConfigStatusText = computed(() => {
-  const hasSubMchId = form.sub_mch_id.trim().length > 0
+  const hasSubMchId = (form.sub_mch_id || '').trim().length > 0
   if (!hasSubMchId) {
     return PaymentConfigStatusText[0]
   }
@@ -221,7 +221,7 @@ function validateBasicInfo() {
 
 function validatePaymentConfig() {
   normalizeRatio()
-  if (!form.sub_mch_id.trim()) {
+  if ((form.sub_mch_id || '').trim()) {
     uni.showToast({ title: '请输入收款子商户号', icon: 'none' })
     return false
   }
@@ -242,13 +242,13 @@ async function submitBasicInfo() {
     if (isEditMode.value) {
       const payload: UpdateSpMerchantFormData = {
         name: form.name.trim(),
-        contact_name: form.contact_name.trim(),
-        contact_phone: form.contact_phone.trim(),
-        contact_email: form.contact_email.trim(),
-        address: form.address.trim(),
-        business_category: form.business_category.trim(),
-        business_hours: form.business_hours.trim(),
-        announcement: form.announcement.trim()
+        contact_name: (form.contact_name || '').trim(),
+        contact_phone: (form.contact_phone || '').trim(),
+        contact_email: (form.contact_email || '').trim(),
+        address: (form.address || '').trim(),
+        business_category: (form.business_category || '').trim(),
+        business_hours: (form.business_hours || '').trim(),
+        announcement: (form.announcement || '').trim()
       }
       await updateSpMerchant(merchantId.value, payload)
       uni.showToast({ title: '基础信息已保存', icon: 'success' })
@@ -259,18 +259,18 @@ async function submitBasicInfo() {
     const created = await createSpMerchant({
       ...form,
       name: form.name.trim(),
-      contact_name: form.contact_name.trim(),
-      contact_phone: form.contact_phone.trim(),
-      contact_email: form.contact_email.trim(),
-      address: form.address.trim(),
-      business_category: form.business_category.trim(),
-      business_hours: form.business_hours.trim(),
-      announcement: form.announcement.trim(),
+      contact_name: (form.contact_name || '').trim(),
+      contact_phone: (form.contact_phone || '').trim(),
+      contact_email: (form.contact_email || '').trim(),
+      address: (form.address || '').trim(),
+      business_category: (form.business_category || '').trim(),
+      business_hours: (form.business_hours || '').trim(),
+      announcement: (form.announcement || '').trim(),
       username: form.username.trim(),
       password: form.password.trim(),
-      staff_name: form.staff_name.trim(),
-      staff_phone: form.staff_phone.trim(),
-      sub_mch_id: form.sub_mch_id.trim()
+      staff_name: (form.staff_name || '').trim(),
+      staff_phone: (form.staff_phone || '').trim(),
+      sub_mch_id: (form.sub_mch_id || '').trim()
     })
 
     merchantId.value = created.id
@@ -298,7 +298,7 @@ async function submitPaymentConfig() {
   savingPayment.value = true
   try {
     const payload: MerchantPaymentConfigFormData = {
-      sub_mch_id: form.sub_mch_id.trim(),
+      sub_mch_id: (form.sub_mch_id || '').trim(),
       profit_sharing_enabled: form.profit_sharing_enabled,
       profit_sharing_ratio: form.profit_sharing_ratio
     }
@@ -393,10 +393,15 @@ function onProfitSharingChange(event: any) {
   background: #f7f8fa;
   font-size: 28rpx;
   color: #1f2329;
+  line-height: 40rpx;
+}
+
+.form-input {
+  height: 84rpx;
 }
 
 .form-textarea {
-  min-height: 160rpx;
+  height: 160rpx;
 }
 
 .switch-row {

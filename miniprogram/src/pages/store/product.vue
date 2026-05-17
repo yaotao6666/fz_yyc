@@ -6,7 +6,7 @@
         <image :src="image" mode="aspectFill" class="swiper-image" />
       </swiper-item>
       <swiper-item v-if="!product.images?.length">
-        <image src="/static/default-product.png" mode="aspectFill" class="swiper-image" />
+        <image :src="BrandAsset.DEFAULT_PRODUCT_IMAGE" mode="aspectFill" class="swiper-image" />
       </swiper-item>
     </swiper>
 
@@ -104,12 +104,13 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
-import { getStoreProduct } from '@api'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { getStoreProduct } from '../../api/store'
 import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
-import { useAuth } from '../../utils/useAuth'
+import { parseStoreProductEntryOptions } from '@utils/storeEntry'
 import type { Product, SpecOption } from '@types'
+import { BrandAsset } from '../../utils/constants'
 
 const cartStore = useCartStore()
 const { trackProductView } = useAnalytics()
@@ -119,6 +120,7 @@ const quantity = ref(1)
 const selectedSpecs = reactive<Record<string, string>>({})
 const merchantId = ref(1)
 const productId = ref(1)
+const entrySource = ref('scan')
 
 const cartCount = computed(() => cartStore.totalCount)
 
@@ -154,15 +156,25 @@ const selectedStock = computed(() => {
   return product.value.stock
 })
 
-onShow(async () => {
+function applyEntryOptions(options?: Record<string, any>) {
+  const { merchantId: nextMerchantId, productId: nextProductId, source } = parseStoreProductEntryOptions(
+    options,
+    merchantId.value,
+    productId.value
+  )
+  merchantId.value = nextMerchantId
+  productId.value = nextProductId
+  entrySource.value = source
+}
+
+onLoad((options) => {
+  applyEntryOptions(options as Record<string, any> | undefined)
+})
+
+onShow(() => {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
-  merchantId.value = Number(currentPage?.options?.merchant_id) || 1
-  productId.value = Number(currentPage?.options?.product_id) || 1
-
-  const { ensureAuth } = useAuth()
-  await ensureAuth()
-
+  applyEntryOptions(currentPage?.options)
   loadProduct()
 })
 

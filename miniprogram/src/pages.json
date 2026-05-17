@@ -179,7 +179,8 @@
       "path": "pages/store/home",
       "style": {
         "navigationBarTitleText": "店铺首页",
-        "navigationBarBackgroundColor": "#FFFFFF"
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "enablePullDownRefresh": true
       }
     },
     {

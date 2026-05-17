@@ -44,6 +44,8 @@
   - `Authorization: Bearer {user_token}` 用于 `GET/POST /api/v1/user/*`
   - `Authorization: Bearer {user_token}` 用于 `POST /api/v1/store/:merchant_id/orders`（下单）
   - `/api/v1/store/:merchant_id/home`、`/products`、`/products/:product_id`、`/delivery-rules` 为公开接口，不要求登录
+  - `pages/store/home`、`pages/store/product`、`pages/store/confirm` 统一支持从 `merchant_id` 或 `scene` 解析商家入口参数
+  - `GET /api/v1/store/:merchant_id/home` 与 `GET /api/v1/store/:merchant_id/delivery-rules` 进入页面后可直接发起，不等待登录完成
 
 #### C 端访问与埋点
 

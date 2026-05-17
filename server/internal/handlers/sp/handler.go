@@ -183,6 +183,9 @@ func GetMerchantDetail(c *gin.Context) {
 	var totalOrders int64
 	database.DB.Model(&models.Order{}).Where("merchant_id = ?", id).Count(&totalOrders)
 
+	var totalUsers int64
+	database.DB.Model(&models.UserVisit{}).Where("merchant_id = ?", id).Distinct("user_id").Count(&totalUsers)
+
 	var totalAmount float64
 	database.DB.Model(&models.Order{}).
 		Where("merchant_id = ? AND status >= 2", id).
@@ -210,7 +213,7 @@ func GetMerchantDetail(c *gin.Context) {
 		"payment_config_status":  merchant.PaymentConfigStatus,
 		"total_orders":           totalOrders,
 		"total_amount":           totalAmount,
-		"total_users":            0,
+		"total_users":            totalUsers,
 	})
 }
 
@@ -262,10 +265,75 @@ func GetMerchantDistribution(c *gin.Context) {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
 		return
 	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "6"))
+	sortBy := c.DefaultQuery("sort_by", "order_amount")
+	sortOrder := c.DefaultQuery("sort_order", "desc")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 50 {
+		pageSize = 6
+	}
+
 	metrics, totals := buildSpMerchantMetrics(serviceProviderID)
+
+	validSortFields := map[string]string{
+		"visit_rate":       "visit_rate",
+		"order_rate":       "order_rate",
+		"order_amount":     "order_amount",
+		"avg_order_amount": "avg_order_amount",
+		"visit_users":      "visit_users",
+		"order_users":      "order_users",
+		"paid_orders":      "paid_orders",
+	}
+	if _, valid := validSortFields[sortBy]; !valid {
+		sortBy = "order_amount"
+	}
+	if sortOrder != "asc" {
+		sortOrder = "desc"
+	}
+
+	sortField := validSortFields[sortBy]
+	sortMultiplier := 1.0
+	if sortOrder == "desc" {
+		sortMultiplier = -1.0
+	}
+	sortSlice(metrics, func(item gin.H) float64 {
+		if val, ok := item[sortField]; ok {
+			switch v := val.(type) {
+			case float64:
+				return v * sortMultiplier
+			case int64:
+				return float64(v) * sortMultiplier
+			case int:
+				return float64(v) * sortMultiplier
+			}
+		}
+		return 0
+	})
+
+	total := len(metrics)
+	start := (page - 1) * pageSize
+	if start > total {
+		start = total
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	pagedMetrics := metrics[start:end]
+
 	response.Success(c, gin.H{
-		"merchants": metrics,
+		"merchants": pagedMetrics,
 		"totals":    totals,
+		"pagination": gin.H{
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
 	})
 }
 
@@ -307,8 +375,51 @@ func GetMerchantList(c *gin.Context) {
 		return
 	}
 
+	list := make([]gin.H, 0, len(merchants))
+	for _, m := range merchants {
+		var totalUsers int64
+		database.DB.Model(&models.UserVisit{}).
+			Where("merchant_id = ?", m.ID).
+			Distinct("user_id").
+			Count(&totalUsers)
+
+		var totalOrders int64
+		database.DB.Model(&models.Order{}).
+			Where("merchant_id = ?", m.ID).
+			Count(&totalOrders)
+
+		var totalAmount float64
+		database.DB.Model(&models.Order{}).
+			Where("merchant_id = ? AND status >= 2", m.ID).
+			Select("COALESCE(SUM(pay_amount), 0)").
+			Scan(&totalAmount)
+
+		list = append(list, gin.H{
+			"id":                     m.ID,
+			"name":                   m.Name,
+			"logo":                   buildAccessibleMerchantAsset(m.Logo),
+			"cover_image":            buildAccessibleMerchantAsset(m.CoverImage),
+			"contact_name":           m.ContactName,
+			"contact_phone":          m.ContactPhone,
+			"contact_email":          m.ContactEmail,
+			"address":                m.Address,
+			"business_category":      m.BusinessCategory,
+			"business_hours":         m.BusinessHours,
+			"announcement":           m.Announcement,
+			"status":                 m.Status,
+			"sub_mch_id":             m.SubMchID,
+			"profit_sharing_enabled": m.ProfitSharingEnabled,
+			"profit_sharing_ratio":   m.ProfitSharingRatio,
+			"payment_config_status":  m.PaymentConfigStatus,
+			"created_at":             m.CreatedAt,
+			"total_users":            totalUsers,
+			"total_orders":           totalOrders,
+			"total_amount":           totalAmount,
+		})
+	}
+
 	response.Success(c, gin.H{
-		"list": merchants,
+		"list": list,
 		"pagination": gin.H{
 			"total":     total,
 			"page":      page,
@@ -517,6 +628,17 @@ func buildSpMerchantMetrics(serviceProviderID uint64) ([]gin.H, gin.H) {
 
 func totalCountInt64(value int) int64 {
 	return int64(value)
+}
+
+func sortSlice(items []gin.H, keyFunc func(gin.H) float64) {
+	n := len(items)
+	for i := 0; i < n-1; i++ {
+		for j := i + 1; j < n; j++ {
+			if keyFunc(items[i]) > keyFunc(items[j]) {
+				items[i], items[j] = items[j], items[i]
+			}
+		}
+	}
 }
 
 func getSpMerchantMetricValue(item gin.H, metric string) float64 {

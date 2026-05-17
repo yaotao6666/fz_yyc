@@ -68,6 +68,7 @@
 - `pages/store/my-orders`：我的订单
 - `pages/store/order-detail`：订单详情
 - `pages/store/order-sound-test`：商家 WebSocket 联调测试页
+- `pages/store/home`、`pages/store/product`、`pages/store/confirm`：统一支持从 `merchant_id` 或 `scene` 解析商家入口参数
 
 ### 3.3 服务商端页面
 
@@ -193,11 +194,12 @@
 1. 商家登录
 2. 配置商品与分类
 3. 用户扫码进店
-4. 浏览商品并加入购物车
-5. 下单支付
-6. 商家收到提醒
-7. 商家核销
-8. 服务商查看统计分析
+4. 店铺首页、商品详情、确认订单按统一入口参数加载当前商家数据
+5. 浏览商品并加入购物车
+6. 下单支付
+7. 商家收到提醒
+8. 商家核销
+9. 服务商查看统计分析
 
 ### 5.2 服务商配置与分账主链路
 

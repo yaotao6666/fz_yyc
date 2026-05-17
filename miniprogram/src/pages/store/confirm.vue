@@ -87,7 +87,7 @@
         >
           <image
             class="goods-image"
-            :src="item.image || '/static/default-product.png'"
+            :src="item.image || BrandAsset.DEFAULT_PRODUCT_IMAGE"
             mode="aspectFill"
           />
           <view class="goods-info">
@@ -133,12 +133,14 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
-import { createOrder, getStoreDeliveryRules } from '@api'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { createOrder, getStoreDeliveryRules } from '../../api/store'
 import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
 import { useAuth } from '../../utils/useAuth'
+import { parseStoreEntryOptions } from '@utils/storeEntry'
 import type { CreateOrderRequest } from '@types'
+import { BrandAsset } from '../../utils/constants'
 
 const cartStore = useCartStore()
 const { trackPageView, trackPayment } = useAnalytics()
@@ -157,6 +159,7 @@ const deliveryDistance = ref(0)
 const deliveryDistanceIndex = ref(0)
 const remark = ref('')
 const merchantId = ref(1)
+const entrySource = ref('scan')
 const deliveryConfig = ref({
   enabled: false,
   base_fee: 0,
@@ -168,17 +171,27 @@ const deliveryConfig = ref({
 // 配送档位选项
 const deliveryRules = ref<{ distance: number; fee: number; label: string }[]>([])
 
+function applyEntryOptions(options?: Record<string, any>) {
+  const { merchantId: nextMerchantId, source } = parseStoreEntryOptions(options, merchantId.value)
+  merchantId.value = nextMerchantId
+  entrySource.value = source
+}
+
+onLoad((options) => {
+  applyEntryOptions(options as Record<string, any> | undefined)
+})
+
 onShow(async () => {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
-  merchantId.value = Number(currentPage?.options?.merchant_id) || 1
+  applyEntryOptions(currentPage?.options)
+
+  // 配送规则属于公开店铺数据，不应被登录流程阻塞。
+  await loadDeliveryRules()
 
   const { ensureAuth } = useAuth()
-  await ensureAuth()
-
-  // 加载配送规则
-  loadDeliveryRules()
-  trackPageView('store_confirm', merchantId.value)
+  void ensureAuth()
+  void trackPageView('store_confirm', merchantId.value, entrySource.value)
 })
 
 async function loadDeliveryRules() {

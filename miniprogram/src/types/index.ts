@@ -239,6 +239,11 @@ export interface MerchantDistributionData {
     paid_orders: number
     order_amount: number
   }
+  pagination?: {
+    total: number
+    page: number
+    page_size: number
+  }
 }
 
 export interface OrderAnalyticsData {
@@ -732,6 +737,7 @@ export interface MerchantWechatLoginRequest {
 }
 
 export interface MerchantBehaviorEventRequest {
+  openid?: string
   event_type: 'page_view' | 'product_view' | 'submit_order' | 'pay_success'
   page?: string
   product_id?: number

@@ -3,7 +3,7 @@
  * 用于记录用户访问、点击等行为事件
  */
 
-import { trackStoreBehaviorEvent } from '../api'
+import { trackStoreBehaviorEvent } from '../api/store'
 import { post } from './request'
 import { useAuth } from './useAuth'
 

@@ -519,7 +519,7 @@ async function submitRefund() {
   background: #f5f5f5;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 140vh;
   box-sizing: border-box;
 }
 

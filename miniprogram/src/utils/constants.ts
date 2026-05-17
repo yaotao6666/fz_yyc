@@ -56,7 +56,8 @@ export const InviteStatus = {
 
 export const BrandAsset = {
   APP_LOGO: '/static/brand-icons/xunmeng-private-butler/icon-circle-aggregated-portal.svg',
-  DEFAULT_MERCHANT_LOGO: '/static/brand-icons/xunmeng-private-butler/icon-circle-store-data-butler.svg'
+  DEFAULT_MERCHANT_LOGO: '/static/brand-icons/xunmeng-private-butler/icon-circle-store-data-butler.svg',
+  DEFAULT_PRODUCT_IMAGE: '/static/logo.png'
 } as const
 
 export default {
