@@ -161,6 +161,7 @@
   - `profit_sharing_order_no`
   - `profit_sharing_at`
   - `profit_sharing_error`
+- 支付成功并完成订单状态回写后，后端向商家 WebSocket 推送 `order_notify`。
 
 ### 2.6 支付与分账接口
 
@@ -228,6 +229,7 @@
 - 商家登录成功后建立连接。
 - 商家退出登录时主动断开。
 - 商家登录失效触发 401 时，也要收口前端登录态并主动断开。
+- `order_notify` 用于商家支付成功后的新订单提醒；`store_visit_notify` 用于顾客进店提醒。
 - 非开发环境不应暴露不必要的联调接口。
 
 ## 3. 返回结构与空值约定

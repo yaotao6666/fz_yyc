@@ -124,8 +124,8 @@
         <text class="total-label">实付金额</text>
         <text class="total-amount">¥{{ totalAmount.toFixed(2) }}</text>
       </view>
-      <view class="submit-btn" @click="submitOrder">
-        提交订单
+      <view class="submit-btn" :class="{ disabled: submitting }" @click="submitOrder">
+        {{ submitting ? '处理中...' : '提交订单' }}
       </view>
     </view>
   </view>
@@ -160,6 +160,7 @@ const deliveryDistanceIndex = ref(0)
 const remark = ref('')
 const merchantId = ref(1)
 const entrySource = ref('scan')
+const submitting = ref(false)
 const deliveryConfig = ref({
   enabled: false,
   base_fee: 0,
@@ -252,6 +253,10 @@ const totalAmount = computed(() => {
 })
 
 async function submitOrder() {
+  if (submitting.value) {
+    return
+  }
+
   const { ensureAuth } = useAuth()
   const authed = await ensureAuth()
   if (!authed) {
@@ -307,12 +312,10 @@ async function submitOrder() {
   }
 
   try {
+    submitting.value = true
     uni.showLoading({ title: '创建订单中...' })
 
     const res = await createOrder(merchantId.value, orderData)
-
-    // 清除购物车
-    cartStore.clearCart()
 
     // 发起微信支付
     if (res.pay_params) {
@@ -325,6 +328,7 @@ async function submitOrder() {
         paySign: res.pay_params.paySign,
         success: async () => {
           uni.hideLoading()
+          cartStore.clearCart()
           uni.showToast({ title: '支付成功', icon: 'success' })
           await trackPayment(merchantId.value, res.order.id, res.order.pay_amount)
           
@@ -347,11 +351,15 @@ async function submitOrder() {
           } else {
             uni.showToast({ title: '支付失败', icon: 'none' })
           }
+        },
+        complete: () => {
+          submitting.value = false
         }
       })
     } else {
       // 无需支付，直接跳转订单页
       uni.hideLoading()
+      cartStore.clearCart()
       uni.showToast({ title: '订单创建成功', icon: 'success' })
       await trackPayment(merchantId.value, res.order.id, res.order.pay_amount)
       
@@ -360,9 +368,11 @@ async function submitOrder() {
           url: `/pages/store/my-orders?merchant_id=${merchantId.value}`
         })
       }, 1500)
+      submitting.value = false
     }
   } catch (error: any) {
     uni.hideLoading()
+    submitting.value = false
     uni.showToast({ title: error.message || '创建订单失败', icon: 'none' })
   }
 }
@@ -595,5 +605,9 @@ async function submitOrder() {
   font-size: 32rpx;
   font-weight: 500;
   color: #ffffff;
+}
+
+.submit-btn.disabled {
+  opacity: 0.72;
 }
 </style>

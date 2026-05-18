@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 	"time"
 
@@ -10,6 +12,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+)
+
+const (
+	orderNoRandomDigits    = 6
+	orderNoMerchantMaxSize = 12
 )
 
 // Pagination 分页参数
@@ -55,12 +62,29 @@ func (p *Pagination) IsLastPage() bool {
 	return p.Page >= p.GetTotalPages()
 }
 
+func generateFixedDigitsRandom(length int) string {
+	if length <= 0 {
+		return ""
+	}
+
+	upperBound := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(length)), nil)
+	randomNumber, err := rand.Int(rand.Reader, upperBound)
+	if err != nil {
+		return fmt.Sprintf("%0*d", length, time.Now().UnixNano()%int64(upperBound.Int64()))
+	}
+	return fmt.Sprintf("%0*d", length, randomNumber.Int64())
+}
+
 // GenerateOrderNo 生成订单号
-func GenerateOrderNo() string {
+func GenerateOrderNo(merchantID uint64) string {
 	now := time.Now()
 	dateStr := now.Format("20060102150405")
-	random := fmt.Sprintf("%04d", now.UnixNano()%10000)
-	return dateStr + random
+	merchantIDStr := strconv.FormatUint(merchantID, 10)
+	if len(merchantIDStr) > orderNoMerchantMaxSize {
+		merchantIDStr = merchantIDStr[len(merchantIDStr)-orderNoMerchantMaxSize:]
+	}
+	random := generateFixedDigitsRandom(orderNoRandomDigits)
+	return dateStr + merchantIDStr + random
 }
 
 // GenerateVerifyCode 生成核销码（6位数字）

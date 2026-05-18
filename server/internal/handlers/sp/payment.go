@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"fz_yyc_api/internal/config"
+	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"math"
 	"net/http"
 	"strings"
@@ -93,7 +94,11 @@ func PaymentNotify(c *gin.Context) {
 }
 
 func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProviderClient, notifyResult *wechatpay.NotifyResult) error {
-	return database.DB.Transaction(func(tx *gorm.DB) error {
+	var shouldBroadcastOrderNotify bool
+	var notifyMerchantID uint64
+	var notifyOrderNo string
+
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		var order models.Order
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("order_no = ?", notifyResult.OrderNo).
@@ -119,6 +124,9 @@ func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProvide
 		if order.Status < 2 {
 			payUpdates["status"] = 2
 			payUpdates["paid_at"] = paySuccessAt
+			shouldBroadcastOrderNotify = true
+			notifyMerchantID = order.MerchantID
+			notifyOrderNo = order.OrderNo
 		} else if order.PaidAt == nil {
 			payUpdates["paid_at"] = paySuccessAt
 		}
@@ -157,18 +165,18 @@ func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProvide
 		}
 
 		record := models.MerchantProfitSharingRecord{
-			ServiceProviderID:       merchant.ServiceProviderID,
-			MerchantID:              merchant.ID,
-			OrderID:                 order.ID,
-			OrderNo:                 order.OrderNo,
-			TransactionID:           notifyResult.TransactionID,
-			ProfitSharingOrderNo:    profitSharingOrderNo,
-			ProfitSharingDate:       time.Now(),
-			PayAmount:               order.PayAmount,
-			ProfitSharingRatio:      ratio,
-			ProfitSharingAmount:     profitSharingAmount,
-			MerchantReceivedAmount:  merchantReceivedAmount,
-			Status:                  profitSharingPending,
+			ServiceProviderID:      merchant.ServiceProviderID,
+			MerchantID:             merchant.ID,
+			OrderID:                order.ID,
+			OrderNo:                order.OrderNo,
+			TransactionID:          notifyResult.TransactionID,
+			ProfitSharingOrderNo:   profitSharingOrderNo,
+			ProfitSharingDate:      time.Now(),
+			PayAmount:              order.PayAmount,
+			ProfitSharingRatio:     ratio,
+			ProfitSharingAmount:    profitSharingAmount,
+			MerchantReceivedAmount: merchantReceivedAmount,
+			Status:                 profitSharingPending,
 		}
 		if err := tx.Create(&record).Error; err != nil {
 			return fmt.Errorf("创建分账记录失败: %w", err)
@@ -235,6 +243,13 @@ func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProvide
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	if shouldBroadcastOrderNotify {
+		wsHandler.BroadcastOrderNotify(notifyMerchantID, notifyOrderNo)
+	}
+	return nil
 }
 
 func processRefundNotify(ctx context.Context, plaintext []byte) error {

@@ -714,7 +714,7 @@ func CreateOrder(c *gin.Context) {
 
 	payAmount := totalAmount + deliveryFee
 
-	orderNo := utils.GenerateOrderNo()
+	orderNo := utils.GenerateOrderNo(req.MerchantID)
 	verifyCode := utils.GenerateVerifyCode()
 
 	tx := database.DB.Begin()
