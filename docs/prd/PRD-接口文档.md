@@ -102,6 +102,9 @@
 当前重点约束：
 
 - 商家资料更新需支持 `logo` 与背景图字段。
+- `GET /api/v1/merchant/settings` 需返回 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled`，`PUT /api/v1/merchant/settings` 需支持更新这三个开关。
+- `GET /api/v1/store/:merchant_id/delivery-rules` 除配送费结构外，还需返回 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 供确认页动态展示下单方式。
+- `delivery_settings.enabled` 只表示配送费规则是否生效，确认页是否展示“配送”必须以后端返回的 `takeout_enabled` 为准。
 - 服务商若代商家维护资料，必须通过明确的服务商侧管理接口或授权更新接口。
 - 商家分账历史至少返回：
   - `profit_sharing_date`
@@ -149,6 +152,11 @@
   - `reason`
   - `refund_amount`
 - 商家退款接口在未传 `refund_amount` 或传入 `<= 0` 时，默认按订单实付金额处理。
+- C 端创建订单接口需按 `delivery_type` 与三字段一一校验：
+  - `delivery_type=1` 校验 `takeout_enabled`
+  - `delivery_type=2` 校验 `dine_in_enabled`
+  - `delivery_type=3` 校验 `pickup_enabled`
+- 当对应方式未开启时，接口分别返回“商家暂未开启配送 / 堂食 / 自提”。
 - **退款状态口径**：
   - 订单 `status=5`：退款中（已发起退款流程；接口会先主动同步一次微信退款状态，未拿到最终结果时继续等待微信退款结果）
   - 订单 `status=6`：已退款（接口主动同步或收到微信退款成功回调后写入）

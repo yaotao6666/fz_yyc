@@ -180,6 +180,7 @@ func GetSettings(c *gin.Context) {
 		"min_order_amount":      merchant.MinOrderAmount,
 		"takeout_enabled":       merchant.TakeoutEnabled,
 		"dine_in_enabled":       merchant.DineInEnabled,
+		"pickup_enabled":        merchant.PickupEnabled,
 		"notify_enabled":        notifyEnabled,
 		"browse_notify_enabled": browseNotifyEnabled,
 		"wechat_bound":          wechatBound,
@@ -192,6 +193,7 @@ func GetSettings(c *gin.Context) {
 type UpdateSettingsRequest struct {
 	TakeoutEnabled      *bool `json:"takeout_enabled"`
 	DineInEnabled       *bool `json:"dine_in_enabled"`
+	PickupEnabled       *bool `json:"pickup_enabled"`
 	NotifyEnabled       *bool `json:"notify_enabled"`
 	BrowseNotifyEnabled *bool `json:"browse_notify_enabled"`
 }
@@ -211,6 +213,9 @@ func UpdateSettings(c *gin.Context) {
 	}
 	if req.DineInEnabled != nil {
 		merchantUpdates["dine_in_enabled"] = *req.DineInEnabled
+	}
+	if req.PickupEnabled != nil {
+		merchantUpdates["pickup_enabled"] = *req.PickupEnabled
 	}
 
 	if len(merchantUpdates) > 0 {
@@ -312,12 +317,27 @@ func GetQRCode(c *gin.Context) {
 func GetDeliverySettings(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
 
+	var merchant models.Merchant
+	if err := database.DB.Select("id", "takeout_enabled", "dine_in_enabled", "pickup_enabled").First(&merchant, merchantID).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
+		return
+	}
+
 	var settings models.MerchantDeliverySettings
 	if err := database.DB.Where("merchant_id = ?", merchantID).First(&settings).Error; err != nil {
 		settings = models.MerchantDeliverySettings{MerchantID: merchantID}
 	}
 
-	response.Success(c, settings)
+	response.Success(c, gin.H{
+		"enabled":              settings.Enabled,
+		"base_fee":             settings.BaseFee,
+		"free_delivery_amount": settings.FreeDeliveryAmount,
+		"max_distance":         settings.MaxDistance,
+		"distance_rules":       settings.DistanceRules,
+		"takeout_enabled":      merchant.TakeoutEnabled,
+		"dine_in_enabled":      merchant.DineInEnabled,
+		"pickup_enabled":       merchant.PickupEnabled,
+	})
 }
 
 type DeliverySettingsRequest struct {
@@ -390,6 +410,12 @@ func normalizeDeliverySettingsRules(req DeliverySettingsRequest) ([]normalizedDi
 func UpdateDeliverySettings(c *gin.Context) {
 	merchantID := middleware.GetMerchantID(c)
 
+	var merchant models.Merchant
+	if err := database.DB.Select("id", "takeout_enabled", "dine_in_enabled", "pickup_enabled").First(&merchant, merchantID).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
+		return
+	}
+
 	var req DeliverySettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -420,5 +446,14 @@ func UpdateDeliverySettings(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, settings)
+	response.Success(c, gin.H{
+		"enabled":              settings.Enabled,
+		"base_fee":             settings.BaseFee,
+		"free_delivery_amount": settings.FreeDeliveryAmount,
+		"max_distance":         settings.MaxDistance,
+		"distance_rules":       settings.DistanceRules,
+		"takeout_enabled":      merchant.TakeoutEnabled,
+		"dine_in_enabled":      merchant.DineInEnabled,
+		"pickup_enabled":       merchant.PickupEnabled,
+	})
 }

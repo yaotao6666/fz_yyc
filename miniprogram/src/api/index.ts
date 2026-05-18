@@ -27,6 +27,8 @@ import type {
   ChangePasswordRequest,
   UploadTokenResponse,
   DeliverySettings,
+  MerchantDeliverySettings,
+  StoreDeliveryRules,
   Category,
   Product,
   ProductListResponse,
@@ -111,6 +113,26 @@ function normalizeDeliverySettings(data: Partial<DeliverySettings> | null | unde
   }
 }
 
+function normalizeStoreDeliveryRules(data: Partial<StoreDeliveryRules> | null | undefined): StoreDeliveryRules {
+  return {
+    ...normalizeDeliverySettings(data),
+    takeout_enabled: !!data?.takeout_enabled,
+    dine_in_enabled: !!data?.dine_in_enabled,
+    pickup_enabled: !!data?.pickup_enabled
+  }
+}
+
+function normalizeMerchantDeliverySettings(
+  data: Partial<MerchantDeliverySettings> | null | undefined
+): MerchantDeliverySettings {
+  return {
+    ...normalizeDeliverySettings(data),
+    takeout_enabled: !!data?.takeout_enabled,
+    dine_in_enabled: !!data?.dine_in_enabled,
+    pickup_enabled: !!data?.pickup_enabled
+  }
+}
+
 function normalizeArrayResponse<T>(response: T[] | null | undefined): T[] {
   return Array.isArray(response) ? response : []
 }
@@ -125,6 +147,9 @@ function normalizeListField<T, R extends { list?: T[] | null }>(response: R): R 
 function normalizeMerchantSettings(data: MerchantSettings): MerchantSettings {
   return {
     ...data,
+    takeout_enabled: !!data?.takeout_enabled,
+    dine_in_enabled: !!data?.dine_in_enabled,
+    pickup_enabled: !!data?.pickup_enabled,
     delivery_settings: data?.delivery_settings
       ? normalizeDeliverySettings(data.delivery_settings)
       : undefined
@@ -313,7 +338,7 @@ export function unbindMerchantWechat() {
  * 获取配送设置
  */
 export function getDeliverySettings() {
-  return get<DeliverySettings>('/api/v1/merchant/delivery-settings').then(normalizeDeliverySettings)
+  return get<MerchantDeliverySettings>('/api/v1/merchant/delivery-settings').then(normalizeMerchantDeliverySettings)
 }
 
 /**
@@ -321,7 +346,7 @@ export function getDeliverySettings() {
  */
 export function updateDeliverySettings(data: Partial<DeliverySettings>) {
   const payload = normalizeDeliverySettings(data)
-  return put<DeliverySettings>('/api/v1/merchant/delivery-settings', payload).then(normalizeDeliverySettings)
+  return put<MerchantDeliverySettings>('/api/v1/merchant/delivery-settings', payload).then(normalizeMerchantDeliverySettings)
 }
 
 /**
@@ -872,13 +897,7 @@ export function getStoreProduct(merchantId: number, productId: number) {
  * 获取配送费规则
  */
 export function getStoreDeliveryRules(merchantId: number) {
-  return get<{
-    enabled: boolean
-    base_fee: number
-    free_delivery_amount: number
-    max_distance: number
-    distance_rules: { min_distance: number; max_distance: number; fee: number }[]
-  }>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeDeliverySettings)
+  return get<StoreDeliveryRules>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeStoreDeliveryRules)
 }
 
 // ============ C端订单相关 ============

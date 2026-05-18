@@ -5,6 +5,7 @@ import type {
   MerchantBehaviorEventRequest,
   Product,
   ProductListResponse,
+  StoreDeliveryRules,
   StoreHomeInfo
 } from '../types'
 
@@ -35,6 +36,15 @@ function normalizeDeliverySettings(data: any) {
     free_delivery_amount: Number(data?.free_delivery_amount || 0),
     max_distance: Number(data?.max_distance || 10),
     distance_rules: parseDistanceRules(data?.distance_rules)
+  }
+}
+
+function normalizeStoreDeliveryRules(data: any): StoreDeliveryRules {
+  return {
+    ...normalizeDeliverySettings(data),
+    takeout_enabled: !!data?.takeout_enabled,
+    dine_in_enabled: !!data?.dine_in_enabled,
+    pickup_enabled: !!data?.pickup_enabled
   }
 }
 
@@ -148,13 +158,7 @@ export function getStoreProduct(merchantId: number, productId: number) {
 }
 
 export function getStoreDeliveryRules(merchantId: number) {
-  return get<{
-    enabled: boolean
-    base_fee: number
-    free_delivery_amount: number
-    max_distance: number
-    distance_rules: { min_distance: number; max_distance: number; fee: number }[]
-  }>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeDeliverySettings)
+  return get<StoreDeliveryRules>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeStoreDeliveryRules)
 }
 
 export function createOrder(merchantId: number, data: CreateOrderRequest) {

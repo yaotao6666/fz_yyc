@@ -193,17 +193,35 @@ func ensureOrderColumns(db *gorm.DB) error {
 }
 
 func ensureMerchantColumns(db *gorm.DB) error {
-	merchantColumns := map[string]string{
-		"cover_image":             "ADD COLUMN cover_image VARCHAR(512) DEFAULT NULL COMMENT '商家背景图' AFTER logo",
-		"profit_sharing_enabled":  "ADD COLUMN profit_sharing_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否开启分账' AFTER sub_mch_id",
-		"profit_sharing_ratio":    "ADD COLUMN profit_sharing_ratio DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT '分账比例' AFTER profit_sharing_enabled",
-		"payment_config_status":   "ADD COLUMN payment_config_status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '支付配置状态' AFTER profit_sharing_ratio",
+	type merchantColumn struct {
+		name   string
+		addSQL string
 	}
 
-	for columnName, addSQL := range merchantColumns {
-		if err := ensureTableColumn(db, "merchants", columnName, addSQL); err != nil {
+	merchantColumns := []merchantColumn{
+		{name: "cover_image", addSQL: "ADD COLUMN cover_image VARCHAR(512) DEFAULT NULL COMMENT '商家背景图' AFTER logo"},
+		{name: "takeout_enabled", addSQL: "ADD COLUMN takeout_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否支持配送' AFTER min_order_amount"},
+		{name: "dine_in_enabled", addSQL: "ADD COLUMN dine_in_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否支持堂食' AFTER takeout_enabled"},
+		{name: "pickup_enabled", addSQL: "ADD COLUMN pickup_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否支持自提' AFTER dine_in_enabled"},
+		{name: "profit_sharing_enabled", addSQL: "ADD COLUMN profit_sharing_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否开启分账' AFTER sub_mch_id"},
+		{name: "profit_sharing_ratio", addSQL: "ADD COLUMN profit_sharing_ratio DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT '分账比例' AFTER profit_sharing_enabled"},
+		{name: "payment_config_status", addSQL: "ADD COLUMN payment_config_status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '支付配置状态' AFTER profit_sharing_ratio"},
+	}
+
+	for _, column := range merchantColumns {
+		if err := ensureTableColumn(db, "merchants", column.name, column.addSQL); err != nil {
 			return err
 		}
+	}
+
+	// 兼容历史库中已存在但值为空的场景，统一补成开启，避免下单方式被错误隐藏。
+	if err := db.Exec(`
+		UPDATE merchants
+		SET takeout_enabled = COALESCE(takeout_enabled, 1),
+			dine_in_enabled = COALESCE(dine_in_enabled, 1),
+			pickup_enabled = COALESCE(pickup_enabled, 1)
+	`).Error; err != nil {
+		return err
 	}
 
 	return nil

@@ -58,6 +58,7 @@
 - `pages/merchant/notification-settings`：消息提醒设置
 - `pages/merchant/delivery-settings`：配送设置
 - `pages/merchant/staff`：员工管理
+- `pages/merchant/delivery-settings` 统一管理配送、堂食、自提三个下单方式开关；配送费与距离规则只服务于配送场景
 
 ### 3.2 用户端页面
 
@@ -69,6 +70,7 @@
 - `pages/store/order-detail`：订单详情
 - `pages/store/order-sound-test`：商家 WebSocket 联调测试页
 - `pages/store/home`、`pages/store/product`、`pages/store/confirm`：统一支持从 `merchant_id` 或 `scene` 解析商家入口参数
+- `pages/store/confirm` 根据 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 动态展示可选下单方式，未开启的方式不展示
 
 ### 3.3 服务商端页面
 
@@ -117,6 +119,11 @@
 - 商家可以维护商品、分类、规格、图片与上下架状态。
 - 用户端商品价格计算遵循“基础价 + 规格加价”。
 - 店铺首页点击商品 `+` 支持弹出规格与数量选择。
+- 确认订单页只展示商家已开启的下单方式：
+  - 配送对应 `takeout_enabled`
+  - 堂食对应 `dine_in_enabled`
+  - 自提对应 `pickup_enabled`
+- 用户选择配送时需填写地址、联系人、联系电话，并从商家配置的配送距离档位中选择范围；选择堂食或自提时不展示配送表单。
 
 ### 4.4 订单与核销
 
@@ -139,6 +146,7 @@
 - 商家可对已支付、已完成订单发起退款处理。
 - 退款处理需要填写退款原因。
 - 退款金额默认按订单实付金额执行，具体以接口文档约定为准。
+- 用户端 `pages/store/order-detail` 的“联系商家退款”点击后直接拉起商家电话拨号；无电话时只展示兜底提示。
 
 ### 4.6 服务商数据分析
 

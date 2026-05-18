@@ -25,7 +25,7 @@
           <view class="setting-icon"><text>🚚</text></view>
           <view class="setting-info">
             <view class="setting-label">配送设置</view>
-            <view class="setting-value">{{ deliveryEnabled ? '已开启配送' : '未开启配送' }}</view>
+            <view class="setting-value">{{ orderModeSummary }}</view>
           </view>
         </view>
         <text class="arrow">›</text>
@@ -157,7 +157,19 @@ const passwordForm = reactive({
   confirm_password: ''
 })
 
-const deliveryEnabled = computed(() => settings.value?.delivery_settings?.enabled ?? false)
+const orderModeSummary = computed(() => {
+  const labels: string[] = []
+  if (settings.value?.takeout_enabled) {
+    labels.push('配送')
+  }
+  if (settings.value?.dine_in_enabled) {
+    labels.push('堂食')
+  }
+  if (settings.value?.pickup_enabled) {
+    labels.push('自提')
+  }
+  return labels.length > 0 ? labels.join(' / ') : '暂未开放下单方式'
+})
 const canManageStaff = computed(() => authStore.staff?.role === 'owner')
 const notificationSummary = computed(() => {
   const labels: string[] = []

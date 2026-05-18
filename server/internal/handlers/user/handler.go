@@ -371,7 +371,7 @@ func GetProducts(c *gin.Context) {
 	}
 
 	var merchant models.Merchant
-	database.DB.Select("id", "min_order_amount", "takeout_enabled", "dine_in_enabled").First(&merchant, id)
+	database.DB.Select("id", "min_order_amount", "takeout_enabled", "dine_in_enabled", "pickup_enabled").First(&merchant, id)
 
 	list := make([]StoreProductResponse, 0, len(products))
 	for _, product := range products {
@@ -384,6 +384,7 @@ func GetProducts(c *gin.Context) {
 			"min_order_amount": merchant.MinOrderAmount,
 			"takeout_enabled":  merchant.TakeoutEnabled,
 			"dine_in_enabled":  merchant.DineInEnabled,
+			"pickup_enabled":   merchant.PickupEnabled,
 		},
 		"pagination": gin.H{
 			"total":     total,
@@ -412,10 +413,23 @@ func GetDeliveryRules(c *gin.Context) {
 	merchantID := c.Param("merchant_id")
 	id, _ := strconv.ParseUint(merchantID, 10, 64)
 
+	var merchant models.Merchant
+	if err := database.DB.Select("id", "takeout_enabled", "dine_in_enabled", "pickup_enabled").First(&merchant, id).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeMerchantNotFound, "商家不存在")
+		return
+	}
+
 	var settings models.MerchantDeliverySettings
 	if err := database.DB.Where("merchant_id = ?", id).First(&settings).Error; err != nil {
 		response.Success(c, gin.H{
-			"enabled": false,
+			"enabled":              false,
+			"base_fee":             0,
+			"free_delivery_amount": 0,
+			"max_distance":         0,
+			"distance_rules":       []struct{}{},
+			"takeout_enabled":      merchant.TakeoutEnabled,
+			"dine_in_enabled":      merchant.DineInEnabled,
+			"pickup_enabled":       merchant.PickupEnabled,
 		})
 		return
 	}
@@ -435,6 +449,9 @@ func GetDeliveryRules(c *gin.Context) {
 		"free_delivery_amount": settings.FreeDeliveryAmount,
 		"max_distance":         settings.MaxDistance,
 		"distance_rules":       distanceRules,
+		"takeout_enabled":      merchant.TakeoutEnabled,
+		"dine_in_enabled":      merchant.DineInEnabled,
+		"pickup_enabled":       merchant.PickupEnabled,
 	})
 }
 
@@ -605,7 +622,12 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	if req.DeliveryType == 1 {
+	switch req.DeliveryType {
+	case 1:
+		if !merchant.TakeoutEnabled {
+			response.Fail(c, http.StatusBadRequest, response.CodeForbidden, "商家暂未开启配送")
+			return
+		}
 		if req.DeliveryAddress == "" {
 			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请输入收货地址")
 			return
@@ -622,7 +644,20 @@ func CreateOrder(c *gin.Context) {
 			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请选择配送距离档位")
 			return
 		}
-	} else {
+	case 2:
+		if !merchant.DineInEnabled {
+			response.Fail(c, http.StatusBadRequest, response.CodeForbidden, "商家暂未开启堂食")
+			return
+		}
+		req.DeliveryDistance = 0
+		req.DeliveryAddress = ""
+		req.ContactName = ""
+		req.ContactPhone = ""
+	case 3:
+		if !merchant.PickupEnabled {
+			response.Fail(c, http.StatusBadRequest, response.CodeForbidden, "商家暂未开启自提")
+			return
+		}
 		req.DeliveryDistance = 0
 		req.DeliveryAddress = ""
 		req.ContactName = ""

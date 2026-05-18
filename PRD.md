@@ -416,7 +416,7 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 **访问路径**：
 
 ```
-用户扫描商家二维码 → 进入商家店铺首页 → 浏览商品 → 选择商品加入购物车 → 确认订单信息 → 选择配送方式 → 调用微信支付 → 支付成功回调 → 更新订单状态 → 通知商家发货 → 用户查看订单
+用户扫描商家二维码 → 进入商家店铺首页 → 浏览商品 → 选择商品加入购物车 → 确认订单信息 → 选择已开启的下单方式（配送 / 堂食 / 自提）→ 调用微信支付 → 支付成功回调 → 更新订单状态 → 通知商家发货 → 用户查看订单
 ```
 
 **订单状态流转**：
@@ -1758,6 +1758,7 @@ Authorization: Bearer {token}
     "min_order_amount": 20.00,
     "takeout_enabled": true,
     "dine_in_enabled": true,
+    "pickup_enabled": true,
     "notify_enabled": true,
     "browse_notify_enabled": true,
     "wechat_bound": true,
@@ -1789,6 +1790,7 @@ Authorization: Bearer {token}
 {
   "takeout_enabled": true,
   "dine_in_enabled": true,
+  "pickup_enabled": true,
   "notify_enabled": true,
   "browse_notify_enabled": true
 }
@@ -1799,6 +1801,8 @@ Authorization: Bearer {token}
 - `notify_enabled` 与 `browse_notify_enabled` 的保存维度均为"当前登录商家员工"，不是商家全局配置。
 - 声音提醒只影响本地 `mp3` 播放，不影响 WebSocket 在线状态。
 - 设置页包含"声音提醒管理"子页面、"修改密码"弹窗、"微信快捷登录绑定/解绑"和"员工管理"入口（仅店主可见）。
+- `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 均为商家主表维度开关，分别控制配送、堂食、自提是否可下单。
+- `delivery_settings.enabled` 只表示配送费规则是否生效，确认页是否展示“配送”仍以后端返回的 `takeout_enabled` 为准。
 - 设置页重新进入或重新登录后，前端应以 `/api/v1/merchant/settings` 返回的员工维度开关与绑定状态为准。
 - `mp3` 提醒音使用静态资源文件，本轮不在后端或前端生成音频。
 - 本轮不包含优惠券、发券和营销配置。
@@ -3436,7 +3440,8 @@ GET /api/v1/store/{merchant_id}/products
     "merchant": {
       "min_order_amount": 20.00,
       "takeout_enabled": true,
-      "dine_in_enabled": true
+      "dine_in_enabled": true,
+      "pickup_enabled": true
     },
     "pagination": {
       "total": 1,
@@ -3512,6 +3517,9 @@ GET /api/v1/store/{merchant_id}/delivery-rules
     "base_fee": 5.00,
     "free_delivery_amount": 50.00,
     "max_distance": 10,
+    "takeout_enabled": true,
+    "dine_in_enabled": true,
+    "pickup_enabled": true,
     "distance_rules": [
       {"min_distance": 0, "max_distance": 2, "fee": 0},
       {"min_distance": 2, "max_distance": 5, "fee": 3.00},
@@ -3526,6 +3534,8 @@ GET /api/v1/store/{merchant_id}/delivery-rules
 - 用户选择的是商家配置的配送距离档位，不是实时定位距离。
 - 前端可根据 `distance_rules` 展示预计配送费区间
 - 如果订单金额 >= `free_delivery_amount`，预计配送费可展示为 0
+- `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 用于确认页动态展示配送、堂食、自提三种下单方式，未开启的方式不显示。
+- `enabled` 仍表示配送费规则是否开启；即使存在配送规则，确认页是否展示“配送”也以后端返回的 `takeout_enabled` 为准。
 - 超出商家支持范围时，前端仅提示不可提交，不接入第三方地图。
 - 创建订单时，服务端会根据 `delivery_distance`、`distance_rules` 和满免门槛重新计算并校验最终配送费
 
@@ -3928,6 +3938,7 @@ POST /api/v1/callback/wechat
 | min\_order\_amount       | DECIMAL(10,2) | 最低起送金额           |
 | takeout\_enabled         | BOOLEAN       | 是否支持外卖           |
 | dine\_in\_enabled        | BOOLEAN       | 是否支持堂食           |
+| pickup\_enabled          | BOOLEAN       | 是否支持自提           |
 | sub\_mch\_id             | VARCHAR(32)   | 微信支付子商户号         |
 | payment\_config\_status  | TINYINT       | 支付配置状态：0未完成 1已完成 |
 | profit\_sharing\_enabled | TINYINT       | 是否开启分账           |

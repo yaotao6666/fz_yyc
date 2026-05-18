@@ -6,7 +6,7 @@
       
       <view class="delivery-type-selector">
         <view
-          v-for="type in deliveryTypes"
+          v-for="type in availableDeliveryTypes"
           :key="type.value"
           class="type-item"
           :class="{ selected: deliveryType === type.value }"
@@ -15,6 +15,9 @@
           <text class="type-icon">{{ type.icon }}</text>
           <text class="type-name">{{ type.name }}</text>
         </view>
+      </view>
+      <view v-if="availableDeliveryTypes.length === 0" class="delivery-mode-empty">
+        商家暂未开放下单方式
       </view>
 
       <view class="delivery-form" v-if="deliveryType === 1">
@@ -139,7 +142,7 @@ import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
 import { useAuth } from '../../utils/useAuth'
 import { parseStoreEntryOptions } from '@utils/storeEntry'
-import type { CreateOrderRequest } from '@types'
+import type { CreateOrderRequest, StoreDeliveryRules } from '@types'
 import { BrandAsset } from '../../utils/constants'
 
 const cartStore = useCartStore()
@@ -161,12 +164,15 @@ const remark = ref('')
 const merchantId = ref(1)
 const entrySource = ref('scan')
 const submitting = ref(false)
-const deliveryConfig = ref({
+const deliveryConfig = ref<StoreDeliveryRules>({
   enabled: false,
   base_fee: 0,
   free_delivery_amount: 0,
   max_distance: 0,
-  distance_rules: [] as { min_distance: number; max_distance: number; fee: number }[]
+  distance_rules: [] as { min_distance: number; max_distance: number; fee: number }[],
+  takeout_enabled: false,
+  dine_in_enabled: false,
+  pickup_enabled: false
 })
 
 // 配送档位选项
@@ -217,6 +223,10 @@ async function loadDeliveryRules() {
       deliveryDistanceIndex.value = 0
       deliveryDistance.value = deliveryRules.value[0].distance
     }
+
+    if (availableDeliveryTypes.value.length > 0 && !availableDeliveryTypes.value.some(type => type.value === deliveryType.value)) {
+      deliveryType.value = availableDeliveryTypes.value[0].value
+    }
   } catch (error) {
     console.error('获取配送规则失败:', error)
     deliveryRules.value = []
@@ -224,6 +234,9 @@ async function loadDeliveryRules() {
 }
 
 function selectDeliveryType(type: number) {
+  if (!availableDeliveryTypes.value.some(item => item.value === type)) {
+    return
+  }
   deliveryType.value = type
 }
 
@@ -233,6 +246,20 @@ function onDistanceChange(e: any) {
 }
 
 const selectedDeliveryRule = computed(() => deliveryRules.value[deliveryDistanceIndex.value] || null)
+const availableDeliveryTypes = computed(() => {
+  return deliveryTypes.filter((type) => {
+    if (type.value === 1) {
+      return deliveryConfig.value.takeout_enabled
+    }
+    if (type.value === 2) {
+      return deliveryConfig.value.dine_in_enabled
+    }
+    if (type.value === 3) {
+      return deliveryConfig.value.pickup_enabled
+    }
+    return false
+  })
+})
 
 const deliveryFee = computed(() => {
   if (deliveryType.value !== 1) return 0
@@ -257,6 +284,15 @@ async function submitOrder() {
     return
   }
 
+  if (!availableDeliveryTypes.value.length) {
+    return uni.showToast({ title: '商家暂未开放下单方式', icon: 'none' })
+  }
+
+  if (!availableDeliveryTypes.value.some(type => type.value === deliveryType.value)) {
+    deliveryType.value = availableDeliveryTypes.value[0].value
+    return uni.showToast({ title: '当前下单方式不可用', icon: 'none' })
+  }
+
   const { ensureAuth } = useAuth()
   const authed = await ensureAuth()
   if (!authed) {
@@ -264,7 +300,7 @@ async function submitOrder() {
   }
 
   if (deliveryType.value === 1) {
-    if (!deliveryConfig.value.enabled) {
+    if (!deliveryConfig.value.takeout_enabled) {
       return uni.showToast({ title: '商家暂未开启配送', icon: 'none' })
     }
     if (!deliveryAddress.value) {
@@ -403,6 +439,14 @@ async function submitOrder() {
   display: flex;
   gap: 24rpx;
   margin-bottom: 24rpx;
+}
+
+.delivery-mode-empty {
+  padding: 24rpx;
+  border-radius: 12rpx;
+  background: #fff7e6;
+  color: #d46b08;
+  font-size: 28rpx;
 }
 
 .type-item {

@@ -100,6 +100,7 @@ CREATE TABLE `merchants` (
     `min_order_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     `takeout_enabled` TINYINT(1) NOT NULL DEFAULT 1,
     `dine_in_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+    `pickup_enabled` TINYINT(1) NOT NULL DEFAULT 1,
     `sub_mch_id` VARCHAR(32) DEFAULT NULL,
     `profit_sharing_enabled` TINYINT(1) NOT NULL DEFAULT 0,
     `profit_sharing_ratio` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
@@ -586,12 +587,12 @@ INSERT INTO `service_provider_sps` (
 INSERT INTO `merchants` (
     `id`, `service_provider_id`, `name`, `logo`, `contact_name`, `contact_phone`, `contact_email`, `address`,
     `lat`, `lng`, `business_category`, `business_hours`, `announcement`, `min_order_amount`, `takeout_enabled`,
-    `dine_in_enabled`, `sub_mch_id`, `profit_sharing_enabled`, `profit_sharing_ratio`, `payment_config_status`,
+    `dine_in_enabled`, `pickup_enabled`, `sub_mch_id`, `profit_sharing_enabled`, `profit_sharing_ratio`, `payment_config_status`,
     `status`, `rating`, `sales_count`, `qrcode_url`, `created_at`, `updated_at`
 ) VALUES (
     1, 1, '美味餐厅', 'https://example.com/images/merchant_logo_1.jpg', '李四', '13900139000',
     'lisi@example.com', '北京市朝阳区建国路88号', 39.908823, 116.407470, '餐饮', '09:00-22:00',
-    '欢迎光临！', 20.00, 1, 1, '1500000001', 1, 5.00, 1, 1, 5.0, 0,
+    '欢迎光临！', 20.00, 1, 1, 1, '1500000001', 1, 5.00, 1, 1, 5.0, 0,
     'https://example.com/qrcode/merchant_1.png', NOW(), NOW()
 );
 

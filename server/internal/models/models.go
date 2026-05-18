@@ -120,6 +120,7 @@ type Merchant struct {
 	MinOrderAmount       float64          `gorm:"type:decimal(10,2);not null;default:0" json:"min_order_amount"`
 	TakeoutEnabled       bool             `gorm:"not null;default:true" json:"takeout_enabled"`
 	DineInEnabled        bool             `gorm:"not null;default:true" json:"dine_in_enabled"`
+	PickupEnabled        bool             `gorm:"not null;default:true" json:"pickup_enabled"`
 	SubMchID             string           `gorm:"size:32" json:"sub_mch_id"`
 	ProfitSharingEnabled bool             `gorm:"not null;default:false" json:"profit_sharing_enabled"`
 	ProfitSharingRatio   float64          `gorm:"type:decimal(5,2);not null;default:0" json:"profit_sharing_ratio"`

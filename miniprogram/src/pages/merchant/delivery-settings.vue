@@ -1,22 +1,50 @@
 <template>
   <view class="delivery-settings-container">
-    <!-- 配送开关 -->
+    <!-- 下单方式 -->
     <view class="section">
-      <view class="switch-row">
+      <view class="section-title">下单方式</view>
+
+      <view class="switch-row mode-row">
+        <view class="switch-label">
+          <text class="label-title">开启堂食</text>
+          <text class="label-desc">开启后用户可选择堂食方式下单</text>
+        </view>
+        <switch
+          :checked="modeForm.dine_in_enabled"
+          @change="onDineInSwitchChange"
+          color="#007AFF"
+        />
+      </view>
+
+      <view class="switch-row mode-row">
+        <view class="switch-label">
+          <text class="label-title">开启自提</text>
+          <text class="label-desc">开启后用户可选择自提方式下单</text>
+        </view>
+        <switch
+          :checked="modeForm.pickup_enabled"
+          @change="onPickupSwitchChange"
+          color="#007AFF"
+        />
+      </view>
+
+
+      <view class="switch-row mode-row">
         <view class="switch-label">
           <text class="label-title">开启配送服务</text>
           <text class="label-desc">开启后用户可选择配送方式下单</text>
         </view>
         <switch
-          :checked="formData.enabled"
-          @change="onSwitchChange"
+          :checked="modeForm.takeout_enabled"
+          @change="onDeliverySwitchChange"
           color="#007AFF"
         />
       </view>
+
     </view>
 
     <!-- 配送设置 -->
-    <view class="section" v-if="formData.enabled">
+    <view class="section" v-if="modeForm.takeout_enabled">
       <view class="section-title">配送费用</view>
 
       <view class="form-item">
@@ -62,7 +90,7 @@
     </view>
 
     <!-- 距离规则 -->
-    <view class="section" v-if="formData.enabled">
+    <view class="section" v-if="modeForm.takeout_enabled">
       <view class="section-header">
         <view class="section-title">按距离收费</view>
         <view class="add-rule-btn" @click="addRule">添加规则</view>
@@ -125,10 +153,15 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getDeliverySettings, updateDeliverySettings } from '@api'
-import type { DeliverySettings, DistanceRule } from '@types'
+import { getDeliverySettings, updateDeliverySettings, updateMerchantSettings } from '@api'
+import type { DeliverySettings, DistanceRule, MerchantDeliverySettings } from '@types'
 
 const saving = ref(false)
+const modeForm = reactive({
+  takeout_enabled: false,
+  dine_in_enabled: false,
+  pickup_enabled: false
+})
 
 const formData = reactive<DeliverySettings>({
   enabled: false,
@@ -137,6 +170,12 @@ const formData = reactive<DeliverySettings>({
   max_distance: 10,
   distance_rules: []
 })
+
+function fillModeSettings(settings: Pick<MerchantDeliverySettings, 'takeout_enabled' | 'dine_in_enabled' | 'pickup_enabled'>) {
+  modeForm.takeout_enabled = !!settings.takeout_enabled
+  modeForm.dine_in_enabled = !!settings.dine_in_enabled
+  modeForm.pickup_enabled = !!settings.pickup_enabled
+}
 
 function fillFormData(settings: DeliverySettings) {
   formData.enabled = !!settings.enabled
@@ -160,15 +199,26 @@ onShow(() => {
 
 async function loadSettings() {
   try {
-    const settings = await getDeliverySettings()
-    fillFormData(settings)
+    const deliverySettings = await getDeliverySettings()
+    fillModeSettings(deliverySettings)
+    fillFormData(deliverySettings)
+    formData.enabled = !!deliverySettings.takeout_enabled
   } catch (error) {
     console.error('加载配送设置失败:', error)
   }
 }
 
-function onSwitchChange(e: any) {
-  formData.enabled = e.detail.value
+function onDeliverySwitchChange(e: any) {
+  modeForm.takeout_enabled = !!e.detail.value
+  formData.enabled = modeForm.takeout_enabled
+}
+
+function onDineInSwitchChange(e: any) {
+  modeForm.dine_in_enabled = !!e.detail.value
+}
+
+function onPickupSwitchChange(e: any) {
+  modeForm.pickup_enabled = !!e.detail.value
 }
 
 function addRule() {
@@ -194,6 +244,10 @@ function normalizeDistanceRules(rules: DistanceRule[]) {
 }
 
 function validateFormData() {
+  if (!formData.enabled) {
+    return ''
+  }
+
   if (formData.base_fee < 0) {
     return '基础配送费不能小于 0'
   }
@@ -238,9 +292,26 @@ async function handleSave() {
   saving.value = true
 
   try {
-    const latestSettings = await updateDeliverySettings(formData)
-    fillFormData(latestSettings)
-    uni.showToast({ title: '保存成功', icon: 'success' })
+    await updateMerchantSettings({
+      takeout_enabled: modeForm.takeout_enabled,
+      dine_in_enabled: modeForm.dine_in_enabled,
+      pickup_enabled: modeForm.pickup_enabled
+    })
+
+    try {
+      const latestSettings = await updateDeliverySettings({
+        ...formData,
+        enabled: modeForm.takeout_enabled
+      })
+      fillModeSettings(latestSettings)
+      fillFormData(latestSettings)
+      formData.enabled = latestSettings.takeout_enabled
+      uni.showToast({ title: '保存成功', icon: 'success' })
+    } catch (error: any) {
+      await loadSettings()
+      uni.showToast({ title: error.message || '下单方式已保存，配送规则保存失败', icon: 'none' })
+      return
+    }
     
     setTimeout(() => {
       uni.navigateBack()
@@ -271,6 +342,12 @@ async function handleSave() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.mode-row {
+  margin-top: 28rpx;
+  padding-top: 28rpx;
+  border-top: 1rpx solid #f0f0f0;
 }
 
 .switch-label {

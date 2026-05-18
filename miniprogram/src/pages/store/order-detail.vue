@@ -263,7 +263,7 @@ async function cancelOrder() {
 
 function contactMerchantForRefund() {
   if (!order.value) return
-  const phone = order.value.merchant?.phone?.trim()
+  const phone = (order.value.merchant?.contact_phone || order.value.merchant?.phone || '').trim()
   const merchantName = order.value.merchant?.name || '商家'
 
   if (!phone) {
@@ -276,15 +276,10 @@ function contactMerchantForRefund() {
     return
   }
 
-  uni.showModal({
-    title: '联系商家退款',
-    content: `请联系${merchantName}退款\n联系电话：${phone}`,
-    confirmText: '拨打电话',
-    cancelText: '取消',
-    success: (res) => {
-      if (res.confirm) {
-        uni.makePhoneCall({ phoneNumber: phone })
-      }
+  uni.makePhoneCall({
+    phoneNumber: phone,
+    fail: () => {
+      uni.showToast({ title: `请联系${merchantName}退款`, icon: 'none' })
     }
   })
 }

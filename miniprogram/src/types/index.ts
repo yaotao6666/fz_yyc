@@ -320,6 +320,7 @@ export interface MerchantSettings {
   min_order_amount: number
   takeout_enabled: boolean
   dine_in_enabled: boolean
+  pickup_enabled: boolean
   notify_enabled?: boolean
   browse_notify_enabled?: boolean
   wechat_bound?: boolean
@@ -335,6 +336,15 @@ export interface DeliverySettings {
   free_delivery_amount: number
   distance_rules: DistanceRule[]
   max_distance: number
+}
+
+export interface MerchantDeliverySettings extends DeliverySettings {
+  takeout_enabled: boolean
+  dine_in_enabled: boolean
+  pickup_enabled: boolean
+}
+
+export interface StoreDeliveryRules extends MerchantDeliverySettings {
 }
 
 // 配送距离规则
@@ -458,6 +468,7 @@ export interface OrderMerchant {
   logo?: string
   address?: string
   phone?: string
+  contact_phone?: string
 }
 
 // 订单商品项
