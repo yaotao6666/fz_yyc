@@ -147,6 +147,27 @@ func buildStoreAccessibleImages(images []string) []string {
 	return result
 }
 
+func buildAccessibleOrderItemImage(image string) string {
+	service := qiniu.GetService()
+	if service == nil {
+		return image
+	}
+	return service.BuildPrivateURL(image)
+}
+
+func buildAccessibleOrder(order models.Order) models.Order {
+	if order.Merchant != nil {
+		order.Merchant.Logo = buildAccessibleOrderItemImage(order.Merchant.Logo)
+		order.Merchant.CoverImage = buildAccessibleOrderItemImage(order.Merchant.CoverImage)
+	}
+
+	for index := range order.Items {
+		order.Items[index].Image = buildAccessibleOrderItemImage(order.Items[index].Image)
+	}
+
+	return order
+}
+
 func buildStoreProductResponse(product models.Product) StoreProductResponse {
 	categoryID := uint64(0)
 	if product.CategoryID != nil {
@@ -889,8 +910,13 @@ func GetOrders(c *gin.Context) {
 		return
 	}
 
+	accessibleOrders := make([]models.Order, 0, len(orders))
+	for _, order := range orders {
+		accessibleOrders = append(accessibleOrders, buildAccessibleOrder(order))
+	}
+
 	response.Success(c, gin.H{
-		"list": orders,
+		"list": accessibleOrders,
 		"pagination": gin.H{
 			"total":     total,
 			"page":      page,
@@ -910,7 +936,7 @@ func GetOrderDetail(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, order)
+	response.Success(c, buildAccessibleOrder(order))
 }
 
 func CancelOrder(c *gin.Context) {

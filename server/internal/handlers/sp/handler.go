@@ -75,7 +75,7 @@ func Login(c *gin.Context) {
 	}
 
 	now := time.Now()
-	database.DB.Model(&spUser).Update("last_login_at", now)
+	database.DB.Model(&models.ServiceProviderSp{}).Where("id = ?", spUser.ID).Update("last_login_at", now)
 
 	token, _ := utils.GenerateToken(spUser.ID, "sp", spUser.Username)
 	database.DB.Preload("ServiceProvider").First(&spUser, spUser.ID)
@@ -986,7 +986,7 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&spUser).Update("password", string(hashed)).Error; err != nil {
+	if err := database.DB.Model(&models.ServiceProviderSp{}).Where("id = ?", spUser.ID).Update("password", string(hashed)).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "修改失败")
 		return
 	}

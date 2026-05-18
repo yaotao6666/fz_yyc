@@ -252,7 +252,7 @@ func WechatQuickLogin(c *gin.Context) {
 	if wechatIdentity.UnionID != "" {
 		loginUpdates["unionid"] = wechatIdentity.UnionID
 	}
-	database.DB.Model(&staff).Updates(loginUpdates)
+	database.DB.Model(&models.MerchantStaff{}).Where("id = ?", staff.ID).Updates(loginUpdates)
 	if wechatIdentity.UnionID != "" {
 		staff.UnionID = wechatIdentity.UnionID
 	}

@@ -7,6 +7,7 @@ import (
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/pkg/database"
+	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
 	"net/http"
 	"strconv"
@@ -31,6 +32,21 @@ func loadMerchantOrderByID(merchantID, orderID uint64) (*models.Order, error) {
 		return nil, err
 	}
 	return &order, nil
+}
+
+func buildAccessibleMerchantOrderItemImage(image string) string {
+	service := qiniu.GetService()
+	if service == nil {
+		return image
+	}
+	return service.BuildPrivateURL(image)
+}
+
+func buildAccessibleMerchantOrder(order models.Order) models.Order {
+	for index := range order.Items {
+		order.Items[index].Image = buildAccessibleMerchantOrderItemImage(order.Items[index].Image)
+	}
+	return order
 }
 
 func getCompleterName(c *gin.Context, merchantID uint64) string {
@@ -237,8 +253,13 @@ func GetOrders(c *gin.Context) {
 		}
 	}
 
+	accessibleOrders := make([]models.Order, 0, len(orders))
+	for _, order := range orders {
+		accessibleOrders = append(accessibleOrders, buildAccessibleMerchantOrder(order))
+	}
+
 	response.Success(c, gin.H{
-		"list": orders,
+		"list": accessibleOrders,
 		"pagination": gin.H{
 			"total":     total,
 			"page":      page,
@@ -263,7 +284,7 @@ func GetOrderDetail(c *gin.Context) {
 		refreshMerchantOrderRefundStatus(c.Request.Context(), client, order)
 	}
 
-	response.Success(c, order)
+	response.Success(c, buildAccessibleMerchantOrder(*order))
 }
 
 func CompleteOrder(c *gin.Context) {
@@ -720,6 +741,10 @@ func GetProductRanking(c *gin.Context) {
 		Order("sales_count DESC").
 		Limit(limitInt).
 		Scan(&rankings)
+
+	for index := range rankings {
+		rankings[index].Image = buildAccessibleMerchantOrderItemImage(rankings[index].Image)
+	}
 
 	response.Success(c, rankings)
 }

@@ -492,6 +492,44 @@ function normalizeStockAlertItem(item: any): StockAlert {
   }
 }
 
+function normalizeOrderItem(item: any) {
+  const normalizedImages = normalizeStringArray(item?.images).map(normalizeImageUrl)
+  const primaryImage = normalizeImageUrl(item?.image || item?.product_image || normalizedImages[0] || '')
+
+  return {
+    ...item,
+    product_id: Number(item?.product_id || 0),
+    product_name: String(item?.product_name || ''),
+    image: primaryImage,
+    images: normalizedImages,
+    price: Number(item?.price || 0),
+    quantity: Number(item?.quantity || 0),
+    specs: item?.specs || item?.spec_info || ''
+  }
+}
+
+function normalizeOrder(order: any): Order {
+  const merchant = order?.merchant
+    ? {
+        ...order.merchant,
+        id: Number(order.merchant?.id || 0),
+        logo: normalizeImageUrl(order.merchant?.logo || '')
+      }
+    : undefined
+
+  return {
+    ...order,
+    id: Number(order?.id || 0),
+    items: Array.isArray(order?.items) ? order.items.map(normalizeOrderItem) : [],
+    total_amount: Number(order?.total_amount || 0),
+    delivery_fee: Number(order?.delivery_fee || 0),
+    discount_amount: Number(order?.discount_amount || 0),
+    pay_amount: Number(order?.pay_amount || 0),
+    status: Number(order?.status || 0),
+    merchant
+  } as Order
+}
+
 /**
  * 获取商品列表
  */
@@ -791,7 +829,17 @@ export async function uploadImage(filePath: string): Promise<{ url: string; key:
 export function getStoreHome(merchantId: number) {
   return get<StoreHomeInfo>(`/api/v1/store/${merchantId}/home`).then(data => {
     if (data?.hot_products) {
-      data.hot_products = data.hot_products.map((p: any) => normalizeProduct(p))
+      data.hot_products = data.hot_products.map((p: any) => {
+        const normalized = normalizeProduct(p)
+        return {
+          id: normalized.id,
+          name: normalized.name,
+          images: normalized.images || [],
+          price: normalized.price,
+          original_price: normalized.original_price,
+          sales: Number(normalized.sales || 0)
+        }
+      })
     }
     if (data?.merchant?.logo) {
       data.merchant.logo = normalizeImageUrl(data.merchant.logo)
@@ -859,7 +907,13 @@ export function getMyOrders(params?: {
   status?: number
   merchant_id?: number
 }) {
-  return get<OrderListResponse>('/api/v1/user/orders', params).then(normalizeListField)
+  return get<OrderListResponse>('/api/v1/user/orders', params).then((response) => {
+    const normalized = normalizeListField(response)
+    return {
+      ...normalized,
+      list: normalized.list.map(normalizeOrder)
+    }
+  })
 }
 
 /**
@@ -888,7 +942,7 @@ export function getPrintLogs(params?: { page?: number; page_size?: number; start
 // ============ C端订单详情 ============
 
 export function getMyOrderDetail(orderId: number) {
-  return get<Order>(`/api/v1/user/orders/${orderId}`)
+  return get<Order>(`/api/v1/user/orders/${orderId}`).then(normalizeOrder)
 }
 
 // ============ C端地址管理 ============

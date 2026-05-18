@@ -225,7 +225,7 @@ func ResetStaffPassword(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&staff).Update("password", string(hashedPassword)).Error; err != nil {
+	if err := database.DB.Model(&models.MerchantStaff{}).Where("id = ?", staff.ID).Update("password", string(hashedPassword)).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "重置密码失败")
 		return
 	}

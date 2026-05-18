@@ -42,7 +42,7 @@
           >
             <image
               class="item-image"
-              :src="item.image || '/static/default-product.png'"
+              :src="getOrderItemImage(item)"
               mode="aspectFill"
             />
           </view>
@@ -244,6 +244,22 @@ function getStatusClass(status: number): string {
 function formatTime(time: string): string {
   const date = new Date(time)
   return `${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function getOrderItemImage(item: any) {
+  if (typeof item?.image === 'string' && item.image.trim()) {
+    return item.image
+  }
+
+  if (Array.isArray(item?.images) && typeof item.images[0] === 'string' && item.images[0].trim()) {
+    return item.images[0]
+  }
+
+  if (typeof item?.product_image === 'string' && item.product_image.trim()) {
+    return item.product_image
+  }
+
+  return BrandAsset.DEFAULT_PRODUCT_IMAGE
 }
 
 function goDetail(orderId: number) {

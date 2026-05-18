@@ -43,7 +43,7 @@ func Login(c *gin.Context) {
 	}
 
 	now := time.Now()
-	database.DB.Model(&staff).Update("last_login_at", now)
+	database.DB.Model(&models.MerchantStaff{}).Where("id = ?", staff.ID).Update("last_login_at", now)
 
 	// 使用商家ID而不是员工ID生成token
 	token, _ := utils.GenerateToken(staff.MerchantID, "merchant", staff.Username)
@@ -297,7 +297,7 @@ func GetQRCode(c *gin.Context) {
 		qrCodeBase64 := base64.StdEncoding.EncodeToString(qrCodeBytes)
 		qrCodeURL = "data:image/png;base64," + qrCodeBase64
 		// 保存到数据库
-		database.DB.Model(&merchant).Update("qrcode_url", qrCodeURL)
+		database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Update("qrcode_url", qrCodeURL)
 	}
 
 	response.Success(c, gin.H{

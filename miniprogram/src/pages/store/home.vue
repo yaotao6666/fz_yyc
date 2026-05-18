@@ -25,9 +25,15 @@
             </view>
             <text class="sales-count">已售 {{ storeInfo?.merchant?.sales_count || 0 }}</text>
           </view>
-          <view class="store-notice" v-if="storeInfo?.merchant?.announcement">
+          <view
+            class="store-notice"
+            :class="{ expanded: isNoticeExpanded, clickable: canToggleNotice }"
+            v-if="storeInfo?.merchant?.announcement"
+            @click="toggleNotice"
+          >
             <text class="notice-icon">📢</text>
             <text class="notice-text">{{ storeInfo.merchant.announcement }}</text>
+            <text v-if="canToggleNotice" class="notice-toggle">{{ isNoticeExpanded ? '收起' : '展开' }}</text>
           </view>
         </view>
       </view>
@@ -58,6 +64,29 @@
     </view>
 
     <template v-else-if="storeInfo">
+      <view v-if="showStickyHeader" class="sticky-mini-bar">
+        <view class="sticky-mini-main">
+          <image
+            class="sticky-mini-logo"
+            :src="merchantLogo || BrandAsset.DEFAULT_MERCHANT_LOGO"
+            mode="aspectFill"
+          />
+          <view class="sticky-mini-info">
+            <view class="sticky-mini-name">{{ storeInfo.merchant.name }}</view>
+            <view class="sticky-mini-meta">
+              <text class="sticky-mini-status" :class="{ closed: storeInfo.merchant.status !== 1 }">
+                {{ storeInfo.merchant.status === 1 ? '营业中' : '休息中' }}
+              </text>
+              <text class="sticky-mini-divider">·</text>
+              <text class="sticky-mini-category">{{ currentCategory?.name || '商品列表' }}</text>
+            </view>
+          </view>
+        </view>
+        <view class="sticky-mini-cart" @click="handlePrimaryAction">
+          {{ isCartEmpty ? '去选购' : `¥${cartAmount.toFixed(2)}` }}
+        </view>
+      </view>
+
       <view class="quick-entry-bar">
         <view class="quick-entry-card" @click="goMyOrders">
           <view class="quick-entry-icon">📋</view>
@@ -72,13 +101,19 @@
       <!-- 分类和商品 -->
       <view class="main-content">
         <!-- 左侧分类 -->
-        <scroll-view class="category-sidebar" scroll-y>
+        <scroll-view
+          class="category-sidebar"
+          scroll-y
+          scroll-with-animation
+          :scroll-into-view="categorySidebarScrollIntoView"
+        >
           <view v-if="!hasCategories" class="category-empty">
             暂无分类
           </view>
           <view
             v-for="(category, index) in storeInfo.categories"
             :key="category.id"
+            :id="getCategoryMenuId(category.id)"
             class="category-item"
             :class="{ active: currentCategoryIndex === index }"
             @click="selectCategory(index)"
@@ -89,11 +124,15 @@
         </scroll-view>
 
         <!-- 右侧商品 -->
-        <scroll-view class="product-list" scroll-y @scrolltolower="loadMoreProducts">
-          <!-- 分类标题 -->
-          <view class="category-title" v-if="currentCategory">
-            {{ currentCategory.name }}
-          </view>
+        <scroll-view
+          class="product-list"
+          scroll-y
+          scroll-with-animation
+          :scroll-into-view="productScrollIntoView"
+          @scroll="handleProductListScroll"
+          @scrolltolower="loadMoreProducts"
+        >
+          <view class="product-list-top-anchor" id="product-list-top"></view>
 
           <!-- 热销推荐 -->
           <view class="hot-products" v-if="showHotProducts">
@@ -128,35 +167,57 @@
           </view>
 
           <!-- 分类商品列表 -->
-          <view class="product-list-items">
-            <view
-              v-for="product in currentProducts"
-              :key="product.id"
-              class="product-list-item"
-              @click="goProductDetail(product.id)"
-            >
-              <image
-                class="item-image"
-                :src="getProductImage(product)"
-                mode="aspectFill"
-              />
-              <view class="item-info">
-                <view class="item-name">{{ product.name }}</view>
-                <view class="item-desc" v-if="product.description">{{ product.description }}</view>
-                <view class="item-bottom">
-                  <view class="item-price">
-                    <text class="price">¥{{ product.price.toFixed(2) }}</text>
-                    <text v-if="product.original_price" class="original-price">
-                      ¥{{ product.original_price.toFixed(2) }}
-                    </text>
-                  </view>
-                  <view class="add-btn" @click.stop="addToCart(product)">+</view>
-                </view>
+          <view v-if="showProductSkeleton" class="product-skeleton-list">
+            <view v-for="item in 3" :key="item" class="product-skeleton-item">
+              <view class="product-skeleton-image"></view>
+              <view class="product-skeleton-content">
+                <view class="product-skeleton-line primary"></view>
+                <view class="product-skeleton-line secondary"></view>
+                <view class="product-skeleton-line short"></view>
               </view>
             </view>
           </view>
 
-          <view v-if="loadingProducts" class="loading">加载中...</view>
+          <view v-else class="product-list-items">
+            <view
+              v-for="section in productSections"
+              :key="section.category.id"
+              :id="getCategorySectionId(section.category.id)"
+              class="product-section"
+            >
+              <view class="category-title">{{ section.category.name }}</view>
+              <view v-if="section.products.length" class="product-section-list">
+                <view
+                  v-for="product in section.products"
+                  :key="product.id"
+                  class="product-list-item"
+                  @click="goProductDetail(product.id)"
+                >
+                  <image
+                    class="item-image"
+                    :src="getProductImage(product)"
+                    mode="aspectFill"
+                  />
+                  <view class="item-info">
+                    <view class="item-name">{{ product.name }}</view>
+                    <view class="item-desc" v-if="product.description">{{ product.description }}</view>
+                    <view class="item-bottom">
+                      <view class="item-price">
+                        <text class="price">¥{{ product.price.toFixed(2) }}</text>
+                        <text v-if="product.original_price" class="original-price">
+                          ¥{{ product.original_price.toFixed(2) }}
+                        </text>
+                      </view>
+                      <view class="add-btn" @click.stop="addToCart(product)">+</view>
+                    </view>
+                  </view>
+                </view>
+              </view>
+              <view v-else class="section-empty">当前分类暂无上架商品</view>
+            </view>
+          </view>
+
+          <view v-if="loadingProducts && hasLoadedAnyProducts" class="loading">加载中...</view>
           <view v-else-if="showProductEmpty" class="product-empty">
             <view class="product-empty-title">当前暂无可展示商品</view>
             <view class="product-empty-desc">可以下拉刷新试试，或稍后再来看看商家上新。</view>
@@ -187,6 +248,10 @@
         >
           {{ primaryActionText }}
         </view>
+      </view>
+
+      <view v-if="showAddSuccessTip" class="add-success-tip">
+        {{ addSuccessText }}
       </view>
 
       <!-- 底部占位 -->
@@ -291,23 +356,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, nextTick, getCurrentInstance, watch } from 'vue'
 import { onLoad, onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { getStoreHome, getStoreProducts, getStoreProduct } from '../../api/store'
 import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
 import { getCachedImagePath, cacheImage } from '@utils/imageCache'
 import { parseStoreEntryOptions } from '@utils/storeEntry'
-import type { StoreHomeInfo, Product, SpecOption } from '@types'
+import type { StoreHomeInfo, Product, SpecOption, StoreProductGroup } from '@types'
 import { BrandAsset } from '../../utils/constants'
 
 const cartStore = useCartStore()
 const { trackVisit, trackPageView } = useAnalytics()
+const instance = getCurrentInstance()
 
 const storeInfo = ref<StoreHomeInfo | null>(null)
 const currentMerchantId = ref(1)
 const currentCategoryIndex = ref(0)
-const currentProducts = ref<Product[]>([])
 const loadingProducts = ref(false)
 const merchantLogo = ref('')
 const merchantCover = ref('')
@@ -315,6 +380,15 @@ const showGuide = ref(false) // 控制操作指引弹窗显示
 const entrySource = ref('scan')
 const isInitialLoading = ref(false)
 const pageErrorMessage = ref('')
+const isNoticeExpanded = ref(false)
+const showAddSuccessTip = ref(false)
+const addSuccessText = ref('')
+const categoryProductsMap = reactive<Record<number, Product[]>>({})
+const productSectionOffsets = ref<number[]>([])
+const productScrollIntoView = ref('')
+const categorySidebarScrollIntoView = ref('')
+const productListScrollTop = ref(0)
+const showStickyHeader = ref(false)
 
 const showAddDialog = ref(false)
 const addDialogLoading = ref(false)
@@ -326,9 +400,24 @@ const currentCategory = computed(() => {
   return storeInfo.value?.categories?.[currentCategoryIndex.value] || null
 })
 const hasCategories = computed(() => !!storeInfo.value?.categories?.length)
-const showHotProducts = computed(() => !currentCategoryIndex.value && !!storeInfo.value?.hot_products?.length)
-const showProductEmpty = computed(() => !loadingProducts.value && !currentProducts.value.length && !showHotProducts.value)
+const showHotProducts = computed(() => !!storeInfo.value?.hot_products?.length)
+const productSections = computed<StoreProductGroup[]>(() => {
+  return (storeInfo.value?.categories || []).map(category => ({
+    category: {
+      id: category.id,
+      name: category.name
+    },
+    products: categoryProductsMap[category.id] || []
+  }))
+})
+const hasLoadedAnyProducts = computed(() => productSections.value.some(section => section.products.length > 0))
+const showProductEmpty = computed(() => !loadingProducts.value && !hasLoadedAnyProducts.value && !showHotProducts.value)
 const showPageError = computed(() => !!pageErrorMessage.value && !storeInfo.value)
+const showProductSkeleton = computed(() => loadingProducts.value && !hasLoadedAnyProducts.value)
+const canToggleNotice = computed(() => {
+  const notice = storeInfo.value?.merchant?.announcement || ''
+  return notice.trim().length > 28
+})
 
 const cartCount = computed(() => cartStore.totalCount)
 const cartAmount = computed(() => cartStore.totalAmount)
@@ -344,18 +433,39 @@ const primaryActionText = computed(() => {
 
 let showPromise: Promise<void> | null = null
 let _loadRetryCount = 0
+let addSuccessTipTimer: ReturnType<typeof setTimeout> | null = null
+let manualCategoryScrollTimer: ReturnType<typeof setTimeout> | null = null
+let ignoreScrollSync = false
 
 function resetStoreHomeState() {
   storeInfo.value = null
   currentCategoryIndex.value = 0
-  currentProducts.value = []
   merchantLogo.value = ''
   merchantCover.value = ''
   pageErrorMessage.value = ''
+  isNoticeExpanded.value = false
+  showAddSuccessTip.value = false
+  addSuccessText.value = ''
+  productSectionOffsets.value = []
+  productScrollIntoView.value = ''
+  categorySidebarScrollIntoView.value = ''
+  productListScrollTop.value = 0
+  showStickyHeader.value = false
   showAddDialog.value = false
   addDialogLoading.value = false
   addDialogProduct.value = null
+  Object.keys(categoryProductsMap).forEach((key) => {
+    delete categoryProductsMap[Number(key)]
+  })
 }
+
+watch(currentCategoryIndex, () => {
+  const categoryId = currentCategory.value?.id
+  if (!categoryId) {
+    return
+  }
+  categorySidebarScrollIntoView.value = getCategoryMenuId(categoryId)
+})
 
 function parseEntryOptions(options?: Record<string, any>) {
   return parseStoreEntryOptions(options, currentMerchantId.value)
@@ -419,10 +529,9 @@ async function loadStoreHome(merchantId: number, silent = false) {
     cacheMerchantImages(res)
 
     if (res.categories?.length) {
-      const catId = res.categories[currentCategoryIndex.value]?.id || res.categories[0].id
-      await loadCategoryProducts(catId, silent)
-    } else {
-      currentProducts.value = []
+      await loadAllCategoryProducts(merchantId, res.categories, silent)
+      await nextTick()
+      measureProductSections()
     }
     return true
   } catch (error) {
@@ -456,6 +565,58 @@ function retryLoadStoreHome() {
   void loadStoreHome(currentMerchantId.value)
 }
 
+function toggleNotice() {
+  if (!canToggleNotice.value) {
+    return
+  }
+
+  isNoticeExpanded.value = !isNoticeExpanded.value
+}
+
+async function loadAllCategoryProducts(
+  merchantId: number,
+  categories: Array<{ id: number; name: string; sort: number; product_count: number }>,
+  silent = false
+) {
+  if (!silent) {
+    loadingProducts.value = true
+  }
+
+  Object.keys(categoryProductsMap).forEach((key) => {
+    delete categoryProductsMap[Number(key)]
+  })
+
+  try {
+    const results = await Promise.allSettled(categories.map(async (category) => {
+      const res = await getStoreProducts(merchantId, { category_id: category.id })
+      return { categoryId: category.id, list: res.list || [] }
+    }))
+
+    results.forEach((result, index) => {
+      const categoryId = categories[index].id
+      if (result.status === 'fulfilled') {
+        categoryProductsMap[categoryId] = result.value.list
+      } else {
+        categoryProductsMap[categoryId] = []
+      }
+    })
+  } catch (error) {
+    if (!silent) {
+      console.error('加载商品失败:', error)
+    }
+  } finally {
+    loadingProducts.value = false
+  }
+}
+
+function getCategoryMenuId(categoryId: number) {
+  return `category-menu-${categoryId}`
+}
+
+function getCategorySectionId(categoryId: number) {
+  return `category-section-${categoryId}`
+}
+
 function cacheMerchantImages(info: StoreHomeInfo) {
   const logo = info?.merchant?.logo
   const cover = info?.merchant?.cover_image
@@ -485,35 +646,87 @@ function cacheMerchantImages(info: StoreHomeInfo) {
   }
 }
 
-async function loadCategoryProducts(categoryId: number, silent = false) {
-  if (!silent) {
-    loadingProducts.value = true
+function measureProductSections() {
+  if (!instance?.proxy || !productSections.value.length) {
+    productSectionOffsets.value = []
+    return
   }
 
-  try {
-    const merchantId = storeInfo.value?.merchant?.id || 1
-    const res = await getStoreProducts(merchantId, { category_id: categoryId })
-    currentProducts.value = res.list || []
-  } catch (error) {
-    if (!silent) {
-      console.error('加载商品失败:', error)
+  const currentScrollTop = productListScrollTop.value
+  const query = uni.createSelectorQuery().in(instance.proxy)
+  query.select('.product-list').boundingClientRect()
+  query.selectAll('.product-section').boundingClientRect()
+  query.exec((result) => {
+    const containerRect = result?.[0] as { top: number } | undefined
+    const sectionRects = (result?.[1] || []) as Array<{ top: number }>
+    if (!containerRect || !sectionRects.length) {
+      productSectionOffsets.value = []
+      return
     }
-  } finally {
-    loadingProducts.value = false
+
+    productSectionOffsets.value = sectionRects.map(rect => rect.top - containerRect.top + currentScrollTop)
+  })
+}
+
+function setManualCategoryScrollLock() {
+  ignoreScrollSync = true
+  if (manualCategoryScrollTimer) {
+    clearTimeout(manualCategoryScrollTimer)
   }
+  manualCategoryScrollTimer = setTimeout(() => {
+    ignoreScrollSync = false
+  }, 420)
+}
+
+function scrollToCategory(categoryId: number) {
+  setManualCategoryScrollLock()
+  productScrollIntoView.value = ''
+  nextTick(() => {
+    productScrollIntoView.value = getCategorySectionId(categoryId)
+  })
 }
 
 function selectCategory(index: number) {
-  currentCategoryIndex.value = index
-
-  if (storeInfo.value?.categories?.[index]) {
-    const catId = storeInfo.value.categories[index].id
-    loadCategoryProducts(catId)
+  const category = storeInfo.value?.categories?.[index]
+  if (!category) {
+    return
   }
+
+  currentCategoryIndex.value = index
+  scrollToCategory(category.id)
 }
 
 function loadMoreProducts() {
   // 加载更多逻辑
+}
+
+function syncCurrentCategoryByScroll(scrollTop: number) {
+  if (!productSectionOffsets.value.length || !storeInfo.value?.categories?.length) {
+    return
+  }
+
+  const activeScrollTop = scrollTop + 24
+  let nextIndex = 0
+
+  for (let index = 0; index < productSectionOffsets.value.length; index++) {
+    if (activeScrollTop >= productSectionOffsets.value[index]) {
+      nextIndex = index
+    } else {
+      break
+    }
+  }
+
+  currentCategoryIndex.value = nextIndex
+}
+
+function handleProductListScroll(event: any) {
+  const scrollTop = Number(event?.detail?.scrollTop || 0)
+  productListScrollTop.value = scrollTop
+  showStickyHeader.value = scrollTop > 96
+
+  if (!ignoreScrollSync) {
+    syncCurrentCategoryByScroll(scrollTop)
+  }
 }
 
 function getHotProductImage(product: any) {
@@ -656,7 +869,21 @@ function confirmAddDialog() {
   })
 
   uni.showToast({ title: '已加入购物车', icon: 'success' })
+  showAddToCartFeedback(addDialogProduct.value.name, addDialogQuantity.value)
   closeAddDialog()
+}
+
+function showAddToCartFeedback(productName: string, quantity: number) {
+  addSuccessText.value = `${productName} x${quantity} 已加入购物车`
+  showAddSuccessTip.value = true
+
+  if (addSuccessTipTimer) {
+    clearTimeout(addSuccessTipTimer)
+  }
+
+  addSuccessTipTimer = setTimeout(() => {
+    showAddSuccessTip.value = false
+  }, 1600)
 }
 
 function closeAddDialog() {
@@ -795,10 +1022,38 @@ function goMyOrders() {
   align-items: center;
   font-size: 24rpx;
   opacity: 0.9;
+  margin-top: 4rpx;
+}
+
+.store-notice.clickable {
+  padding-right: 12rpx;
+}
+
+.store-notice.expanded {
+  align-items: flex-start;
 }
 
 .notice-icon {
   margin-right: 8rpx;
+  margin-top: 2rpx;
+}
+
+.notice-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-notice.expanded .notice-text {
+  white-space: normal;
+  line-height: 1.6;
+}
+
+.notice-toggle {
+  margin-left: 12rpx;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 22rpx;
 }
 
 .store-status {
@@ -827,6 +1082,92 @@ function goMyOrders() {
 
 .quick-entry-bar {
   padding: 20rpx 24rpx 0;
+}
+
+.sticky-mini-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 18rpx 24rpx;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10rpx 24rpx rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(12rpx);
+}
+
+.sticky-mini-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.sticky-mini-logo {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 18rpx;
+  margin-right: 18rpx;
+  background: #f5f5f5;
+}
+
+.sticky-mini-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sticky-mini-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sticky-mini-meta {
+  margin-top: 6rpx;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  font-size: 22rpx;
+  color: #666666;
+}
+
+.sticky-mini-status {
+  color: #18a058;
+}
+
+.sticky-mini-status.closed {
+  color: #999999;
+}
+
+.sticky-mini-divider {
+  color: #c7c7c7;
+}
+
+.sticky-mini-category {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sticky-mini-cart {
+  min-width: 148rpx;
+  height: 64rpx;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .page-state-card {
@@ -988,6 +1329,10 @@ function goMyOrders() {
   padding: 24rpx;
 }
 
+.product-list-top-anchor {
+  height: 2rpx;
+}
+
 .category-title {
   font-size: 32rpx;
   font-weight: 600;
@@ -1075,6 +1420,69 @@ function goMyOrders() {
   flex-direction: column;
 }
 
+.product-section {
+  margin-bottom: 20rpx;
+}
+
+.product-section:last-child {
+  margin-bottom: 0;
+}
+
+.product-section-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.product-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.product-skeleton-item {
+  display: flex;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f2f3f5;
+}
+
+.product-skeleton-image {
+  width: 200rpx;
+  height: 200rpx;
+  margin-right: 20rpx;
+  border-radius: 12rpx;
+  background: linear-gradient(90deg, #f2f3f5 0%, #e9ecef 50%, #f2f3f5 100%);
+  background-size: 200% 100%;
+  animation: loadingShimmer 1.2s linear infinite;
+}
+
+.product-skeleton-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18rpx;
+}
+
+.product-skeleton-line {
+  height: 24rpx;
+  border-radius: 12rpx;
+  background: linear-gradient(90deg, #f2f3f5 0%, #e9ecef 50%, #f2f3f5 100%);
+  background-size: 200% 100%;
+  animation: loadingShimmer 1.2s linear infinite;
+}
+
+.product-skeleton-line.primary {
+  width: 68%;
+}
+
+.product-skeleton-line.secondary {
+  width: 92%;
+}
+
+.product-skeleton-line.short {
+  width: 38%;
+}
+
 .product-list-item {
   display: flex;
   padding: 20rpx 0;
@@ -1083,6 +1491,13 @@ function goMyOrders() {
 
 .product-list-item:last-child {
   border-bottom: none;
+}
+
+.section-empty {
+  padding: 24rpx 0 32rpx;
+  font-size: 24rpx;
+  color: #999999;
+  text-align: center;
 }
 
 .item-image {
@@ -1257,6 +1672,23 @@ function goMyOrders() {
 .cart-btn.disabled {
   background: #d9d9d9;
   color: #ffffff;
+}
+
+.add-success-tip {
+  position: fixed;
+  left: 50%;
+  bottom: calc(160rpx + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  max-width: 620rpx;
+  padding: 18rpx 28rpx;
+  border-radius: 999rpx;
+  background: rgba(26, 26, 26, 0.86);
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 1.5;
+  text-align: center;
+  z-index: 120;
+  box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.18);
 }
 
 .add-dialog-mask {

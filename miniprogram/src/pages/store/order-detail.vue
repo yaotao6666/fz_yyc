@@ -71,7 +71,7 @@
         :key="`${item.product_id}-${index}`"
         class="goods-item"
       >
-        <image class="goods-image" :src="item.image || '/static/default-product.png'" mode="aspectFill" />
+        <image class="goods-image" :src="getOrderItemImage(item)" mode="aspectFill" />
         <view class="goods-info">
           <view class="goods-name">{{ item.product_name }}</view>
           <view class="goods-spec" v-if="item.specs">{{ item.specs }}</view>
@@ -131,6 +131,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { cancelMyOrder, getMyOrderDetail } from '@api'
 import { DeliveryTypeText, OrderStatus, OrderStatusText } from '@types'
 import type { Order } from '@types'
+import { BrandAsset } from '../../utils/constants'
 import { useAuth } from '../../utils/useAuth'
 
 const order = ref<Order | null>(null)
@@ -203,6 +204,22 @@ function formatDateTime(value?: string) {
   if (!value) return '-'
   const date = new Date(value)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function getOrderItemImage(item: any) {
+  if (typeof item?.image === 'string' && item.image.trim()) {
+    return item.image
+  }
+
+  if (Array.isArray(item?.images) && typeof item.images[0] === 'string' && item.images[0].trim()) {
+    return item.images[0]
+  }
+
+  if (typeof item?.product_image === 'string' && item.product_image.trim()) {
+    return item.product_image
+  }
+
+  return BrandAsset.DEFAULT_PRODUCT_IMAGE
 }
 
 function copyOrderNo() {
