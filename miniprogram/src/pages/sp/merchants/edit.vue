@@ -221,7 +221,7 @@ function validateBasicInfo() {
 
 function validatePaymentConfig() {
   normalizeRatio()
-  if ((form.sub_mch_id || '').trim()) {
+  if (!(form.sub_mch_id || '').trim()) {
     uni.showToast({ title: '请输入收款子商户号', icon: 'none' })
     return false
   }

@@ -64,7 +64,7 @@
             当前暂无可选配送档位
           </view>
           <view class="distance-tip" v-if="deliveryRules.length > 0">
-            由商家配置配送范围档位，用户手动选择，不进行真实定位计算
+            当前距离对应费用由商家设置，您需自主选择距离，超出可能商家拒绝配送
           </view>
         </view>
       </view>

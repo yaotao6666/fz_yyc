@@ -9,7 +9,11 @@
           <view class="merchant-name">{{ merchantInfo?.name || '加载中...' }}</view>
           <view class="merchant-status">
             <text class="status-dot" :class="{ active: merchantInfo?.status === 1 }"></text>
-            {{ merchantInfo?.status === 1 ? '营业中' : '休息中' }}
+            <text>{{ merchantInfo?.status === 1 ? '营业中' : '休息中' }}</text>
+            <text class="merchant-socket-status">
+              <text class="status-dot" :class="{ active: isSocketOnline }"></text>
+              <text>{{ isSocketOnline ? '在线' : '离线' }}</text>
+            </text>
           </view>
         </view>
       </view>
@@ -37,24 +41,6 @@
       <view class="announcement-actions">
         <text class="announcement-view" @click.stop="viewAnnouncement">查看</text>
         <text class="announcement-close" @click.stop="closeAnnouncement">×</text>
-      </view>
-    </view>
-
-    <view class="ws-status-section">
-      <view class="section-title">商铺连接状态</view>
-      <view class="ws-status-card">
-        <view class="ws-status-row">
-          <text class="ws-status-label">当前状态</text>
-          <text class="ws-status-value" :class="socketStatusClass">{{ socketStatusText }}</text>
-        </view>
-        <view class="ws-status-row">
-          <text class="ws-status-label">最近消息</text>
-          <text class="ws-status-content">{{ lastSocketMessageText }}</text>
-        </view>
-        <view class="ws-status-row">
-          <text class="ws-status-label">接收时间</text>
-          <text class="ws-status-content">{{ authStore.lastSocketMessageAt || '暂无' }}</text>
-        </view>
       </view>
     </view>
 
@@ -217,30 +203,7 @@ const merchantCardStyle = computed(() => {
 })
 
 const hasLowStock = computed(() => lowStockCount.value > 0)
-const socketStatusTextMap: Record<string, string> = {
-  disconnected: '未连接',
-  connecting: '连接中',
-  connected: '已连接',
-  reconnecting: '重连中'
-}
-const socketStatusText = computed(() => socketStatusTextMap[authStore.socketStatus] || '未连接')
-const socketStatusClass = computed(() => `socket-${authStore.socketStatus}`)
-const lastSocketMessageText = computed(() => {
-  const message = authStore.lastSocketMessage
-  if (!message) {
-    return '暂无'
-  }
-
-  if (message.type === 'order_notify') {
-    return `订单提醒，订单号：${message.orderNo || '未提供'}`
-  }
-
-  if (message.type === 'store_visit_notify') {
-    return `顾客进店，访客：${message.visitorOpenId || '未提供'}，来源：${message.source || '未提供'}`
-  }
-
-  return message.type || '未知消息'
-})
+const isSocketOnline = computed(() => authStore.socketStatus === 'connected')
 const quickMenuItems = computed(() => [
   {
     title: '分类管理',
@@ -695,6 +658,13 @@ function formatDateTime(time: string): string {
   opacity: 0.9;
 }
 
+.merchant-socket-status {
+  margin-left: 16rpx;
+  display: inline-flex;
+  align-items: center;
+  font-size: 26rpx;
+}
+
 .status-dot {
   width: 12rpx;
   height: 12rpx;
@@ -739,59 +709,6 @@ function formatDateTime(time: string): string {
   font-weight: 600;
   color: #1a1a1a;
   margin-bottom: 24rpx;
-}
-
-.ws-status-section {
-  background: #ffffff;
-  margin: 0 24rpx 24rpx;
-  padding: 32rpx;
-  border-radius: 24rpx;
-}
-
-.ws-status-card {
-  background: #f8faff;
-  border-radius: 16rpx;
-  padding: 20rpx 24rpx;
-}
-
-.ws-status-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24rpx;
-  padding: 12rpx 0;
-}
-
-.ws-status-row:not(:last-child) {
-  border-bottom: 1rpx solid #eef2ff;
-}
-
-.ws-status-label {
-  flex-shrink: 0;
-  font-size: 26rpx;
-  color: #666666;
-}
-
-.ws-status-value,
-.ws-status-content {
-  flex: 1;
-  text-align: right;
-  font-size: 26rpx;
-  line-height: 1.6;
-  color: #1a1a1a;
-}
-
-.socket-connected {
-  color: #16a34a;
-}
-
-.socket-connecting,
-.socket-reconnecting {
-  color: #2563eb;
-}
-
-.socket-disconnected {
-  color: #dc2626;
 }
 
 .stats-section {

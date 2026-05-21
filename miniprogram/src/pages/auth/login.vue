@@ -79,8 +79,8 @@ import { BrandAsset } from '../../utils/constants'
 const authStore = useAuthStore()
 
 const formData = reactive({
-  username: 'merchant',
-  password: 'merchant123'
+  username: '',
+  password: '123123'
 })
 
 const errors = reactive({
