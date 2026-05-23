@@ -8,6 +8,13 @@
       }
     },
     {
+      "path": "pages/auth/agreement",
+      "style": {
+        "navigationBarTitleText": "商家服务协议",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
       "path": "pages/sp/login",
       "style": {
         "navigationBarTitleText": "服务商登录",

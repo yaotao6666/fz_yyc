@@ -3224,12 +3224,16 @@ Authorization: Bearer {token}
     {
       "product_id": 1,
       "product_name": "招牌红烧肉",
+      "image": "可直接显示的图片地址",
+      "images": ["可直接显示的图片地址1", "可直接显示的图片地址2"],
       "stock": 5,
       "status": "low_stock"
     }
   ]
 }
 ```
+
+- 库存预警接口返回的 `image` 与 `images` 已完成七牛私有访问签名，前端可直接展示。
 
 #### 3.8.6 商家用户分析（商家维度）
 
@@ -4826,6 +4830,7 @@ miniprogram/                    # 微信小程序
 
 - `pages/sp/login`：服务商登录入口
 - `pages/auth/login`：商家登录入口
+- `pages/auth/agreement`：商家服务协议入口页，整合原隐私政策内容
 - `pages/store/test-entry`：C 端店铺测试入口，不是服务商入口
 - `pages/store/home?merchant_id=...`：C 端店铺首页直达方式，不是服务商入口
 

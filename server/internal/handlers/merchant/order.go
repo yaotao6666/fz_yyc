@@ -794,7 +794,34 @@ func GetStockAlert(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, products)
+	type StockAlertResponse struct {
+		ProductID   uint64   `json:"product_id"`
+		ProductName string   `json:"product_name"`
+		Image       string   `json:"image"`
+		Images      []string `json:"images"`
+		Stock       uint     `json:"stock"`
+		Status      string   `json:"status"`
+	}
+
+	alerts := make([]StockAlertResponse, 0, len(products))
+	for _, product := range products {
+		accessibleImages := buildAccessibleImages(parseStringArray(product.Images))
+		primaryImage := ""
+		if len(accessibleImages) > 0 {
+			primaryImage = accessibleImages[0]
+		}
+
+		alerts = append(alerts, StockAlertResponse{
+			ProductID:   product.ID,
+			ProductName: product.Name,
+			Image:       primaryImage,
+			Images:      accessibleImages,
+			Stock:       product.Stock,
+			Status:      "low_stock",
+		})
+	}
+
+	response.Success(c, alerts)
 }
 
 func GetCustomerAnalysis(c *gin.Context) {
