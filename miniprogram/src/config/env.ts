@@ -9,12 +9,16 @@
  */
 
 const DEFAULT_API_BASE_URL = 'http://192.168.10.6:8080'
+const DEFAULT_APP_NAME = '寻梦私域管家'
 
 function trimTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '')
 }
 
-function getEnvValue(key: 'VITE_API_BASE_URL' | 'VITE_WS_BASE_URL', fallback: string): string {
+function getEnvValue(
+  key: 'VITE_API_BASE_URL' | 'VITE_WS_BASE_URL' | 'VITE_APP_NAME',
+  fallback: string
+): string {
   const value = import.meta.env?.[key]
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
@@ -38,5 +42,7 @@ export const API_BASE_URL = trimTrailingSlash(
 export const WS_BASE_URL = trimTrailingSlash(
   getEnvValue('VITE_WS_BASE_URL', toWsBaseUrl(API_BASE_URL))
 )
+
+export const APP_NAME = getEnvValue('VITE_APP_NAME', DEFAULT_APP_NAME)
 
 export const MERCHANT_SOCKET_URL = `${WS_BASE_URL}/api/v1/ws/merchant`

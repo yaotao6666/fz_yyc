@@ -73,6 +73,35 @@ npm run build:mp-weixin
 
 构建产物在 `dist/build/mp-weixin` 目录。
 
+### 双小程序发布
+
+- 当前项目支持通过一套源码切换发布 2 个微信小程序。
+- 品牌差异配置位于：
+  - `config/brands/xunmeng.json`
+  - `config/brands/caixu.json`
+- 生产环境域名配置位于：
+  - `.env.production.xunmeng`
+  - `.env.production.caixu`
+- 预构建脚本：
+  - `scripts/apply-brand-config.mjs`
+- 发布命令：
+
+```bash
+# 寻梦私域管家
+npm run build:mp-weixin:xunmeng
+
+# 财旭商贸
+npm run build:mp-weixin:caixu
+```
+
+- 执行上述命令时，脚本会自动：
+  - 按品牌配置写入 `src/manifest.json` 中的 `name`、`appid`、`mp-weixin.appid`
+  - 按品牌配置同步写入 `src/pages.json` 的全局导航标题
+  - 将对应品牌的环境变量复制为 `.env.production`
+- 页面运行时的品牌名称统一通过 `src/config/env.ts` 导出的 `APP_NAME` 读取，登录页、协议页等文案不再手工硬编码品牌名。
+- 版本号仍以 `src/manifest.json` 中的 `versionName` / `versionCode` 为准，发布前只需维护这一处。
+- `caixu` 当前默认使用占位 `appid`，正式发布前需替换为真实小程序 AppID。
+
 ### 构建 H5（生产环境）
 
 ```bash

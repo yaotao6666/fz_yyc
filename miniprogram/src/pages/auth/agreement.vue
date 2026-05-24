@@ -25,6 +25,8 @@
 </template>
 
 <script setup lang="ts">
+import { APP_NAME } from '../../config/env'
+
 interface AgreementSection {
   title: string
   paragraphs: string[]
@@ -34,7 +36,7 @@ const agreementSections: AgreementSection[] = [
   {
     title: '一、协议说明',
     paragraphs: [
-      '1.1 本协议是您与寻梦私域管家平台之间关于使用商家管理服务所订立的协议，适用于商家账号登录、经营管理及相关服务使用行为。',
+      `1.1 本协议是您与${APP_NAME}平台之间关于使用商家管理服务所订立的协议，适用于商家账号登录、经营管理及相关服务使用行为。`,
       '1.2 您登录或继续使用平台服务，即视为已经阅读、理解并同意接受本协议全部内容。'
     ]
   },

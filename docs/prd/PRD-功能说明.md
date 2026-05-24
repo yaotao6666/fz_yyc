@@ -107,6 +107,26 @@
 - 用户完成支付后，后端向对应商家推送新订单提醒。
 - 商家退出登录时必须立即断开 WebSocket，不再继续重连。
 
+### 4.1.1 双小程序发布配置
+
+- 小程序前端支持“一套源码发布两个微信小程序”。
+- 差异配置统一收口到品牌配置文件与独立生产环境文件：
+  - `miniprogram/config/brands/xunmeng.json`
+  - `miniprogram/config/brands/caixu.json`
+  - `miniprogram/.env.production.xunmeng`
+  - `miniprogram/.env.production.caixu`
+- 发布时通过预构建脚本 `miniprogram/scripts/apply-brand-config.mjs` 自动写入：
+  - `src/manifest.json` 的 `name`
+  - 顶层 `appid`
+  - `mp-weixin.appid`
+  - `src/pages.json` 的全局导航标题
+  - `.env.production`
+- 页面运行时品牌名称统一由 `src/config/env.ts` 中的 `APP_NAME` 提供，登录页与协议页不得再硬编码品牌名。
+- 版本号仍统一维护在 `miniprogram/src/manifest.json` 的 `versionName` / `versionCode`。
+- 标准发布命令：
+  - `npm run build:mp-weixin:xunmeng`
+  - `npm run build:mp-weixin:caixu`
+
 ### 4.2 商家接入与支付配置
 
 - 商家由服务商直接创建，不再走小程序入驻、审核、进件页面。

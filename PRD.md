@@ -4834,6 +4834,24 @@ miniprogram/                    # 微信小程序
 - `pages/store/test-entry`：C 端店铺测试入口，不是服务商入口
 - `pages/store/home?merchant_id=...`：C 端店铺首页直达方式，不是服务商入口
 
+### 9.1.1 双小程序发布约定
+
+- 小程序前端支持通过一套源码切换发布两个微信小程序。
+- 品牌配置文件：
+  - `miniprogram/config/brands/xunmeng.json`
+  - `miniprogram/config/brands/caixu.json`
+- 品牌环境文件：
+  - `miniprogram/.env.production.xunmeng`
+  - `miniprogram/.env.production.caixu`
+- 预构建脚本：`miniprogram/scripts/apply-brand-config.mjs`
+- 发布命令：
+  - `npm run build:mp-weixin:xunmeng`
+  - `npm run build:mp-weixin:caixu`
+- 执行品牌构建脚本时，会自动写入 `src/manifest.json` 的应用名称与 `appid`，并同步对应的 `.env.production`。
+- 执行品牌构建脚本时，也会同步写入 `src/pages.json` 的全局导航标题。
+- 页面运行时统一通过 `src/config/env.ts` 中的 `APP_NAME` 读取品牌名称，页面文案不再手工硬编码品牌名。
+- `versionName` 与 `versionCode` 继续统一维护在 `miniprogram/src/manifest.json`。
+
 ### 9.2 测试账号总表（开发环境）
 
 | 角色     | 账号         | 密码            | 说明                 |

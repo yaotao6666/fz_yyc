@@ -6,6 +6,10 @@
   "scripts": {
     "dev:mp-weixin": "uni -p mp-weixin",
     "build:mp-weixin": "uni build -p mp-weixin",
+    "prepare:brand:xunmeng": "node scripts/apply-brand-config.mjs xunmeng",
+    "prepare:brand:caixu": "node scripts/apply-brand-config.mjs caixu",
+    "build:mp-weixin:xunmeng": "npm run prepare:brand:xunmeng && uni build -p mp-weixin",
+    "build:mp-weixin:caixu": "npm run prepare:brand:caixu && uni build -p mp-weixin",
     "dev:h5": "uni",
     "build:h5": "uni build"
   },

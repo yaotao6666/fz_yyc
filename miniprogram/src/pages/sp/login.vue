@@ -2,7 +2,7 @@
   <view class="login-container">
     <view class="login-header">
       <image class="logo" :src="BrandAsset.APP_LOGO" mode="aspectFit" />
-      <text class="title">寻梦私域管家</text>
+      <text class="title">{{ APP_NAME }}</text>
       <text class="subtitle">服务商管理端</text>
     </view>
 
@@ -47,6 +47,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
+import { APP_NAME } from '../../config/env'
 import { useSpStore } from '../../stores/sp'
 import { BrandAsset } from '../../utils/constants'
 
