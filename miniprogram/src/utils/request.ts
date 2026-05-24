@@ -42,9 +42,6 @@ export interface RequestOptions {
  * 获取 Token
  */
 function getToken(url: string): string {
-  if (url.startsWith('/api/v1/sp/')) {
-    return uni.getStorageSync('sp_token') || ''
-  }
   if (url.startsWith('/api/v1/user/')) {
     return uni.getStorageSync('user_token') || ''
   }
@@ -149,7 +146,6 @@ function request<T = any>(options: RequestOptions): Promise<T> {
     showLoading(loadingText)
   }
 
-  const isSpRequest = url.startsWith('/api/v1/sp/')
   const isMerchantRequest = url.startsWith('/api/v1/merchant/')
   const isUserRequest = url.startsWith('/api/v1/user/')
   const isStoreRequest = url.startsWith('/api/v1/store/')
@@ -183,13 +179,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
           if (apiResponse.code === ResponseCode.SUCCESS) {
             resolve(apiResponse.data)
           } else if (apiResponse.code === ResponseCode.UNAUTHORIZED) {
-            if (isSpRequest) {
-              uni.removeStorageSync('sp_token')
-              uni.removeStorageSync('sp_id')
-              uni.removeStorageSync('sp_info')
-              uni.showToast({ title: '请先登录', icon: 'none' })
-              uni.reLaunch({ url: '/pages/sp/login' })
-            } else if (isMerchantRequest) {
+            if (isMerchantRequest) {
               uni.removeStorageSync('token')
               uni.removeStorageSync('merchantId')
               uni.removeStorageSync('staff')
@@ -231,13 +221,7 @@ function request<T = any>(options: RequestOptions): Promise<T> {
           const errorMessage = getResponseMessage(response, `请求失败(${statusCode})`)
           const errorCode = getResponseCode(response)
           if (statusCode === 401 && errorCode === ResponseCode.UNAUTHORIZED) {
-            if (isSpRequest) {
-              uni.removeStorageSync('sp_token')
-              uni.removeStorageSync('sp_id')
-              uni.removeStorageSync('sp_info')
-              uni.showToast({ title: '请先登录', icon: 'none' })
-              uni.reLaunch({ url: '/pages/sp/login' })
-            } else if (isMerchantRequest) {
+            if (isMerchantRequest) {
               uni.removeStorageSync('token')
               uni.removeStorageSync('merchantId')
               uni.removeStorageSync('staff')

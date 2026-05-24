@@ -49,6 +49,10 @@ type UpdateMerchantPaymentConfigRequest struct {
 	ProfitSharingRatio   float64 `json:"profit_sharing_ratio"`
 }
 
+type ResetMerchantAdminPasswordRequest struct {
+	NewPassword string `json:"new_password" binding:"required,min=6"`
+}
+
 func buildPaymentConfigStatus(subMchID string, enabled bool, ratio float64) uint8 {
 	if strings.TrimSpace(subMchID) == "" {
 		return 0
@@ -231,6 +235,57 @@ func UpdateMerchantPaymentConfig(c *gin.Context) {
 	}
 
 	GetMerchantDetail(c)
+}
+
+func ResetMerchantAdminPassword(c *gin.Context) {
+	merchantID, _ := strconv.ParseUint(c.Param("merchant_id"), 10, 64)
+	serviceProviderID, ok := getCurrentServiceProviderID(c)
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "服务商身份无效")
+		return
+	}
+
+	var merchant models.Merchant
+	if err := database.DB.Select("id").
+		Where("id = ? AND service_provider_id = ?", merchantID, serviceProviderID).
+		First(&merchant).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
+		return
+	}
+
+	var req ResetMerchantAdminPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var adminStaff models.MerchantStaff
+	if err := database.DB.
+		Where("merchant_id = ? AND role = ?", merchantID, "owner").
+		Order("status DESC, id ASC").
+		First(&adminStaff).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家管理员不存在")
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "密码加密失败")
+		return
+	}
+
+	if err := database.DB.Model(&models.MerchantStaff{}).
+		Where("id = ?", adminStaff.ID).
+		Update("password", string(hashedPassword)).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "重置管理员密码失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"staff_id": adminStaff.ID,
+		"username": adminStaff.Username,
+		"message":  "管理员密码已重置",
+	})
 }
 
 func GetProfitSharingRecords(c *gin.Context) {

@@ -1,0 +1,5 @@
+- [x] `/api/v1/merchant/qrcode` 生成的小程序码页面路径已对齐当前实际店铺首页
+- [x] 商家二维码携带的参数可被 `pages/store/home` 现有入口解析逻辑识别出正确的 `merchant_id`
+- [x] `pages/merchant/home` 仍能正常加载并展示当前商家的店铺二维码
+- [x] 二维码接口返回中的 `scene` 与 `page` 字段已可用于调试核对
+- [x] `npm run build:mp-weixin` 构建通过，且二维码相关改动未破坏小程序发布链路

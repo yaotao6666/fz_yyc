@@ -33,13 +33,13 @@
 
 ### 2.3 服务商端
 
-- 独立入口，负责统一管理多个商家。
+- 独立 Web/PC 后台入口，负责统一管理多个商家。
 - 核心职责：
   - 直接创建商家与维护商家资料
   - 配置商家 `sub_mch_id`、分账开关和分账比例
   - 查看服务商与商家分账历史
   - 商家经营看板与统计分析
-  - 系统公告管理接口保留，当前小程序端不再提供公告管理页面，预留后续 PC 端复用
+  - 通过 `web-admin/` 公告管理页发布和维护系统公告
 
 ## 3. 页面结构
 
@@ -73,18 +73,19 @@
 - `pages/store/home`、`pages/store/product`、`pages/store/confirm`：统一支持从 `merchant_id` 或 `scene` 解析商家入口参数
 - `pages/store/confirm` 根据 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 动态展示可选下单方式，未开启的方式不展示
 
-### 3.3 服务商端页面
+### 3.3 服务商端页面（Web/PC 后台）
 
-- `pages/sp/login`：服务商登录页
-- `pages/sp/home`：服务商工作台
-- `pages/sp/merchants/list`：商家列表
-- `pages/sp/merchants/detail`：商家详情
-- `pages/sp/merchants/edit`：商家创建与支付配置
-- `pages/sp/settlements/history`：服务商分账历史
-- `pages/sp/analytics/merchant-stats`：服务商数据分析
-- `pages/sp/settings`：服务商设置
-- 服务商公告管理页已从小程序下线，当前不再配置 `pages/sp/announcements/*` 页面路由
-- 后端 `/api/v1/sp/announcements*` 接口继续保留，供后续 PC 端公告管理能力复用
+- `web-admin/src/views/login/LoginView.vue`：服务商登录页
+- `web-admin/src/views/dashboard/DashboardView.vue`：服务商工作台
+- `web-admin/src/views/merchant/MerchantListView.vue`：商家列表
+- `web-admin/src/views/merchant/MerchantDetailView.vue`：商家详情
+- `web-admin/src/views/merchant/MerchantEditView.vue`：商家创建与支付配置
+- `web-admin/src/views/announcement/AnnouncementListView.vue`：公告列表与停用管理
+- `web-admin/src/views/announcement/AnnouncementEditView.vue`：公告新增与编辑
+- `web-admin/src/views/settlement/ProfitSharingHistoryView.vue`：服务商分账历史
+- `web-admin/src/views/analytics/MerchantStatsView.vue`：服务商数据分析
+- `web-admin/src/views/settings/SpSettingsView.vue`：服务商设置
+- 服务商公告管理页已由 `web-admin/` 承接，继续复用后端 `/api/v1/sp/announcements*` 接口
 
 ## 4. 核心功能说明
 

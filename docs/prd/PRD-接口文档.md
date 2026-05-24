@@ -63,12 +63,13 @@
 
 #### 服务商公告接口说明
 
-- 服务商公告管理页面已从当前小程序下线。
-- 以下 `/api/v1/sp/announcements*` 接口继续保留，供后续 PC 端公告管理后台复用。
+- 服务商公告管理页面已从当前小程序下线，现阶段服务商能力由 `web-admin/` 承接。
+- `web-admin/` 已接入以下 `/api/v1/sp/announcements*` 接口，用于公告列表、详情、新增、编辑和删除（停用）管理。
 - 商家端首页公告展示仍可继续读取已发布公告。
 
 ### 2.2 服务商接口
 
+- 当前调用端：`web-admin/` 服务商 Web/PC 后台。
 - 仪表盘
 - 创建商家：`POST /api/v1/sp/merchants`
 - 商家列表
@@ -94,7 +95,7 @@
 - `GET /api/v1/sp/merchants/analytics/distribution` 返回 `merchants + totals` 结构。
 - `GET /api/v1/sp/orders/analytics` 返回 `day/week/month/year` 四组订单量桶。
 - `GET /api/v1/sp/amount/top-merchants` 支持 `metric` 参数切换排行维度。
-- `/api/v1/sp/announcements*` 服务商公告接口当前不再由小程序页面直接调用，但后端能力继续保留，供后续 PC 端复用。
+- `/api/v1/sp/announcements*` 服务商公告接口当前由 `web-admin/` 直接调用，小程序端不再承载该页面。
 
 ### 2.3 商家管理接口
 
@@ -112,6 +113,8 @@
 - `GET /api/v1/merchant/settings` 需返回 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled`，`PUT /api/v1/merchant/settings` 需支持更新这三个开关。
 - `GET /api/v1/store/:merchant_id/delivery-rules` 除配送费结构外，还需返回 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 供确认页动态展示下单方式。
 - `delivery_settings.enabled` 只表示配送费规则是否生效，确认页是否展示“配送”必须以后端返回的 `takeout_enabled` 为准。
+- `GET /api/v1/merchant/qrcode` 必须固定生成指向 `pages/store/home` 的小程序码，且 `scene` 需使用 `merchant_id={当前商家ID}` 以兼容现有店铺入口解析逻辑。
+- `GET /api/v1/sp/merchants/{id}/qrcode` 作为服务商代查看商家二维码接口，必须与商家侧二维码保持一致，通过微信小程序码接口生成真实二维码，并返回可直接展示的二维码图片、`pages/store/home` 页面路径以及 `merchant_id={商家ID}` 的 `scene` 参数；若微信生成失败，应直接返回错误，不能回退为系统自绘占位二维码。
 - 服务商若代商家维护资料，必须通过明确的服务商侧管理接口或授权更新接口。
 - 商家分账历史至少返回：
   - `profit_sharing_date`

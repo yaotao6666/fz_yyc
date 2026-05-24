@@ -192,6 +192,12 @@ func GetMerchantDetail(c *gin.Context) {
 		Select("COALESCE(SUM(pay_amount), 0)").
 		Scan(&totalAmount)
 
+	var adminStaff models.MerchantStaff
+	_ = database.DB.Select("id", "username", "name", "phone", "status").
+		Where("merchant_id = ? AND role = ?", id, "owner").
+		Order("status DESC, id ASC").
+		First(&adminStaff).Error
+
 	response.Success(c, gin.H{
 		"id":                     merchant.ID,
 		"name":                   merchant.Name,
@@ -211,6 +217,11 @@ func GetMerchantDetail(c *gin.Context) {
 		"profit_sharing_enabled": merchant.ProfitSharingEnabled,
 		"profit_sharing_ratio":   merchant.ProfitSharingRatio,
 		"payment_config_status":  merchant.PaymentConfigStatus,
+		"admin_staff_id":         adminStaff.ID,
+		"admin_username":         adminStaff.Username,
+		"admin_name":             adminStaff.Name,
+		"admin_phone":            adminStaff.Phone,
+		"admin_status":           adminStaff.Status,
 		"total_orders":           totalOrders,
 		"total_amount":           totalAmount,
 		"total_users":            totalUsers,
@@ -797,13 +808,20 @@ func GetMerchantQRCode(c *gin.Context) {
 		return
 	}
 
-	qrCodeURL := "/qrcode/" + strconv.FormatUint(id, 10)
+	qrCode, err := utils.GenerateMerchantStoreQRCode(id, 280)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "生成微信小程序码失败: "+err.Error())
+		return
+	}
+	database.DB.Model(&models.Merchant{}).Where("id = ?", id).Update("qrcode_url", qrCode.QRCodeURL)
 
 	response.Success(c, gin.H{
 		"merchant_id":   id,
 		"merchant_name": merchant.Name,
-		"qrcode_url":    qrCodeURL,
-		"page_path":     "pages/shop/index?merchant_id=" + strconv.FormatUint(id, 10),
+		"qrcode_url":    qrCode.QRCodeURL,
+		"page_path":     qrCode.Page,
+		"scene":         qrCode.Scene,
+		"placeholder":   false,
 	})
 }
 

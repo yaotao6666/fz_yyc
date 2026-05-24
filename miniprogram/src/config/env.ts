@@ -8,7 +8,7 @@
  * - http:// -> ws://
  */
 
-const DEFAULT_API_BASE_URL = 'http://192.168.10.6:8080'
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8080'
 const DEFAULT_APP_NAME = '寻梦私域管家'
 
 function trimTrailingSlash(url: string): string {

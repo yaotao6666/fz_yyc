@@ -225,6 +225,7 @@ func setupRoutes(r *gin.Engine) {
 				spGroup.POST("/merchants", sp.CreateMerchant)
 				spGroup.PUT("/merchants/:merchant_id", sp.UpdateMerchant)
 				spGroup.GET("/merchants/:merchant_id", sp.GetMerchantDetail)
+				spGroup.POST("/merchants/:merchant_id/admin/reset-password", sp.ResetMerchantAdminPassword)
 				spGroup.PUT("/merchants/:merchant_id/payment-config", sp.UpdateMerchantPaymentConfig)
 				spGroup.PUT("/merchants/:merchant_id/assets", sp.UpdateMerchantAssets)
 				spGroup.GET("/merchants/analytics/distribution", sp.GetMerchantDistribution)

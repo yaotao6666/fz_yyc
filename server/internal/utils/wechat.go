@@ -52,14 +52,14 @@ func GetAccessToken() (string, error) {
 	return accessToken, nil
 }
 
-// 生成小程序码（使用 getwxacode 接口）
+// 生成不限数量的小程序码（使用 getwxacodeunlimit 接口，支持 scene + page）
 func CreateWXACode(scene string, page string, width int) ([]byte, error) {
 	accessToken, err := GetAccessToken()
 	if err != nil {
 		return nil, err
 	}
 
-	url := fmt.Sprintf("https://api.weixin.qq.com/wxa/getwxacode?access_token=%s", accessToken)
+	url := fmt.Sprintf("https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=%s", accessToken)
 
 	request := map[string]interface{}{
 		"scene": scene,

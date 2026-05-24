@@ -61,20 +61,6 @@ export interface MerchantLoginResponse {
   staff: MerchantStaff
 }
 
-export interface ServiceProviderLoginRequest {
-  username: string
-  password: string
-}
-
-export interface ServiceProviderLoginResponse {
-  token: string
-  service_provider: {
-    id: number
-    name: string
-    sp_name?: string
-  }
-}
-
 // C端用户登录请求
 export interface WechatLoginRequest {
   code: string
@@ -88,27 +74,6 @@ export interface WechatLoginResponse {
   user: UserInfo
 }
 
-// ============ 服务商相关 ============
-
-// 服务商账号
-export interface ServiceProviderSp {
-  id: number
-  service_provider_id: number
-  username: string
-  name: string
-  phone: string
-  role: string
-  status: number
-}
-
-export interface SpSettings {
-  name: string
-  sp_name: string
-  contact_phone: string
-  contact_email?: string
-  created_at?: string
-}
-
 export enum PaymentConfigStatus {
   INCOMPLETE = 0,
   COMPLETED = 1
@@ -117,70 +82,6 @@ export enum PaymentConfigStatus {
 export const PaymentConfigStatusText: Record<number, string> = {
   [PaymentConfigStatus.INCOMPLETE]: '待完善',
   [PaymentConfigStatus.COMPLETED]: '已完成'
-}
-
-export interface MerchantListItem {
-  id: number
-  name: string
-  contact_name?: string
-  contact_phone?: string
-  contact_email?: string
-  address?: string
-  business_category: string
-  business_hours?: string
-  announcement?: string
-  sub_mch_id?: string
-  profit_sharing_enabled?: boolean
-  profit_sharing_ratio?: number
-  payment_config_status?: number
-  status: number
-  created_at: string
-  total_users: number
-  total_orders: number
-  total_amount: number
-}
-
-export interface MerchantDetail extends MerchantListItem {
-  address?: string
-  qrcode_url?: string
-  logo?: string
-  cover_image?: string
-}
-
-export interface SpMerchantFormData {
-  name: string
-  contact_name?: string
-  contact_phone?: string
-  contact_email?: string
-  address?: string
-  business_category?: string
-  business_hours?: string
-  announcement?: string
-  username: string
-  password: string
-  staff_name?: string
-  staff_phone?: string
-  sub_mch_id?: string
-  profit_sharing_enabled: boolean
-  profit_sharing_ratio: number
-}
-
-export interface UpdateSpMerchantFormData {
-  name?: string
-  contact_name?: string
-  contact_phone?: string
-  contact_email?: string
-  address?: string
-  business_category?: string
-  business_hours?: string
-  announcement?: string
-  status?: number
-}
-
-export interface MerchantPaymentConfigFormData {
-  sub_mch_id: string
-  profit_sharing_enabled: boolean
-  profit_sharing_ratio: number
 }
 
 export interface ProfitSharingRecord {
@@ -215,61 +116,6 @@ export interface ProfitSharingRecordQuery extends PaginationParams {
   status?: number
   start_date?: string
   end_date?: string
-}
-
-export interface SpMerchantConversionItem {
-  merchant_id: number
-  merchant_name: string
-  merchant_logo?: string
-  visit_users: number
-  order_users: number
-  paid_orders: number
-  order_amount: number
-  avg_order_amount: number
-  visit_rate: number
-  order_rate: number
-}
-
-export interface MerchantDistributionData {
-  merchants: SpMerchantConversionItem[]
-  totals: {
-    merchant_count: number
-    visit_users: number
-    order_users: number
-    paid_orders: number
-    order_amount: number
-  }
-  pagination?: {
-    total: number
-    page: number
-    page_size: number
-  }
-}
-
-export interface OrderAnalyticsData {
-  day: { label: string; order_count: number }[]
-  week: { label: string; order_count: number }[]
-  month: { label: string; order_count: number }[]
-  year: { label: string; order_count: number }[]
-}
-
-export interface AmountAnalyticsData {
-  merchants: SpMerchantConversionItem[]
-}
-
-export interface TopMerchantRanking {
-  rank: number
-  metric: string
-  merchant_id: number
-  merchant_name: string
-  merchant_logo?: string
-  visit_rate: number
-  order_rate: number
-  order_amount: number
-  avg_order_amount: number
-  visit_users: number
-  order_users: number
-  paid_orders: number
 }
 
 // ============ 商家相关 ============

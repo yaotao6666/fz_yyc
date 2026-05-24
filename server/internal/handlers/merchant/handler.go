@@ -1,7 +1,6 @@
 package merchant
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"fz_yyc_api/internal/middleware"
@@ -289,28 +288,20 @@ func GetQRCode(c *gin.Context) {
 		return
 	}
 
-	// 尝试生成微信小程序二维码
-	scene := fmt.Sprintf("id=%d", merchantID)
-
-	var qrCodeURL string
-	qrCodeBytes, err := utils.CreateWXACode(scene, "pages/index/index", 280)
+	qrCode, err := utils.GenerateMerchantStoreQRCode(merchantID, 280)
 	if err != nil {
-		// 如果生成失败，返回占位符URL
-		// TODO: 小程序发布后需要配置正确的页面路径
-		qrCodeURL = fmt.Sprintf("/placeholder-qrcode/%d", merchantID)
-	} else {
-		qrCodeBase64 := base64.StdEncoding.EncodeToString(qrCodeBytes)
-		qrCodeURL = "data:image/png;base64," + qrCodeBase64
-		// 保存到数据库
-		database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Update("qrcode_url", qrCodeURL)
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "生成微信小程序码失败: "+err.Error())
+		return
 	}
+	// 保存到数据库，便于详情页直接复用最新二维码。
+	database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Update("qrcode_url", qrCode.QRCodeURL)
 
 	response.Success(c, gin.H{
-		"qrcode_url":  qrCodeURL,
-		"scene":       scene,
-		"page":        "pages/index/index",
-		"placeholder": err != nil,
-		"message":     "小程序发布后可生成正式二维码",
+		"qrcode_url":  qrCode.QRCodeURL,
+		"scene":       qrCode.Scene,
+		"page":        qrCode.Page,
+		"placeholder": false,
+		"message":     "微信小程序码生成成功",
 	})
 }
 

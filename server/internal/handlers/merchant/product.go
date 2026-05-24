@@ -10,6 +10,7 @@ import (
 	"fz_yyc_api/pkg/response"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -61,6 +62,29 @@ func parseStringArray(raw models.JSON) []string {
 	var single string
 	if err := json.Unmarshal(raw, &single); err == nil && single != "" {
 		return []string{single}
+	}
+
+	trimmedRaw := strings.TrimSpace(string(raw))
+	if trimmedRaw == "" {
+		return []string{}
+	}
+	if strings.Contains(trimmedRaw, ",") {
+		parts := strings.Split(trimmedRaw, ",")
+		result := make([]string, 0, len(parts))
+		for _, part := range parts {
+			normalized := strings.TrimSpace(strings.Trim(part, `"'`))
+			if normalized != "" {
+				result = append(result, normalized)
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+	}
+
+	normalized := strings.TrimSpace(strings.Trim(trimmedRaw, `"'`))
+	if normalized != "" {
+		return []string{normalized}
 	}
 
 	return []string{}

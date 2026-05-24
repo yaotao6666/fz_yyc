@@ -8,16 +8,6 @@ import type { RequestOptions } from '../utils/request'
 import type {
   MerchantLoginRequest,
   MerchantLoginResponse,
-  ServiceProviderLoginRequest,
-  ServiceProviderLoginResponse,
-  SpSettings,
-  MerchantListItem,
-  MerchantDetail,
-  AnnouncementStatus,
-  MerchantDistributionData,
-  OrderAnalyticsData,
-  AmountAnalyticsData,
-  TopMerchantRanking,
   MerchantInfo,
   MerchantWechatLoginRequest,
   MerchantSettings,
@@ -43,20 +33,15 @@ import type {
   CustomerAnalysis,
   CustomerTrend,
   StoreHomeInfo,
-  StoreProductGroup,
   CreateOrderRequest,
   CreateOrderResponse,
   MerchantBehaviorEventRequest,
   Announcement,
   AnnouncementListResponse,
-  SpMerchantFormData,
-  UpdateSpMerchantFormData,
-  MerchantPaymentConfigFormData,
   ProfitSharingRecordListResponse,
   ProfitSharingRecordQuery,
   UserAddress,
 } from '../types'
-import type { ApiResponse } from '../types'
 
 export { get, post, put, del }
 export * from '../types'
@@ -74,14 +59,6 @@ export const ResponseCode = {
   CATEGORY_HAS_PRODUCT: 7002,
   QINIU_UPLOAD_FAILED: 8002,
 } as const
-
-function getToken(): string {
-  return uni.getStorageSync('token') || ''
-}
-
-function getUserToken(): string {
-  return uni.getStorageSync('user_token') || ''
-}
 
 function parseDistanceRules(value: unknown): { min_distance: number; max_distance: number; fee: number }[] {
   if (Array.isArray(value)) {
@@ -181,62 +158,6 @@ export async function merchantWechatLogin(data: MerchantWechatLoginRequest): Pro
   return res
 }
 
-export function spLogin(data: ServiceProviderLoginRequest) {
-  return post<ServiceProviderLoginResponse>('/api/v1/sp/auth/login', data)
-}
-
-export function spLogout() {
-  return post<{ message: string }>('/api/v1/sp/auth/logout', {})
-}
-
-export function getSpSettings() {
-  return get<SpSettings>('/api/v1/sp/settings')
-}
-
-export function changeSpPassword(data: { old_password: string; new_password: string }) {
-  return post<{ message: string }>('/api/v1/sp/account/change-password', data)
-}
-
-export function createSpMerchant(data: SpMerchantFormData) {
-  return post<MerchantDetail>('/api/v1/sp/merchants', data)
-}
-
-export function updateSpMerchant(merchantId: number, data: UpdateSpMerchantFormData) {
-  return put<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}`, data)
-}
-
-export function updateSpMerchantPaymentConfig(merchantId: number, data: MerchantPaymentConfigFormData) {
-  return put<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}/payment-config`, data)
-}
-
-export async function getMerchantList(params?: any) {
-  const res = await get<{ list: any[]; pagination: { total: number; page: number; page_size: number } }>(
-    '/api/v1/sp/merchants/list',
-    params
-  )
-
-  const list: MerchantListItem[] = (res.list || []).map((item: any) => ({
-    ...item,
-    total_users: Number(item?.total_users || 0),
-    total_orders: Number(item?.total_orders || 0),
-    total_amount: Number(item?.total_amount || 0)
-  }))
-
-  return { ...res, list }
-}
-
-export function getMerchantDetail(merchantId: number) {
-  return get<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}`).then(data => {
-    if (data?.logo) data.logo = normalizeImageUrl(data.logo)
-    if (data?.cover_image) data.cover_image = normalizeImageUrl(data.cover_image)
-    return data
-  })
-}
-
-export function getSpProfitSharingRecords(params?: ProfitSharingRecordQuery) {
-  return get<ProfitSharingRecordListResponse>('/api/v1/sp/profit-sharing-records', params).then(normalizeListField)
-}
-
 export function getMerchantProfitSharingRecords(params?: Omit<ProfitSharingRecordQuery, 'merchant_id'>) {
   return get<ProfitSharingRecordListResponse>('/api/v1/merchant/profit-sharing-records', params).then(normalizeListField)
 }
@@ -332,8 +253,17 @@ export function updateMerchantStatus(status: number) {
 /**
  * 获取商家小程序码
  */
-export function getMerchantQrcode(params?: { page?: string; width?: number }) {
-  return get<{ qrcode_url: string; expire_time?: string }>('/api/v1/merchant/qrcode', params)
+export interface MerchantQrcodeResponse {
+  qrcode_url: string
+  scene: string
+  page: string
+  placeholder: boolean
+  message: string
+  expire_time?: string
+}
+
+export function getMerchantQrcode() {
+  return get<MerchantQrcodeResponse>('/api/v1/merchant/qrcode')
 }
 
 export function getMerchantAnnouncements(params?: { page?: number; page_size?: number }) {
@@ -350,11 +280,6 @@ export function getMerchantAnnouncementDetail(announcementId: number) {
  * 获取分类列表
  */
 export function getCategories(options?: Partial<RequestOptions>) {
-  const token = uni.getStorageSync('token') || ''
-  const spToken = uni.getStorageSync('sp_token') || ''
-  if (!token && spToken) {
-    return Promise.resolve([])
-  }
   return get<Category[] | null>('/api/v1/merchant/categories', undefined, options).then(normalizeArrayResponse)
 }
 
@@ -1010,10 +935,6 @@ export default {
   merchantLogin,
   merchantWechatLogin,
   getMerchantProfile,
-  createSpMerchant,
-  updateSpMerchant,
-  updateSpMerchantPaymentConfig,
-  getSpProfitSharingRecords,
   getMerchantProfitSharingRecords,
   // 商家设置
   updateMerchantProfile,

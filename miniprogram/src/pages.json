@@ -15,62 +15,6 @@
       }
     },
     {
-      "path": "pages/sp/login",
-      "style": {
-        "navigationBarTitleText": "服务商登录",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
-      "path": "pages/sp/home",
-      "style": {
-        "navigationBarTitleText": "服务商工作台",
-        "navigationBarBackgroundColor": "#F5F5F5"
-      }
-    },
-    {
-      "path": "pages/sp/merchants/list",
-      "style": {
-        "navigationBarTitleText": "商家列表",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
-      "path": "pages/sp/merchants/detail",
-      "style": {
-        "navigationBarTitleText": "商家详情",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
-      "path": "pages/sp/merchants/edit",
-      "style": {
-        "navigationBarTitleText": "商家配置",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
-      "path": "pages/sp/settlements/history",
-      "style": {
-        "navigationBarTitleText": "分账历史",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
-      "path": "pages/sp/analytics/merchant-stats",
-      "style": {
-        "navigationBarTitleText": "商家统计",
-        "navigationBarBackgroundColor": "#F5F5F5"
-      }
-    },
-    {
-      "path": "pages/sp/settings",
-      "style": {
-        "navigationBarTitleText": "服务商设置",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
       "path": "pages/merchant/home",
       "style": {
         "navigationBarTitleText": "商户管理中心",
@@ -256,10 +200,6 @@
       {
         "name": "商家登录",
         "path": "pages/auth/login"
-      },
-      {
-        "name": "服务商登录（后台）",
-        "path": "pages/sp/login"
       },
       {
         "name": "C端测试入口",
