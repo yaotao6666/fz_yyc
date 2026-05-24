@@ -61,6 +61,12 @@
     - `source?: string`
     - `payload?: object`
 
+#### 服务商公告接口说明
+
+- 服务商公告管理页面已从当前小程序下线。
+- 以下 `/api/v1/sp/announcements*` 接口继续保留，供后续 PC 端公告管理后台复用。
+- 商家端首页公告展示仍可继续读取已发布公告。
+
 ### 2.2 服务商接口
 
 - 仪表盘
@@ -88,6 +94,7 @@
 - `GET /api/v1/sp/merchants/analytics/distribution` 返回 `merchants + totals` 结构。
 - `GET /api/v1/sp/orders/analytics` 返回 `day/week/month/year` 四组订单量桶。
 - `GET /api/v1/sp/amount/top-merchants` 支持 `metric` 参数切换排行维度。
+- `/api/v1/sp/announcements*` 服务商公告接口当前不再由小程序页面直接调用，但后端能力继续保留，供后续 PC 端复用。
 
 ### 2.3 商家管理接口
 

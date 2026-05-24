@@ -245,33 +245,6 @@ export function updateSpMerchantAssets(merchantId: number, data: { logo?: string
   return put<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}/assets`, data)
 }
 
-export async function getAnnouncements(params?: { page?: number; page_size?: number }) {
-  const res = await get<AnnouncementListResponse>('/api/v1/sp/announcements', params)
-
-  const list = (res.list || []).map((item: any) => ({
-    ...item,
-    summary: typeof item?.summary === 'string' ? item.summary : String(item?.content || '').slice(0, 60),
-    published_at: typeof item?.published_at === 'string' ? item.published_at : item?.created_at
-  }))
-
-  return { ...res, list }
-}
-
-export function getAnnouncement(announcementId: number) {
-  return get<Announcement>(`/api/v1/sp/announcements/${announcementId}`)
-}
-
-export function createAnnouncement(data: { title: string; content: string; status?: AnnouncementStatus }) {
-  return post<{ id: number; message: string }>('/api/v1/sp/announcements', data)
-}
-
-export function updateAnnouncement(
-  announcementId: number,
-  data: { title: string; content: string; status?: AnnouncementStatus }
-) {
-  return put<Announcement>(`/api/v1/sp/announcements/${announcementId}`, data)
-}
-
 export function getMerchantDistribution() {
   return get<MerchantDistributionData>('/api/v1/sp/merchants/analytics/distribution')
 }
@@ -988,10 +961,6 @@ export function updateSpSettings(data: Partial<SpSettings>) {
   return put<SpSettings>('/api/v1/sp/settings', data)
 }
 
-export function deleteAnnouncement(announcementId: number) {
-  return del<null>(`/api/v1/sp/announcements/${announcementId}`)
-}
-
 export function getMerchantFee(merchantId: number) {
   return get<any>(`/api/v1/sp/merchants/${merchantId}/fee`)
 }
@@ -1118,7 +1087,6 @@ export default {
   deleteUserAddress,
   // SP端缺失API
   updateSpSettings,
-  deleteAnnouncement,
   getMerchantFee,
   getMerchantRate,
   setMerchantRate,

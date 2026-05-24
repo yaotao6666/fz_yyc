@@ -57,20 +57,6 @@
       }
     },
     {
-      "path": "pages/sp/announcements/index",
-      "style": {
-        "navigationBarTitleText": "系统公告",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
-      "path": "pages/sp/announcements/edit",
-      "style": {
-        "navigationBarTitleText": "编辑公告",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
       "path": "pages/sp/analytics/merchant-stats",
       "style": {
         "navigationBarTitleText": "商家统计",
@@ -228,7 +214,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "寻梦私域管家",
+    "navigationBarTitleText": "财旭商贸",
     "navigationBarBackgroundColor": "#FFFFFF",
     "backgroundColor": "#F5F5F5"
   },

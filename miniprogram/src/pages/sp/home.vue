@@ -56,10 +56,6 @@
             <text class="menu-title">数据分析</text>
             <text class="menu-desc">查看访问率、下单率、订单量和排行榜</text>
           </view>
-          <view class="menu-card" @click="goAnnouncements">
-            <text class="menu-title">系统公告</text>
-            <text class="menu-desc">维护面对商家的统一公告与通知内容</text>
-          </view>
         </view>
       </view>
 
@@ -160,10 +156,6 @@ function goProfitSharingHistory() {
 
 function goAnalytics() {
   uni.navigateTo({ url: '/pages/sp/analytics/merchant-stats' })
-}
-
-function goAnnouncements() {
-  uni.navigateTo({ url: '/pages/sp/announcements/index' })
 }
 
 onShow(() => {
