@@ -77,6 +77,8 @@
 - 更新商家资料：`PUT /api/v1/sp/merchants/:merchant_id`
 - 更新支付配置：`PUT /api/v1/sp/merchants/:merchant_id/payment-config`
 - 商家图片资产更新：`PUT /api/v1/sp/merchants/:merchant_id/assets`
+- 订单列表：`GET /api/v1/sp/orders`
+- 订单详情：`GET /api/v1/sp/orders/:order_id`
 - 分账历史：`GET /api/v1/sp/profit-sharing-records`
 - 商家费率
 - 商家二维码
@@ -93,6 +95,8 @@
   - 日 / 周 / 月 / 年订单量
   - 商家排行维度切换
 - `GET /api/v1/sp/merchants/analytics/distribution` 返回 `merchants + totals` 结构。
+- `GET /api/v1/sp/orders` 需支持 `merchant_id`、`status`、`start_date`、`end_date`、`keyword`、`page`、`page_size` 筛选，并且仅返回当前服务商名下商家的订单。
+- `GET /api/v1/sp/orders/:order_id` 需校验订单归属当前服务商，返回结构与商家侧订单详情保持一致，包含商品明细、用户信息、配送信息、支付单号、核销码、核销时间与核销人。
 - `GET /api/v1/sp/orders/analytics` 返回 `day/week/month/year` 四组订单量桶。
 - `GET /api/v1/sp/amount/top-merchants` 支持 `metric` 参数切换排行维度。
 - `/api/v1/sp/announcements*` 服务商公告接口当前由 `web-admin/` 直接调用，小程序端不再承载该页面。

@@ -165,6 +165,94 @@ export interface MerchantDistributionData {
   }
 }
 
+export const SpOrderStatusText: Record<number, string> = {
+  1: '待支付',
+  2: '已支付',
+  3: '已完成',
+  4: '已取消',
+  5: '退款中',
+  6: '已退款'
+}
+
+export const SpDeliveryTypeText: Record<number, string> = {
+  1: '配送',
+  2: '堂食',
+  3: '自提'
+}
+
+export interface SpOrderUser {
+  id: number
+  nickname?: string
+  avatar?: string
+  phone?: string
+}
+
+export interface SpOrderMerchant {
+  id: number
+  name: string
+  logo?: string
+  address?: string
+  phone?: string
+  contact_phone?: string
+}
+
+export interface SpOrderItem {
+  id?: number
+  product_id: number
+  product_name: string
+  image: string
+  price: number
+  quantity: number
+  specs?: string
+  spec_info?: string
+  subtotal?: number
+}
+
+export interface SpOrderDeliveryInfo {
+  type?: string
+  address?: string
+  contact_name?: string
+  contact_phone?: string
+  distance?: number
+}
+
+export interface SpOrder {
+  id: number
+  order_no: string
+  user?: SpOrderUser
+  merchant?: SpOrderMerchant
+  items: SpOrderItem[]
+  total_amount: number
+  delivery_fee: number
+  discount_amount: number
+  pay_amount: number
+  delivery_type?: number
+  delivery_distance?: number
+  delivery_info?: SpOrderDeliveryInfo
+  delivery_address?: string
+  contact_name?: string
+  contact_phone?: string
+  status: number
+  remark?: string
+  verify_code?: string
+  transaction_id?: string
+  created_at: string
+  paid_at?: string
+  completed_at?: string
+  completed_by_name?: string
+  cancelled_at?: string
+  refunded_at?: string
+}
+
+export interface SpOrderListResponse {
+  list: SpOrder[]
+  pagination: {
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
 export interface OrderAnalyticsBucket {
   label: string
   order_count: number

@@ -10,6 +10,8 @@ import type {
   MerchantListResponse,
   MerchantPaymentConfigFormData,
   OrderAnalyticsData,
+  SpOrder,
+  SpOrderListResponse,
   ProfitSharingRecordListResponse,
   ServiceProviderLoginRequest,
   ServiceProviderLoginResponse,
@@ -68,6 +70,14 @@ export function getMerchantDistribution(params?: Record<string, unknown>) {
 
 export function getOrderAnalytics(params?: Record<string, unknown>) {
   return request.get('/api/v1/sp/orders/analytics', { params }).then(unwrapApiResponse<OrderAnalyticsData>)
+}
+
+export function getSpOrders(params?: Record<string, unknown>) {
+  return request.get('/api/v1/sp/orders', { params }).then(unwrapApiResponse<SpOrderListResponse>)
+}
+
+export function getSpOrderDetail(orderId: number) {
+  return request.get(`/api/v1/sp/orders/${orderId}`).then(unwrapApiResponse<SpOrder>)
 }
 
 export function getAmountAnalytics(params?: Record<string, unknown>) {

@@ -6,6 +6,8 @@ import DashboardView from '@/views/dashboard/DashboardView.vue'
 import MerchantListView from '@/views/merchant/MerchantListView.vue'
 import MerchantDetailView from '@/views/merchant/MerchantDetailView.vue'
 import MerchantEditView from '@/views/merchant/MerchantEditView.vue'
+import OrderListView from '@/views/order/OrderListView.vue'
+import OrderDetailView from '@/views/order/OrderDetailView.vue'
 import AnnouncementListView from '@/views/announcement/AnnouncementListView.vue'
 import AnnouncementEditView from '@/views/announcement/AnnouncementEditView.vue'
 import ProfitSharingHistoryView from '@/views/settlement/ProfitSharingHistoryView.vue'
@@ -55,6 +57,18 @@ const routes = [
         name: 'merchant-edit',
         component: MerchantEditView,
         meta: { title: '编辑商家', requiresAuth: true }
+      },
+      {
+        path: '/orders',
+        name: 'orders',
+        component: OrderListView,
+        meta: { title: '订单管理', requiresAuth: true }
+      },
+      {
+        path: '/orders/:id',
+        name: 'order-detail',
+        component: OrderDetailView,
+        meta: { title: '订单详情', requiresAuth: true }
       },
       {
         path: '/profit-sharing',

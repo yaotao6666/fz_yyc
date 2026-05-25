@@ -12,6 +12,7 @@ const authStore = useAuthStore()
 const menuItems = [
   { index: '/dashboard', label: '工作台' },
   { index: '/merchants', label: '商家列表' },
+  { index: '/orders', label: '订单管理' },
   { index: '/announcements', label: '公告管理' },
   { index: '/profit-sharing', label: '分账历史' },
   { index: '/analytics', label: '数据分析' },
@@ -24,6 +25,9 @@ const activeMenu = computed(() => {
   }
   if (route.path.startsWith('/announcements')) {
     return '/announcements'
+  }
+  if (route.path.startsWith('/orders')) {
+    return '/orders'
   }
   return route.path
 })

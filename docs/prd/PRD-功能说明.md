@@ -80,12 +80,15 @@
 - `web-admin/src/views/merchant/MerchantListView.vue`：商家列表
 - `web-admin/src/views/merchant/MerchantDetailView.vue`：商家详情
 - `web-admin/src/views/merchant/MerchantEditView.vue`：商家创建与支付配置
+- `web-admin/src/views/order/OrderListView.vue`：订单管理列表
+- `web-admin/src/views/order/OrderDetailView.vue`：订单详情
 - `web-admin/src/views/announcement/AnnouncementListView.vue`：公告列表与停用管理
 - `web-admin/src/views/announcement/AnnouncementEditView.vue`：公告新增与编辑
 - `web-admin/src/views/settlement/ProfitSharingHistoryView.vue`：服务商分账历史
 - `web-admin/src/views/analytics/MerchantStatsView.vue`：服务商数据分析
 - `web-admin/src/views/settings/SpSettingsView.vue`：服务商设置
 - 服务商公告管理页已由 `web-admin/` 承接，继续复用后端 `/api/v1/sp/announcements*` 接口
+- 服务商订单管理页由 `web-admin/` 承接，支持按商家、订单状态、日期区间和订单号查看订单，并提供独立详情页
 
 ## 4. 核心功能说明
 
