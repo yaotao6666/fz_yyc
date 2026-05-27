@@ -221,9 +221,46 @@ export interface Category {
 
 // ============ 商品相关 ============
 
+export type CompatibleAmountValue = number | string
+export type OptionalCompatibleAmountValue = CompatibleAmountValue | null | undefined
+
+export interface ProductApiSpecOption {
+  id?: number | string
+  name?: string
+  price?: OptionalCompatibleAmountValue
+  stock?: number | string | null
+}
+
+export interface ProductApiSpec {
+  id?: number | string
+  name?: string
+  options?: ProductApiSpecOption[] | null
+}
+
+export interface ProductApiResponse {
+  id?: number | string
+  merchant_id?: number | string
+  name?: string
+  images?: string[] | string | null
+  price?: OptionalCompatibleAmountValue
+  original_price?: OptionalCompatibleAmountValue
+  stock?: number | string | null
+  sales?: number | string | null
+  category_id?: number | string | null
+  category_name?: string
+  status?: number | string
+  sort?: number | string | null
+  unit?: string
+  description?: string
+  specs?: ProductApiSpec[] | null
+  created_at?: string
+  updated_at?: string
+}
+
 // 商品信息
 export interface Product {
   id: number
+  merchant_id?: number
   name: string
   images: string[]
   price: number
@@ -238,6 +275,7 @@ export interface Product {
   description?: string
   specs?: ProductSpec[]
   created_at: string
+  updated_at?: string
 }
 
 // 商品规格
@@ -253,6 +291,32 @@ export interface SpecOption {
   name: string
   price: number
   stock?: number
+}
+
+// 商品保存载荷
+export interface ProductSpecOptionPayload {
+  name: string
+  price: number
+  stock?: number
+}
+
+export interface ProductSpecPayload {
+  id?: number
+  name: string
+  options: ProductSpecOptionPayload[]
+}
+
+export interface ProductUpsertPayload {
+  name: string
+  description?: string
+  images: string[]
+  category_id: number
+  price: number
+  original_price?: number
+  stock?: number
+  unit?: string
+  sort?: number
+  specs?: ProductSpecPayload[]
 }
 
 // 商品列表响应

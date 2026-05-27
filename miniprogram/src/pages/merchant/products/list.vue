@@ -74,7 +74,7 @@
             <view class="product-name">{{ product.name }}</view>
             <view class="product-price">
               <text class="current-price">¥{{ product.price.toFixed(2) }}</text>
-              <text v-if="product.original_price" class="original-price">
+              <text v-if="product.original_price > 0" class="original-price">
                 ¥{{ product.original_price.toFixed(2) }}
               </text>
             </view>

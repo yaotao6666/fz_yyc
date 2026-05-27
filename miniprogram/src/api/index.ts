@@ -21,7 +21,12 @@ import type {
   StoreDeliveryRules,
   Category,
   Product,
+  ProductApiResponse,
+  ProductApiSpec,
+  ProductApiSpecOption,
   ProductListResponse,
+  SpecOption,
+  ProductUpsertPayload,
   Order,
   OrderListResponse,
   OrderStatistics,
@@ -369,37 +374,60 @@ function getPersistedImageUrl(keyOrUrl: string): string {
   return normalizedUrl.slice(0, queryIndex)
 }
 
-function normalizeSpecs(value: unknown): Product['specs'] {
+function normalizeNumberValue(value: number | string | null | undefined): number | undefined {
+  if (value === '' || value === null || value === undefined) {
+    return undefined
+  }
+
+  const normalizedValue = Number(value)
+  if (!Number.isFinite(normalizedValue)) {
+    return undefined
+  }
+
+  return normalizedValue
+}
+
+function normalizeRequiredNumber(value: number | string | null | undefined, fallback = 0): number {
+  return normalizeNumberValue(value) ?? fallback
+}
+
+function normalizeSpecOption(option: ProductApiSpecOption): SpecOption {
+  return {
+    name: option?.name || '',
+    price: normalizeRequiredNumber(option?.price),
+    stock: normalizeNumberValue(option?.stock)
+  }
+}
+
+function normalizeSpecs(value: ProductApiResponse['specs']): Product['specs'] {
   if (!Array.isArray(value)) {
     return []
   }
 
-  return value.map((spec: any) => ({
-    id: typeof spec?.id === 'number' ? spec.id : undefined,
+  return value.map((spec: ProductApiSpec) => ({
+    id: normalizeNumberValue(spec?.id),
     name: spec?.name || '',
     options: Array.isArray(spec?.options)
-      ? spec.options.map((option: any) => ({
-          id: typeof option?.id === 'number' ? option.id : undefined,
-          name: option?.name || '',
-          price: Number(option?.price || 0),
-          stock: typeof option?.stock === 'number' ? option.stock : undefined
-        }))
+      ? spec.options.map(normalizeSpecOption)
       : []
   }))
 }
 
-function normalizeProduct(product: any): Product {
+function normalizeProduct(product: ProductApiResponse | null | undefined): Product {
   return {
     ...product,
-    id: Number(product?.id || 0),
-    category_id: Number(product?.category_id || 0),
-    price: Number(product?.price || 0),
-    original_price: product?.original_price !== undefined ? Number(product.original_price || 0) : undefined,
-    stock: Number(product?.stock || 0),
-    sales: product?.sales !== undefined ? Number(product.sales || 0) : undefined,
-    sort: product?.sort !== undefined ? Number(product.sort || 0) : undefined,
+    id: normalizeRequiredNumber(product?.id),
+    merchant_id: normalizeNumberValue(product?.merchant_id),
+    category_id: normalizeRequiredNumber(product?.category_id),
+    price: normalizeRequiredNumber(product?.price),
+    original_price: normalizeNumberValue(product?.original_price),
+    stock: normalizeRequiredNumber(product?.stock),
+    sales: normalizeNumberValue(product?.sales),
+    sort: normalizeNumberValue(product?.sort),
     images: normalizeStringArray(product?.images).map(normalizeImageUrl),
-    specs: normalizeSpecs(product?.specs)
+    specs: normalizeSpecs(product?.specs),
+    created_at: String(product?.created_at || ''),
+    updated_at: product?.updated_at ? String(product.updated_at) : undefined
   } as Product
 }
 
@@ -481,18 +509,7 @@ export async function getProduct(productId: number, options?: Partial<RequestOpt
 /**
  * 创建商品
  */
-export async function createProduct(data: {
-  name: string
-  description?: string
-  images: string[]
-  category_id: number
-  price: number
-  original_price?: number
-  stock?: number
-  unit?: string
-  sort?: number
-  specs?: { name: string; options: { name: string; price: number; stock?: number }[] }[]
-}) {
+export async function createProduct(data: ProductUpsertPayload) {
   const payload = {
     ...data,
     images: Array.isArray(data.images) ? data.images.map(getPersistedImageUrl) : []
@@ -504,7 +521,7 @@ export async function createProduct(data: {
 /**
  * 更新商品
  */
-export async function updateProduct(productId: number, data: Partial<Product>) {
+export async function updateProduct(productId: number, data: ProductUpsertPayload) {
   const payload = {
     ...data,
     images: Array.isArray(data.images) ? data.images.map(getPersistedImageUrl) : data.images

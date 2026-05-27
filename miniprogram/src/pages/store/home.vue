@@ -154,8 +154,8 @@
                   <view class="product-bottom">
                     <view class="product-price">
                       <text class="price">¥{{ product.price.toFixed(2) }}</text>
-                      <text v-if="product.original_price" class="original-price">
-                        ¥{{ product.original_price.toFixed(2) }}
+                      <text v-if="(product.original_price || 0) > 0" class="original-price">
+                        ¥{{ (product.original_price || 0).toFixed(2) }}
                       </text>
                     </view>
                     <view class="add-btn" @click.stop="addToCart(product)">+</view>
@@ -204,8 +204,8 @@
                     <view class="item-bottom">
                       <view class="item-price">
                         <text class="price">¥{{ product.price.toFixed(2) }}</text>
-                        <text v-if="product.original_price" class="original-price">
-                          ¥{{ product.original_price.toFixed(2) }}
+                        <text v-if="(product.original_price || 0) > 0" class="original-price">
+                          ¥{{ (product.original_price || 0).toFixed(2) }}
                         </text>
                       </view>
                       <view class="add-btn" @click.stop="addToCart(product)">+</view>
@@ -292,7 +292,7 @@
                   @click="selectAddDialogSpec(spec.name, option)"
                 >
                   <text class="option-name">{{ option.name }}</text>
-                  <text class="option-price">+¥{{ option.price.toFixed(2) }}</text>
+                  <text v-if="option.price > 0" class="option-price">+¥{{ option.price.toFixed(2) }}</text>
                 </view>
               </view>
             </view>
@@ -809,7 +809,7 @@ const addDialogSelectedStock = computed(() => {
       const selectedName = addDialogSelectedSpecs[spec.name]
       const option = spec.options?.find(o => o.name === selectedName)
       if (option) {
-        return option.stock || addDialogProduct.value.stock
+        return option.stock ?? addDialogProduct.value.stock
       }
     }
   }
@@ -1408,6 +1408,7 @@ function goMyOrders() {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .product-sales {
@@ -1485,6 +1486,7 @@ function goMyOrders() {
 
 .product-list-item {
   display: flex;
+  align-items: flex-start;
   padding: 20rpx 0;
   border-bottom: 1rpx solid #f0f0f0;
 }
@@ -1502,14 +1504,17 @@ function goMyOrders() {
 
 .item-image {
   width: 200rpx;
+  min-width: 200rpx;
   height: 200rpx;
   border-radius: 12rpx;
   background: #f0f0f0;
   margin-right: 20rpx;
+  flex-shrink: 0;
 }
 
 .item-info {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1519,21 +1524,39 @@ function goMyOrders() {
   font-size: 30rpx;
   color: #1a1a1a;
   font-weight: 500;
+  line-height: 1.4;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .item-desc {
   font-size: 24rpx;
   color: #999999;
   margin-top: 8rpx;
+  line-height: 1.5;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .item-bottom {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.item-price {
+  flex: 1;
+  min-width: 0;
 }
 
 .item-price .price {

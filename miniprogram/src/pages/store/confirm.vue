@@ -533,7 +533,8 @@ async function submitOrder() {
 
 .goods-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  gap: 20rpx;
   padding: 20rpx 0;
   border-bottom: 1rpx solid #f0f0f0;
 }
@@ -545,28 +546,51 @@ async function submitOrder() {
 .goods-image {
   width: 140rpx;
   height: 140rpx;
+  flex-shrink: 0;
   border-radius: 12rpx;
   background: #f0f0f0;
-  margin-right: 20rpx;
 }
 
 .goods-info {
   flex: 1;
+  min-width: 0;
+  padding-top: 4rpx;
 }
 
 .goods-name {
   font-size: 30rpx;
+  line-height: 1.4;
   color: #1a1a1a;
   margin-bottom: 8rpx;
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .goods-spec {
   font-size: 26rpx;
+  line-height: 1.4;
   color: #999999;
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .goods-right {
+  width: 148rpx;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
   text-align: right;
+  padding-top: 4rpx;
 }
 
 .goods-price {

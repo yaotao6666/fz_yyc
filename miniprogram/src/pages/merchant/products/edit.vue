@@ -48,19 +48,23 @@
           <view class="form-item half">
             <view class="form-label">售价 <text class="required">*</text></view>
             <input
-              v-model.number="formData.price"
+              :value="formData.price"
               type="digit"
               class="form-input"
               placeholder="0.00"
+              @input="onAmountInput('price', $event)"
+              @blur="onAmountBlur('price')"
             />
           </view>
           <view class="form-item half">
             <view class="form-label">原价</view>
             <input
-              v-model.number="formData.original_price"
+              :value="formData.original_price"
               type="digit"
               class="form-input"
               placeholder="0.00"
+              @input="onAmountInput('original_price', $event)"
+              @blur="onAmountBlur('original_price', true)"
             />
           </view>
         </view>
@@ -140,10 +144,12 @@
               placeholder="选项名称"
             />
             <input
-              v-model.number="option.price"
+              :value="option.price"
               type="digit"
               class="option-price"
-              placeholder="价格"
+              placeholder="0.00"
+              @input="onOptionPriceInput(specIndex, optIndex, $event)"
+              @blur="onOptionPriceBlur(specIndex, optIndex)"
             />
             <text class="delete-option" @click="removeOption(specIndex, optIndex)">×</text>
           </view>
@@ -179,7 +185,7 @@
 import { ref, reactive, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getProduct, createProduct, updateProduct, getCategories, uploadImage, ResponseCode } from '@api'
-import type { Category } from '@types'
+import type { Category, Product, ProductUpsertPayload } from '@types'
 
 const productId = ref<number | null>(null)
 const categories = ref<Category[]>([])
@@ -193,16 +199,28 @@ type ProductLoadError = {
   statusCode?: number
 }
 
+type ProductSpecFormOption = {
+  name: string
+  price: string
+}
+
+type ProductSpecForm = {
+  name: string
+  options: ProductSpecFormOption[]
+}
+
+type ProductAmountField = 'price' | 'original_price'
+
 const formData = reactive({
   name: '',
   category_id: 0,
   description: '',
-  price: 0,
-  original_price: 0,
+  price: '',
+  original_price: '',
   stock: 0,
   unit: '份',
   images: [] as string[],
-  specs: [] as { name: string; options: { name: string; price: number }[] }[],
+  specs: [] as ProductSpecForm[],
   sort: 0
 })
 
@@ -283,13 +301,13 @@ async function loadProduct(id: number) {
     formData.name = product.name
     formData.category_id = product.category_id
     formData.description = product.description || ''
-    formData.price = product.price
-    formData.original_price = product.original_price || 0
+    formData.price = formatAmountForInput(product.price)
+    formData.original_price = formatAmountForInput(product.original_price, true)
     formData.stock = product.stock
     formData.unit = product.unit || '份'
     formData.images = product.images || []
     imagePreviewMap.value = {}
-    formData.specs = product.specs || []
+    formData.specs = normalizeProductSpecs(product.specs)
     formData.sort = product.sort || 0
 
     syncCategoryIndex()
@@ -349,10 +367,123 @@ function getImagePreviewSrc(imageUrl: string) {
   return imagePreviewMap.value[imageUrl] || imageUrl
 }
 
+function getInputValue(event: any) {
+  return String(event?.detail?.value ?? '')
+}
+
+// 金额输入先保留字符串中间态，避免小程序 digit 输入在录入小数时被 number 转换打断。
+function sanitizeAmountInput(rawValue: string) {
+  const value = rawValue.replace(/[^\d.]/g, '')
+  if (!value) {
+    return ''
+  }
+
+  const firstDotIndex = value.indexOf('.')
+  if (firstDotIndex === -1) {
+    return value
+  }
+
+  const integerPart = value.slice(0, firstDotIndex) || '0'
+  const decimalPart = value.slice(firstDotIndex + 1).replace(/\./g, '').slice(0, 2)
+  return `${integerPart}.${decimalPart}`
+}
+
+function roundAmount(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+function parseAmountValue(value: string) {
+  const sanitizedValue = sanitizeAmountInput(value).replace(/\.$/, '')
+  if (!sanitizedValue) {
+    return undefined
+  }
+
+  const amount = Number(sanitizedValue)
+  if (!Number.isFinite(amount)) {
+    return undefined
+  }
+
+  return roundAmount(amount)
+}
+
+function formatAmountForInput(amount?: number, emptyWhenZero = false) {
+  if (amount === undefined || amount === null) {
+    return ''
+  }
+
+  const normalizedAmount = roundAmount(Number(amount))
+  if (!Number.isFinite(normalizedAmount)) {
+    return ''
+  }
+
+  if (emptyWhenZero && normalizedAmount <= 0) {
+    return ''
+  }
+
+  return normalizedAmount.toFixed(2)
+}
+
+function normalizeAmountValue(value: string, emptyWhenZero = false) {
+  const amount = parseAmountValue(value)
+  if (amount === undefined) {
+    return ''
+  }
+
+  if (emptyWhenZero && amount <= 0) {
+    return ''
+  }
+
+  return amount.toFixed(2)
+}
+
+function onAmountInput(field: ProductAmountField, event: any) {
+  formData[field] = sanitizeAmountInput(getInputValue(event))
+}
+
+function onAmountBlur(field: ProductAmountField, emptyWhenZero = false) {
+  formData[field] = normalizeAmountValue(formData[field], emptyWhenZero)
+}
+
+function onOptionPriceInput(specIndex: number, optIndex: number, event: any) {
+  formData.specs[specIndex].options[optIndex].price = sanitizeAmountInput(getInputValue(event))
+}
+
+function onOptionPriceBlur(specIndex: number, optIndex: number) {
+  formData.specs[specIndex].options[optIndex].price = normalizeAmountValue(
+    formData.specs[specIndex].options[optIndex].price
+  )
+}
+
+function normalizeProductSpecs(specs?: Product['specs']): ProductSpecForm[] {
+  if (!Array.isArray(specs)) {
+    return []
+  }
+
+  return specs.map(spec => ({
+    name: spec.name || '',
+    options: Array.isArray(spec.options)
+      ? spec.options.map(option => ({
+          name: option.name || '',
+          price: formatAmountForInput(option.price)
+        }))
+      : []
+  }))
+}
+
+function normalizeFormAmounts() {
+  formData.price = normalizeAmountValue(formData.price)
+  formData.original_price = normalizeAmountValue(formData.original_price, true)
+  formData.specs.forEach((spec) => {
+    spec.options.forEach((option) => {
+      option.price = normalizeAmountValue(option.price)
+    })
+  })
+}
+
 function addSpec() {
   formData.specs.push({
     name: '',
-    options: [{ name: '', price: 0 }]
+    options: [{ name: '', price: '' }]
   })
 }
 
@@ -361,7 +492,7 @@ function removeSpec(index: number) {
 }
 
 function addOption(specIndex: number) {
-  formData.specs[specIndex].options.push({ name: '', price: 0 })
+  formData.specs[specIndex].options.push({ name: '', price: '' })
 }
 
 function removeOption(specIndex: number, optIndex: number) {
@@ -369,6 +500,8 @@ function removeOption(specIndex: number, optIndex: number) {
 }
 
 function validateForm(): boolean {
+  normalizeFormAmounts()
+
   if (!formData.name.trim()) {
     uni.showToast({ title: '请输入商品名称', icon: 'none' })
     return false
@@ -377,9 +510,23 @@ function validateForm(): boolean {
     uni.showToast({ title: '请选择商品分类', icon: 'none' })
     return false
   }
-  if (!formData.price || formData.price <= 0) {
+  const price = parseAmountValue(formData.price)
+  if (price === undefined || price <= 0) {
     uni.showToast({ title: '请输入正确的售价', icon: 'none' })
     return false
+  }
+  const originalPrice = parseAmountValue(formData.original_price)
+  if (formData.original_price && originalPrice === undefined) {
+    uni.showToast({ title: '请输入正确的原价', icon: 'none' })
+    return false
+  }
+  for (const spec of formData.specs) {
+    for (const option of spec.options) {
+      if (option.price && parseAmountValue(option.price) === undefined) {
+        uni.showToast({ title: '请输入正确的规格加价', icon: 'none' })
+        return false
+      }
+    }
   }
   if (formData.stock < 0) {
     uni.showToast({ title: '库存不能为负数', icon: 'none' })
@@ -402,22 +549,34 @@ async function submitForm(publish: boolean) {
   submitting.value = true
 
   try {
-    const data = {
-      name: formData.name,
+    const price = parseAmountValue(formData.price)
+    if (price === undefined) {
+      throw new Error('请输入正确的售价')
+    }
+
+    const originalPrice = parseAmountValue(formData.original_price)
+    const specs = formData.specs
+      .map(spec => ({
+        name: spec.name.trim(),
+        options: spec.options
+          .map(option => ({
+            name: option.name.trim(),
+            price: parseAmountValue(option.price) ?? 0
+          }))
+          .filter(option => option.name)
+      }))
+      .filter(spec => spec.name && spec.options.length > 0)
+
+    const data: ProductUpsertPayload = {
+      name: formData.name.trim(),
       category_id: formData.category_id,
-      description: formData.description,
-      price: formData.price,
-      original_price: formData.original_price || undefined,
+      description: formData.description.trim(),
+      price,
+      original_price: originalPrice,
       stock: formData.stock,
-      unit: formData.unit,
+      unit: formData.unit.trim(),
       images: formData.images,
-      specs: formData.specs.filter(s => s.name && s.options.length > 0).map(s => ({
-        name: s.name,
-        options: s.options.filter(o => o.name).map(o => ({
-          name: o.name,
-          price: o.price || 0
-        }))
-      })),
+      specs,
       sort: formData.sort
     }
 

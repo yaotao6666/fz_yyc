@@ -14,7 +14,7 @@
     <view class="product-info">
       <view class="price-row">
         <text class="current-price">¥{{ selectedPrice.toFixed(2) }}</text>
-        <text v-if="product.original_price" class="original-price">
+        <text v-if="product.original_price > 0" class="original-price">
           ¥{{ product.original_price.toFixed(2) }}
         </text>
       </view>
@@ -51,7 +51,7 @@
               @click="selectSpec(spec.name, option)"
             >
               <text class="option-name">{{ option.name }}</text>
-              <text class="option-price">+¥{{ option.price.toFixed(2) }}</text>
+              <text v-if="option.price > 0" class="option-price">+¥{{ option.price.toFixed(2) }}</text>
             </view>
           </view>
         </view>
@@ -148,7 +148,7 @@ const selectedStock = computed(() => {
     for (const spec of product.value.specs) {
       const selectedOption = spec.options.find(o => o.name === selectedSpecs[spec.name])
       if (selectedOption) {
-        return selectedOption.stock || product.value.stock
+        return selectedOption.stock ?? product.value.stock
       }
     }
   }
