@@ -11,7 +11,9 @@ import type { ApiResponse, WechatLoginResponse } from '../types'
 const userToken = ref(uni.getStorageSync('user_token') || '')
 const userInfo = ref(uni.getStorageSync('userInfo') || null)
 const openid = ref(uni.getStorageSync('openid') || '')
-const isLoggedIn = ref(!!userToken.value && !!openid.value)
+const loginAppMode = ref(uni.getStorageSync('user_login_app_mode') || '')
+const loginAppId = ref(uni.getStorageSync('user_login_app_id') || '')
+const isLoggedIn = ref(!!userToken.value && !!openid.value && !!loginAppMode.value)
 
 let loginPromise: Promise<LoginResult> | null = null
 
@@ -27,6 +29,8 @@ export function useAuth() {
     const storedToken = uni.getStorageSync('user_token') || ''
     const storedUserInfo = uni.getStorageSync('userInfo') || null
     const storedOpenid = uni.getStorageSync('openid') || ''
+    const storedLoginAppMode = uni.getStorageSync('user_login_app_mode') || ''
+    const storedLoginAppId = uni.getStorageSync('user_login_app_id') || ''
 
     if (storedToken !== userToken.value) {
       userToken.value = storedToken
@@ -40,7 +44,15 @@ export function useAuth() {
       openid.value = storedOpenid
     }
 
-    isLoggedIn.value = !!userToken.value && !!openid.value
+    if (storedLoginAppMode !== loginAppMode.value) {
+      loginAppMode.value = storedLoginAppMode
+    }
+
+    if (storedLoginAppId !== loginAppId.value) {
+      loginAppId.value = storedLoginAppId
+    }
+
+    isLoggedIn.value = !!userToken.value && !!openid.value && !!loginAppMode.value
   }
 
   const login = async (): Promise<LoginResult> => {
@@ -105,15 +117,19 @@ export function useAuth() {
       const token = payload?.token
       const user = payload?.user
 
-      if (token && user?.openid) {
+      if (token && user?.openid && payload?.app_mode) {
         userToken.value = token
         userInfo.value = user
         openid.value = user.openid
+        loginAppMode.value = payload.app_mode
+        loginAppId.value = payload.app_id || ''
         isLoggedIn.value = true
 
         uni.setStorageSync('user_token', token)
         uni.setStorageSync('userInfo', user)
         uni.setStorageSync('openid', user.openid)
+        uni.setStorageSync('user_login_app_mode', payload.app_mode)
+        uni.setStorageSync('user_login_app_id', payload.app_id || '')
 
         console.log('useAuth: 登录成功,token:', token)
         console.log('useAuth: 用户信息:', user)
@@ -142,11 +158,15 @@ export function useAuth() {
     userToken.value = ''
     userInfo.value = null
     openid.value = ''
+    loginAppMode.value = ''
+    loginAppId.value = ''
     isLoggedIn.value = false
 
     uni.removeStorageSync('user_token')
     uni.removeStorageSync('userInfo')
     uni.removeStorageSync('openid')
+    uni.removeStorageSync('user_login_app_mode')
+    uni.removeStorageSync('user_login_app_id')
 
     console.log('useAuth: 退出登录')
   }

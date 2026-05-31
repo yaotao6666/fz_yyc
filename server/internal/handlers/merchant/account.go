@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"fz_yyc_api/internal/config"
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
@@ -75,13 +75,14 @@ func resolveMerchantWechatIdentity(code string) (*merchantWechatIdentity, error)
 		}, nil
 	}
 
-	if config.Config == nil || config.Config.Wechat.AppID == "" || config.Config.Wechat.AppSecret == "" {
+	appIdentity, err := wechatpay.GetActiveAppIdentity()
+	if err != nil {
 		return nil, fmt.Errorf("微信小程序配置缺失")
 	}
 
 	query := url.Values{}
-	query.Set("appid", config.Config.Wechat.AppID)
-	query.Set("secret", config.Config.Wechat.AppSecret)
+	query.Set("appid", appIdentity.AppID)
+	query.Set("secret", appIdentity.AppSecret)
 	query.Set("js_code", trimmedCode)
 	query.Set("grant_type", "authorization_code")
 

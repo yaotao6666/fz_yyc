@@ -68,6 +68,7 @@ type WechatPay struct {
 	PrivateKey   string
 	PublicKey    string
 	CallbackURL  string
+	AppMode      string
 }
 
 // Qiniu 七牛云配置
@@ -81,8 +82,10 @@ type Qiniu struct {
 
 // Wechat 微信小程序配置
 type Wechat struct {
-	AppID     string // 小程序AppID
-	AppSecret string // 小程序AppSecret
+	AppID        string // 服务商主体小程序AppID
+	AppSecret    string // 服务商主体小程序AppSecret
+	SubAppID     string // 非服务商主体小程序AppID
+	SubAppSecret string // 非服务商主体小程序AppSecret
 }
 
 // InitConfig 初始化配置
@@ -185,6 +188,12 @@ func mergeConfig() {
 	if viper.IsSet("WECHAT_APP_SECRET") {
 		Config.Wechat.AppSecret = viper.GetString("WECHAT_APP_SECRET")
 	}
+	if viper.IsSet("WECHAT_SUB_APP_ID") {
+		Config.Wechat.SubAppID = viper.GetString("WECHAT_SUB_APP_ID")
+	}
+	if viper.IsSet("WECHAT_SUB_APP_SECRET") {
+		Config.Wechat.SubAppSecret = viper.GetString("WECHAT_SUB_APP_SECRET")
+	}
 
 	if viper.IsSet("WECHAT_PAY_SP_MCH_ID") {
 		Config.WechatPay.SPMchID = viper.GetString("WECHAT_PAY_SP_MCH_ID")
@@ -216,6 +225,9 @@ func mergeConfig() {
 	}
 	if viper.IsSet("WECHAT_PAY_SP_CALLBACK_URL") {
 		Config.WechatPay.CallbackURL = viper.GetString("WECHAT_PAY_SP_CALLBACK_URL")
+	}
+	if viper.IsSet("WECHAT_PAY_APP_MODE") {
+		Config.WechatPay.AppMode = viper.GetString("WECHAT_PAY_APP_MODE")
 	}
 
 	if viper.IsSet("QINIU_ACCESS_KEY") {
@@ -320,6 +332,12 @@ func mergeEnvConfig() {
 	if env := os.Getenv("WECHAT_APP_SECRET"); env != "" {
 		Config.Wechat.AppSecret = env
 	}
+	if env := os.Getenv("WECHAT_SUB_APP_ID"); env != "" {
+		Config.Wechat.SubAppID = env
+	}
+	if env := os.Getenv("WECHAT_SUB_APP_SECRET"); env != "" {
+		Config.Wechat.SubAppSecret = env
+	}
 
 	if env := os.Getenv("WECHAT_PAY_SP_MCH_ID"); env != "" {
 		Config.WechatPay.SPMchID = env
@@ -346,6 +364,9 @@ func mergeEnvConfig() {
 	}
 	if env := os.Getenv("WECHAT_PAY_SP_CALLBACK_URL"); env != "" {
 		Config.WechatPay.CallbackURL = env
+	}
+	if env := os.Getenv("WECHAT_PAY_APP_MODE"); env != "" {
+		Config.WechatPay.AppMode = env
 	}
 
 	if env := os.Getenv("QINIU_ACCESS_KEY"); env != "" {
@@ -397,8 +418,10 @@ func getDefaultConfig() *AppConfig {
 			Expire: 720,
 		},
 		Wechat: Wechat{
-			AppID:     "",
-			AppSecret: "",
+			AppID:        "",
+			AppSecret:    "",
+			SubAppID:     "",
+			SubAppSecret: "",
 		},
 		WechatPay: WechatPay{
 			SPMchID:      "",
@@ -407,6 +430,7 @@ func getDefaultConfig() *AppConfig {
 			PrivateKey:   "",
 			PublicKey:    "",
 			CallbackURL:  "",
+			AppMode:      "sp_app",
 		},
 		Qiniu: Qiniu{
 			AccessKey: "",

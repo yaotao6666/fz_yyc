@@ -81,6 +81,9 @@
 - 不同商家下单时能拉起各自的 `sub_mch_id`
 - 未完成支付配置的商家会被下单拦截
 - 使用 `1112649854` 的商家样例可正常拉起支付
+- `WECHAT_PAY_APP_MODE=sp_app` 时，下单请求使用 `sp_appid + payer.sp_openid`
+- `WECHAT_PAY_APP_MODE=sub_app` 时，下单请求使用 `sub_appid + payer.sub_openid`
+- 小程序支付身份切换后，前端会清理旧登录态并重新登录
 - 支付回调后订单支付状态正确
 - 分账成功 / 失败 / 跳过三类记录都会写入历史
 - 商家端与服务商端都能查询到分账历史

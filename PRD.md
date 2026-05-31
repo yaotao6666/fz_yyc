@@ -66,12 +66,13 @@
   - 服务商在商家管理中直接维护 `sub_mch_id`、分账开关和抽佣比例。
   - 已进件商家示例 `1112649854` 已纳入支付配置和联调验收口径。
   - 支付成功回调后立即发起分账，并沉淀服务商与商家可查询的抽佣历史。
+  - 系统新增全局支付身份切换 `WECHAT_PAY_APP_MODE`，支持 `sp_app` 与 `sub_app` 两种服务商支付小程序口径。
   - 数据分析收口为商家访问率、下单率、下单金额、下单均价、日周月年订单量与排行榜维度切换。
   - 商家详情支持维护 `logo` 与 `cover_image`。
 - 文档与测试：
   - 本轮接口、功能、测试结论已同步到拆分文档。
   - 完整回归结果单独沉淀在 `docs/prd/完整链路测试报告-20260513.md`。
-  - C 端微信登录接口返回结构统一为 `code/message/data.token/data.user`，前端缓存字段为 `user_token/userInfo/openid`，下单接口使用 `user_token` 鉴权。
+  - C 端微信登录接口返回结构统一为 `code/message/data.token/data.app_mode/data.app_id/data.user`，前端缓存字段为 `user_token/userInfo/openid/user_login_app_mode/user_login_app_id`，下单接口使用 `user_token` 鉴权。
 -  - C 端订单退款状态口径统一为：`status=5` 退款中、`status=6` 已退款；商家退款接口会在收到微信退款响应后主动同步一次退款状态，若仍未拿到最终结果则继续等待微信退款成功回调把 5 更新为 6。
   - C 端访问/行为埋点接口使用 `openid` 作为用户唯一标识（`/api/v1/store/:merchant_id/visit`、`/api/v1/store/:merchant_id/event`）。
   - C 端订单详情已独立为 `pages/store/order-detail`，支付完成、取消支付与“去购物”均保留当前 `merchant_id`，避免返回错误商家店铺。

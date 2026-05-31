@@ -307,7 +307,7 @@ func WechatLogin(c *gin.Context) {
 			Nickname: "微信用户",
 			Status:   1,
 		}
-		if err := database.DB.Create(&user).Error; err != nil {
+		if createErr := database.DB.Create(&user).Error; createErr != nil {
 			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建用户失败")
 			return
 		}
@@ -327,9 +327,16 @@ func WechatLogin(c *gin.Context) {
 	database.DB.Model(&user).Updates(updates)
 
 	token, _ := utils.GenerateToken(user.ID, "user", user.Nickname)
+	appIdentity, err := wechatpay.GetActiveAppIdentity()
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, err.Error())
+		return
+	}
 
 	response.Success(c, gin.H{
-		"token": token,
+		"token":    token,
+		"app_mode": appIdentity.Mode,
+		"app_id":   appIdentity.AppID,
 		"user": gin.H{
 			"id":       user.ID,
 			"openid":   user.OpenID,
@@ -339,12 +346,14 @@ func WechatLogin(c *gin.Context) {
 }
 
 func getWechatOpenID(code string) (string, string, error) {
-	appID := config.Config.Wechat.AppID
-	appSecret := config.Config.Wechat.AppSecret
+	appIdentity, err := wechatpay.GetActiveAppIdentity()
+	if err != nil {
+		return "", "", err
+	}
 
 	url := fmt.Sprintf(
 		"https://api.weixin.qq.com/sns/jscode2session?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code",
-		appID, appSecret, code,
+		appIdentity.AppID, appIdentity.AppSecret, code,
 	)
 
 	resp, err := http.Get(url)
@@ -937,7 +946,7 @@ func CreateOrder(c *gin.Context) {
 				return
 			}
 
-			payResponse, payErr := createWechatPayOrder(context.Background(), client, &merchant, order, int64(payAmount*100), config.Config.Wechat.AppID, currentUser.OpenID)
+			payResponse, payErr := createWechatPayOrder(context.Background(), client, &merchant, order, int64(payAmount*100), currentUser.OpenID)
 			if payErr != nil {
 				response.Fail(c, http.StatusBadRequest, response.CodeParamError, payErr.Error())
 				return
@@ -966,7 +975,6 @@ func createWechatPayOrder(
 	merchant *models.Merchant,
 	order models.Order,
 	totalAmount int64,
-	appID string,
 	openID string,
 ) (*wechatpay.JSAPIPayResponse, error) {
 	if merchant == nil {
@@ -981,6 +989,10 @@ func createWechatPayOrder(
 	if openID == "" {
 		return nil, fmt.Errorf("缺少用户支付标识")
 	}
+	appIdentity, err := wechatpay.GetActiveAppIdentity()
+	if err != nil {
+		return nil, err
+	}
 
 	notifyURL := config.Config.WechatPay.CallbackURL
 	if notifyURL == "" {
@@ -988,8 +1000,9 @@ func createWechatPayOrder(
 	}
 
 	return client.CreatePartnerJSAPIPayOrder(ctx, wechatpay.JSAPIPayRequest{
-		AppID:       appID,
+		AppID:       appIdentity.AppID,
 		OpenID:      openID,
+		AppMode:     appIdentity.Mode,
 		SubMchID:    merchant.SubMchID,
 		OrderNo:     order.OrderNo,
 		Description: fmt.Sprintf("%s订单支付", merchant.Name),

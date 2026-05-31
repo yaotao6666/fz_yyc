@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"fz_yyc_api/internal/config"
 	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"math"
 	"net/http"
@@ -191,8 +190,12 @@ func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProvide
 			return fmt.Errorf("写入订单待分账状态失败: %w", err)
 		}
 
+		appIdentity, err := wechatpay.GetActiveAppIdentity()
+		if err != nil {
+			return err
+		}
 		result, err := client.CreateProfitSharingOrder(ctx, wechatpay.ProfitSharingRequest{
-			AppID:         config.Config.Wechat.AppID,
+			AppID:         appIdentity.AppID,
 			SubMchID:      merchant.SubMchID,
 			TransactionID: notifyResult.TransactionID,
 			OrderNo:       profitSharingOrderNo,

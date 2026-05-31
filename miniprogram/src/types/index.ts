@@ -69,6 +69,8 @@ export interface WechatLoginRequest {
 // C端用户登录响应
 export interface WechatLoginResponse {
   token: string
+  app_mode: string
+  app_id: string
   user: UserInfo
 }
 

@@ -8,19 +8,21 @@ import (
 	"net/http"
 	"time"
 
-	"fz_yyc_api/internal/config"
+	"fz_yyc_api/internal/services/wechatpay"
 )
 
 // 获取微信access_token
 func GetAccessToken() (string, error) {
-	appID := config.Config.Wechat.AppID
-	appSecret := config.Config.Wechat.AppSecret
-
-	if appID == "" || appSecret == "" {
+	appIdentity, err := wechatpay.GetActiveAppIdentity()
+	if err != nil {
 		return "", fmt.Errorf("微信AppID或AppSecret未配置")
 	}
 
-	url := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s", appID, appSecret)
+	url := fmt.Sprintf(
+		"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s",
+		appIdentity.AppID,
+		appIdentity.AppSecret,
+	)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)

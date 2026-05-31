@@ -32,6 +32,8 @@
   - `code`: `0`
   - `message`: `success`
   - `data.token`: C 端用户 token
+  - `data.app_mode`: 当前生效的小程序支付身份，取值为 `sp_app` 或 `sub_app`
+  - `data.app_id`: 当前生效的小程序 `appid`
   - `data.user`：
     - `id`
     - `openid`
@@ -40,6 +42,8 @@
   - `user_token`：对应 `data.token`
   - `userInfo`：对应 `data.user`
   - `openid`：对应 `data.user.openid`
+  - `user_login_app_mode`：对应 `data.app_mode`
+  - `user_login_app_id`：对应 `data.app_id`
 - **鉴权使用**：
   - `Authorization: Bearer {user_token}` 用于 `GET/POST /api/v1/user/*`
   - `Authorization: Bearer {user_token}` 用于 `POST /api/v1/store/:merchant_id/orders`（下单）
@@ -200,6 +204,9 @@
 ### 2.6 支付与分账接口
 
 - C 端下单支付由服务商模式统一拉起。
+- 全局配置 `WECHAT_PAY_APP_MODE` 控制当前部署版本的小程序支付身份：
+  - `sp_app`：请求微信支付时使用 `sp_appid + payer.sp_openid`
+  - `sub_app`：请求微信支付时继续必传 `sp_appid`，同时使用 `sub_appid + payer.sub_openid`
 - 商家支付配置字段：
   - `sub_mch_id`
   - `profit_sharing_enabled`
@@ -214,6 +221,7 @@
 
 - 下单时必须按商家维度读取 `sub_mch_id`。
 - 已进件商家仅通过服务商后台回填 `sub_mch_id` 完成支付配置，本轮联调样例为 `1112649854`。
+- `WECHAT_PAY_APP_MODE` 仅切换登录与下单支付时使用的小程序身份，不改变服务商支付回调、退款与分账实现。
 - 支付成功与分账成功不是同一状态，前后端需分别展示。
 - 分账历史需覆盖成功 / 失败 / 跳过三类状态。
 

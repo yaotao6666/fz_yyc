@@ -40,6 +40,7 @@ func (c *ServiceProviderClient) GetSPMchID() string {
 type JSAPIPayRequest struct {
 	AppID       string
 	OpenID      string
+	AppMode     string
 	SubMchID    string
 	OrderNo     string
 	Description string
@@ -140,8 +141,12 @@ func NewServiceProviderClient() (*ServiceProviderClient, error) {
 }
 
 func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(ctx context.Context, req JSAPIPayRequest) (*JSAPIPayResponse, error) {
+	spAppID := strings.TrimSpace(config.Config.Wechat.AppID)
+	if spAppID == "" {
+		return nil, fmt.Errorf("服务商主体小程序AppID未配置")
+	}
 	payload := map[string]any{
-		"sp_appid":     req.AppID,
+		"sp_appid":     spAppID,
 		"sp_mchid":     c.config.SPMchID,
 		"sub_mchid":    req.SubMchID,
 		"description":  req.Description,
@@ -151,9 +156,17 @@ func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(ctx context.Context, 
 			"total":    req.TotalAmount,
 			"currency": "CNY",
 		},
-		"payer": map[string]any{
+	}
+	if normalizeAppMode(req.AppMode) == AppModeSubApp {
+		payload["sub_appid"] = req.AppID
+		payload["payer"] = map[string]any{
+			"sub_openid": req.OpenID,
+		}
+	} else {
+		payload["sp_appid"] = req.AppID
+		payload["payer"] = map[string]any{
 			"sp_openid": req.OpenID,
-		},
+		}
 	}
 
 	var result struct {

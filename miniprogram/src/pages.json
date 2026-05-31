@@ -1,6 +1,14 @@
 {
   "pages": [
     {
+      "path": "pages/store/home",
+      "style": {
+        "navigationBarTitleText": "店铺首页",
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/auth/login",
       "style": {
         "navigationBarTitleText": "商家登录",
@@ -127,14 +135,6 @@
       }
     },
     {
-      "path": "pages/store/home",
-      "style": {
-        "navigationBarTitleText": "店铺首页",
-        "navigationBarBackgroundColor": "#FFFFFF",
-        "enablePullDownRefresh": true
-      }
-    },
-    {
       "path": "pages/store/product",
       "style": {
         "navigationBarTitleText": "商品详情",
@@ -186,7 +186,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "寻梦私域管家",
+    "navigationBarTitleText": "财旭商贸",
     "navigationBarBackgroundColor": "#FFFFFF",
     "backgroundColor": "#F5F5F5"
   },
