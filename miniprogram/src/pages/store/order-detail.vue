@@ -23,6 +23,30 @@
     </view>
 
     <view class="section">
+      <view class="section-title">配送信息</view>
+      <view class="info-row">
+        <text class="label">取餐方式</text>
+        <text class="value">{{ getDeliveryTypeText() }}</text>
+      </view>
+      <view v-if="deliveryAddressText" class="info-row">
+        <text class="label">收货地址</text>
+        <text class="value">{{ deliveryAddressText }}</text>
+      </view>
+      <view v-if="contactNameText" class="info-row">
+        <text class="label">联系人</text>
+        <text class="value">{{ contactNameText }}</text>
+      </view>
+      <view v-if="contactPhoneText" class="info-row">
+        <text class="label">联系电话</text>
+        <text class="value">{{ contactPhoneText }}</text>
+      </view>
+      <view v-if="order.delivery_distance" class="info-row">
+        <text class="label">配送距离</text>
+        <text class="value">{{ Number(order.delivery_distance || 0).toFixed(2) }} 公里</text>
+      </view>
+    </view>
+
+    <view class="section">
       <view class="section-title">订单信息</view>
       <view class="info-row">
         <text class="label">订单号</text>
@@ -46,10 +70,6 @@
       <view class="info-row" v-if="order.refunded_at">
         <text class="label">退款时间</text>
         <text class="value">{{ formatDateTime(order.refunded_at) }}</text>
-      </view>
-      <view class="info-row">
-        <text class="label">取餐方式</text>
-        <text class="value">{{ getDeliveryTypeText() }}</text>
       </view>
       <view class="info-row" v-if="order.verify_code && order.status === OrderStatus.PAID">
         <text class="label">核销码</text>
@@ -86,16 +106,20 @@
     <view class="section">
       <view class="section-title">金额明细</view>
       <view class="amount-row">
-        <text class="label">商品金额</text>
-        <text class="value">¥{{ Number(order.total_amount || 0).toFixed(2) }}</text>
+        <text class="amount-label">商品金额</text>
+        <text class="amount-value">¥{{ Number(order.total_amount || 0).toFixed(2) }}</text>
       </view>
       <view class="amount-row">
-        <text class="label">配送费</text>
-        <text class="value">¥{{ Number(order.delivery_fee || 0).toFixed(2) }}</text>
+        <text class="amount-label">配送费</text>
+        <text class="amount-value">¥{{ Number(order.delivery_fee || 0).toFixed(2) }}</text>
+      </view>
+      <view v-if="Number(order.discount_amount || 0) > 0" class="amount-row discount-row">
+        <text class="amount-label">优惠金额</text>
+        <text class="amount-value discount-value">-¥{{ Number(order.discount_amount || 0).toFixed(2) }}</text>
       </view>
       <view class="amount-row total-row">
-        <text class="label">实付金额</text>
-        <text class="value highlight">¥{{ Number(order.pay_amount || 0).toFixed(2) }}</text>
+        <text class="amount-label total-label">支付金额</text>
+        <text class="amount-value total-value">¥{{ Number(order.pay_amount || 0).toFixed(2) }}</text>
       </view>
     </view>
 
@@ -114,6 +138,13 @@
     <view v-if="showVerify" class="dialog-mask" @click="closeVerifyDialog">
       <view class="dialog-content" @click.stop>
         <view class="dialog-title">核销码</view>
+        <image
+          v-if="order.verify_qrcode_url"
+          class="verify-qrcode"
+          :src="order.verify_qrcode_url"
+          mode="aspectFit"
+          show-menu-by-longpress
+        />
         <view class="verify-code-display">
           <text class="code">{{ order.verify_code || '------' }}</text>
         </view>
@@ -141,6 +172,15 @@ const submitting = ref(false)
 const canCancel = computed(() => order.value?.status === OrderStatus.PENDING_PAYMENT)
 const canRefund = computed(() => {
   return order.value?.status === OrderStatus.PAID
+})
+const deliveryAddressText = computed(() => {
+  return order.value?.delivery_info?.address || order.value?.delivery_address || ''
+})
+const contactNameText = computed(() => {
+  return order.value?.delivery_info?.contact_name || order.value?.contact_name || ''
+})
+const contactPhoneText = computed(() => {
+  return order.value?.delivery_info?.contact_phone || order.value?.contact_phone || ''
 })
 
 onLoad(async (options: any) => {
@@ -353,6 +393,10 @@ function contactMerchantForRefund() {
   padding: 14rpx 0;
 }
 
+.amount-row {
+  align-items: center;
+}
+
 .label {
   color: #86909c;
   font-size: 26rpx;
@@ -429,14 +473,35 @@ function contactMerchantForRefund() {
   color: #86909c;
 }
 
+.amount-label {
+  font-size: 26rpx;
+  color: #4e5969;
+}
+
+.amount-value {
+  font-size: 26rpx;
+  color: #1f2329;
+  font-weight: 500;
+}
+
 .total-row {
   padding-top: 24rpx;
   border-top: 1rpx solid #f2f3f5;
 }
 
-.highlight {
+.discount-value {
+  color: #ff4d4f;
+}
+
+.total-label {
+  color: #1f2329;
+  font-weight: 600;
+}
+
+.total-value {
   color: #f53f3f;
   font-weight: 600;
+  font-size: 30rpx;
 }
 
 .bottom-bar {
@@ -500,11 +565,20 @@ function contactMerchantForRefund() {
 }
 
 .verify-code-display {
-  margin: 32rpx 0 20rpx;
+  margin: 24rpx 0 20rpx;
   padding: 24rpx;
   border-radius: 20rpx;
   background: #f7f8fa;
   text-align: center;
+}
+
+.verify-qrcode {
+  width: 320rpx;
+  height: 320rpx;
+  margin: 32rpx auto 0;
+  display: block;
+  border-radius: 20rpx;
+  background: #f7f8fa;
 }
 
 .code {

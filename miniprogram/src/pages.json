@@ -71,6 +71,20 @@
       }
     },
     {
+      "path": "pages/merchant/marketing",
+      "style": {
+        "navigationBarTitleText": "满减营销",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/merchant/printers",
+      "style": {
+        "navigationBarTitleText": "打印机管理",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
       "path": "pages/merchant/settlements/history",
       "style": {
         "navigationBarTitleText": "分账历史",
@@ -131,6 +145,20 @@
       "path": "pages/store/confirm",
       "style": {
         "navigationBarTitleText": "确认订单",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/store/address-list",
+      "style": {
+        "navigationBarTitleText": "收货地址",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/store/address-edit",
+      "style": {
+        "navigationBarTitleText": "编辑地址",
         "navigationBarBackgroundColor": "#FFFFFF"
       }
     },

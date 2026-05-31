@@ -21,31 +21,28 @@
       </view>
 
       <view class="delivery-form" v-if="deliveryType === 1">
-        <view class="form-item">
-          <view class="form-label">收货地址</view>
-          <input
-            v-model="deliveryAddress"
-            class="form-input"
-            placeholder="请输入详细收货地址"
-          />
+        <view class="address-card" :class="{ empty: !selectedAddress }" @click="goAddressList">
+          <view v-if="selectedAddress" class="address-main">
+            <view class="address-top">
+              <text class="address-name">{{ selectedAddress.name }}</text>
+              <text class="address-phone">{{ selectedAddress.phone }}</text>
+              <text v-if="selectedAddress.is_default" class="address-default-tag">默认</text>
+            </view>
+            <view class="address-detail">{{ selectedAddressText }}</view>
+          </view>
+          <view v-else class="address-empty">
+            <text class="address-empty-title">请选择收货地址</text>
+            <text class="address-empty-desc">支持从微信快速导入，也可选择已保存地址</text>
+          </view>
+          <text class="address-arrow">></text>
         </view>
-        <view class="form-item">
-          <view class="form-label">联系人</view>
-          <input
-            v-model="contactName"
-            class="form-input"
-            placeholder="请输入联系人姓名"
-          />
+
+        <view class="address-actions">
+          <view class="address-action-btn" @click.stop="goAddressList">选择地址</view>
+          <view class="address-action-btn secondary" @click.stop="goAddressEdit">新增地址</view>
+          <view class="address-action-btn secondary" @click.stop="importWechatAddress">微信导入</view>
         </view>
-        <view class="form-item">
-          <view class="form-label">联系电话</view>
-          <input
-            v-model="contactPhone"
-            class="form-input"
-            type="number"
-            placeholder="请输入联系电话"
-          />
-        </view>
+
         <view class="form-item">
           <view class="form-label">配送距离</view>
           <picker
@@ -105,27 +102,56 @@
       </view>
     </view>
 
+    <view class="section promo-section">
+      <view class="section-title">满减优惠</view>
+      <view v-if="fullReductionRules.length > 0" class="promo-banner" :class="{ active: promoBannerActive }">
+        <view class="promo-title">
+          {{ promoTitle }}
+        </view>
+        <view class="promo-desc">
+          {{ promoDescription }}
+        </view>
+      </view>
+      <view v-else class="promo-empty">商家当前未配置满减活动</view>
+
+      <view v-if="fullReductionRules.length > 0" class="promo-rule-list">
+        <view v-for="rule in fullReductionRules" :key="rule.id || `${rule.threshold_amount}-${rule.discount_amount}`" class="promo-rule-item">
+          <text>满 {{ rule.threshold_amount.toFixed(2) }} 元减 {{ rule.discount_amount.toFixed(2) }} 元</text>
+          <text class="promo-rule-tag" :class="{ active: activeFullReductionRule?.threshold_amount === rule.threshold_amount && activeFullReductionRule?.discount_amount === rule.discount_amount }">
+            {{ activeFullReductionRule?.threshold_amount === rule.threshold_amount && activeFullReductionRule?.discount_amount === rule.discount_amount ? '已命中' : '可参与' }}
+          </text>
+        </view>
+      </view>
+    </view>
+
     <!-- 金额明细 -->
     <view class="section amount-section">
-      <view class="amount-row">
-        <text class="amount-label">商品金额</text>
-        <text class="amount-value">¥{{ cartStore.totalAmount.toFixed(2) }}</text>
+      <view class="amount-caption" :class="{ final: hasFinalPricing }">
+        {{ amountCaption }}
       </view>
       <view class="amount-row">
-        <text class="amount-label">配送费</text>
-        <text class="amount-value">¥{{ deliveryFee.toFixed(2) }}</text>
+        <text class="amount-label">{{ hasFinalPricing ? '商品金额' : '预估商品金额' }}</text>
+        <text class="amount-value">¥{{ displayGoodsAmount.toFixed(2) }}</text>
+      </view>
+      <view class="amount-row">
+        <text class="amount-label">{{ hasFinalPricing ? '配送费' : '预估配送费' }}</text>
+        <text class="amount-value">¥{{ displayDeliveryFee.toFixed(2) }}</text>
+      </view>
+      <view v-if="displayDiscountAmount > 0" class="amount-row discount">
+        <text class="amount-label">{{ hasFinalPricing ? '优惠金额' : '预估满减优惠' }}</text>
+        <text class="amount-value">-¥{{ displayDiscountAmount.toFixed(2) }}</text>
       </view>
       <view class="amount-row total">
-        <text class="amount-label">合计</text>
-        <text class="amount-value">¥{{ totalAmount.toFixed(2) }}</text>
+        <text class="amount-label">{{ hasFinalPricing ? '合计' : '预估合计' }}</text>
+        <text class="amount-value">¥{{ displayTotalAmount.toFixed(2) }}</text>
       </view>
     </view>
 
     <!-- 底部操作栏 -->
     <view class="bottom-bar">
       <view class="total-info">
-        <text class="total-label">实付金额</text>
-        <text class="total-amount">¥{{ totalAmount.toFixed(2) }}</text>
+        <text class="total-label">{{ hasFinalPricing ? '最终实付' : '预计实付' }}</text>
+        <text class="total-amount">¥{{ displayPayAmount.toFixed(2) }}</text>
       </view>
       <view class="submit-btn" :class="{ disabled: submitting }" @click="submitOrder">
         {{ submitting ? '处理中...' : '提交订单' }}
@@ -135,15 +161,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { createOrder, getStoreDeliveryRules } from '../../api/store'
+import { createOrder, getStoreDeliveryRules, getStoreFullReductionRules } from '../../api/store'
+import { createUserAddress, getUserAddresses } from '../../api'
 import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
 import { useAuth } from '../../utils/useAuth'
 import { parseStoreEntryOptions } from '@utils/storeEntry'
-import type { CreateOrderRequest, StoreDeliveryRules } from '@types'
+import type { CreateOrderRequest, MerchantFullReductionRule, Order, StoreDeliveryRules, UserAddress } from '@types'
 import { BrandAsset } from '../../utils/constants'
+import {
+  STORE_SELECTED_ADDRESS_ID_KEY,
+  buildUserAddressPayload,
+  chooseWechatAddress,
+  formatUserAddress,
+  getPreferredAddress,
+  isChooseAddressCancel,
+  mapWechatAddressToUserAddress
+} from '../../utils/address'
 
 const cartStore = useCartStore()
 const { trackPageView, trackPayment } = useAnalytics()
@@ -155,15 +191,18 @@ const deliveryTypes = [
 ]
 
 const deliveryType = ref(1)
-const deliveryAddress = ref('')
-const contactName = ref('')
-const contactPhone = ref('')
 const deliveryDistance = ref(0)
 const deliveryDistanceIndex = ref(0)
 const remark = ref('')
 const merchantId = ref(1)
 const entrySource = ref('scan')
 const submitting = ref(false)
+const fullReductionRules = ref<MerchantFullReductionRule[]>([])
+const finalOrder = ref<Order | null>(null)
+const finalAmountAdjusted = ref(false)
+const selectedAddress = ref<UserAddress | null>(null)
+const addressList = ref<UserAddress[]>([])
+const loadingAddresses = ref(false)
 const deliveryConfig = ref<StoreDeliveryRules>({
   enabled: false,
   base_fee: 0,
@@ -194,10 +233,13 @@ onShow(async () => {
   applyEntryOptions(currentPage?.options)
 
   // 配送规则属于公开店铺数据，不应被登录流程阻塞。
-  await loadDeliveryRules()
+  await Promise.all([loadDeliveryRules(), loadFullReductionRules()])
 
   const { ensureAuth } = useAuth()
-  void ensureAuth()
+  const authed = await ensureAuth()
+  if (authed) {
+    await loadAddresses(readSelectedAddressId())
+  }
   void trackPageView('store_confirm', merchantId.value, entrySource.value)
 })
 
@@ -233,6 +275,18 @@ async function loadDeliveryRules() {
   }
 }
 
+async function loadFullReductionRules() {
+  try {
+    const result = await getStoreFullReductionRules(merchantId.value)
+    fullReductionRules.value = (result.rules || [])
+      .filter((rule) => rule.status === 1)
+      .sort((prev, next) => prev.threshold_amount - next.threshold_amount)
+  } catch (error) {
+    console.error('获取满减规则失败:', error)
+    fullReductionRules.value = []
+  }
+}
+
 function selectDeliveryType(type: number) {
   if (!availableDeliveryTypes.value.some(item => item.value === type)) {
     return
@@ -245,7 +299,81 @@ function onDistanceChange(e: any) {
   deliveryDistance.value = deliveryRules.value[e.detail.value].distance
 }
 
+function readSelectedAddressId() {
+  const value = uni.getStorageSync(STORE_SELECTED_ADDRESS_ID_KEY)
+  if (!value) return undefined
+  uni.removeStorageSync(STORE_SELECTED_ADDRESS_ID_KEY)
+  const addressId = Number(value)
+  return Number.isFinite(addressId) && addressId > 0 ? addressId : undefined
+}
+
+async function loadAddresses(preferredAddressId?: number) {
+  try {
+    loadingAddresses.value = true
+    const list = await getUserAddresses()
+    addressList.value = list
+    selectedAddress.value = getPreferredAddress(
+      list,
+      preferredAddressId || selectedAddress.value?.id
+    )
+  } catch (error) {
+    console.error('获取地址列表失败:', error)
+    addressList.value = []
+    selectedAddress.value = null
+  } finally {
+    loadingAddresses.value = false
+  }
+}
+
+async function goAddressList() {
+  const { ensureAuth } = useAuth()
+  const authed = await ensureAuth()
+  if (!authed) {
+    return uni.showToast({ title: '登录失败，请重试', icon: 'none' })
+  }
+  uni.navigateTo({
+    url: `/pages/store/address-list?selected_id=${selectedAddress.value?.id || ''}`
+  })
+}
+
+async function goAddressEdit() {
+  const { ensureAuth } = useAuth()
+  const authed = await ensureAuth()
+  if (!authed) {
+    return uni.showToast({ title: '登录失败，请重试', icon: 'none' })
+  }
+  uni.navigateTo({
+    url: '/pages/store/address-edit'
+  })
+}
+
+async function importWechatAddress() {
+  const { ensureAuth } = useAuth()
+  const authed = await ensureAuth()
+  if (!authed) {
+    return uni.showToast({ title: '登录失败，请重试', icon: 'none' })
+  }
+
+  try {
+    const importedAddress = mapWechatAddressToUserAddress(await chooseWechatAddress())
+    const createdAddress = await createUserAddress(buildUserAddressPayload({
+      ...importedAddress,
+      is_default: !addressList.value.some((item) => item.is_default)
+    }))
+    selectedAddress.value = createdAddress
+    await loadAddresses(createdAddress.id)
+    uni.showToast({ title: '导入地址成功', icon: 'success' })
+  } catch (error: any) {
+    if (isChooseAddressCancel(error)) {
+      return
+    }
+    uni.showToast({ title: error.message || '导入地址失败', icon: 'none' })
+  }
+}
+
 const selectedDeliveryRule = computed(() => deliveryRules.value[deliveryDistanceIndex.value] || null)
+const selectedAddressText = computed(() => formatUserAddress(selectedAddress.value))
+const goodsAmount = computed(() => cartStore.totalAmount)
 const availableDeliveryTypes = computed(() => {
   return deliveryTypes.filter((type) => {
     if (type.value === 1) {
@@ -260,11 +388,84 @@ const availableDeliveryTypes = computed(() => {
     return false
   })
 })
+const bestFullReductionRule = computed<MerchantFullReductionRule | null>(() => {
+  let currentRule: MerchantFullReductionRule | null = null
+  fullReductionRules.value.forEach((rule) => {
+    if (goodsAmount.value >= rule.threshold_amount) {
+      currentRule = rule
+    }
+  })
+  return currentRule
+})
+const nextFullReductionRule = computed<MerchantFullReductionRule | null>(() => {
+  return fullReductionRules.value.find((rule) => goodsAmount.value < rule.threshold_amount) || null
+})
+const amountToNextRule = computed(() => {
+  if (!nextFullReductionRule.value) {
+    return 0
+  }
+  return Math.max(0, nextFullReductionRule.value.threshold_amount - goodsAmount.value)
+})
+const fullReductionDiscount = computed(() => {
+  return bestFullReductionRule.value?.discount_amount || 0
+})
+const activeFullReductionRule = computed<MerchantFullReductionRule | null>(() => {
+  if (!hasFinalPricing.value) {
+    return bestFullReductionRule.value
+  }
+
+  return fullReductionRules.value.find((rule) => (
+    !isAmountDifferent(rule.discount_amount, displayDiscountAmount.value) &&
+    displayGoodsAmount.value >= rule.threshold_amount
+  )) || null
+})
+const hasFinalPricing = computed(() => !!finalOrder.value)
+const displayGoodsAmount = computed(() => finalOrder.value?.total_amount ?? goodsAmount.value)
+const displayDeliveryFee = computed(() => finalOrder.value?.delivery_fee ?? deliveryFee.value)
+const displayDiscountAmount = computed(() => finalOrder.value?.discount_amount ?? fullReductionDiscount.value)
+const displayTotalAmount = computed(() => displayGoodsAmount.value + displayDeliveryFee.value)
+const displayPayAmount = computed(() => finalOrder.value?.pay_amount ?? payableAmount.value)
+const promoBannerActive = computed(() => hasFinalPricing.value ? displayDiscountAmount.value > 0 : !!bestFullReductionRule.value)
+const promoTitle = computed(() => {
+  if (hasFinalPricing.value) {
+    return displayDiscountAmount.value > 0
+      ? `已按后端结算优惠 ¥${displayDiscountAmount.value.toFixed(2)}`
+      : '后端结算未命中优惠'
+  }
+
+  return bestFullReductionRule.value ? `已优惠 ¥${fullReductionDiscount.value.toFixed(2)}` : '当前未命中满减'
+})
+const promoDescription = computed(() => {
+  if (hasFinalPricing.value) {
+    return finalAmountAdjusted.value
+      ? '订单已创建，优惠与支付金额已按后端最终结算刷新'
+      : '订单已创建，优惠与支付金额以后端订单返回值为准'
+  }
+
+  if (bestFullReductionRule.value) {
+    return `本单已命中满 ${bestFullReductionRule.value.threshold_amount.toFixed(2)} 减 ${bestFullReductionRule.value.discount_amount.toFixed(2)}`
+  }
+
+  if (nextFullReductionRule.value) {
+    return `再买 ¥${amountToNextRule.value.toFixed(2)} 可减 ¥${nextFullReductionRule.value.discount_amount.toFixed(2)}`
+  }
+
+  return '当前购物车金额暂未达到满减门槛'
+})
+const amountCaption = computed(() => {
+  if (hasFinalPricing.value) {
+    return finalAmountAdjusted.value
+      ? '订单已按后端最终结算更新，支付将以以下金额为准'
+      : '订单已创建，以下金额以后端订单返回为准'
+  }
+
+  return '以下金额为提交前预估，创建订单后会自动切换为最终支付金额'
+})
 
 const deliveryFee = computed(() => {
   if (deliveryType.value !== 1) return 0
 
-  if (cartStore.totalAmount >= deliveryConfig.value.free_delivery_amount && deliveryConfig.value.free_delivery_amount > 0) {
+  if (goodsAmount.value >= deliveryConfig.value.free_delivery_amount && deliveryConfig.value.free_delivery_amount > 0) {
     return 0
   }
 
@@ -276,8 +477,43 @@ const deliveryFee = computed(() => {
 })
 
 const totalAmount = computed(() => {
-  return cartStore.totalAmount + deliveryFee.value
+  return goodsAmount.value + deliveryFee.value
 })
+
+const payableAmount = computed(() => {
+  return Math.max(0, totalAmount.value - fullReductionDiscount.value)
+})
+
+watch(
+  [
+    deliveryType,
+    deliveryDistanceIndex,
+    () => selectedAddress.value?.id,
+    () => cartStore.totalAmount
+  ],
+  () => {
+    if (!finalOrder.value) {
+      return
+    }
+
+    finalOrder.value = null
+    finalAmountAdjusted.value = false
+  }
+)
+
+function isAmountDifferent(currentValue: number, nextValue: number) {
+  return Math.abs(currentValue - nextValue) > 0.009
+}
+
+function applyFinalOrderAmount(order: Order) {
+  finalAmountAdjusted.value = (
+    isAmountDifferent(goodsAmount.value, order.total_amount) ||
+    isAmountDifferent(deliveryFee.value, order.delivery_fee) ||
+    isAmountDifferent(fullReductionDiscount.value, order.discount_amount) ||
+    isAmountDifferent(payableAmount.value, order.pay_amount)
+  )
+  finalOrder.value = order
+}
 
 async function submitOrder() {
   if (submitting.value) {
@@ -303,14 +539,8 @@ async function submitOrder() {
     if (!deliveryConfig.value.takeout_enabled) {
       return uni.showToast({ title: '商家暂未开启配送', icon: 'none' })
     }
-    if (!deliveryAddress.value) {
-      return uni.showToast({ title: '请输入收货地址', icon: 'none' })
-    }
-    if (!contactName.value) {
-      return uni.showToast({ title: '请输入联系人', icon: 'none' })
-    }
-    if (!contactPhone.value) {
-      return uni.showToast({ title: '请输入联系电话', icon: 'none' })
+    if (!selectedAddress.value) {
+      return uni.showToast({ title: loadingAddresses.value ? '地址加载中，请稍后' : '请选择收货地址', icon: 'none' })
     }
     if (!deliveryRules.value.length) {
       return uni.showToast({ title: '当前暂无可选配送档位', icon: 'none' })
@@ -321,7 +551,7 @@ async function submitOrder() {
     if (deliveryDistance.value > deliveryConfig.value.max_distance) {
       return uni.showToast({ title: '已超出商家配送范围', icon: 'none' })
     }
-    if (!/^1\d{10}$/.test(contactPhone.value)) {
+    if (!/^1\d{10}$/.test(selectedAddress.value.phone || '')) {
       return uni.showToast({ title: '请输入正确的联系电话', icon: 'none' })
     }
   }
@@ -342,9 +572,9 @@ async function submitOrder() {
 
   if (deliveryType.value === 1) {
     orderData.delivery_distance = deliveryDistance.value
-    orderData.delivery_address = deliveryAddress.value
-    orderData.contact_name = contactName.value
-    orderData.contact_phone = contactPhone.value
+    orderData.delivery_address = selectedAddressText.value
+    orderData.contact_name = selectedAddress.value?.name || ''
+    orderData.contact_phone = selectedAddress.value?.phone || ''
   }
 
   try {
@@ -352,6 +582,7 @@ async function submitOrder() {
     uni.showLoading({ title: '创建订单中...' })
 
     const res = await createOrder(merchantId.value, orderData)
+    applyFinalOrderAmount(res.order)
 
     // 发起微信支付
     if (res.pay_params) {
@@ -479,6 +710,105 @@ async function submitOrder() {
   margin-bottom: 24rpx;
 }
 
+.address-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  background: #f8f9fa;
+  border-radius: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.address-card.empty {
+  border: 2rpx dashed #d9e7ff;
+  background: #f7fbff;
+}
+
+.address-main,
+.address-empty {
+  flex: 1;
+  min-width: 0;
+}
+
+.address-top {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 10rpx;
+  flex-wrap: wrap;
+}
+
+.address-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.address-phone {
+  font-size: 26rpx;
+  color: #666666;
+}
+
+.address-default-tag {
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: #e6f0ff;
+  color: #007AFF;
+  font-size: 22rpx;
+}
+
+.address-detail {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #333333;
+  word-break: break-all;
+}
+
+.address-empty-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8rpx;
+}
+
+.address-empty-desc {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  line-height: 1.5;
+}
+
+.address-arrow {
+  font-size: 28rpx;
+  color: #c0c4cc;
+  flex-shrink: 0;
+}
+
+.address-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.address-action-btn {
+  flex: 1;
+  height: 72rpx;
+  border-radius: 999rpx;
+  background: #007AFF;
+  color: #ffffff;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.address-action-btn.secondary {
+  background: #eef3ff;
+  color: #007AFF;
+}
+
 .form-item {
   margin-bottom: 20rpx;
 }
@@ -529,6 +859,69 @@ async function submitOrder() {
 .goods-list {
   display: flex;
   flex-direction: column;
+}
+
+.promo-banner {
+  border-radius: 18rpx;
+  background: #f8f9fb;
+  padding: 24rpx;
+}
+
+.promo-banner.active {
+  background: #fff7e8;
+}
+
+.promo-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.promo-desc {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #8a9099;
+}
+
+.promo-empty {
+  border-radius: 18rpx;
+  background: #f8f9fb;
+  padding: 24rpx;
+  font-size: 24rpx;
+  color: #8a9099;
+}
+
+.promo-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+  margin-top: 20rpx;
+}
+
+.promo-rule-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  background: #f8f9fb;
+  font-size: 24rpx;
+  color: #5f6570;
+}
+
+.promo-rule-tag {
+  flex-shrink: 0;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: #eef1f5;
+  color: #8a9099;
+}
+
+.promo-rule-tag.active {
+  background: #ffe7ba;
+  color: #d46b08;
 }
 
 .goods-item {
@@ -611,12 +1004,31 @@ async function submitOrder() {
   font-size: 28rpx;
 }
 
+.amount-caption {
+  margin-bottom: 12rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 12rpx;
+  background: #f5f7fa;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #8a9099;
+}
+
+.amount-caption.final {
+  background: #eef6ff;
+  color: #0056cc;
+}
+
 .amount-label {
   color: #666666;
 }
 
 .amount-value {
   color: #1a1a1a;
+}
+
+.amount-row.discount .amount-value {
+  color: #ff4d4f;
 }
 
 .amount-row.total {

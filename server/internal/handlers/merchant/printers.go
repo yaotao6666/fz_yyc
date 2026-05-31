@@ -2,6 +2,7 @@ package merchant
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -20,10 +21,34 @@ type createPrinterRequest struct {
 	DeviceNo   string          `json:"device_no" binding:"required"`
 	APIKey     string          `json:"api_key"`
 	APIURL     string          `json:"api_url"`
+	FeieUser   string          `json:"feie_user"`
+	FeieUKey   string          `json:"feie_ukey"`
+	FeieSN     string          `json:"feie_sn"`
 	PrintTypes json.RawMessage `json:"print_types"`
 	Status     *uint8          `json:"status"`
 	AutoPrint  *bool           `json:"auto_print"`
 	IsDefault  *bool           `json:"is_default"`
+}
+
+type printerResponse struct {
+	ID           uint64      `json:"id"`
+	MerchantID   uint64      `json:"merchant_id"`
+	Name         string      `json:"name"`
+	Type         string      `json:"type"`
+	DeviceNo     string      `json:"device_no"`
+	APIURL       string      `json:"api_url"`
+	FeieUser     string      `json:"feie_user"`
+	FeieSN       string      `json:"feie_sn"`
+	PrintTypes   models.JSON `json:"print_types"`
+	Status       uint8       `json:"status"`
+	AutoPrint    bool        `json:"auto_print"`
+	IsDefault    bool        `json:"is_default"`
+	PrintCount   int         `json:"print_count"`
+	LastPrintAt  *time.Time  `json:"last_print_at"`
+	HasAPIKey    bool        `json:"has_api_key"`
+	HasFeieUKey  bool        `json:"has_feie_ukey"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
 }
 
 func GetPrinters(c *gin.Context) {
@@ -35,7 +60,12 @@ func GetPrinters(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, printers)
+	list := make([]printerResponse, 0, len(printers))
+	for _, printer := range printers {
+		list = append(list, buildPrinterResponse(printer))
+	}
+
+	response.Success(c, list)
 }
 
 func CreatePrinter(c *gin.Context) {
@@ -46,6 +76,10 @@ func CreatePrinter(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
+	if err := validatePrinterPayload(req.Type, req.DeviceNo, req.FeieUser, req.FeieUKey, req.FeieSN); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
+		return
+	}
 
 	printer := models.CloudPrinter{
 		MerchantID: merchantID,
@@ -54,6 +88,9 @@ func CreatePrinter(c *gin.Context) {
 		DeviceNo:   req.DeviceNo,
 		APIKey:     req.APIKey,
 		APIURL:     req.APIURL,
+		FeieUser:   req.FeieUser,
+		FeieUKey:   req.FeieUKey,
+		FeieSN:     req.FeieSN,
 		Status:     1,
 	}
 	if len(req.PrintTypes) > 0 {
@@ -87,7 +124,7 @@ func CreatePrinter(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, printer)
+	response.Success(c, buildPrinterResponse(printer))
 }
 
 type updatePrinterRequest struct {
@@ -96,6 +133,9 @@ type updatePrinterRequest struct {
 	DeviceNo   *string         `json:"device_no"`
 	APIKey     *string         `json:"api_key"`
 	APIURL     *string         `json:"api_url"`
+	FeieUser   *string         `json:"feie_user"`
+	FeieUKey   *string         `json:"feie_ukey"`
+	FeieSN     *string         `json:"feie_sn"`
 	PrintTypes json.RawMessage `json:"print_types"`
 	Status     *uint8          `json:"status"`
 	AutoPrint  *bool           `json:"auto_print"`
@@ -118,6 +158,31 @@ func UpdatePrinter(c *gin.Context) {
 		return
 	}
 
+	targetType := printer.Brand
+	if req.Type != nil {
+		targetType = *req.Type
+	}
+	targetDeviceNo := printer.DeviceNo
+	if req.DeviceNo != nil {
+		targetDeviceNo = *req.DeviceNo
+	}
+	targetFeieUser := printer.FeieUser
+	if req.FeieUser != nil {
+		targetFeieUser = *req.FeieUser
+	}
+	targetFeieUKey := printer.FeieUKey
+	if req.FeieUKey != nil {
+		targetFeieUKey = *req.FeieUKey
+	}
+	targetFeieSN := printer.FeieSN
+	if req.FeieSN != nil {
+		targetFeieSN = *req.FeieSN
+	}
+	if err := validatePrinterPayload(targetType, targetDeviceNo, targetFeieUser, targetFeieUKey, targetFeieSN); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
+		return
+	}
+
 	updates := map[string]interface{}{}
 	if req.Name != nil {
 		updates["name"] = *req.Name
@@ -133,6 +198,15 @@ func UpdatePrinter(c *gin.Context) {
 	}
 	if req.APIURL != nil {
 		updates["api_url"] = *req.APIURL
+	}
+	if req.FeieUser != nil {
+		updates["feie_user"] = *req.FeieUser
+	}
+	if req.FeieUKey != nil {
+		updates["feie_ukey"] = *req.FeieUKey
+	}
+	if req.FeieSN != nil {
+		updates["feie_sn"] = *req.FeieSN
 	}
 	if len(req.PrintTypes) > 0 {
 		updates["print_types"] = models.JSON(req.PrintTypes)
@@ -167,7 +241,7 @@ func UpdatePrinter(c *gin.Context) {
 
 	var updated models.CloudPrinter
 	database.DB.Where("id = ?", printer.ID).First(&updated)
-	response.Success(c, updated)
+	response.Success(c, buildPrinterResponse(updated))
 }
 
 func DeletePrinter(c *gin.Context) {
@@ -215,4 +289,45 @@ func TestPrinter(c *gin.Context) {
 		"success": true,
 		"message": "打印测试成功",
 	})
+}
+
+func validatePrinterPayload(printerType string, deviceNo string, feieUser string, feieUKey string, feieSN string) error {
+	if deviceNo == "" {
+		return fmt.Errorf("打印机设备编号不能为空")
+	}
+	if printerType == "feie" {
+		if feieUser == "" {
+			return fmt.Errorf("请输入飞鹅账号")
+		}
+		if feieUKey == "" {
+			return fmt.Errorf("请输入飞鹅 UKey")
+		}
+		if feieSN == "" {
+			return fmt.Errorf("请输入飞鹅打印机终端号")
+		}
+	}
+	return nil
+}
+
+func buildPrinterResponse(printer models.CloudPrinter) printerResponse {
+	return printerResponse{
+		ID:          printer.ID,
+		MerchantID:  printer.MerchantID,
+		Name:        printer.Name,
+		Type:        printer.Brand,
+		DeviceNo:    printer.DeviceNo,
+		APIURL:      printer.APIURL,
+		FeieUser:    printer.FeieUser,
+		FeieSN:      printer.FeieSN,
+		PrintTypes:  printer.PrintTypes,
+		Status:      printer.Status,
+		AutoPrint:   printer.AutoPrint,
+		IsDefault:   printer.IsDefault,
+		PrintCount:  printer.PrintCount,
+		LastPrintAt: printer.LastPrintAt,
+		HasAPIKey:   printer.APIKey != "",
+		HasFeieUKey: printer.FeieUKey != "",
+		CreatedAt:   printer.CreatedAt,
+		UpdatedAt:   printer.UpdatedAt,
+	}
 }

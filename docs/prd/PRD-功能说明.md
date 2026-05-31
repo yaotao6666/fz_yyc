@@ -54,11 +54,14 @@
 - `pages/merchant/orders/list`：订单管理
 - `pages/merchant/orders/detail`：订单详情
 - `pages/merchant/analytics/index`：商家分析页
-- `pages/merchant/settings`：商家设置
+- `pages/merchant/settings`：商家设置首页
+- `pages/merchant/marketing`：满减营销配置
+- `pages/merchant/printers`：打印机管理
 - `pages/merchant/settlements/history`：商家分账历史
 - `pages/merchant/notification-settings`：消息提醒设置
 - `pages/merchant/delivery-settings`：配送设置
 - `pages/merchant/staff`：员工管理
+- `pages/merchant/settings` 采用顶部信息卡 + 功能宫格，统一承接配送设置、满减营销、打印机管理、声音提醒、员工管理、分账历史等入口
 - `pages/merchant/delivery-settings` 统一管理配送、堂食、自提三个下单方式开关；配送费与距离规则只服务于配送场景
 
 ### 3.2 用户端页面
@@ -153,6 +156,36 @@
   - 堂食对应 `dine_in_enabled`
   - 自提对应 `pickup_enabled`
 - 用户选择配送时需填写地址、联系人、联系电话，并从商家配置的配送距离档位中选择范围；选择堂食或自提时不展示配送表单。
+- 确认订单页展示商家当前启用的满减规则、已命中优惠和下一档提示，下单金额以服务端返回的 `discount_amount`、`pay_amount` 为准。
+
+### 4.3.1 满减营销
+
+- 商家可在 `pages/merchant/marketing` 配置最多 5 档满减规则。
+- 单档规则至少包含：
+  - 满减门槛金额
+  - 减免金额
+  - 启用状态
+- 规则保存后整体覆盖当前商家的满减配置。
+- 用户下单时按当前满足条件的最高优惠档位自动生效。
+
+### 4.3.2 打印机管理
+
+- 商家可在 `pages/merchant/printers` 管理打印机列表。
+- 打印机管理至少支持：
+  - 新增
+  - 编辑
+  - 删除
+  - 启停开关
+  - 自动打印开关
+  - 默认打印机切换
+  - 测试打印
+- 打印机类型至少支持：
+  - 通用云打印机
+  - 飞鹅打印机
+- 飞鹅打印机需维护：
+  - 飞鹅账号
+  - 飞鹅 UKey
+  - 飞鹅终端号
 
 ### 4.4 订单与核销
 

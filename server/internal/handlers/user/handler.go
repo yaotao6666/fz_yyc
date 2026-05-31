@@ -7,6 +7,7 @@ import (
 	"fz_yyc_api/internal/config"
 	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/fullreduction"
 	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
@@ -15,6 +16,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -134,6 +136,72 @@ func parseStoreSpecOptions(raw models.JSON) []StoreProductSpecOptionResponse {
 	return []StoreProductSpecOptionResponse{}
 }
 
+func loadProductSpecs(productID uint64) ([]models.ProductSpec, error) {
+	var specs []models.ProductSpec
+	if err := database.DB.
+		Where("product_id = ?", productID).
+		Order("id ASC").
+		Find(&specs).Error; err != nil {
+		return nil, err
+	}
+	return specs, nil
+}
+
+func parseSelectedSpecNames(specInfo string) []string {
+	if strings.TrimSpace(specInfo) == "" {
+		return []string{}
+	}
+
+	rawItems := strings.Split(specInfo, "/")
+	result := make([]string, 0, len(rawItems))
+	for _, item := range rawItems {
+		name := strings.TrimSpace(item)
+		if name != "" {
+			result = append(result, name)
+		}
+	}
+	return result
+}
+
+func calculateOrderItemUnitPrice(product models.Product, specInfo string) (float64, error) {
+	price := product.Price
+	selectedSpecNames := parseSelectedSpecNames(specInfo)
+	if len(selectedSpecNames) == 0 {
+		return price, nil
+	}
+
+	specs, err := loadProductSpecs(product.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(specs) == 0 {
+		return 0, fmt.Errorf("商品规格不存在或已变更")
+	}
+
+	if len(selectedSpecNames) > len(specs) {
+		return 0, fmt.Errorf("商品规格信息无效")
+	}
+
+	for index, selectedName := range selectedSpecNames {
+		options := parseStoreSpecOptions(specs[index].Options)
+		matched := false
+		for _, option := range options {
+			if option.Name != selectedName {
+				continue
+			}
+			price += option.Price
+			matched = true
+			break
+		}
+		if !matched {
+			return 0, fmt.Errorf("商品规格已变更，请重新选择")
+		}
+	}
+
+	return price, nil
+}
+
 func buildStoreAccessibleImages(images []string) []string {
 	service := qiniu.GetService()
 	if service == nil {
@@ -163,6 +231,13 @@ func buildAccessibleOrder(order models.Order) models.Order {
 
 	for index := range order.Items {
 		order.Items[index].Image = buildAccessibleOrderItemImage(order.Items[index].Image)
+	}
+
+	if order.VerifyCode != "" {
+		verifyQRCodeURL, err := utils.BuildVerifyCodeQRCodeDataURL(order.VerifyCode)
+		if err == nil {
+			order.VerifyQRCodeURL = verifyQRCodeURL
+		}
 	}
 
 	return order
@@ -694,9 +769,10 @@ func CreateOrder(c *gin.Context) {
 			}
 		}
 
-		price := product.Price
-		if item.Price > 0 {
-			price = item.Price
+		price, err := calculateOrderItemUnitPrice(product, item.SpecInfo)
+		if err != nil {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
+			return
 		}
 
 		subtotal := price * float64(item.Quantity)
@@ -747,7 +823,18 @@ func CreateOrder(c *gin.Context) {
 		deliveryFee = utils.CalculateDeliveryFee(totalAmount, settings.BaseFee, settings.FreeDeliveryAmount, req.DeliveryDistance, rules)
 	}
 
-	payAmount := totalAmount + deliveryFee
+	// 满减按商品金额匹配，不包含配送费；最终支付金额再减去命中的优惠金额。
+	fullReductionRules, err := fullreduction.GetActiveRulesByMerchantID(req.MerchantID)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取满减规则失败")
+		return
+	}
+	discountAmount, _ := fullreduction.CalculateDiscount(totalAmount, fullReductionRules)
+
+	payAmount := totalAmount + deliveryFee - discountAmount
+	if payAmount < 0 {
+		payAmount = 0
+	}
 
 	orderNo := utils.GenerateOrderNo(req.MerchantID)
 	verifyCode := utils.GenerateVerifyCode()
@@ -760,6 +847,7 @@ func CreateOrder(c *gin.Context) {
 		MerchantID:       req.MerchantID,
 		TotalAmount:      totalAmount,
 		DeliveryFee:      deliveryFee,
+		DiscountAmount:   discountAmount,
 		PayAmount:        payAmount,
 		DeliveryType:     req.DeliveryType,
 		DeliveryDistance: req.DeliveryDistance,

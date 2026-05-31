@@ -11,6 +11,10 @@ import type {
   MerchantInfo,
   MerchantWechatLoginRequest,
   MerchantSettings,
+  MerchantFullReductionRule,
+  MerchantFullReductionRulesResponse,
+  MerchantPrinter,
+  MerchantPrinterPayload,
   MerchantStaffListResponse,
   CreateMerchantStaffRequest,
   UpdateMerchantStaffRequest,
@@ -42,7 +46,9 @@ import type {
   AnnouncementListResponse,
   ProfitSharingRecordListResponse,
   ProfitSharingRecordQuery,
+  StoreFullReductionRulesResponse,
   UserAddress,
+  UpdateMerchantFullReductionRulesRequest,
 } from '../types'
 
 export { get, post, put, del }
@@ -132,6 +138,67 @@ function normalizeMerchantSettings(data: MerchantSettings): MerchantSettings {
     delivery_settings: data?.delivery_settings
       ? normalizeDeliverySettings(data.delivery_settings)
       : undefined
+  }
+}
+
+function normalizeMerchantFullReductionRule(data: Partial<MerchantFullReductionRule> | null | undefined): MerchantFullReductionRule {
+  return {
+    id: normalizeNumberValue(data?.id),
+    merchant_id: normalizeNumberValue(data?.merchant_id),
+    threshold_amount: normalizeRequiredNumber(data?.threshold_amount),
+    discount_amount: normalizeRequiredNumber(data?.discount_amount),
+    sort: normalizeNumberValue(data?.sort),
+    status: normalizeRequiredNumber(data?.status, 1),
+    created_at: data?.created_at ? String(data.created_at) : undefined,
+    updated_at: data?.updated_at ? String(data.updated_at) : undefined
+  }
+}
+
+function normalizeMerchantFullReductionRulesResponse(
+  data: MerchantFullReductionRulesResponse | null | undefined
+): MerchantFullReductionRulesResponse {
+  return {
+    rules: normalizeArrayResponse(data?.rules).map(normalizeMerchantFullReductionRule),
+    active_rules: normalizeArrayResponse(data?.active_rules).map(normalizeMerchantFullReductionRule)
+  }
+}
+
+function parsePrinterPrintTypes(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string')
+  }
+
+  if (typeof value === 'string' && value) {
+    try {
+      return parsePrinterPrintTypes(JSON.parse(value))
+    } catch (error) {
+      console.warn('解析打印类型失败:', error)
+    }
+  }
+
+  return []
+}
+
+function normalizeMerchantPrinter(printer: Partial<MerchantPrinter> | null | undefined): MerchantPrinter {
+  return {
+    id: normalizeRequiredNumber(printer?.id),
+    merchant_id: normalizeRequiredNumber(printer?.merchant_id),
+    name: printer?.name || '',
+    type: String(printer?.type || ''),
+    device_no: printer?.device_no || '',
+    api_url: printer?.api_url || '',
+    feie_user: printer?.feie_user || '',
+    feie_sn: printer?.feie_sn || '',
+    print_types: parsePrinterPrintTypes(printer?.print_types),
+    status: normalizeRequiredNumber(printer?.status, 1),
+    auto_print: !!printer?.auto_print,
+    is_default: !!printer?.is_default,
+    print_count: normalizeRequiredNumber(printer?.print_count),
+    last_print_at: printer?.last_print_at ? String(printer.last_print_at) : undefined,
+    has_api_key: !!printer?.has_api_key,
+    has_feie_ukey: !!printer?.has_feie_ukey,
+    created_at: String(printer?.created_at || ''),
+    updated_at: String(printer?.updated_at || '')
   }
 }
 
@@ -243,6 +310,23 @@ export function getMerchantQrcode() {
 
 export function getMerchantAnnouncements(params?: { page?: number; page_size?: number }) {
   return get<AnnouncementListResponse>('/api/v1/merchant/announcements', params).then(normalizeListField)
+}
+
+export function getMerchantFullReductionRules() {
+  return get<MerchantFullReductionRulesResponse>('/api/v1/merchant/full-reduction-rules')
+    .then(normalizeMerchantFullReductionRulesResponse)
+}
+
+export function updateMerchantFullReductionRules(data: UpdateMerchantFullReductionRulesRequest) {
+  return put<MerchantFullReductionRulesResponse>('/api/v1/merchant/full-reduction-rules', data)
+    .then(normalizeMerchantFullReductionRulesResponse)
+}
+
+export function getStoreFullReductionRules(merchantId: number) {
+  return get<StoreFullReductionRulesResponse>(`/api/v1/store/${merchantId}/full-reduction-rules`)
+    .then((response) => ({
+      rules: normalizeArrayResponse(response?.rules).map(normalizeMerchantFullReductionRule)
+    }))
 }
 
 // ============ 商品分类相关 ============
@@ -434,6 +518,22 @@ function normalizeOrder(order: any): Order {
       }
     : undefined
 
+  const deliveryInfo = order?.delivery_info
+    ? {
+        ...order.delivery_info,
+        address: String(order.delivery_info?.address || order?.delivery_address || ''),
+        contact_name: String(order.delivery_info?.contact_name || order?.contact_name || ''),
+        contact_phone: String(order.delivery_info?.contact_phone || order?.contact_phone || ''),
+        distance: Number(order.delivery_info?.distance || order?.delivery_distance || 0)
+      }
+    : {
+        type: '',
+        address: String(order?.delivery_address || ''),
+        contact_name: String(order?.contact_name || ''),
+        contact_phone: String(order?.contact_phone || ''),
+        distance: Number(order?.delivery_distance || 0)
+      }
+
   return {
     ...order,
     id: Number(order?.id || 0),
@@ -443,6 +543,11 @@ function normalizeOrder(order: any): Order {
     discount_amount: Number(order?.discount_amount || 0),
     pay_amount: Number(order?.pay_amount || 0),
     status: Number(order?.status || 0),
+    delivery_address: String(order?.delivery_address || ''),
+    contact_name: String(order?.contact_name || ''),
+    contact_phone: String(order?.contact_phone || ''),
+    verify_qrcode_url: String(order?.verify_qrcode_url || ''),
+    delivery_info: deliveryInfo,
     merchant
   } as Order
 }
@@ -551,7 +656,7 @@ export function getOrders(params?: {
  * 获取订单详情
  */
 export function getOrder(orderId: number) {
-  return get<Order>(`/api/v1/merchant/orders/${orderId}`)
+  return get<Order>(`/api/v1/merchant/orders/${orderId}`).then(normalizeOrder)
 }
 
 /**
@@ -816,6 +921,37 @@ export function applyRefund(orderId: number, data: { reason: string }) {
   return post<any>(`/api/v1/user/orders/${orderId}/refund`, data)
 }
 
+// ============ 云打印相关 ============
+
+/**
+ * 获取打印记录
+ */
+export function getPrintLogs(params?: { page?: number; page_size?: number; start_date?: string; end_date?: string }) {
+  return get<any>('/api/v1/merchant/print-logs', params)
+}
+
+export function getMerchantPrinters() {
+  return get<MerchantPrinter[] | null>('/api/v1/merchant/printers').then((response) => {
+    return normalizeArrayResponse(response).map(normalizeMerchantPrinter)
+  })
+}
+
+export function createMerchantPrinter(data: MerchantPrinterPayload) {
+  return post<MerchantPrinter>('/api/v1/merchant/printers', data).then(normalizeMerchantPrinter)
+}
+
+export function updateMerchantPrinter(printerId: number, data: Partial<MerchantPrinterPayload>) {
+  return put<MerchantPrinter>(`/api/v1/merchant/printers/${printerId}`, data).then(normalizeMerchantPrinter)
+}
+
+export function deleteMerchantPrinter(printerId: number) {
+  return del<null>(`/api/v1/merchant/printers/${printerId}`)
+}
+
+export function testMerchantPrinter(printerId: number) {
+  return post<{ success: boolean; message: string }>(`/api/v1/merchant/printers/${printerId}/test`)
+}
+
 // ============ C端订单详情 ============
 
 export function getMyOrderDetail(orderId: number) {
@@ -840,6 +976,7 @@ export function deleteUserAddress(addressId: number) {
   return del<null>(`/api/v1/user/addresses/${addressId}`)
 }
 
+
 export default {
   // 认证
   merchantLogin,
@@ -856,6 +993,8 @@ export default {
   updateDeliverySettings,
   updateMerchantStatus,
   getMerchantQrcode,
+  getMerchantFullReductionRules,
+  updateMerchantFullReductionRules,
   getMerchantStaffList,
   createMerchantStaff,
   updateMerchantStaff,
@@ -898,12 +1037,20 @@ export default {
   getStoreProducts,
   getStoreProduct,
   getStoreDeliveryRules,
+  getStoreFullReductionRules,
   trackStoreBehaviorEvent,
   // C端订单
   createOrder,
   getMyOrders,
   cancelMyOrder,
   applyRefund,
+  // 云打印
+  getPrintLogs,
+  getMerchantPrinters,
+  createMerchantPrinter,
+  updateMerchantPrinter,
+  deleteMerchantPrinter,
+  testMerchantPrinter,
   // C端订单详情
   getMyOrderDetail,
   // C端地址管理
@@ -911,5 +1058,4 @@ export default {
   createUserAddress,
   updateUserAddress,
   deleteUserAddress,
-
 }

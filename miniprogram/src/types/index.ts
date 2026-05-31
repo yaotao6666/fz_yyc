@@ -173,6 +173,73 @@ export interface MerchantSettings {
   delivery_settings?: DeliverySettings
 }
 
+export interface MerchantFullReductionRule {
+  id?: number
+  merchant_id?: number
+  threshold_amount: number
+  discount_amount: number
+  sort?: number
+  status: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface MerchantFullReductionRulesResponse {
+  rules: MerchantFullReductionRule[]
+  active_rules: MerchantFullReductionRule[]
+}
+
+export interface StoreFullReductionRulesResponse {
+  rules: MerchantFullReductionRule[]
+}
+
+export interface UpdateMerchantFullReductionRulesRequest {
+  rules: Array<{
+    threshold_amount: number
+    discount_amount: number
+    status?: number
+  }>
+}
+
+export type MerchantPrinterType = 'yilianyun' | 'feie' | string
+export type MerchantPrinterPrintType = string
+
+export interface MerchantPrinter {
+  id: number
+  merchant_id: number
+  name: string
+  type: MerchantPrinterType
+  device_no: string
+  api_url?: string
+  feie_user?: string
+  feie_sn?: string
+  print_types: MerchantPrinterPrintType[]
+  status: number
+  auto_print: boolean
+  is_default: boolean
+  print_count: number
+  last_print_at?: string
+  has_api_key?: boolean
+  has_feie_ukey?: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface MerchantPrinterPayload {
+  name: string
+  type: MerchantPrinterType
+  device_no: string
+  api_key?: string
+  api_url?: string
+  feie_user?: string
+  feie_ukey?: string
+  feie_sn?: string
+  print_types?: MerchantPrinterPrintType[]
+  status?: number
+  auto_print?: boolean
+  is_default?: boolean
+}
+
 // 配送设置
 export interface DeliverySettings {
   enabled: boolean
@@ -405,11 +472,15 @@ export interface Order {
   pay_amount: number
   delivery_type?: number
   delivery_distance?: number
+  delivery_address?: string
+  contact_name?: string
+  contact_phone?: string
   delivery_info?: DeliveryInfo
   status: number
   status_text?: string
   remark?: string
   verify_code?: string
+  verify_qrcode_url?: string
   transaction_id?: string
   created_at: string
   paid_at?: string

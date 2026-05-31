@@ -634,7 +634,8 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 | 分账历史   | 查看本店抽佣日期、金额、比例、状态    | P0  |
 | 支付状态   | 查看支付配置是否完成           | P0  |
 | 商家信息   | 商家基本信息管理             | P0  |
-| 商家设置   | 营业执照、门店公告、营业时间等自定义设置 | P0  |
+| 商家设置   | 设置首页、快捷入口与账号安全管理     | P0  |
+| 满减营销   | 配置多档满多少减多少规则         | P0  |
 | 商家二维码  | 生成商家专属小程序码           | P0  |
 | 商家状态   | 开启/关闭店铺              | P0  |
 | 系统公告查看 | 查看服务商发布的平台公告         | P0  |
@@ -691,7 +692,7 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 | 商品浏览 | 浏览当前商家的商品列表    | P0  |
 | 商品详情 | 查看商品详细信息、规格选择  | P0  |
 | 购物车  | 加入购物车、修改数量     | P1  |
-| 下单支付 | 确认订单、微信支付      | P0  |
+| 下单支付 | 确认订单、满减优惠、微信支付 | P0  |
 | 我的订单 | 查看个人订单（按商家分组）  | P0  |
 | 订单详情 | 查看订单详情、申请退款    | P0  |
 
@@ -711,8 +712,9 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 | 功能     | 描述           | 优先级 |
 | ------ | ------------ | --- |
 | 打印机配置  | 添加/编辑/删除云打印机 | P1  |
-| 打印机管理  | 查看打印机列表、状态   | P1  |
+| 打印机管理  | 查看打印机列表、状态、默认设备 | P1  |
 | 自动打印开关 | 商家开启/关闭自动打印  | P1  |
+| 飞鹅参数配置 | 维护飞鹅账号、UKey、终端号 | P1  |
 | 打印模板设置 | 设置小票打印格式     | P2  |
 | 打印记录   | 查看历史打印记录     | P2  |
 | 打印测试   | 测试打印机连接      | P1  |
@@ -1803,12 +1805,13 @@ Authorization: Bearer {token}
 
 - `notify_enabled` 与 `browse_notify_enabled` 的保存维度均为"当前登录商家员工"，不是商家全局配置。
 - 声音提醒只影响本地 `mp3` 播放，不影响 WebSocket 在线状态。
-- 设置页包含"声音提醒管理"子页面、"修改密码"弹窗、"微信快捷登录绑定/解绑"和"员工管理"入口（仅店主可见）。
+- 设置页包含"声音提醒管理"子页面、"满减营销"、"打印机管理"、"修改密码"弹窗、"微信快捷登录绑定/解绑"和"员工管理"入口（仅店主可见）。
 - `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 均为商家主表维度开关，分别控制配送、堂食、自提是否可下单。
 - `delivery_settings.enabled` 只表示配送费规则是否生效，确认页是否展示“配送”仍以后端返回的 `takeout_enabled` 为准。
 - 设置页重新进入或重新登录后，前端应以 `/api/v1/merchant/settings` 返回的员工维度开关与绑定状态为准。
 - `mp3` 提醒音使用静态资源文件，本轮不在后端或前端生成音频。
-- 本轮不包含优惠券、发券和营销配置。
+- 本轮不包含优惠券、发券和复杂营销活动，但新增商家满减营销配置。
+- 满减规则通过 `GET/PUT /api/v1/merchant/full-reduction-rules` 维护，用户确认订单页通过 `GET /api/v1/store/{merchant_id}/full-reduction-rules` 获取当前启用规则。
 
 **配送距离规则说明：**
 
@@ -2392,10 +2395,15 @@ Authorization: Bearer {token}
       "name": "前台打印机",
       "type": "yilianyun",
       "device_no": "设备编号",
+      "api_url": "https://api.example.com",
+      "feie_user": "",
+      "feie_sn": "",
       "status": 1,
       "auto_print": true,
       "is_default": true,
-      "print_count": 156
+      "print_count": 156,
+      "has_api_key": true,
+      "has_feie_ukey": false
     }
   ]
 }
@@ -2417,8 +2425,21 @@ Authorization: Bearer {token}
   "device_no": "设备编号",
   "api_key": "API密钥",
   "api_url": "https://api.example.com",
+  "print_types": ["order"],
   "auto_print": true,
   "is_default": false
+}
+```
+
+**飞鹅打印机附加字段：**
+
+```json
+{
+  "type": "feie",
+  "device_no": "打印机设备编号",
+  "feie_user": "飞鹅账号",
+  "feie_ukey": "飞鹅UKey",
+  "feie_sn": "飞鹅终端号"
 }
 ```
 
@@ -2435,7 +2456,8 @@ Authorization: Bearer {token}
 {
   "name": "打印机名称",
   "auto_print": true,
-  "is_default": true
+  "is_default": true,
+  "status": 1
 }
 ```
 
@@ -4572,7 +4594,9 @@ miniprogram/                    # 微信小程序
 
 | 页面                         | 功能描述      | 对接API                                      |
 | -------------------------- | --------- | ------------------------------------------ |
-| merchant/settings          | 商家信息、营业设置 | PUT /api/v1/merchant/profile               |
+| merchant/settings          | 商家设置首页、快捷入口 | GET /api/v1/merchant/settings               |
+| merchant/marketing         | 满减营销配置    | GET/PUT /api/v1/merchant/full-reduction-rules |
+| merchant/printers          | 打印机管理     | GET/POST/PUT/DELETE /api/v1/merchant/printers* |
 | merchant/delivery-settings | 配送设置      | GET/PUT /api/v1/merchant/delivery-settings |
 | merchant/announcements     | 系统公告列表    | GET /api/v1/merchant/announcements         |
 

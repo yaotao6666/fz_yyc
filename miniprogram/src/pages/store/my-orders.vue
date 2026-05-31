@@ -57,8 +57,24 @@
             <text class="order-time">{{ formatTime(order.created_at) }}</text>
           </view>
           <view class="order-amount">
-            <text class="amount-label">实付</text>
-            <text class="amount-value">¥{{ order.pay_amount.toFixed(2) }}</text>
+            <view class="amount-summary-row">
+              <text class="amount-label">商品金额</text>
+              <text class="amount-summary-value">¥{{ order.total_amount.toFixed(2) }}</text>
+            </view>
+            <view class="amount-summary-row">
+              <text class="amount-label">配送费</text>
+              <text class="amount-summary-value">¥{{ order.delivery_fee.toFixed(2) }}</text>
+            </view>
+            <view class="amount-summary-row">
+              <text class="amount-label">优惠</text>
+              <text class="amount-summary-value discount">
+                {{ order.discount_amount > 0 ? `-¥${order.discount_amount.toFixed(2)}` : '¥0.00' }}
+              </text>
+            </view>
+            <view class="amount-summary-row total">
+              <text class="amount-label total-label">实付</text>
+              <text class="amount-value">¥{{ order.pay_amount.toFixed(2) }}</text>
+            </view>
           </view>
         </view>
 
@@ -89,6 +105,13 @@
     <view v-if="showVerify" class="dialog-mask" @click="closeVerifyDialog">
       <view class="dialog-content" @click.stop>
         <view class="dialog-title">核销码</view>
+        <image
+          v-if="currentOrder?.verify_qrcode_url"
+          class="verify-qrcode"
+          :src="currentOrder.verify_qrcode_url"
+          mode="aspectFit"
+          show-menu-by-longpress
+        />
         <view class="verify-code-display">
           <text class="code">{{ currentOrder?.verify_code || '------' }}</text>
         </view>
@@ -471,12 +494,43 @@ function contactMerchantForRefund(order: Order) {
 }
 
 .order-amount {
+  min-width: 220rpx;
   text-align: right;
 }
 
 .amount-label {
   font-size: 24rpx;
   color: #666666;
+}
+
+.amount-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12rpx;
+  margin-bottom: 8rpx;
+}
+
+.amount-summary-row:last-child {
+  margin-bottom: 0;
+}
+
+.amount-summary-row.total {
+  margin-top: 4rpx;
+}
+
+.amount-summary-value {
+  font-size: 24rpx;
+  color: #1a1a1a;
+}
+
+.amount-summary-value.discount {
+  color: #ff4d4f;
+}
+
+.total-label {
+  color: #1a1a1a;
+  font-weight: 600;
 }
 
 .amount-value {
@@ -583,6 +637,15 @@ function contactMerchantForRefund(order: Order) {
 .verify-code-display {
   text-align: center;
   margin-bottom: 24rpx;
+}
+
+.verify-qrcode {
+  width: 320rpx;
+  height: 320rpx;
+  margin: 0 auto 24rpx;
+  display: block;
+  border-radius: 20rpx;
+  background: #f7f8fa;
 }
 
 .code {

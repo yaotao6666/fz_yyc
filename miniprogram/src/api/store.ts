@@ -2,6 +2,7 @@ import { get, post } from '../utils/request'
 import type {
   CreateOrderRequest,
   CreateOrderResponse,
+  MerchantFullReductionRule,
   MerchantBehaviorEventRequest,
   Product,
   ProductApiResponse,
@@ -10,6 +11,7 @@ import type {
   ProductListResponse,
   SpecOption,
   StoreDeliveryRules,
+  StoreFullReductionRulesResponse,
   StoreHomeInfo
 } from '../types'
 
@@ -49,6 +51,19 @@ function normalizeStoreDeliveryRules(data: any): StoreDeliveryRules {
     takeout_enabled: !!data?.takeout_enabled,
     dine_in_enabled: !!data?.dine_in_enabled,
     pickup_enabled: !!data?.pickup_enabled
+  }
+}
+
+function normalizeMerchantFullReductionRule(data: Partial<MerchantFullReductionRule> | null | undefined): MerchantFullReductionRule {
+  return {
+    id: normalizeNumberValue(data?.id),
+    merchant_id: normalizeNumberValue(data?.merchant_id),
+    threshold_amount: normalizeRequiredNumber(data?.threshold_amount),
+    discount_amount: normalizeRequiredNumber(data?.discount_amount),
+    sort: normalizeNumberValue(data?.sort),
+    status: normalizeRequiredNumber(data?.status, 1),
+    created_at: data?.created_at ? String(data.created_at) : undefined,
+    updated_at: data?.updated_at ? String(data.updated_at) : undefined
   }
 }
 
@@ -163,14 +178,14 @@ export function getStoreHome(merchantId: number) {
   return get<StoreHomeInfo>(`/api/v1/store/${merchantId}/home`).then(data => {
     if (data?.hot_products) {
       data.hot_products = data.hot_products.map((item: any) => {
-        const normalized = normalizeProduct(item)
+        const normalizedProduct = normalizeProduct(item)
         return {
-          id: normalized.id,
-          name: normalized.name,
-          images: normalized.images || [],
-          price: normalized.price,
-          original_price: normalized.original_price,
-          sales: Number(normalized.sales || 0)
+          id: normalizedProduct.id,
+          name: normalizedProduct.name,
+          images: normalizedProduct.images,
+          price: normalizedProduct.price,
+          original_price: normalizedProduct.original_price,
+          sales: normalizedProduct.sales ?? 0
         }
       })
     }
@@ -197,6 +212,12 @@ export function getStoreProduct(merchantId: number, productId: number) {
 
 export function getStoreDeliveryRules(merchantId: number) {
   return get<StoreDeliveryRules>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeStoreDeliveryRules)
+}
+
+export function getStoreFullReductionRules(merchantId: number) {
+  return get<StoreFullReductionRulesResponse>(`/api/v1/store/${merchantId}/full-reduction-rules`).then((response) => ({
+    rules: Array.isArray(response?.rules) ? response.rules.map(normalizeMerchantFullReductionRule) : []
+  }))
 }
 
 export function createOrder(merchantId: number, data: CreateOrderRequest) {

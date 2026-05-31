@@ -111,6 +111,7 @@ func setupRoutes(r *gin.Engine) {
 			storeGroup.GET("/products", user.GetProducts)
 			storeGroup.GET("/products/:product_id", user.GetProductDetail)
 			storeGroup.GET("/delivery-rules", user.GetDeliveryRules)
+			storeGroup.GET("/full-reduction-rules", user.GetStoreFullReductionRules)
 			storeGroup.POST("/visit", user.RecordUserVisit)
 			storeGroup.POST("/event", user.RecordBehaviorEvent)
 
@@ -151,6 +152,8 @@ func setupRoutes(r *gin.Engine) {
 			merchantGroup.GET("/qrcode", merchant.GetQRCode)
 			merchantGroup.GET("/delivery-settings", merchant.GetDeliverySettings)
 			merchantGroup.PUT("/delivery-settings", merchant.UpdateDeliverySettings)
+			merchantGroup.GET("/full-reduction-rules", merchant.GetFullReductionRules)
+			merchantGroup.PUT("/full-reduction-rules", merchant.UpdateFullReductionRules)
 			merchantGroup.GET("/subscriptions", merchant.GetSubscriptions)
 			merchantGroup.PUT("/subscriptions", merchant.UpdateSubscriptions)
 			merchantGroup.GET("/profit-sharing-records", sp.GetMerchantProfitSharingRecords)

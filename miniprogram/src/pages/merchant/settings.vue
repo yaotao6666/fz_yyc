@@ -1,115 +1,54 @@
 <template>
   <view class="settings-container">
-    <view class="section">
-      <view class="section-title">商家信息</view>
-      <view class="setting-item">
-        <view class="setting-left">
-          <view class="setting-icon"><text>🏪</text></view>
-          <view class="setting-info">
-            <view class="setting-label">店铺名称</view>
-            <view class="setting-value">{{ merchantInfo?.name || '未设置' }}</view>
-          </view>
+    <view class="hero-card">
+      <view class="hero-header">
+        <view class="hero-icon">🏪</view>
+        <view class="hero-main">
+          <view class="hero-title">{{ merchantInfo?.name || '未设置店铺名称' }}</view>
+          <view class="hero-subtitle">{{ merchantInfo?.contact_phone || '未绑定联系电话' }}</view>
         </view>
       </view>
-      <view class="setting-item">
-        <view class="setting-left">
-          <view class="setting-icon"><text>📞</text></view>
-          <view class="setting-info">
-            <view class="setting-label">联系电话</view>
-            <view class="setting-value">{{ merchantInfo?.contact_phone || '未绑定' }}</view>
-          </view>
-        </view>
-      </view>
-      <view class="setting-item" @click="goDeliverySettings">
-        <view class="setting-left">
-          <view class="setting-icon"><text>🚚</text></view>
-          <view class="setting-info">
-            <view class="setting-label">配送设置</view>
-            <view class="setting-value">{{ orderModeSummary }}</view>
-          </view>
-        </view>
-        <text class="arrow">›</text>
-      </view>
-      <view class="setting-item" @click="goQrcode">
-        <view class="setting-left">
-          <view class="setting-icon"><text>📱</text></view>
-          <view class="setting-info">
-            <view class="setting-label">店铺二维码</view>
-            <view class="setting-value">前往工作台查看</view>
-          </view>
-        </view>
-        <text class="arrow">›</text>
+      <view class="hero-tags">
+        <text class="hero-tag primary">{{ orderModeSummary }}</text>
+        <text class="hero-tag">{{ wechatStatusText }}</text>
       </view>
     </view>
 
     <view class="section">
-      <view class="section-title">账号安全</view>
-      <view class="setting-item" @click="openPasswordDialog">
-        <view class="setting-left">
-          <view class="setting-icon"><text>🔑</text></view>
-          <view class="setting-info">
-            <view class="setting-label">修改密码</view>
-            <view class="setting-value">修改成功后需重新登录</view>
-          </view>
+      <view class="section-title">经营工具</view>
+      <view class="feature-grid">
+        <view
+          v-for="item in featureCards"
+          :key="item.key"
+          class="feature-card"
+          @click="handleFeatureClick(item.key)"
+        >
+          <view class="feature-icon">{{ item.icon }}</view>
+          <view class="feature-title">{{ item.title }}</view>
+          <view class="feature-desc">{{ item.desc }}</view>
         </view>
-        <text class="arrow">›</text>
-      </view>
-      <view class="setting-item" @click="handleWechatAction">
-        <view class="setting-left">
-          <view class="setting-icon"><text>💬</text></view>
-          <view class="setting-info">
-            <view class="setting-label">微信快捷登录</view>
-            <view class="setting-value">
-              {{ settings?.wechat_bound ? `已绑定${formattedWechatBoundAt ? ` · ${formattedWechatBoundAt}` : ''}` : '未绑定' }}
-            </view>
-          </view>
-        </view>
-        <text class="arrow">›</text>
       </view>
     </view>
 
     <view class="section">
-      <view class="section-title">店铺运营</view>
-      <view class="setting-item" @click="goNotificationSettings">
-        <view class="setting-left">
-          <view class="setting-icon"><text>🔔</text></view>
-          <view class="setting-info">
-            <view class="setting-label">声音提醒管理</view>
-            <view class="setting-value">{{ notificationSummary }}</view>
+      <view class="section-title">账号与安全</view>
+      <view class="security-grid">
+        <view class="security-card" @click="openPasswordDialog">
+          <view class="security-icon">🔑</view>
+          <view class="security-main">
+            <view class="security-title">修改密码</view>
+            <view class="security-desc">修改成功后需重新登录</view>
           </view>
+          <text class="security-arrow">›</text>
         </view>
-        <text class="arrow">›</text>
-      </view>
-      <view class="setting-item" @click="goAnalytics">
-        <view class="setting-left">
-          <view class="setting-icon"><text>📊</text></view>
-          <view class="setting-info">
-            <view class="setting-label">数据看板</view>
-            <view class="setting-value">查看经营数据与访客趋势</view>
+        <view class="security-card" @click="handleWechatAction">
+          <view class="security-icon">💬</view>
+          <view class="security-main">
+            <view class="security-title">微信快捷登录</view>
+            <view class="security-desc">{{ wechatStatusText }}</view>
           </view>
+          <text class="security-arrow">›</text>
         </view>
-        <text class="arrow">›</text>
-      </view>
-      <view v-if="canManageStaff" class="setting-item" @click="goStaffManagement">
-        <view class="setting-left">
-          <view class="setting-icon"><text>👥</text></view>
-          <view class="setting-info">
-            <view class="setting-label">员工管理</view>
-            <view class="setting-value">仅店主可管理账号与提醒</view>
-          </view>
-        </view>
-        <text class="arrow">›</text>
-      </view>
-
-      <view class="setting-item" @click="goProfitSharingHistory">
-        <view class="setting-left">
-          <view class="setting-icon"><text>💰</text></view>
-          <view class="setting-info">
-            <view class="setting-label">分账历史</view>
-            <view class="setting-value">查看抽佣日期、金额、比例与状态</view>
-          </view>
-        </view>
-        <text class="arrow">›</text>
       </view>
     </view>
 
@@ -143,6 +82,14 @@ import { useAuthStore } from '../../stores/auth'
 import { bindMerchantWechat, changeMerchantPassword, getMerchantSettings, unbindMerchantWechat } from '@api'
 import type { MerchantSettings } from '@types'
 import { getMerchantWechatCode } from '../../utils/merchant_wechat'
+
+type FeatureKey =
+  | 'delivery'
+  | 'marketing'
+  | 'printers'
+  | 'notification'
+  | 'staff'
+  | 'profit-sharing'
 
 const authStore = useAuthStore()
 
@@ -187,6 +134,59 @@ const formattedWechatBoundAt = computed(() => {
   }
   return settings.value.wechat_bound_at.replace('T', ' ').slice(0, 16)
 })
+const wechatStatusText = computed(() => {
+  if (!settings.value?.wechat_bound) {
+    return '未绑定微信快捷登录'
+  }
+  return formattedWechatBoundAt.value
+    ? `已绑定 · ${formattedWechatBoundAt.value}`
+    : '已绑定微信快捷登录'
+})
+const featureCards = computed(() => {
+  const cards: Array<{ key: FeatureKey; icon: string; title: string; desc: string }> = [
+    {
+      key: 'delivery',
+      icon: '🚚',
+      title: '配送设置',
+      desc: orderModeSummary.value
+    },
+    {
+      key: 'marketing',
+      icon: '🎯',
+      title: '满减营销',
+      desc: '配置满多少减多少'
+    },
+    {
+      key: 'printers',
+      icon: '🖨️',
+      title: '打印机管理',
+      desc: '飞鹅参数与打印开关'
+    },
+    {
+      key: 'notification',
+      icon: '🔔',
+      title: '声音提醒',
+      desc: notificationSummary.value
+    },
+    {
+      key: 'profit-sharing',
+      icon: '💰',
+      title: '分账历史',
+      desc: '查看抽佣日期与状态'
+    }
+  ]
+
+  if (canManageStaff.value) {
+    cards.splice(4, 0, {
+      key: 'staff',
+      icon: '👥',
+      title: '员工管理',
+      desc: '仅店主可管理账号'
+    })
+  }
+
+  return cards
+})
 
 onShow(() => {
   loadSettings()
@@ -207,6 +207,14 @@ function goDeliverySettings() {
   uni.navigateTo({ url: '/pages/merchant/delivery-settings' })
 }
 
+function goMarketing() {
+  uni.navigateTo({ url: '/pages/merchant/marketing' })
+}
+
+function goPrinters() {
+  uni.navigateTo({ url: '/pages/merchant/printers' })
+}
+
 function goNotificationSettings() {
   uni.navigateTo({ url: '/pages/merchant/notification-settings' })
 }
@@ -215,16 +223,31 @@ function goProfitSharingHistory() {
   uni.navigateTo({ url: '/pages/merchant/settlements/history' })
 }
 
-function goAnalytics() {
-  uni.switchTab({ url: '/pages/merchant/analytics/index' })
-}
-
-function goQrcode() {
-  uni.switchTab({ url: '/pages/merchant/home' })
-}
-
 function goStaffManagement() {
   uni.navigateTo({ url: '/pages/merchant/staff' })
+}
+
+function handleFeatureClick(key: FeatureKey) {
+  switch (key) {
+    case 'delivery':
+      goDeliverySettings()
+      return
+    case 'marketing':
+      goMarketing()
+      return
+    case 'printers':
+      goPrinters()
+      return
+    case 'notification':
+      goNotificationSettings()
+      return
+    case 'staff':
+      goStaffManagement()
+      return
+    case 'profit-sharing':
+      goProfitSharingHistory()
+      return
+  }
 }
 
 function openPasswordDialog() {
@@ -343,87 +366,192 @@ function handleLogout() {
 <style scoped>
 .settings-container {
   min-height: 100vh;
-  background: #f5f5f5;
-  padding: 24rpx;
-  padding-bottom: 200rpx;
+  background: linear-gradient(180deg, #eef5ff 0%, #f5f5f5 220rpx);
+  padding: 24rpx 24rpx 200rpx;
+}
+
+.hero-card {
+  background: linear-gradient(135deg, #0a60ff 0%, #3d8dff 100%);
+  border-radius: 28rpx;
+  padding: 32rpx;
+  color: #ffffff;
+  box-shadow: 0 20rpx 40rpx rgba(10, 96, 255, 0.18);
+  margin-bottom: 24rpx;
+}
+
+.hero-header {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.hero-icon {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  flex-shrink: 0;
+}
+
+.hero-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.hero-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.hero-subtitle {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.82);
+  word-break: break-all;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 28rpx;
+}
+
+.hero-tag {
+  padding: 10rpx 20rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.hero-tag.primary {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .section {
   background: #ffffff;
-  border-radius: 16rpx;
+  border-radius: 24rpx;
   margin-bottom: 24rpx;
-  overflow: hidden;
+  padding: 28rpx;
+  box-shadow: 0 12rpx 32rpx rgba(17, 32, 68, 0.05);
 }
 
 .section-title {
-  font-size: 26rpx;
-  color: #999999;
-  padding: 24rpx 32rpx 16rpx;
-  background: #fafafa;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 20rpx;
 }
 
-.setting-item {
+.feature-grid {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 28rpx 32rpx;
-  border-bottom: 1rpx solid #f5f5f5;
+  flex-wrap: wrap;
+  gap: 18rpx;
 }
 
-.setting-item:last-child {
-  border-bottom: none;
+.feature-card {
+  width: calc((100% - 18rpx) / 2);
+  min-height: 200rpx;
+  border-radius: 22rpx;
+  background: #f8fbff;
+  border: 1rpx solid #e6efff;
+  padding: 28rpx 24rpx;
+  box-sizing: border-box;
 }
 
-.setting-left {
-  display: flex;
-  align-items: center;
-  flex: 1;
-}
-
-.setting-icon {
-  width: 64rpx;
-  height: 64rpx;
-  background: #f0f5ff;
-  border-radius: 16rpx;
+.feature-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 18rpx;
+  background: #e8f1ff;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 20rpx;
-  font-size: 32rpx;
+  font-size: 34rpx;
 }
 
-.setting-info {
+.feature-title {
+  margin-top: 18rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.feature-desc {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #7a7f89;
+}
+
+.security-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.security-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  border-radius: 20rpx;
+  background: #f8f9fb;
+}
+
+.security-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 18rpx;
+  background: #eef3ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.security-main {
+  min-width: 0;
   flex: 1;
 }
 
-.setting-label {
+.security-title {
   font-size: 30rpx;
   color: #1a1a1a;
-  margin-bottom: 6rpx;
+  font-weight: 600;
 }
 
-.setting-value {
-  font-size: 26rpx;
-  color: #999999;
+.security-desc {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #7a7f89;
+  line-height: 1.5;
 }
 
-.arrow {
-  font-size: 32rpx;
-  color: #cccccc;
+.security-arrow {
+  font-size: 34rpx;
+  color: #c8ccd6;
 }
 
 .logout-area {
-  margin-top: 48rpx;
-  padding: 0 32rpx;
+  margin-top: 16rpx;
 }
 
 .btn-logout {
   width: 100%;
-  height: 96rpx;
   background: #ffffff;
+  color: #ff4d4f;
+  height: 96rpx;
+  line-height: 96rpx;
   border-radius: 48rpx;
   font-size: 32rpx;
-  color: #ff4d4f;
   display: flex;
   align-items: center;
   justify-content: center;

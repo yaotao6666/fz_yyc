@@ -105,10 +105,13 @@
 
 - 商家资料查询 / 更新
 - 商家设置
+- 商家满减规则：`GET/PUT /api/v1/merchant/full-reduction-rules`
 - 员工绑定微信 / 解绑微信
 - 商家营业状态
 - 配送设置
 - 商家二维码
+- 商家打印机管理：`GET/POST/PUT/DELETE /api/v1/merchant/printers*`
+- 打印测试：`POST /api/v1/merchant/printers/:printer_id/test`
 - 商家分账历史：`GET /api/v1/merchant/profit-sharing-records`
 
 当前重点约束：
@@ -116,7 +119,12 @@
 - 商家资料更新需支持 `logo` 与背景图字段。
 - `GET /api/v1/merchant/settings` 需返回 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled`，`PUT /api/v1/merchant/settings` 需支持更新这三个开关。
 - `GET /api/v1/store/:merchant_id/delivery-rules` 除配送费结构外，还需返回 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 供确认页动态展示下单方式。
+- `GET /api/v1/merchant/full-reduction-rules` 返回 `rules` 与 `active_rules`，单档规则至少包含 `threshold_amount`、`discount_amount`、`status`、`sort`。
+- `PUT /api/v1/merchant/full-reduction-rules` 最多支持 5 档规则，`discount_amount` 必须小于 `threshold_amount`。
+- `GET /api/v1/store/:merchant_id/full-reduction-rules` 为公开接口，仅返回当前商家启用中的满减规则。
 - `delivery_settings.enabled` 只表示配送费规则是否生效，确认页是否展示“配送”必须以后端返回的 `takeout_enabled` 为准。
+- `GET /api/v1/merchant/printers` 返回打印机列表时，需返回 `type`、`status`、`auto_print`、`is_default`、`print_count`、`last_print_at`、`has_api_key`、`has_feie_ukey`。
+- 飞鹅打印机请求字段至少包含 `feie_user`、`feie_ukey`、`feie_sn`。
 - `GET /api/v1/merchant/qrcode` 必须固定生成指向 `pages/store/home` 的小程序码，且 `scene` 需使用 `merchant_id={当前商家ID}` 以兼容现有店铺入口解析逻辑。
 - `GET /api/v1/sp/merchants/{id}/qrcode` 作为服务商代查看商家二维码接口，必须与商家侧二维码保持一致，通过微信小程序码接口生成真实二维码，并返回可直接展示的二维码图片、`pages/store/home` 页面路径以及 `merchant_id={商家ID}` 的 `scene` 参数；若微信生成失败，应直接返回错误，不能回退为系统自绘占位二维码。
 - 服务商若代商家维护资料，必须通过明确的服务商侧管理接口或授权更新接口。
@@ -171,6 +179,10 @@
   - `delivery_type=2` 校验 `dine_in_enabled`
   - `delivery_type=3` 校验 `pickup_enabled`
 - 当对应方式未开启时，接口分别返回“商家暂未开启配送 / 堂食 / 自提”。
+- C 端确认订单页展示的满减优惠仅作提示，下单结果必须以后端返回的 `discount_amount`、`pay_amount` 为准。
+- 创建订单接口需按商家启用中的满减规则重算：
+  - `discount_amount`
+  - `pay_amount`
 - **退款状态口径**：
   - 订单 `status=5`：退款中（已发起退款流程；接口会先主动同步一次微信退款状态，未拿到最终结果时继续等待微信退款结果）
   - 订单 `status=6`：已退款（接口主动同步或收到微信退款成功回调后写入）

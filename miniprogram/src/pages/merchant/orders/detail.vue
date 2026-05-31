@@ -22,13 +22,17 @@
         <text class="info-label">配送距离</text>
         <text class="info-value">{{ order.delivery_distance }}公里</text>
       </view>
-      <view class="info-row" v-if="order.delivery_info?.address">
+      <view class="info-row" v-if="deliveryAddressText">
         <text class="info-label">收货地址</text>
-        <text class="info-value">{{ order.delivery_info.address }}</text>
+        <text class="info-value">{{ deliveryAddressText }}</text>
       </view>
-      <view class="info-row" v-if="order.delivery_info?.contact_name">
+      <view class="info-row" v-if="contactNameText">
         <text class="info-label">联系人</text>
-        <text class="info-value">{{ order.delivery_info.contact_name }} {{ order.delivery_info.contact_phone }}</text>
+        <text class="info-value">{{ contactNameText }}</text>
+      </view>
+      <view class="info-row" v-if="contactPhoneText">
+        <text class="info-label">联系电话</text>
+        <text class="info-value">{{ contactPhoneText }}</text>
       </view>
     </view>
 
@@ -188,6 +192,15 @@ const refunding = ref(false)
 
 const canRefund = computed(() => {
   return order.value?.status === OrderStatus.PAID || order.value?.status === OrderStatus.COMPLETED
+})
+const deliveryAddressText = computed(() => {
+  return order.value?.delivery_info?.address || order.value?.delivery_address || ''
+})
+const contactNameText = computed(() => {
+  return order.value?.delivery_info?.contact_name || order.value?.contact_name || ''
+})
+const contactPhoneText = computed(() => {
+  return order.value?.delivery_info?.contact_phone || order.value?.contact_phone || ''
 })
 
 onLoad((options: any) => {

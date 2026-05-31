@@ -345,6 +345,7 @@ type Order struct {
 	Status               uint8       `gorm:"not null;default:1;comment:订单状态: 1=待支付 2=已支付 3=已完成 4=已取消 5=退款中 6=已退款" json:"status"`
 	Remark               string      `gorm:"size:256;comment:用户备注" json:"remark"`
 	VerifyCode           string      `gorm:"size:16;comment:核销码(已支付订单出示给商家)" json:"verify_code"`
+	VerifyQRCodeURL      string      `gorm:"-" json:"verify_qrcode_url,omitempty"`
 	TransactionID        string      `gorm:"size:64;comment:微信支付交易单号" json:"transaction_id"`
 	PaidAt               *time.Time  `gorm:"comment:支付完成时间" json:"paid_at"`
 	PayNotifyPayload     JSON        `gorm:"type:json;comment:微信支付回调原始报文JSON" json:"pay_notify_payload"`
@@ -597,6 +598,25 @@ func (CouponRecord) TableName() string {
 }
 
 // ============================================
+// 商家满减规则表 (merchant_full_reduction_rules)
+// 用途：商家配置自动满减规则，下单时按门槛自动匹配最优优惠
+// ============================================
+type MerchantFullReductionRule struct {
+	ID             uint64    `gorm:"primaryKey;autoIncrement;comment:规则ID" json:"id"`
+	MerchantID     uint64    `gorm:"not null;index;comment:所属商家ID" json:"merchant_id"`
+	ThresholdAmount float64  `gorm:"type:decimal(10,2);not null;comment:满减门槛金额(元)" json:"threshold_amount"`
+	DiscountAmount float64   `gorm:"type:decimal(10,2);not null;comment:减免金额(元)" json:"discount_amount"`
+	Sort           int       `gorm:"not null;default:0;comment:排序值" json:"sort"`
+	Status         uint8     `gorm:"not null;default:1;comment:状态: 1=启用 0=停用" json:"status"`
+	CreatedAt      time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt      time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+}
+
+func (MerchantFullReductionRule) TableName() string {
+	return "merchant_full_reduction_rules"
+}
+
+// ============================================
 // 云打印机表 (cloud_printers)
 // 用途：商家绑定的云打印机设备，支持自动打印与多打印类型
 // ============================================
@@ -608,6 +628,9 @@ type CloudPrinter struct {
 	DeviceNo    string     `gorm:"size:64;not null;comment:打印机设备编号" json:"device_no"`
 	APIKey      string     `gorm:"size:64;comment:打印机API密钥(不返回)" json:"-"`
 	APIURL      string     `gorm:"size:256;comment:打印机API地址" json:"api_url"`
+	FeieUser    string     `gorm:"size:64;comment:飞鹅账号" json:"feie_user"`
+	FeieUKey    string     `gorm:"size:128;comment:飞鹅UKey(不返回)" json:"-"`
+	FeieSN      string     `gorm:"size:64;comment:飞鹅打印机终端号" json:"feie_sn"`
 	PrintTypes  JSON       `gorm:"type:json;comment:自动打印类型JSON(如[new_order]=新订单自动打印)" json:"print_types"`
 	Status      uint8      `gorm:"not null;default:1;comment:状态: 1=在线 0=离线" json:"status"`
 	AutoPrint   bool       `gorm:"not null;default:false;comment:是否自动打印: true=开启 false=关闭" json:"auto_print"`
