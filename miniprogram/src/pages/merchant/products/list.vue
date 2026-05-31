@@ -52,7 +52,12 @@
     </view>
 
     <!-- 商品列表 -->
-    <scroll-view class="product-list" scroll-y @scrolltolower="loadMore">
+    <scroll-view
+      class="product-list"
+      scroll-y
+      :lower-threshold="80"
+      @scrolltolower="loadMore"
+    >
       <checkbox-group @change="onCheckboxChange">
         <view
           v-for="product in products"
@@ -74,8 +79,8 @@
             <view class="product-name">{{ product.name }}</view>
             <view class="product-price">
               <text class="current-price">¥{{ product.price.toFixed(2) }}</text>
-              <text v-if="product.original_price > 0" class="original-price">
-                ¥{{ product.original_price.toFixed(2) }}
+              <text v-if="Number(product.original_price || 0) > 0" class="original-price">
+                ¥{{ Number(product.original_price || 0).toFixed(2) }}
               </text>
             </view>
             <view class="product-meta">
@@ -103,6 +108,7 @@
         <text class="empty-text">暂无商品</text>
         <button class="btn-add" @click="goAdd">添加商品</button>
       </view>
+      <view v-if="products.length > 0" class="list-bottom-spacer"></view>
     </scroll-view>
 
     <!-- 底部操作栏 -->
@@ -138,6 +144,7 @@ const loading = ref(false)
 const noMore = ref(false)
 const page = ref(1)
 const pageSize = 10
+const total = ref(0)
 
 // 分类相关
 const categories = ref<Category[]>([])
@@ -186,6 +193,7 @@ async function loadProducts(reset = false) {
     page.value = 1
     noMore.value = false
     products.value = []
+    total.value = 0
   }
 
   if (noMore.value || loading.value) return
@@ -218,7 +226,13 @@ async function loadProducts(reset = false) {
       products.value.push(...res.list)
     }
 
-    if (res.list.length < pageSize) {
+    total.value = Number(res.pagination?.total || 0)
+    const pageSizeValue = Number(res.pagination?.page_size || pageSize)
+    const loadedCount = products.value.length
+    const reachedEndByTotal = total.value > 0 && loadedCount >= total.value
+    const reachedEndByPageSize = res.list.length < pageSizeValue
+
+    if (reachedEndByTotal || reachedEndByPageSize) {
       noMore.value = true
     } else {
       page.value++
@@ -349,13 +363,16 @@ function goAdd() {
 
 <style scoped>
 .product-list-container {
-  min-height: 100vh;
+  height: 100vh;
   background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
 }
 
 .filter-bar {
   background: #ffffff;
   padding: 24rpx;
+  flex-shrink: 0;
 }
 
 .filter-row {
@@ -434,7 +451,10 @@ function goAdd() {
 }
 
 .product-list {
-  width: calc(100% - 48rpx);
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
   padding: 24rpx;
 }
 
@@ -526,6 +546,10 @@ function goAdd() {
   padding: 24rpx;
   font-size: 26rpx;
   color: #999999;
+}
+
+.list-bottom-spacer {
+  height: calc(140rpx + env(safe-area-inset-bottom));
 }
 
 .empty {

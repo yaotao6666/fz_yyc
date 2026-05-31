@@ -35,13 +35,10 @@ import type {
   HourlyAnalysis,
   SalesOverview,
   SalesTrend,
-  CustomerAnalysis,
-  CustomerTrend,
   StoreHomeInfo,
   CreateOrderRequest,
   CreateOrderResponse,
   MerchantBehaviorEventRequest,
-  Announcement,
   AnnouncementListResponse,
   ProfitSharingRecordListResponse,
   ProfitSharingRecordQuery,
@@ -167,26 +164,6 @@ export function getMerchantProfitSharingRecords(params?: Omit<ProfitSharingRecor
   return get<ProfitSharingRecordListResponse>('/api/v1/merchant/profit-sharing-records', params).then(normalizeListField)
 }
 
-export function updateSpMerchantAssets(merchantId: number, data: { logo?: string; cover_image?: string }) {
-  return put<MerchantDetail>(`/api/v1/sp/merchants/${merchantId}/assets`, data)
-}
-
-export function getMerchantDistribution() {
-  return get<MerchantDistributionData>('/api/v1/sp/merchants/analytics/distribution')
-}
-
-export function getOrderAnalytics(params?: { days?: number }) {
-  return get<OrderAnalyticsData>('/api/v1/sp/orders/analytics', params)
-}
-
-export function getAmountAnalytics(params?: { days?: number }) {
-  return get<AmountAnalyticsData>('/api/v1/sp/amount/analytics', params)
-}
-
-export function getTopMerchants(params?: { limit?: number; metric?: string }) {
-  return get<TopMerchantRanking[] | null>('/api/v1/sp/amount/top-merchants', params).then(normalizeArrayResponse)
-}
-
 /**
  * 获取商家信息
  */
@@ -199,13 +176,6 @@ export async function getMerchantProfile() {
 }
 
 // ============ 商家设置相关 ============
-
-/**
- * 更新商家基本信息
- */
-export function updateMerchantProfile(data: Partial<MerchantInfo>) {
-  return put<null>('/api/v1/merchant/profile', data)
-}
 
 /**
  * 获取商家设置
@@ -273,10 +243,6 @@ export function getMerchantQrcode() {
 
 export function getMerchantAnnouncements(params?: { page?: number; page_size?: number }) {
   return get<AnnouncementListResponse>('/api/v1/merchant/announcements', params).then(normalizeListField)
-}
-
-export function getMerchantAnnouncementDetail(announcementId: number) {
-  return get<Announcement>(`/api/v1/merchant/announcements/${announcementId}`)
 }
 
 // ============ 商品分类相关 ============
@@ -491,7 +457,7 @@ export async function getProducts(params?: {
   status?: string
   keyword?: string
 }) {
-  const res = await get<ProductListResponse>('/api/v1/merchant/products', params)
+  const res = normalizeListField(await get<ProductListResponse>('/api/v1/merchant/products', params))
   return {
     ...res,
     list: Array.isArray(res?.list) ? res.list.map(normalizeProduct) : []
@@ -656,20 +622,6 @@ export function getStockAlert(params?: { threshold?: number }) {
   return get<StockAlert[] | null>('/api/v1/merchant/analytics/stock-alert', params)
     .then(normalizeArrayResponse)
     .then(list => list.map(normalizeStockAlertItem))
-}
-
-/**
- * 获取客户分析
- */
-export function getCustomerAnalysis() {
-  return get<CustomerAnalysis>('/api/v1/merchant/analytics/customers')
-}
-
-/**
- * 获取客户趋势
- */
-export function getCustomerTrend(params: { start_date: string; end_date: string }) {
-  return get<CustomerTrend[] | null>('/api/v1/merchant/analytics/customer-trend', params).then(normalizeArrayResponse)
 }
 
 export function getMerchantStaffList(params?: { page?: number; page_size?: number }) {
@@ -864,15 +816,6 @@ export function applyRefund(orderId: number, data: { reason: string }) {
   return post<any>(`/api/v1/user/orders/${orderId}/refund`, data)
 }
 
-// ============ 云打印相关 ============
-
-/**
- * 获取打印记录
- */
-export function getPrintLogs(params?: { page?: number; page_size?: number; start_date?: string; end_date?: string }) {
-  return get<any>('/api/v1/merchant/print-logs', params)
-}
-
 // ============ C端订单详情 ============
 
 export function getMyOrderDetail(orderId: number) {
@@ -897,56 +840,6 @@ export function deleteUserAddress(addressId: number) {
   return del<null>(`/api/v1/user/addresses/${addressId}`)
 }
 
-// ============ SP端缺失API ============
-
-export function updateSpSettings(data: Partial<SpSettings>) {
-  return put<SpSettings>('/api/v1/sp/settings', data)
-}
-
-export function getMerchantFee(merchantId: number) {
-  return get<any>(`/api/v1/sp/merchants/${merchantId}/fee`)
-}
-
-export function getMerchantRate(merchantId: number) {
-  return get<any>(`/api/v1/sp/merchants/${merchantId}/rate`)
-}
-
-export function setMerchantRate(merchantId: number, data: any) {
-  return post<any>(`/api/v1/sp/merchants/${merchantId}/rate`, data)
-}
-
-export function getSpMerchantQrcode(merchantId: number) {
-  return get<{ qrcode_url: string }>(`/api/v1/sp/merchants/${merchantId}/qrcode`)
-}
-
-export function getSpRefunds(params?: any) {
-  return get<any>('/api/v1/sp/orders/refunds', params)
-}
-
-export function getSpActivities(params?: any) {
-  return get<any>('/api/v1/sp/activities', params)
-}
-
-export function createSpActivity(data: any) {
-  return post<any>('/api/v1/sp/activities', data)
-}
-
-export function updateSpActivity(activityId: number, data: any) {
-  return put<any>(`/api/v1/sp/activities/${activityId}`, data)
-}
-
-export function deleteSpActivity(activityId: number) {
-  return del<any>(`/api/v1/sp/activities/${activityId}`)
-}
-
-export function getSpWechatConfig() {
-  return get<any>('/api/v1/sp/wechat-config')
-}
-
-export function updateSpWechatConfig(data: any) {
-  return put<any>('/api/v1/sp/wechat-config', data)
-}
-
 export default {
   // 认证
   merchantLogin,
@@ -954,7 +847,6 @@ export default {
   getMerchantProfile,
   getMerchantProfitSharingRecords,
   // 商家设置
-  updateMerchantProfile,
   getMerchantSettings,
   updateMerchantSettings,
   changeMerchantPassword,
@@ -998,8 +890,6 @@ export default {
   getProductRanking,
   getHourlyAnalysis,
   getStockAlert,
-  getCustomerAnalysis,
-  getCustomerTrend,
   // 文件上传
   getUploadToken,
   uploadImage,
@@ -1014,8 +904,6 @@ export default {
   getMyOrders,
   cancelMyOrder,
   applyRefund,
-  // 云打印
-  getPrintLogs,
   // C端订单详情
   getMyOrderDetail,
   // C端地址管理
@@ -1023,17 +911,5 @@ export default {
   createUserAddress,
   updateUserAddress,
   deleteUserAddress,
-  // SP端缺失API
-  updateSpSettings,
-  getMerchantFee,
-  getMerchantRate,
-  setMerchantRate,
-  getSpMerchantQrcode,
-  getSpRefunds,
-  getSpActivities,
-  createSpActivity,
-  updateSpActivity,
-  deleteSpActivity,
-  getSpWechatConfig,
-  updateSpWechatConfig,
+
 }

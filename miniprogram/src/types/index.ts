@@ -35,8 +35,6 @@ export interface Announcement {
   updated_at: string
 }
 
-export type AnnouncementStatus = 0 | 1
-
 export interface AnnouncementListResponse {
   list: Announcement[]
   pagination: {
@@ -322,9 +320,11 @@ export interface ProductUpsertPayload {
 // 商品列表响应
 export interface ProductListResponse {
   list: Product[]
-  total: number
-  page: number
-  page_size: number
+  pagination?: {
+    total: number
+    page: number
+    page_size: number
+  }
 }
 
 // ============ 订单相关 ============
