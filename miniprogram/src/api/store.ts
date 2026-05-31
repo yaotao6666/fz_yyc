@@ -162,7 +162,17 @@ function normalizeListField<T, R extends { list?: T[] | null }>(response: R): R 
 export function getStoreHome(merchantId: number) {
   return get<StoreHomeInfo>(`/api/v1/store/${merchantId}/home`).then(data => {
     if (data?.hot_products) {
-      data.hot_products = data.hot_products.map((item: any) => normalizeProduct(item))
+      data.hot_products = data.hot_products.map((item: any) => {
+        const normalized = normalizeProduct(item)
+        return {
+          id: normalized.id,
+          name: normalized.name,
+          images: normalized.images || [],
+          price: normalized.price,
+          original_price: normalized.original_price,
+          sales: Number(normalized.sales || 0)
+        }
+      })
     }
     if (data?.merchant?.logo) {
       data.merchant.logo = normalizeImageUrl(data.merchant.logo)
