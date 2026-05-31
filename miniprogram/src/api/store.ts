@@ -178,14 +178,14 @@ export function getStoreHome(merchantId: number) {
   return get<StoreHomeInfo>(`/api/v1/store/${merchantId}/home`).then(data => {
     if (data?.hot_products) {
       data.hot_products = data.hot_products.map((item: any) => {
-        const normalizedProduct = normalizeProduct(item)
+        const normalized = normalizeProduct(item)
         return {
-          id: normalizedProduct.id,
-          name: normalizedProduct.name,
-          images: normalizedProduct.images,
-          price: normalizedProduct.price,
-          original_price: normalizedProduct.original_price,
-          sales: normalizedProduct.sales ?? 0
+          id: normalized.id,
+          name: normalized.name,
+          images: normalized.images || [],
+          price: normalized.price,
+          original_price: normalized.original_price,
+          sales: Number(normalized.sales || 0)
         }
       })
     }
