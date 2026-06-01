@@ -14,6 +14,9 @@ const merchant = ref<MerchantDetail | null>(null)
 const qrcodeVisible = ref(false)
 const qrcodeUrl = ref('')
 const qrcodePagePath = ref('')
+const logoInputRef = ref<HTMLInputElement | null>(null)
+const coverInputRef = ref<HTMLInputElement | null>(null)
+const assetUploading = ref<'logo' | 'cover_image' | ''>('')
 
 const merchantId = computed(() => Number(route.params.id || 0))
 
@@ -39,10 +42,23 @@ async function updateAsset(field: 'logo' | 'cover_image', event: Event) {
   const file = target.files?.[0]
   target.value = ''
   if (!file || !merchant.value) return
+  assetUploading.value = field
+  try {
+    const uploadResult = await uploadSpImage(file)
+    merchant.value = await updateSpMerchantAssets(merchantId.value, { [field]: uploadResult.url })
+    ElMessage.success('图片更新成功')
+  } catch (error) {
+    console.error('更新商家图片失败:', error)
+    ElMessage.error(error instanceof Error ? error.message : '图片更新失败')
+  } finally {
+    assetUploading.value = ''
+  }
+}
 
-  const uploadResult = await uploadSpImage(file)
-  merchant.value = await updateSpMerchantAssets(merchantId.value, { [field]: uploadResult.url })
-  ElMessage.success('图片更新成功')
+function triggerAssetInput(field: 'logo' | 'cover_image') {
+  if (assetUploading.value) return
+  const inputRef = field === 'logo' ? logoInputRef.value : coverInputRef.value
+  inputRef?.click()
 }
 
 onMounted(loadDetail)
@@ -115,19 +131,31 @@ onMounted(loadDetail)
                 <div style="margin-bottom: 12px; font-weight: 600;">商家 Logo</div>
                 <img v-if="merchant.logo" :src="merchant.logo" class="asset-preview" alt="商家 Logo" />
                 <div v-else class="empty-asset">未上传</div>
-                <label style="display: inline-block; margin-top: 12px;">
-                  <input hidden type="file" accept="image/*" @change="updateAsset('logo', $event)" />
-                  <el-button type="primary" plain>更换 Logo</el-button>
-                </label>
+                <input ref="logoInputRef" hidden type="file" accept="image/*" @change="updateAsset('logo', $event)" />
+                <el-button
+                  type="primary"
+                  plain
+                  style="margin-top: 12px;"
+                  :loading="assetUploading === 'logo'"
+                  @click="triggerAssetInput('logo')"
+                >
+                  更换 Logo
+                </el-button>
               </div>
               <div class="asset-box">
                 <div style="margin-bottom: 12px; font-weight: 600;">背景图</div>
                 <img v-if="merchant.cover_image" :src="merchant.cover_image" class="asset-preview" alt="背景图" />
                 <div v-else class="empty-asset">未上传</div>
-                <label style="display: inline-block; margin-top: 12px;">
-                  <input hidden type="file" accept="image/*" @change="updateAsset('cover_image', $event)" />
-                  <el-button type="primary" plain>更换背景图</el-button>
-                </label>
+                <input ref="coverInputRef" hidden type="file" accept="image/*" @change="updateAsset('cover_image', $event)" />
+                <el-button
+                  type="primary"
+                  plain
+                  style="margin-top: 12px;"
+                  :loading="assetUploading === 'cover_image'"
+                  @click="triggerAssetInput('cover_image')"
+                >
+                  更换背景图
+                </el-button>
               </div>
             </div>
           </el-card>
