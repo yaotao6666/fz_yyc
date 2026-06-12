@@ -64,6 +64,30 @@ export interface MerchantDetail extends MerchantListItem {
   admin_status?: number
 }
 
+export interface MerchantPickupPoint {
+  id: number
+  merchant_id: number
+  name: string
+  address: string
+  lat: number
+  lng: number
+  is_default: boolean
+  status: number
+  sort: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface MerchantPickupPointPayload {
+  name: string
+  address: string
+  lat: number
+  lng: number
+  is_default?: boolean
+  status?: number
+  sort?: number
+}
+
 export interface MerchantListResponse {
   list: MerchantListItem[]
   pagination: {

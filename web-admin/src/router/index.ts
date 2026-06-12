@@ -6,6 +6,7 @@ import DashboardView from '@/views/dashboard/DashboardView.vue'
 import MerchantListView from '@/views/merchant/MerchantListView.vue'
 import MerchantDetailView from '@/views/merchant/MerchantDetailView.vue'
 import MerchantEditView from '@/views/merchant/MerchantEditView.vue'
+import MerchantPickupPointsView from '@/views/merchant/MerchantPickupPointsView.vue'
 import OrderListView from '@/views/order/OrderListView.vue'
 import OrderDetailView from '@/views/order/OrderDetailView.vue'
 import AnnouncementListView from '@/views/announcement/AnnouncementListView.vue'
@@ -51,6 +52,12 @@ const routes = [
         name: 'merchant-detail',
         component: MerchantDetailView,
         meta: { title: '商家详情', requiresAuth: true }
+      },
+      {
+        path: '/merchants/:id/pickup-points',
+        name: 'merchant-pickup-points',
+        component: MerchantPickupPointsView,
+        meta: { title: '自提点管理', requiresAuth: true }
       },
       {
         path: '/merchants/:id/edit',

@@ -101,6 +101,24 @@ services:
     networks:
       - fz_yyc_network
 
+  # 构建 Linux 可执行文件（输出到宿主机 ./dist）
+  go-build-linux:
+    image: golang:1.21-alpine
+    container_name: fz_yyc_go_build_linux
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      GOPROXY: https://goproxy.cn,direct
+      CGO_ENABLED: 0
+      GOOS: linux
+      GOARCH: amd64
+      GOFLAGS: -buildvcs=false
+    command:
+      - /bin/sh
+      - -c
+      - apk add --no-cache git ca-certificates && mkdir -p dist && go mod download && go build -trimpath -ldflags "-s -w" -o dist/fz_yyc_api_linux_amd64 ./cmd/server
+
 networks:
   fz_yyc_network:
     driver: bridge

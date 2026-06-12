@@ -9,6 +9,8 @@ import type {
   MerchantDistributionData,
   MerchantListResponse,
   MerchantPaymentConfigFormData,
+  MerchantPickupPoint,
+  MerchantPickupPointPayload,
   OrderAnalyticsData,
   SpOrder,
   SpOrderListResponse,
@@ -62,6 +64,30 @@ export function resetSpMerchantAdminPassword(merchantId: number, data: { new_pas
 
 export function updateSpMerchantAssets(merchantId: number, data: { logo?: string; cover_image?: string }) {
   return request.put(`/api/v1/sp/merchants/${merchantId}/assets`, data).then(unwrapApiResponse<MerchantDetail>)
+}
+
+export function getMerchantPickupPoints(merchantId: number) {
+  return request
+    .get(`/api/v1/sp/merchants/${merchantId}/pickup-points`)
+    .then(unwrapApiResponse<MerchantPickupPoint[]>)
+}
+
+export function createMerchantPickupPoint(merchantId: number, data: MerchantPickupPointPayload) {
+  return request
+    .post(`/api/v1/sp/merchants/${merchantId}/pickup-points`, data)
+    .then(unwrapApiResponse<MerchantPickupPoint>)
+}
+
+export function updateMerchantPickupPoint(merchantId: number, pickupPointId: number, data: MerchantPickupPointPayload) {
+  return request
+    .put(`/api/v1/sp/merchants/${merchantId}/pickup-points/${pickupPointId}`, data)
+    .then(unwrapApiResponse<MerchantPickupPoint>)
+}
+
+export function deleteMerchantPickupPoint(merchantId: number, pickupPointId: number) {
+  return request
+    .delete(`/api/v1/sp/merchants/${merchantId}/pickup-points/${pickupPointId}`)
+    .then(unwrapApiResponse<{ message: string }>)
 }
 
 export function getMerchantDistribution(params?: Record<string, unknown>) {

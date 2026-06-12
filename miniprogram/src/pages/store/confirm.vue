@@ -66,6 +66,23 @@
         </view>
       </view>
 
+      <view class="pickup-form" v-if="deliveryType === 3">
+        <view class="pickup-card" :class="{ empty: !selectedPickupPoint }" @click="openPickupSelector">
+          <view v-if="selectedPickupPoint" class="pickup-main">
+            <view class="pickup-top">
+              <text class="pickup-name">{{ selectedPickupPoint.name }}</text>
+              <text v-if="selectedPickupPoint.is_default" class="pickup-default-tag">默认</text>
+            </view>
+            <view class="pickup-address">{{ selectedPickupPoint.address }}</view>
+          </view>
+          <view v-else class="pickup-empty">
+            <text class="pickup-empty-title">{{ pickupPoints.length ? '请选择自提点' : '商家未配置自提点' }}</text>
+            <text class="pickup-empty-desc">自提订单需先选择自提点</text>
+          </view>
+          <text class="address-arrow">></text>
+        </view>
+      </view>
+
       <view class="remark-form">
         <view class="form-label">备注</view>
         <input
@@ -147,6 +164,34 @@
       </view>
     </view>
 
+    <view v-if="pickupSelectorVisible" class="pickup-selector-mask" @click="closePickupSelector">
+      <view class="pickup-selector-panel" @click.stop>
+        <view class="pickup-selector-header">
+          <view class="pickup-selector-title">选择自提点</view>
+          <view class="pickup-selector-close" @click="closePickupSelector">×</view>
+        </view>
+
+        <scroll-view scroll-y class="pickup-selector-list">
+          <view
+            v-for="point in pickupPoints"
+            :key="point.id"
+            class="pickup-selector-item"
+            :class="{ selected: selectedPickupPoint?.id === point.id }"
+            @click="selectPickupPoint(point)"
+          >
+            <view class="pickup-selector-item-top">
+              <view class="pickup-selector-item-title">
+                <text class="pickup-selector-item-name">{{ point.name }}</text>
+                <text v-if="point.is_default" class="pickup-selector-tag">默认</text>
+              </view>
+              <text class="pickup-selector-nav" @click.stop="openPickupPointLocation(point)">导航</text>
+            </view>
+            <view class="pickup-selector-item-address">{{ point.address }}</view>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
+
     <!-- 底部操作栏 -->
     <view class="bottom-bar">
       <view class="total-info">
@@ -163,13 +208,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { createOrder, getStoreDeliveryRules, getStoreFullReductionRules } from '../../api/store'
+import { createOrder, getStoreDeliveryRules, getStoreFullReductionRules, getStorePickupPoints } from '../../api/store'
 import { createUserAddress, getUserAddresses } from '../../api'
 import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
 import { useAuth } from '../../utils/useAuth'
 import { parseStoreEntryOptions } from '@utils/storeEntry'
-import type { CreateOrderRequest, MerchantFullReductionRule, Order, StoreDeliveryRules, UserAddress } from '@types'
+import type { CreateOrderRequest, MerchantFullReductionRule, Order, PickupPoint, StoreDeliveryRules, UserAddress } from '@types'
 import { BrandAsset } from '../../utils/constants'
 import {
   STORE_SELECTED_ADDRESS_ID_KEY,
@@ -216,6 +261,9 @@ const deliveryConfig = ref<StoreDeliveryRules>({
 
 // 配送档位选项
 const deliveryRules = ref<{ distance: number; fee: number; label: string }[]>([])
+const pickupPoints = ref<PickupPoint[]>([])
+const selectedPickupPoint = ref<PickupPoint | null>(null)
+const pickupSelectorVisible = ref(false)
 
 function applyEntryOptions(options?: Record<string, any>) {
   const { merchantId: nextMerchantId, source } = parseStoreEntryOptions(options, merchantId.value)
@@ -233,7 +281,7 @@ onShow(async () => {
   applyEntryOptions(currentPage?.options)
 
   // 配送规则属于公开店铺数据，不应被登录流程阻塞。
-  await Promise.all([loadDeliveryRules(), loadFullReductionRules()])
+  await Promise.all([loadDeliveryRules(), loadPickupPoints(), loadFullReductionRules()])
 
   const { ensureAuth } = useAuth()
   const authed = await ensureAuth()
@@ -285,6 +333,65 @@ async function loadFullReductionRules() {
     console.error('获取满减规则失败:', error)
     fullReductionRules.value = []
   }
+}
+
+async function loadPickupPoints() {
+  try {
+    pickupPoints.value = await getStorePickupPoints(merchantId.value)
+    applyDefaultPickupPoint()
+  } catch (error) {
+    console.error('获取自提点失败:', error)
+    pickupPoints.value = []
+    selectedPickupPoint.value = null
+  }
+}
+
+function applyDefaultPickupPoint() {
+  if (deliveryType.value !== 3) {
+    return
+  }
+
+  if (!pickupPoints.value.length) {
+    selectedPickupPoint.value = null
+    return
+  }
+
+  const defaultPoint = pickupPoints.value.find(item => item.is_default) || pickupPoints.value[0]
+  if (!selectedPickupPoint.value || !pickupPoints.value.some(item => item.id === selectedPickupPoint.value?.id)) {
+    selectedPickupPoint.value = defaultPoint
+  }
+}
+
+watch(deliveryType, () => {
+  if (deliveryType.value === 3) {
+    applyDefaultPickupPoint()
+  }
+})
+
+function openPickupSelector() {
+  if (!pickupPoints.value.length) {
+    return uni.showToast({ title: '商家未配置自提点', icon: 'none' })
+  }
+  pickupSelectorVisible.value = true
+}
+
+function closePickupSelector() {
+  pickupSelectorVisible.value = false
+}
+
+function selectPickupPoint(point: PickupPoint) {
+  selectedPickupPoint.value = point
+  pickupSelectorVisible.value = false
+}
+
+function openPickupPointLocation(point: PickupPoint) {
+  if (!point.lat || !point.lng) return
+  uni.openLocation({
+    latitude: point.lat,
+    longitude: point.lng,
+    name: point.name,
+    address: point.address
+  })
 }
 
 function selectDeliveryType(type: number) {
@@ -489,6 +596,7 @@ watch(
     deliveryType,
     deliveryDistanceIndex,
     () => selectedAddress.value?.id,
+    () => selectedPickupPoint.value?.id,
     () => cartStore.totalAmount
   ],
   () => {
@@ -556,6 +664,18 @@ async function submitOrder() {
     }
   }
 
+  if (deliveryType.value === 3) {
+    if (!deliveryConfig.value.pickup_enabled) {
+      return uni.showToast({ title: '商家暂未开启自提', icon: 'none' })
+    }
+    if (!pickupPoints.value.length) {
+      return uni.showToast({ title: '商家未配置自提点', icon: 'none' })
+    }
+    if (!selectedPickupPoint.value) {
+      return uni.showToast({ title: '请选择自提点', icon: 'none' })
+    }
+  }
+
   if (cartStore.isEmpty) {
     return uni.showToast({ title: '购物车为空', icon: 'none' })
   }
@@ -575,6 +695,9 @@ async function submitOrder() {
     orderData.delivery_address = selectedAddressText.value
     orderData.contact_name = selectedAddress.value?.name || ''
     orderData.contact_phone = selectedAddress.value?.phone || ''
+  }
+  if (deliveryType.value === 3) {
+    orderData.pickup_point_id = selectedPickupPoint.value?.id
   }
 
   try {
@@ -849,6 +972,175 @@ async function submitOrder() {
   padding: 8rpx 16rpx;
   background: #fff2f0;
   border-radius: 8rpx;
+}
+
+.pickup-form {
+  margin-bottom: 24rpx;
+}
+
+.pickup-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  background: #f8f9fa;
+  border-radius: 16rpx;
+}
+
+.pickup-card.empty {
+  border: 2rpx dashed #d9e7ff;
+  background: #f7fbff;
+}
+
+.pickup-main,
+.pickup-empty {
+  flex: 1;
+  min-width: 0;
+}
+
+.pickup-top {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 10rpx;
+  flex-wrap: wrap;
+}
+
+.pickup-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.pickup-default-tag {
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: #e6f0ff;
+  color: #007AFF;
+  font-size: 22rpx;
+}
+
+.pickup-address {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #333333;
+  word-break: break-all;
+}
+
+.pickup-empty-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8rpx;
+}
+
+.pickup-empty-desc {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  line-height: 1.5;
+}
+
+.pickup-selector-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.pickup-selector-panel {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 24rpx;
+  max-height: 70vh;
+}
+
+.pickup-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.pickup-selector-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.pickup-selector-close {
+  font-size: 44rpx;
+  color: #999999;
+  line-height: 1;
+  padding: 8rpx 12rpx;
+}
+
+.pickup-selector-list {
+  max-height: 58vh;
+}
+
+.pickup-selector-item {
+  padding: 20rpx 20rpx;
+  border-radius: 16rpx;
+  background: #f8f9fb;
+  margin-bottom: 16rpx;
+}
+
+.pickup-selector-item.selected {
+  background: #e6f0ff;
+}
+
+.pickup-selector-item-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.pickup-selector-item-title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.pickup-selector-item-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pickup-selector-tag {
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(0, 122, 255, 0.12);
+  color: #007AFF;
+  font-size: 22rpx;
+  flex-shrink: 0;
+}
+
+.pickup-selector-nav {
+  font-size: 26rpx;
+  color: #007AFF;
+  flex-shrink: 0;
+}
+
+.pickup-selector-item-address {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  color: #666666;
+  line-height: 1.5;
 }
 
 .remark-form {

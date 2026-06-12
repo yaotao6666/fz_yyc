@@ -23,7 +23,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o fz_yyc_api ./cmd/server
 
 # 运行阶段
-FROM alpine:latest
+FROM alpine:3.20
 
 # 安装运行时依赖
 RUN apk --no-cache add ca-certificates tzdata

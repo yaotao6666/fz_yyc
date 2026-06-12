@@ -666,6 +666,7 @@ type CreateOrderRequest struct {
 	DeliveryAddress  string  `json:"delivery_address"`
 	ContactName      string  `json:"contact_name"`
 	ContactPhone     string  `json:"contact_phone"`
+	PickupPointID    uint64  `json:"pickup_point_id"`
 	Remark           string  `json:"remark"`
 	Items            []struct {
 		ProductID uint64  `json:"product_id" binding:"required"`
@@ -706,6 +707,7 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
+	var pickupPoint *models.MerchantPickupPoint
 	switch req.DeliveryType {
 	case 1:
 		if !merchant.TakeoutEnabled {
@@ -742,6 +744,20 @@ func CreateOrder(c *gin.Context) {
 			response.Fail(c, http.StatusBadRequest, response.CodeForbidden, "商家暂未开启自提")
 			return
 		}
+		if req.PickupPointID == 0 {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请选择自提点")
+			return
+		}
+
+		var selected models.MerchantPickupPoint
+		if err := database.DB.
+			Where("id = ? AND merchant_id = ? AND status = 1", req.PickupPointID, req.MerchantID).
+			First(&selected).Error; err != nil {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "自提点不可用，请重新选择")
+			return
+		}
+		pickupPoint = &selected
+
 		req.DeliveryDistance = 0
 		req.DeliveryAddress = ""
 		req.ContactName = ""
@@ -866,6 +882,14 @@ func CreateOrder(c *gin.Context) {
 		Remark:           req.Remark,
 		VerifyCode:       verifyCode,
 		Status:           1,
+	}
+	if pickupPoint != nil {
+		pickupPointID := pickupPoint.ID
+		order.PickupPointID = &pickupPointID
+		order.PickupPointName = pickupPoint.Name
+		order.PickupPointAddress = pickupPoint.Address
+		order.PickupPointLat = pickupPoint.Lat
+		order.PickupPointLng = pickupPoint.Lng
 	}
 
 	if err := tx.Create(&order).Error; err != nil {

@@ -23,7 +23,12 @@
               <text class="stars">★★★★★</text>
               <text class="rating-value">{{ storeInfo?.merchant?.rating }}</text>
             </view>
-            <text class="sales-count">已售 {{ storeInfo?.merchant?.sales_count || 0 }}</text>
+            <text v-if="merchantPhone" class="merchant-phone" @click.stop="callMerchant">
+              📞 {{ merchantPhone }}
+            </text>
+          </view>
+          <view v-if="storeInfo?.merchant?.address" class="store-address">
+            {{ storeInfo.merchant.address }}
           </view>
           <view
             class="store-notice"
@@ -418,6 +423,10 @@ const canToggleNotice = computed(() => {
   const notice = storeInfo.value?.merchant?.announcement || ''
   return notice.trim().length > 28
 })
+const merchantPhone = computed(() => {
+  const merchant = storeInfo.value?.merchant as any
+  return String((merchant?.contact_phone || merchant?.phone || '') ?? '').trim()
+})
 
 const cartCount = computed(() => cartStore.totalCount)
 const cartAmount = computed(() => cartStore.totalAmount)
@@ -435,6 +444,23 @@ let showPromise: Promise<void> | null = null
 let _loadRetryCount = 0
 let addSuccessTipTimer: ReturnType<typeof setTimeout> | null = null
 let manualCategoryScrollTimer: ReturnType<typeof setTimeout> | null = null
+
+function callMerchant() {
+  const phone = merchantPhone.value
+  const merchantName = storeInfo.value?.merchant?.name || '商家'
+
+  if (!phone) {
+    uni.showToast({ title: `暂无${merchantName}联系电话`, icon: 'none' })
+    return
+  }
+
+  uni.makePhoneCall({
+    phoneNumber: phone,
+    fail: () => {
+      uni.showToast({ title: `请联系${merchantName}`, icon: 'none' })
+    }
+  })
+}
 let ignoreScrollSync = false
 
 function resetStoreHomeState() {
@@ -983,10 +1009,12 @@ function goMyOrders() {
   background: #ffffff;
   margin-right: 24rpx;
   border: 4rpx solid #ffffff;
+  flex-shrink: 0;
 }
 
 .store-detail {
   flex: 1;
+  min-width: 0;
 }
 
 .store-name {
@@ -1002,6 +1030,27 @@ function goMyOrders() {
   margin-bottom: 12rpx;
 }
 
+.merchant-phone {
+  max-width: 280rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  background: rgba(255, 255, 255, 0.18);
+  border: 2rpx solid rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-address {
+  font-size: 24rpx;
+  opacity: 0.9;
+  margin-bottom: 12rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .stars {
   color: #ffd700;
   font-size: 24rpx;
@@ -1010,11 +1059,6 @@ function goMyOrders() {
 .rating-value {
   font-size: 24rpx;
   margin-left: 8rpx;
-}
-
-.sales-count {
-  font-size: 24rpx;
-  opacity: 0.9;
 }
 
 .store-notice {

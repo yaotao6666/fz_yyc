@@ -74,6 +74,7 @@ onMounted(loadDetail)
       <el-space>
         <el-button @click="router.push('/merchants')">返回列表</el-button>
         <el-button type="primary" @click="router.push(`/merchants/${merchantId}/edit`)">编辑商家</el-button>
+        <el-button type="primary" plain @click="router.push(`/merchants/${merchantId}/pickup-points`)">自提点管理</el-button>
       </el-space>
     </div>
 

@@ -194,7 +194,8 @@ func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProvide
 		if err != nil {
 			return err
 		}
-		result, err := client.CreateProfitSharingOrder(ctx, wechatpay.ProfitSharingRequest{
+		receiverAccount := client.GetSPMchID()
+		profitSharingReq := wechatpay.ProfitSharingRequest{
 			AppID:         appIdentity.AppID,
 			SubMchID:      merchant.SubMchID,
 			TransactionID: notifyResult.TransactionID,
@@ -202,12 +203,27 @@ func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProvide
 			Receivers: []wechatpay.ProfitSharingReceiver{
 				{
 					Type:        "MERCHANT_ID",
-					Account:     client.GetSPMchID(),
+					Account:     receiverAccount,
 					Amount:      amountToCents(profitSharingAmount),
 					Description: "服务商抽佣",
 				},
 			},
-		})
+		}
+
+		result, err := client.CreateProfitSharingOrder(ctx, profitSharingReq)
+		if wechatpay.IsProfitSharingReceiverRelationNotExist(err) {
+			addErr := client.AddProfitSharingReceiver(ctx, wechatpay.AddProfitSharingReceiverRequest{
+				SubMchID:     merchant.SubMchID,
+				Type:         "MERCHANT_ID",
+				Account:      receiverAccount,
+				RelationType: "SERVICE_PROVIDER",
+			})
+			if addErr != nil {
+				err = fmt.Errorf("添加分账接收方失败: %w", addErr)
+			} else {
+				result, err = client.CreateProfitSharingOrder(ctx, profitSharingReq)
+			}
+		}
 		if err != nil {
 			updateErr := tx.Model(&order).Updates(map[string]any{
 				"profit_sharing_status":   profitSharingFailed,

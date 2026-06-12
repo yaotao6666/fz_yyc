@@ -22,6 +22,7 @@ import type {
   UploadTokenResponse,
   DeliverySettings,
   MerchantDeliverySettings,
+  PickupPoint,
   StoreDeliveryRules,
   Category,
   Product,
@@ -283,6 +284,22 @@ export function getDeliverySettings() {
 export function updateDeliverySettings(data: Partial<DeliverySettings>) {
   const payload = normalizeDeliverySettings(data)
   return put<MerchantDeliverySettings>('/api/v1/merchant/delivery-settings', payload).then(normalizeMerchantDeliverySettings)
+}
+
+export function getPickupPoints() {
+  return get<PickupPoint[]>('/api/v1/merchant/pickup-points').then(normalizeArrayResponse)
+}
+
+export function createPickupPoint(data: Partial<PickupPoint>) {
+  return post<PickupPoint>('/api/v1/merchant/pickup-points', data)
+}
+
+export function updatePickupPoint(id: number, data: Partial<PickupPoint>) {
+  return put<PickupPoint>(`/api/v1/merchant/pickup-points/${id}`, data)
+}
+
+export function deletePickupPoint(id: number) {
+  return del<{ message: string }>(`/api/v1/merchant/pickup-points/${id}`)
 }
 
 /**
@@ -991,6 +1008,10 @@ export default {
   unbindMerchantWechat,
   getDeliverySettings,
   updateDeliverySettings,
+  getPickupPoints,
+  createPickupPoint,
+  updatePickupPoint,
+  deletePickupPoint,
   updateMerchantStatus,
   getMerchantQrcode,
   getMerchantFullReductionRules,

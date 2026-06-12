@@ -260,6 +260,20 @@ export interface MerchantDeliverySettings extends DeliverySettings {
 export interface StoreDeliveryRules extends MerchantDeliverySettings {
 }
 
+export interface PickupPoint {
+  id: number
+  merchant_id: number
+  name: string
+  address: string
+  lat: number
+  lng: number
+  is_default: boolean
+  status: number
+  sort: number
+  created_at: string
+  updated_at: string
+}
+
 // 配送距离规则
 export interface DistanceRule {
   min_distance: number
@@ -477,6 +491,11 @@ export interface Order {
   delivery_address?: string
   contact_name?: string
   contact_phone?: string
+  pickup_point_id?: number
+  pickup_point_name?: string
+  pickup_point_address?: string
+  pickup_point_lat?: number
+  pickup_point_lng?: number
   delivery_info?: DeliveryInfo
   status: number
   status_text?: string
@@ -532,6 +551,7 @@ export interface CreateOrderRequest {
   delivery_address?: string
   contact_name?: string
   contact_phone?: string
+  pickup_point_id?: number
   remark?: string
 }
 

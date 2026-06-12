@@ -13,6 +13,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -79,6 +80,57 @@ type ProfitSharingResponse struct {
 	Status     string `json:"state"`
 	CreateTime string `json:"create_time"`
 	UpdateTime string `json:"update_time"`
+}
+
+type APIError struct {
+	StatusCode int
+	Code       string `json:"code"`
+	Message    string `json:"message"`
+	Detail     string `json:"detail"`
+	Raw        string
+}
+
+func (e *APIError) Error() string {
+	raw := strings.TrimSpace(e.Raw)
+	if raw == "" {
+		raw = fmt.Sprintf(`{"code":"%s","message":"%s","detail":"%s"}`, e.Code, e.Message, e.Detail)
+	}
+	return fmt.Sprintf("微信支付请求失败: %s", raw)
+}
+
+func IsProfitSharingReceiverRelationNotExist(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		if apiErr.Code == "PARAM_ERROR" && strings.Contains(apiErr.Message, "分账接收方关系不存在") {
+			return true
+		}
+	}
+	return strings.Contains(err.Error(), "分账接收方关系不存在")
+}
+
+func IsProfitSharingReceiverAlreadyExists(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		if strings.Contains(apiErr.Message, "已存在") {
+			return true
+		}
+	}
+	return strings.Contains(err.Error(), "已存在")
+}
+
+type AddProfitSharingReceiverRequest struct {
+	AppID          string `json:"appid,omitempty"`
+	SubMchID       string `json:"sub_mchid,omitempty"`
+	Type           string `json:"type"`
+	Account        string `json:"account"`
+	RelationType   string `json:"relation_type"`
+	CustomRelation string `json:"custom_relation,omitempty"`
 }
 
 type RefundRequest struct {
@@ -214,6 +266,31 @@ func (c *ServiceProviderClient) CreateProfitSharingOrder(ctx context.Context, re
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (c *ServiceProviderClient) AddProfitSharingReceiver(ctx context.Context, req AddProfitSharingReceiverRequest) error {
+	req.SubMchID = strings.TrimSpace(req.SubMchID)
+	req.Type = strings.TrimSpace(req.Type)
+	req.Account = strings.TrimSpace(req.Account)
+	req.RelationType = strings.TrimSpace(req.RelationType)
+	req.CustomRelation = strings.TrimSpace(req.CustomRelation)
+
+	if req.SubMchID == "" {
+		return fmt.Errorf("缺少 sub_mchid")
+	}
+	if req.Type == "" || req.Account == "" {
+		return fmt.Errorf("缺少分账接收方信息")
+	}
+	if req.RelationType == "" {
+		return fmt.Errorf("缺少分账关系类型")
+	}
+
+	var result any
+	err := c.doJSONRequest(ctx, http.MethodPost, "/v3/profitsharing/receivers/add", req, &result)
+	if IsProfitSharingReceiverAlreadyExists(err) {
+		return nil
+	}
+	return err
 }
 
 func (c *ServiceProviderClient) CreatePartnerRefund(ctx context.Context, req RefundRequest) (*RefundResponse, error) {
@@ -379,7 +456,14 @@ func (c *ServiceProviderClient) doJSONRequest(ctx context.Context, method, path 
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf("微信支付请求失败: %s", strings.TrimSpace(string(respBody)))
+		raw := strings.TrimSpace(string(respBody))
+		var parsed APIError
+		if jsonErr := json.Unmarshal(respBody, &parsed); jsonErr == nil && parsed.Code != "" {
+			parsed.StatusCode = resp.StatusCode
+			parsed.Raw = raw
+			return &parsed
+		}
+		return fmt.Errorf("微信支付请求失败: %s", raw)
 	}
 	if target == nil || len(respBody) == 0 {
 		return nil

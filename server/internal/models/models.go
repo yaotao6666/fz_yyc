@@ -162,6 +162,29 @@ func (MerchantDeliverySettings) TableName() string {
 }
 
 // ============================================
+// 商家自提点表 (merchant_pickup_points)
+// 用途：商家配置多个自提点供 C 端下单选择
+// ============================================
+type MerchantPickupPoint struct {
+	ID        uint64    `gorm:"primaryKey;autoIncrement;comment:自提点ID" json:"id"`
+	MerchantID uint64   `gorm:"not null;index;comment:所属商家ID" json:"merchant_id"`
+	Name      string    `gorm:"size:64;not null;comment:自提点名称" json:"name"`
+	Address   string    `gorm:"size:256;not null;comment:自提点地址" json:"address"`
+	Lat       float64   `gorm:"type:decimal(10,6);not null;comment:纬度" json:"lat"`
+	Lng       float64   `gorm:"type:decimal(10,6);not null;comment:经度" json:"lng"`
+	IsDefault bool      `gorm:"not null;default:false;comment:是否默认自提点" json:"is_default"`
+	Status    uint8     `gorm:"not null;default:1;comment:状态: 1=启用 0=停用" json:"status"`
+	Sort      uint      `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
+	CreatedAt time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	Merchant  *Merchant `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
+}
+
+func (MerchantPickupPoint) TableName() string {
+	return "merchant_pickup_points"
+}
+
+// ============================================
 // 商家员工表 (merchant_staffs)
 // 用途：商家端登录账号，支持owner/staff角色与微信快捷登录
 // ============================================
@@ -342,6 +365,11 @@ type Order struct {
 	DeliveryAddress      string      `gorm:"size:256;comment:收货地址(配送时填写)" json:"delivery_address"`
 	ContactName          string      `gorm:"size:64;comment:联系人姓名(配送时填写)" json:"contact_name"`
 	ContactPhone         string      `gorm:"size:20;comment:联系电话(配送时填写)" json:"contact_phone"`
+	PickupPointID        *uint64     `gorm:"index;comment:自提点ID(自提订单)" json:"pickup_point_id"`
+	PickupPointName      string      `gorm:"size:64;comment:自提点名称快照" json:"pickup_point_name"`
+	PickupPointAddress   string      `gorm:"size:256;comment:自提点地址快照" json:"pickup_point_address"`
+	PickupPointLat       float64     `gorm:"type:decimal(10,6);comment:自提点纬度快照" json:"pickup_point_lat"`
+	PickupPointLng       float64     `gorm:"type:decimal(10,6);comment:自提点经度快照" json:"pickup_point_lng"`
 	Status               uint8       `gorm:"not null;default:1;comment:订单状态: 1=待支付 2=已支付 3=已完成 4=已取消 5=退款中 6=已退款" json:"status"`
 	Remark               string      `gorm:"size:256;comment:用户备注" json:"remark"`
 	VerifyCode           string      `gorm:"size:16;comment:核销码(已支付订单出示给商家)" json:"verify_code"`

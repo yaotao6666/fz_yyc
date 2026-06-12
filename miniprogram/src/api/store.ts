@@ -9,6 +9,7 @@ import type {
   ProductApiSpec,
   ProductApiSpecOption,
   ProductListResponse,
+  PickupPoint,
   SpecOption,
   StoreDeliveryRules,
   StoreFullReductionRulesResponse,
@@ -212,6 +213,12 @@ export function getStoreProduct(merchantId: number, productId: number) {
 
 export function getStoreDeliveryRules(merchantId: number) {
   return get<StoreDeliveryRules>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeStoreDeliveryRules)
+}
+
+export function getStorePickupPoints(merchantId: number) {
+  return get<PickupPoint[]>(`/api/v1/store/${merchantId}/pickup-points`).then((list) => (
+    Array.isArray(list) ? list : []
+  ))
 }
 
 export function getStoreFullReductionRules(merchantId: number) {
