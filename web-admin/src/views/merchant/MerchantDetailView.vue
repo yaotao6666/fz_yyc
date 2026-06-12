@@ -6,11 +6,14 @@ import { getMerchantDetail, getMerchantQRCode, updateSpMerchantAssets } from '@/
 import type { MerchantDetail } from '@/types/sp'
 import { formatAmount, formatDateTime, formatPercent, getMerchantStatusText, getPaymentConfigText } from '@/utils/format'
 import { uploadSpImage } from '@/utils/qiniu'
+import MerchantProductsTab from './components/MerchantProductsTab.vue'
+import MerchantCategoriesTab from './components/MerchantCategoriesTab.vue'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const merchant = ref<MerchantDetail | null>(null)
+const activeTab = ref('basic')
 const qrcodeVisible = ref(false)
 const qrcodeUrl = ref('')
 const qrcodePagePath = ref('')
@@ -44,7 +47,7 @@ async function updateAsset(field: 'logo' | 'cover_image', event: Event) {
   if (!file || !merchant.value) return
   assetUploading.value = field
   try {
-    const uploadResult = await uploadSpImage(file)
+    const uploadResult = await uploadSpImage(file, merchantId.value)
     merchant.value = await updateSpMerchantAssets(merchantId.value, { [field]: uploadResult.url })
     ElMessage.success('图片更新成功')
   } catch (error) {
@@ -80,87 +83,99 @@ onMounted(loadDetail)
 
     <el-skeleton :rows="8" animated :loading="loading">
       <template v-if="merchant">
-        <div class="metric-grid">
-          <div class="metric-card">
-            <div class="metric-label">商家状态</div>
-            <div class="metric-value" style="font-size: 22px;">{{ getMerchantStatusText(merchant.status) }}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">支付配置</div>
-            <div class="metric-value" style="font-size: 22px;">{{ getPaymentConfigText(merchant.payment_config_status) }}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">用户数</div>
-            <div class="metric-value">{{ merchant.total_users }}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">累计金额</div>
-            <div class="metric-value">¥{{ formatAmount(merchant.total_amount) }}</div>
-          </div>
-        </div>
-
-        <div class="section-grid">
-          <el-card class="page-card" shadow="never">
-            <template #header>
-              <span>商家资料</span>
-            </template>
-            <el-descriptions :column="2" border>
-              <el-descriptions-item label="商家名称">{{ merchant.name }}</el-descriptions-item>
-              <el-descriptions-item label="联系人">{{ merchant.contact_name || '未设置' }}</el-descriptions-item>
-              <el-descriptions-item label="联系电话">{{ merchant.contact_phone || '未设置' }}</el-descriptions-item>
-              <el-descriptions-item label="联系邮箱">{{ merchant.contact_email || '未设置' }}</el-descriptions-item>
-              <el-descriptions-item label="经营分类">{{ merchant.business_category || '未设置' }}</el-descriptions-item>
-              <el-descriptions-item label="营业时间">{{ merchant.business_hours || '未设置' }}</el-descriptions-item>
-              <el-descriptions-item label="子商户号">{{ merchant.sub_mch_id || '未配置' }}</el-descriptions-item>
-              <el-descriptions-item label="抽佣比例">{{ merchant.profit_sharing_enabled ? formatPercent(merchant.profit_sharing_ratio) : '未开启' }}</el-descriptions-item>
-              <el-descriptions-item label="商家地址" :span="2">{{ merchant.address || '未设置' }}</el-descriptions-item>
-              <el-descriptions-item label="商家公告" :span="2">{{ merchant.announcement || '未设置' }}</el-descriptions-item>
-              <el-descriptions-item label="创建时间" :span="2">{{ formatDateTime(merchant.created_at) }}</el-descriptions-item>
-            </el-descriptions>
-            <el-space style="margin-top: 16px;">
-              <el-button @click="router.push(`/profit-sharing?merchant_id=${merchant.id}`)">查看分账历史</el-button>
-              <el-button type="primary" plain @click="openQrcode">查看商家二维码</el-button>
-            </el-space>
-          </el-card>
-
-          <el-card class="page-card" shadow="never">
-            <template #header>
-              <span>图片资产</span>
-            </template>
-            <div class="asset-grid">
-              <div class="asset-box">
-                <div style="margin-bottom: 12px; font-weight: 600;">商家 Logo</div>
-                <img v-if="merchant.logo" :src="merchant.logo" class="asset-preview" alt="商家 Logo" />
-                <div v-else class="empty-asset">未上传</div>
-                <input ref="logoInputRef" hidden type="file" accept="image/*" @change="updateAsset('logo', $event)" />
-                <el-button
-                  type="primary"
-                  plain
-                  style="margin-top: 12px;"
-                  :loading="assetUploading === 'logo'"
-                  @click="triggerAssetInput('logo')"
-                >
-                  更换 Logo
-                </el-button>
+        <el-tabs v-model="activeTab">
+          <el-tab-pane label="基础资料" name="basic">
+            <div class="metric-grid">
+              <div class="metric-card">
+                <div class="metric-label">商家状态</div>
+                <div class="metric-value" style="font-size: 22px;">{{ getMerchantStatusText(merchant.status) }}</div>
               </div>
-              <div class="asset-box">
-                <div style="margin-bottom: 12px; font-weight: 600;">背景图</div>
-                <img v-if="merchant.cover_image" :src="merchant.cover_image" class="asset-preview" alt="背景图" />
-                <div v-else class="empty-asset">未上传</div>
-                <input ref="coverInputRef" hidden type="file" accept="image/*" @change="updateAsset('cover_image', $event)" />
-                <el-button
-                  type="primary"
-                  plain
-                  style="margin-top: 12px;"
-                  :loading="assetUploading === 'cover_image'"
-                  @click="triggerAssetInput('cover_image')"
-                >
-                  更换背景图
-                </el-button>
+              <div class="metric-card">
+                <div class="metric-label">支付配置</div>
+                <div class="metric-value" style="font-size: 22px;">{{ getPaymentConfigText(merchant.payment_config_status) }}</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">用户数</div>
+                <div class="metric-value">{{ merchant.total_users }}</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">累计金额</div>
+                <div class="metric-value">¥{{ formatAmount(merchant.total_amount) }}</div>
               </div>
             </div>
-          </el-card>
-        </div>
+
+            <div class="section-grid">
+              <el-card class="page-card" shadow="never">
+                <template #header>
+                  <span>商家资料</span>
+                </template>
+                <el-descriptions :column="2" border>
+                  <el-descriptions-item label="商家名称">{{ merchant.name }}</el-descriptions-item>
+                  <el-descriptions-item label="联系人">{{ merchant.contact_name || '未设置' }}</el-descriptions-item>
+                  <el-descriptions-item label="联系电话">{{ merchant.contact_phone || '未设置' }}</el-descriptions-item>
+                  <el-descriptions-item label="联系邮箱">{{ merchant.contact_email || '未设置' }}</el-descriptions-item>
+                  <el-descriptions-item label="经营分类">{{ merchant.business_category || '未设置' }}</el-descriptions-item>
+                  <el-descriptions-item label="营业时间">{{ merchant.business_hours || '未设置' }}</el-descriptions-item>
+                  <el-descriptions-item label="子商户号">{{ merchant.sub_mch_id || '未配置' }}</el-descriptions-item>
+                  <el-descriptions-item label="抽佣比例">{{ merchant.profit_sharing_enabled ? formatPercent(merchant.profit_sharing_ratio) : '未开启' }}</el-descriptions-item>
+                  <el-descriptions-item label="商家地址" :span="2">{{ merchant.address || '未设置' }}</el-descriptions-item>
+                  <el-descriptions-item label="商家公告" :span="2">{{ merchant.announcement || '未设置' }}</el-descriptions-item>
+                  <el-descriptions-item label="创建时间" :span="2">{{ formatDateTime(merchant.created_at) }}</el-descriptions-item>
+                </el-descriptions>
+                <el-space style="margin-top: 16px;">
+                  <el-button @click="router.push(`/profit-sharing?merchant_id=${merchant.id}`)">查看分账历史</el-button>
+                  <el-button type="primary" plain @click="openQrcode">查看商家二维码</el-button>
+                </el-space>
+              </el-card>
+
+              <el-card class="page-card" shadow="never">
+                <template #header>
+                  <span>图片资产</span>
+                </template>
+                <div class="asset-grid">
+                  <div class="asset-box">
+                    <div style="margin-bottom: 12px; font-weight: 600;">商家 Logo</div>
+                    <img v-if="merchant.logo" :src="merchant.logo" class="asset-preview" alt="商家 Logo" />
+                    <div v-else class="empty-asset">未上传</div>
+                    <input ref="logoInputRef" hidden type="file" accept="image/*" @change="updateAsset('logo', $event)" />
+                    <el-button
+                      type="primary"
+                      plain
+                      style="margin-top: 12px;"
+                      :loading="assetUploading === 'logo'"
+                      @click="triggerAssetInput('logo')"
+                    >
+                      更换 Logo
+                    </el-button>
+                  </div>
+                  <div class="asset-box">
+                    <div style="margin-bottom: 12px; font-weight: 600;">背景图</div>
+                    <img v-if="merchant.cover_image" :src="merchant.cover_image" class="asset-preview" alt="背景图" />
+                    <div v-else class="empty-asset">未上传</div>
+                    <input ref="coverInputRef" hidden type="file" accept="image/*" @change="updateAsset('cover_image', $event)" />
+                    <el-button
+                      type="primary"
+                      plain
+                      style="margin-top: 12px;"
+                      :loading="assetUploading === 'cover_image'"
+                      @click="triggerAssetInput('cover_image')"
+                    >
+                      更换背景图
+                    </el-button>
+                  </div>
+                </div>
+              </el-card>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="商品管理" name="products">
+            <MerchantProductsTab :merchant-id="merchantId" />
+          </el-tab-pane>
+
+          <el-tab-pane label="分类管理" name="categories">
+            <MerchantCategoriesTab :merchant-id="merchantId" />
+          </el-tab-pane>
+        </el-tabs>
       </template>
     </el-skeleton>
 

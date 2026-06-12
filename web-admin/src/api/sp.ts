@@ -5,7 +5,16 @@ import type {
   AnnouncementItem,
   AnnouncementListResponse,
   DashboardData,
+  MerchantCategory,
+  MerchantCategoryPayload,
+  MerchantCategorySortItem,
   MerchantDetail,
+  MerchantProduct,
+  MerchantProductListResponse,
+  MerchantProductQuery,
+  MerchantProductSpecsPayload,
+  MerchantProductSpecsResponse,
+  MerchantProductUpsertPayload,
   MerchantDistributionData,
   MerchantListResponse,
   MerchantPaymentConfigFormData,
@@ -90,6 +99,102 @@ export function deleteMerchantPickupPoint(merchantId: number, pickupPointId: num
     .then(unwrapApiResponse<{ message: string }>)
 }
 
+export function getMerchantCategories(merchantId: number) {
+  return request
+    .get(`/api/v1/sp/merchants/${merchantId}/categories`)
+    .then(unwrapApiResponse<MerchantCategory[]>)
+}
+
+export function createMerchantCategory(merchantId: number, data: MerchantCategoryPayload) {
+  return request
+    .post(`/api/v1/sp/merchants/${merchantId}/categories`, data)
+    .then(unwrapApiResponse<MerchantCategory>)
+}
+
+export function updateMerchantCategory(merchantId: number, categoryId: number, data: MerchantCategoryPayload) {
+  return request
+    .put(`/api/v1/sp/merchants/${merchantId}/categories/${categoryId}`, data)
+    .then(unwrapApiResponse<MerchantCategory>)
+}
+
+export function deleteMerchantCategory(merchantId: number, categoryId: number) {
+  return request
+    .delete(`/api/v1/sp/merchants/${merchantId}/categories/${categoryId}`)
+    .then(unwrapApiResponse<{ message: string }>)
+}
+
+export function sortMerchantCategories(merchantId: number, categories: MerchantCategorySortItem[]) {
+  return request
+    .post(`/api/v1/sp/merchants/${merchantId}/categories/sort`, { categories })
+    .then(unwrapApiResponse<{ message: string }>)
+}
+
+export function getMerchantProducts(merchantId: number, params?: MerchantProductQuery) {
+  return request
+    .get(`/api/v1/sp/merchants/${merchantId}/products`, { params })
+    .then(unwrapApiResponse<MerchantProductListResponse>)
+}
+
+export function getMerchantProduct(merchantId: number, productId: number) {
+  return request
+    .get(`/api/v1/sp/merchants/${merchantId}/products/${productId}`)
+    .then(unwrapApiResponse<MerchantProduct>)
+}
+
+export function createMerchantProduct(merchantId: number, data: MerchantProductUpsertPayload) {
+  return request
+    .post(`/api/v1/sp/merchants/${merchantId}/products`, data)
+    .then(unwrapApiResponse<MerchantProduct>)
+}
+
+export function updateMerchantProduct(merchantId: number, productId: number, data: MerchantProductUpsertPayload) {
+  return request
+    .put(`/api/v1/sp/merchants/${merchantId}/products/${productId}`, data)
+    .then(unwrapApiResponse<MerchantProduct>)
+}
+
+export function merchantProductOnSale(merchantId: number, productId: number) {
+  return request
+    .post(`/api/v1/sp/merchants/${merchantId}/products/${productId}/on-sale`, {})
+    .then(unwrapApiResponse<{ message: string }>)
+}
+
+export function merchantProductOffSale(merchantId: number, productId: number) {
+  return request
+    .post(`/api/v1/sp/merchants/${merchantId}/products/${productId}/off-sale`, {})
+    .then(unwrapApiResponse<{ message: string }>)
+}
+
+export function batchUpdateMerchantProductStatus(merchantId: number, productIds: number[], status: number) {
+  return request
+    .post(`/api/v1/sp/merchants/${merchantId}/products/batch-status`, { product_ids: productIds, status })
+    .then(unwrapApiResponse<{ message: string }>)
+}
+
+export function deleteMerchantProduct(merchantId: number, productId: number) {
+  return request
+    .delete(`/api/v1/sp/merchants/${merchantId}/products/${productId}`)
+    .then(unwrapApiResponse<{ message: string }>)
+}
+
+export function updateMerchantProductStock(merchantId: number, productId: number, stock: number) {
+  return request
+    .put(`/api/v1/sp/merchants/${merchantId}/products/${productId}/stock`, { stock })
+    .then(unwrapApiResponse<{ message: string }>)
+}
+
+export function getMerchantProductSpecs(merchantId: number, productId: number) {
+  return request
+    .get(`/api/v1/sp/merchants/${merchantId}/products/${productId}/specs`)
+    .then(unwrapApiResponse<MerchantProductSpecsResponse>)
+}
+
+export function updateMerchantProductSpecs(merchantId: number, productId: number, data: MerchantProductSpecsPayload) {
+  return request
+    .put(`/api/v1/sp/merchants/${merchantId}/products/${productId}/specs`, data)
+    .then(unwrapApiResponse<{ message: string }>)
+}
+
 export function getMerchantDistribution(params?: Record<string, unknown>) {
   return request.get('/api/v1/sp/merchants/analytics/distribution', { params }).then(unwrapApiResponse<MerchantDistributionData>)
 }
@@ -136,8 +241,8 @@ export function getMerchantQRCode(merchantId: number) {
   )
 }
 
-export function getUploadToken() {
-  return request.get('/api/v1/upload/token').then(unwrapApiResponse<UploadTokenResponse>)
+export function getUploadToken(params?: { merchant_id?: number }) {
+  return request.get('/api/v1/upload/token', { params }).then(unwrapApiResponse<UploadTokenResponse>)
 }
 
 export function getAnnouncements(params?: Record<string, unknown>) {

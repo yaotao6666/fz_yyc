@@ -3,8 +3,11 @@ package upload
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"fz_yyc_api/internal/middleware"
+	"fz_yyc_api/internal/models"
+	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
 
@@ -26,6 +29,20 @@ func (h *UploadHandler) GetToken(c *gin.Context) {
 		prefix = fmt.Sprintf("uploads/merchant/%d", userID)
 	} else if userType == "sp" {
 		prefix = "uploads/sp"
+
+		merchantID, err := strconv.ParseUint(c.Query("merchant_id"), 10, 64)
+		if err == nil && merchantID > 0 {
+			var merchant models.Merchant
+			if err := database.DB.Select("id").
+				Where("id = ? AND service_provider_id = ?", merchantID, userID).
+				First(&merchant).Error; err != nil {
+				response.Fail(c, http.StatusForbidden, response.CodeForbidden, "无权为该商家上传图片")
+				return
+			}
+
+			// 服务商代理商家上传时，资源应归属到目标商家目录，避免商品图落到 uploads/sp。
+			prefix = fmt.Sprintf("uploads/merchant/%d", merchantID)
+		}
 	}
 
 	token, err := qiniu.GetService().GetUploadToken()

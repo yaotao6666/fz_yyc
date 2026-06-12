@@ -88,6 +88,107 @@ export interface MerchantPickupPointPayload {
   sort?: number
 }
 
+export interface MerchantCategory {
+  id: number
+  merchant_id: number
+  name: string
+  sort: number
+  status: number
+  product_count?: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface MerchantCategoryPayload {
+  name: string
+  sort?: number
+  status?: number
+}
+
+export interface MerchantCategorySortItem {
+  id: number
+  sort: number
+}
+
+export interface MerchantProductQuery {
+  page?: number
+  page_size?: number
+  category_id?: number
+  status?: number | string
+  keyword?: string
+}
+
+export interface MerchantProductSpecOption {
+  id?: number
+  name: string
+  price: number
+  stock?: number
+}
+
+export interface MerchantProductSpec {
+  id?: number
+  name: string
+  options: MerchantProductSpecOption[]
+}
+
+export interface MerchantProduct {
+  id: number
+  merchant_id: number
+  category_id: number
+  name: string
+  description: string
+  images: string[]
+  price: number
+  original_price: number
+  stock: number
+  unit: string
+  sales: number
+  sort: number
+  status: number
+  category_name?: string
+  specs: MerchantProductSpec[]
+  created_at?: string
+  updated_at?: string
+}
+
+export interface MerchantProductListResponse {
+  list: MerchantProduct[]
+  pagination?: {
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
+export interface MerchantProductUpsertPayload {
+  category_id?: number
+  name: string
+  description?: string
+  images: string[]
+  price: number
+  original_price?: number
+  stock?: number
+  unit?: string
+  sort?: number
+  specs?: MerchantProductSpec[]
+}
+
+export interface MerchantProductEditableSpec {
+  id?: number
+  name: string
+  values: string[]
+}
+
+export interface MerchantProductSpecsResponse {
+  specs: MerchantProductEditableSpec[]
+  skus: unknown[]
+}
+
+export interface MerchantProductSpecsPayload {
+  specs: MerchantProductEditableSpec[]
+  skus: unknown[]
+}
+
 export interface MerchantListResponse {
   list: MerchantListItem[]
   pagination: {

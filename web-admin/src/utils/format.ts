@@ -27,3 +27,11 @@ export function getMerchantStatusText(status: number): string {
 export function getPaymentConfigText(status?: number): string {
   return Number(status || 0) === 1 ? '已完成' : '待完善'
 }
+
+export function getProductStatusText(status?: number): string {
+  return Number(status || 0) === 1 ? '上架' : '下架'
+}
+
+export function getCategoryStatusText(status?: number): string {
+  return Number(status || 0) === 1 ? '启用' : '停用'
+}
