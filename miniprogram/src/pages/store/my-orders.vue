@@ -55,6 +55,7 @@
           <view class="order-info">
             <text class="order-no">{{ order.order_no }}</text>
             <text class="order-time">{{ formatTime(order.created_at) }}</text>
+            <text class="order-summary">{{ getOrderSummary(order) }}</text>
           </view>
           <view class="order-amount">
             <view class="amount-summary-row">
@@ -127,7 +128,7 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { getMyOrders, cancelMyOrder } from '@api'
-import { OrderStatus, OrderStatusText } from '@types'
+import { DeliveryTypeText, OrderStatus, OrderStatusText } from '@types'
 import type { Order } from '@types'
 import { BrandAsset } from '../../utils/constants'
 import { useAuth } from '../../utils/useAuth'
@@ -267,6 +268,20 @@ function getStatusClass(status: number): string {
 function formatTime(time: string): string {
   const date = new Date(time)
   return `${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function getOrderSummary(order: Order): string {
+  const deliveryTypeText = DeliveryTypeText[order.delivery_type || 0] || '未知方式'
+  if (order.delivery_type === 3) {
+    const pickupPointName = order.pickup_point_name || '未设置自提点'
+    const pickupPointAddress = order.pickup_point_address || order.delivery_info?.address || ''
+    return pickupPointAddress
+      ? `取货方式：${deliveryTypeText} · ${pickupPointName} · ${pickupPointAddress}`
+      : `取货方式：${deliveryTypeText} · ${pickupPointName}`
+  }
+
+  const deliveryAddress = order.delivery_info?.address || order.delivery_address || '未填写收货地址'
+  return `取货方式：${deliveryTypeText} · ${deliveryAddress}`
 }
 
 function getOrderItemImage(item: any) {
@@ -491,6 +506,13 @@ function contactMerchantForRefund(order: Order) {
 .order-time {
   font-size: 24rpx;
   color: #999999;
+}
+
+.order-summary {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #666;
+  line-height: 1.5;
 }
 
 .order-amount {

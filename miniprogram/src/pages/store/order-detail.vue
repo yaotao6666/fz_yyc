@@ -25,11 +25,15 @@
     <view class="section">
       <view class="section-title">配送信息</view>
       <view class="info-row">
-        <text class="label">取餐方式</text>
+        <text class="label">取货方式</text>
         <text class="value">{{ getDeliveryTypeText() }}</text>
       </view>
+      <view v-if="pickupPointNameText" class="info-row">
+        <text class="label">自提点</text>
+        <text class="value">{{ pickupPointNameText }}</text>
+      </view>
       <view v-if="deliveryAddressText" class="info-row">
-        <text class="label">收货地址</text>
+        <text class="label">{{ isPickupOrder ? '自提点地址' : '收货地址' }}</text>
         <text class="value">{{ deliveryAddressText }}</text>
       </view>
       <view v-if="contactNameText" class="info-row">
@@ -40,7 +44,7 @@
         <text class="label">联系电话</text>
         <text class="value">{{ contactPhoneText }}</text>
       </view>
-      <view v-if="order.delivery_distance" class="info-row">
+      <view v-if="!isPickupOrder && order.delivery_distance" class="info-row">
         <text class="label">配送距离</text>
         <text class="value">{{ Number(order.delivery_distance || 0).toFixed(2) }} 公里</text>
       </view>
@@ -173,7 +177,14 @@ const canCancel = computed(() => order.value?.status === OrderStatus.PENDING_PAY
 const canRefund = computed(() => {
   return order.value?.status === OrderStatus.PAID
 })
+const isPickupOrder = computed(() => order.value?.delivery_type === 3)
+const pickupPointNameText = computed(() => {
+  return order.value?.pickup_point_name || ''
+})
 const deliveryAddressText = computed(() => {
+  if (isPickupOrder.value) {
+    return order.value?.pickup_point_address || order.value?.delivery_info?.address || order.value?.delivery_address || ''
+  }
   return order.value?.delivery_info?.address || order.value?.delivery_address || ''
 })
 const contactNameText = computed(() => {

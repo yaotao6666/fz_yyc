@@ -21,6 +21,8 @@ const statusSummary = computed(() => {
   return SpOrderStatusText[order.value.status] || '未知状态'
 })
 
+const isPickupOrder = computed(() => order.value?.delivery_type === 3)
+
 function formatOptionalDateTime(value?: string) {
   return value ? formatDateTime(value) : '-'
 }
@@ -30,6 +32,9 @@ function resolveSpecText(item: SpOrderItem) {
 }
 
 function resolveDeliveryAddress() {
+  if (isPickupOrder.value) {
+    return order.value?.pickup_point_address || order.value?.delivery_info?.address || order.value?.delivery_address || '-'
+  }
   return order.value?.delivery_info?.address || order.value?.delivery_address || '-'
 }
 
@@ -40,6 +45,10 @@ function resolveContactInfo() {
     return '-'
   }
   return [contactName, contactPhone].filter(Boolean).join(' ')
+}
+
+function resolvePickupPointName() {
+  return order.value?.pickup_point_name || '-'
 }
 
 async function loadOrderDetail() {
@@ -111,9 +120,10 @@ onMounted(() => {
         <el-card class="page-card" shadow="never">
           <template #header>配送信息</template>
           <div class="info-list">
-            <div class="info-row"><span>配送方式</span><span>{{ SpDeliveryTypeText[order.delivery_type || 0] || '-' }}</span></div>
-            <div class="info-row"><span>配送距离</span><span>{{ order.delivery_distance ? `${order.delivery_distance} km` : '-' }}</span></div>
-            <div class="info-row"><span>收货地址</span><span>{{ resolveDeliveryAddress() }}</span></div>
+            <div class="info-row"><span>取货方式</span><span>{{ SpDeliveryTypeText[order.delivery_type || 0] || '-' }}</span></div>
+            <div v-if="isPickupOrder" class="info-row"><span>自提点</span><span>{{ resolvePickupPointName() }}</span></div>
+            <div v-if="!isPickupOrder" class="info-row"><span>配送距离</span><span>{{ order.delivery_distance ? `${order.delivery_distance} km` : '-' }}</span></div>
+            <div class="info-row"><span>{{ isPickupOrder ? '自提点地址' : '收货地址' }}</span><span>{{ resolveDeliveryAddress() }}</span></div>
             <div class="info-row"><span>联系人</span><span>{{ resolveContactInfo() }}</span></div>
             <div class="info-row"><span>订单备注</span><span>{{ order.remark || '-' }}</span></div>
           </div>

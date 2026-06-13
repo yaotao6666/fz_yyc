@@ -357,6 +357,11 @@ export interface SpOrder {
   delivery_address?: string
   contact_name?: string
   contact_phone?: string
+  pickup_point_id?: number
+  pickup_point_name?: string
+  pickup_point_address?: string
+  pickup_point_lat?: number
+  pickup_point_lng?: number
   status: number
   remark?: string
   verify_code?: string
