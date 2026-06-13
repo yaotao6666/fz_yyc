@@ -79,7 +79,7 @@
             <text class="pickup-empty-title">{{ pickupPoints.length ? '请选择自提点' : '商家未配置自提点' }}</text>
             <text class="pickup-empty-desc">自提订单需先选择自提点</text>
           </view>
-          <text class="address-arrow">></text>
+          <text class="address-arrow"> > </text>
         </view>
       </view>
 

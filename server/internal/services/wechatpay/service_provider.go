@@ -269,14 +269,26 @@ func (c *ServiceProviderClient) CreateProfitSharingOrder(ctx context.Context, re
 }
 
 func (c *ServiceProviderClient) AddProfitSharingReceiver(ctx context.Context, req AddProfitSharingReceiverRequest) error {
+	req.AppID = strings.TrimSpace(req.AppID)
 	req.SubMchID = strings.TrimSpace(req.SubMchID)
 	req.Type = strings.TrimSpace(req.Type)
 	req.Account = strings.TrimSpace(req.Account)
 	req.RelationType = strings.TrimSpace(req.RelationType)
 	req.CustomRelation = strings.TrimSpace(req.CustomRelation)
 
+	if req.AppID == "" {
+		appIdentity, err := GetActiveAppIdentity()
+		if err != nil {
+			return fmt.Errorf("缺少 appid: %w", err)
+		}
+		req.AppID = strings.TrimSpace(appIdentity.AppID)
+	}
+
 	if req.SubMchID == "" {
 		return fmt.Errorf("缺少 sub_mchid")
+	}
+	if req.AppID == "" {
+		return fmt.Errorf("缺少 appid")
 	}
 	if req.Type == "" || req.Account == "" {
 		return fmt.Errorf("缺少分账接收方信息")

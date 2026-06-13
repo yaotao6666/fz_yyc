@@ -213,6 +213,7 @@ func processPaymentSuccess(ctx context.Context, client *wechatpay.ServiceProvide
 		result, err := client.CreateProfitSharingOrder(ctx, profitSharingReq)
 		if wechatpay.IsProfitSharingReceiverRelationNotExist(err) {
 			addErr := client.AddProfitSharingReceiver(ctx, wechatpay.AddProfitSharingReceiverRequest{
+				AppID:         appIdentity.AppID,
 				SubMchID:     merchant.SubMchID,
 				Type:         "MERCHANT_ID",
 				Account:      receiverAccount,
