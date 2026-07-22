@@ -3,7 +3,6 @@ package merchant
 import (
 	"encoding/json"
 	"errors"
-	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
@@ -195,7 +194,10 @@ func loadProductWithRelations(id uint64, merchantID uint64) (*models.Product, er
 }
 
 func GetCategories(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 
 	var categories []models.Category
 	if err := database.DB.Where("merchant_id = ?", merchantID).Order("sort ASC, id ASC").Find(&categories).Error; err != nil {
@@ -231,7 +233,10 @@ type CategoryRequest struct {
 }
 
 func CreateCategory(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 
 	var req CategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -261,7 +266,10 @@ func CreateCategory(c *gin.Context) {
 }
 
 func UpdateCategory(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	categoryID := c.Param("category_id")
 	id, _ := strconv.ParseUint(categoryID, 10, 64)
 
@@ -298,7 +306,10 @@ func UpdateCategory(c *gin.Context) {
 }
 
 func DeleteCategory(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	categoryID := c.Param("category_id")
 	id, _ := strconv.ParseUint(categoryID, 10, 64)
 
@@ -318,7 +329,10 @@ type SortCategoriesRequest struct {
 }
 
 func SortCategories(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 
 	var req SortCategoriesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -340,7 +354,10 @@ func SortCategories(c *gin.Context) {
 }
 
 func GetProduct(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
@@ -354,7 +371,10 @@ func GetProduct(c *gin.Context) {
 }
 
 func GetProducts(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	categoryID := c.Query("category_id")
@@ -417,6 +437,7 @@ type ProductRequest struct {
 	Stock         uint     `json:"stock"`
 	Unit          string   `json:"unit"`
 	Sort          uint     `json:"sort"`
+	Sales         *uint    `json:"sales"`
 	Specs         []struct {
 		Name    string `json:"name" binding:"required"`
 		Options []struct {
@@ -427,7 +448,10 @@ type ProductRequest struct {
 }
 
 func CreateProduct(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 
 	var req ProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -487,7 +511,10 @@ func CreateProduct(c *gin.Context) {
 }
 
 func UpdateProduct(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
@@ -515,6 +542,9 @@ func UpdateProduct(c *gin.Context) {
 		"stock":          req.Stock,
 		"unit":           req.Unit,
 		"sort":           req.Sort,
+	}
+	if req.Sales != nil {
+		updates["sales"] = *req.Sales
 	}
 
 	tx := database.DB.Begin()
@@ -559,7 +589,10 @@ func UpdateProduct(c *gin.Context) {
 }
 
 func ProductOnSale(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
@@ -573,7 +606,10 @@ func ProductOnSale(c *gin.Context) {
 }
 
 func ProductOffSale(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
@@ -592,7 +628,10 @@ type BatchStatusRequest struct {
 }
 
 func BatchUpdateProductStatus(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 
 	var req BatchStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -609,7 +648,10 @@ func BatchUpdateProductStatus(c *gin.Context) {
 }
 
 func DeleteProduct(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
@@ -637,7 +679,10 @@ type StockRequest struct {
 }
 
 func UpdateStock(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 

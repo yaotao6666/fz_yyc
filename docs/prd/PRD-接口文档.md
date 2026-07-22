@@ -104,6 +104,8 @@
 - `GET /api/v1/sp/orders/analytics` 返回 `day/week/month/year` 四组订单量桶。
 - `GET /api/v1/sp/amount/top-merchants` 支持 `metric` 参数切换排行维度。
 - `/api/v1/sp/announcements*` 服务商公告接口当前由 `web-admin/` 直接调用，小程序端不再承载该页面。
+- 服务商端商品代管首版不新增 `/api/v1/sp/products*` 路径，继续通过现有 `/api/v1/merchant/categories*`、`/api/v1/merchant/products*`、`/api/v1/merchant/products/:product_id/specs` 接口完成分类、商品、规格管理。
+- 当调用方为服务商 token 时，商品域接口需显式透传 `merchant_id`，后端按 `merchant_id + 当前服务商 service_provider_id` 校验归属后执行。
 
 ### 2.3 商家管理接口
 
@@ -117,6 +119,9 @@
 - 商家打印机管理：`GET/POST/PUT/DELETE /api/v1/merchant/printers*`
 - 打印测试：`POST /api/v1/merchant/printers/:printer_id/test`
 - 商家分账历史：`GET /api/v1/merchant/profit-sharing-records`
+- 商品分类：`GET/POST/PUT/DELETE /api/v1/merchant/categories*`
+- 商品管理：`GET/POST/PUT/DELETE /api/v1/merchant/products*`
+- 商品规格：`GET/PUT/DELETE /api/v1/merchant/products/:product_id/specs`
 
 当前重点约束：
 
@@ -132,6 +137,7 @@
 - `GET /api/v1/merchant/qrcode` 必须固定生成指向 `pages/store/home` 的小程序码，且 `scene` 需使用 `merchant_id={当前商家ID}` 以兼容现有店铺入口解析逻辑。
 - `GET /api/v1/sp/merchants/{id}/qrcode` 作为服务商代查看商家二维码接口，必须与商家侧二维码保持一致，通过微信小程序码接口生成真实二维码，并返回可直接展示的二维码图片、`pages/store/home` 页面路径以及 `merchant_id={商家ID}` 的 `scene` 参数；若微信生成失败，应直接返回错误，不能回退为系统自绘占位二维码。
 - 服务商若代商家维护资料，必须通过明确的服务商侧管理接口或授权更新接口。
+- 服务商端代管商品时，`/api/v1/merchant/categories*`、`/api/v1/merchant/products*`、`/api/v1/merchant/products/:product_id/specs` 允许 `sp` 身份访问，但必须携带 `merchant_id`，且只能操作当前服务商名下商家。
 - 商家分账历史至少返回：
   - `profit_sharing_date`
   - `order_no`
@@ -152,6 +158,7 @@
 
 - 商品图片字段以当前接口返回结构为准。
 - 商品相关列表接口返回空值时，数组字段统一返回 `[]`。
+- 服务商端 web-admin 可通过 `PUT /api/v1/merchant/products/:product_id` 手动修改商品销量（`sales` 字段），仅限服务商角色可见，商家端保持销量只读（由订单系统自动更新）。
 
 ### 2.5 订单接口
 

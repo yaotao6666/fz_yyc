@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
@@ -20,7 +19,10 @@ type prdSpecResponse struct {
 }
 
 func GetProductSpecs(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	productID, _ := strconv.ParseUint(c.Param("product_id"), 10, 64)
 
 	var product models.Product
@@ -67,7 +69,10 @@ type prdUpdateProductSpecsRequest struct {
 }
 
 func UpdateProductSpecs(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	productID, _ := strconv.ParseUint(c.Param("product_id"), 10, 64)
 
 	var req prdUpdateProductSpecsRequest
@@ -123,7 +128,10 @@ type prdDeleteProductSpecsRequest struct {
 }
 
 func DeleteProductSpecs(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
+	merchantID, ok := resolveTargetMerchantID(c)
+	if !ok {
+		return
+	}
 	productID, _ := strconv.ParseUint(c.Param("product_id"), 10, 64)
 
 	var req prdDeleteProductSpecsRequest

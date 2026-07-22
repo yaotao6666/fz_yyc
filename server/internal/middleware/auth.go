@@ -134,6 +134,19 @@ func MerchantAuth() gin.HandlerFunc {
 	}
 }
 
+// MerchantOrSpAuth 商家或服务商认证中间件
+func MerchantOrSpAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userType, exists := c.Get("user_type")
+		if !exists || (userType != "merchant" && userType != "sp") {
+			response.Forbidden(c, "需要商家或服务商权限")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // UserAuth 用户认证中间件
 func UserAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {

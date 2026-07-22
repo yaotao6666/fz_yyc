@@ -7,6 +7,7 @@ import MerchantListView from '@/views/merchant/MerchantListView.vue'
 import MerchantDetailView from '@/views/merchant/MerchantDetailView.vue'
 import MerchantEditView from '@/views/merchant/MerchantEditView.vue'
 import MerchantPickupPointsView from '@/views/merchant/MerchantPickupPointsView.vue'
+import MerchantProductEditView from '@/views/merchant/MerchantProductEditView.vue'
 import OrderListView from '@/views/order/OrderListView.vue'
 import OrderDetailView from '@/views/order/OrderDetailView.vue'
 import AnnouncementListView from '@/views/announcement/AnnouncementListView.vue'
@@ -64,6 +65,18 @@ const routes = [
         name: 'merchant-edit',
         component: MerchantEditView,
         meta: { title: '编辑商家', requiresAuth: true }
+      },
+      {
+        path: '/merchants/:id/products/new',
+        name: 'merchant-product-create',
+        component: MerchantProductEditView,
+        meta: { title: '新增商品', requiresAuth: true }
+      },
+      {
+        path: '/merchants/:id/products/:productId/edit',
+        name: 'merchant-product-edit',
+        component: MerchantProductEditView,
+        meta: { title: '编辑商品', requiresAuth: true }
       },
       {
         path: '/orders',

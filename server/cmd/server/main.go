@@ -139,85 +139,89 @@ func setupRoutes(r *gin.Engine) {
 
 		// 商家管理员接口
 		merchantGroup := v1.Group("/merchant")
-		merchantGroup.Use(middleware.JWTAuth(), middleware.MerchantAuth())
+		merchantGroup.Use(middleware.JWTAuth())
 		{
-			// 商家信息
-			merchantGroup.GET("/profile", merchant.GetProfile)
-			merchantGroup.PUT("/profile", merchant.UpdateProfile)
-			merchantGroup.GET("/settings", merchant.GetSettings)
-			merchantGroup.PUT("/settings", merchant.UpdateSettings)
-			merchantGroup.POST("/account/change-password", merchant.ChangePassword)
-			merchantGroup.POST("/account/wechat/bind", merchant.BindWechat)
-			merchantGroup.DELETE("/account/wechat/bind", merchant.UnbindWechat)
-			merchantGroup.POST("/status", merchant.UpdateStatus)
-			merchantGroup.GET("/qrcode", merchant.GetQRCode)
-			merchantGroup.GET("/delivery-settings", merchant.GetDeliverySettings)
-			merchantGroup.PUT("/delivery-settings", merchant.UpdateDeliverySettings)
-			merchantGroup.GET("/pickup-points", merchant.GetPickupPoints)
-			merchantGroup.POST("/pickup-points", merchant.CreatePickupPoint)
-			merchantGroup.PUT("/pickup-points/:id", merchant.UpdatePickupPoint)
-			merchantGroup.DELETE("/pickup-points/:id", merchant.DeletePickupPoint)
-			merchantGroup.GET("/full-reduction-rules", merchant.GetFullReductionRules)
-			merchantGroup.PUT("/full-reduction-rules", merchant.UpdateFullReductionRules)
-			merchantGroup.GET("/subscriptions", merchant.GetSubscriptions)
-			merchantGroup.PUT("/subscriptions", merchant.UpdateSubscriptions)
-			merchantGroup.GET("/profit-sharing-records", sp.GetMerchantProfitSharingRecords)
+			merchantOnlyGroup := merchantGroup.Group("")
+			merchantOnlyGroup.Use(middleware.MerchantAuth())
+			{
+				// 商家信息
+				merchantGroup.GET("/profile", merchant.GetProfile)
+				merchantGroup.PUT("/profile", merchant.UpdateProfile)
+				merchantGroup.GET("/settings", merchant.GetSettings)
+				merchantGroup.PUT("/settings", merchant.UpdateSettings)
+				merchantGroup.POST("/account/change-password", merchant.ChangePassword)
+				merchantGroup.POST("/account/wechat/bind", merchant.BindWechat)
+				merchantGroup.DELETE("/account/wechat/bind", merchant.UnbindWechat)
+				merchantGroup.POST("/status", merchant.UpdateStatus)
+				merchantGroup.GET("/qrcode", merchant.GetQRCode)
+				merchantGroup.GET("/delivery-settings", merchant.GetDeliverySettings)
+				merchantGroup.PUT("/delivery-settings", merchant.UpdateDeliverySettings)
+				merchantGroup.GET("/full-reduction-rules", merchant.GetFullReductionRules)
+				merchantGroup.PUT("/full-reduction-rules", merchant.UpdateFullReductionRules)
+				merchantGroup.GET("/subscriptions", merchant.GetSubscriptions)
+				merchantGroup.PUT("/subscriptions", merchant.UpdateSubscriptions)
+				merchantGroup.GET("/profit-sharing-records", sp.GetMerchantProfitSharingRecords)
 
-			// 员工管理
-			merchantGroup.GET("/staff", merchant.GetStaffList)
-			merchantGroup.POST("/staff", merchant.CreateStaff)
-			merchantGroup.PUT("/staff/:id", merchant.UpdateStaff)
-			merchantGroup.DELETE("/staff/:id", merchant.DeleteStaff)
-			merchantGroup.POST("/staff/:id/reset-password", merchant.ResetStaffPassword)
+				// 员工管理
+				merchantOnlyGroup.GET("/staff", merchant.GetStaffList)
+				merchantOnlyGroup.POST("/staff", merchant.CreateStaff)
+				merchantOnlyGroup.PUT("/staff/:id", merchant.UpdateStaff)
+				merchantOnlyGroup.DELETE("/staff/:id", merchant.DeleteStaff)
+				merchantOnlyGroup.POST("/staff/:id/reset-password", merchant.ResetStaffPassword)
 
-			// 系统公告（商家查看）
-			merchantGroup.GET("/announcements", merchant.GetAnnouncements)
-			merchantGroup.GET("/announcements/:id", merchant.GetAnnouncementDetail)
+				// 系统公告（商家查看）
+				merchantOnlyGroup.GET("/announcements", merchant.GetAnnouncements)
+				merchantOnlyGroup.GET("/announcements/:id", merchant.GetAnnouncementDetail)
 
-			// 商品分类
-			merchantGroup.GET("/categories", merchant.GetCategories)
-			merchantGroup.POST("/categories", merchant.CreateCategory)
-			merchantGroup.PUT("/categories/:category_id", merchant.UpdateCategory)
-			merchantGroup.DELETE("/categories/:category_id", merchant.DeleteCategory)
-			merchantGroup.POST("/categories/sort", merchant.SortCategories)
+				// 订单管理
+				merchantOnlyGroup.GET("/orders", merchant.GetOrders)
+				merchantOnlyGroup.GET("/orders/:order_id", merchant.GetOrderDetail)
+				merchantOnlyGroup.POST("/orders/quick-complete", merchant.QuickCompleteOrder)
+				merchantOnlyGroup.POST("/orders/:order_id/complete", merchant.CompleteOrder)
+				merchantOnlyGroup.POST("/orders/:order_id/refund", merchant.RefundOrder)
+				merchantOnlyGroup.GET("/orders/statistics", merchant.GetOrderStatistics)
 
-			// 商品管理
-			merchantGroup.GET("/products", merchant.GetProducts)
-			merchantGroup.GET("/products/:product_id", merchant.GetProduct)
-			merchantGroup.POST("/products", merchant.CreateProduct)
-			merchantGroup.PUT("/products/:product_id", merchant.UpdateProduct)
-			merchantGroup.POST("/products/:product_id/on-sale", merchant.ProductOnSale)
-			merchantGroup.POST("/products/:product_id/off-sale", merchant.ProductOffSale)
-			merchantGroup.POST("/products/batch-status", merchant.BatchUpdateProductStatus)
-			merchantGroup.DELETE("/products/:product_id", merchant.DeleteProduct)
-			merchantGroup.PUT("/products/:product_id/stock", merchant.UpdateStock)
-			merchantGroup.GET("/products/:product_id/specs", merchant.GetProductSpecs)
-			merchantGroup.PUT("/products/:product_id/specs", merchant.UpdateProductSpecs)
-			merchantGroup.DELETE("/products/:product_id/specs", merchant.DeleteProductSpecs)
+				// 数据分析
+				merchantOnlyGroup.GET("/analytics/overview", merchant.GetAnalyticsOverview)
+				merchantOnlyGroup.GET("/analytics/sales-trend", merchant.GetSalesTrend)
+				merchantOnlyGroup.GET("/analytics/product-ranking", merchant.GetProductRanking)
+				merchantOnlyGroup.GET("/analytics/hourly", merchant.GetHourlyAnalysis)
+				merchantOnlyGroup.GET("/analytics/stock-alert", merchant.GetStockAlert)
+				merchantOnlyGroup.GET("/analytics/customers", merchant.GetCustomerAnalysis)
+				merchantOnlyGroup.GET("/analytics/customer-trend", merchant.GetCustomerTrend)
 
-			// 订单管理
-			merchantGroup.GET("/orders", merchant.GetOrders)
-			merchantGroup.GET("/orders/:order_id", merchant.GetOrderDetail)
-			merchantGroup.POST("/orders/quick-complete", merchant.QuickCompleteOrder)
-			merchantGroup.POST("/orders/:order_id/complete", merchant.CompleteOrder)
-			merchantGroup.POST("/orders/:order_id/refund", merchant.RefundOrder)
-			merchantGroup.GET("/orders/statistics", merchant.GetOrderStatistics)
+				merchantOnlyGroup.GET("/printers", merchant.GetPrinters)
+				merchantOnlyGroup.POST("/printers", merchant.CreatePrinter)
+				merchantOnlyGroup.PUT("/printers/:printer_id", merchant.UpdatePrinter)
+				merchantOnlyGroup.DELETE("/printers/:printer_id", merchant.DeletePrinter)
+				merchantOnlyGroup.POST("/printers/:printer_id/test", merchant.TestPrinter)
+				merchantOnlyGroup.GET("/print-logs", merchant.GetPrintLogs)
+			}
 
-			// 数据分析
-			merchantGroup.GET("/analytics/overview", merchant.GetAnalyticsOverview)
-			merchantGroup.GET("/analytics/sales-trend", merchant.GetSalesTrend)
-			merchantGroup.GET("/analytics/product-ranking", merchant.GetProductRanking)
-			merchantGroup.GET("/analytics/hourly", merchant.GetHourlyAnalysis)
-			merchantGroup.GET("/analytics/stock-alert", merchant.GetStockAlert)
-			merchantGroup.GET("/analytics/customers", merchant.GetCustomerAnalysis)
-			merchantGroup.GET("/analytics/customer-trend", merchant.GetCustomerTrend)
+			merchantProductGroup := merchantGroup.Group("")
+			merchantProductGroup.Use(middleware.MerchantOrSpAuth())
+			{
+				// 商品分类
+				merchantProductGroup.GET("/categories", merchant.GetCategories)
+				merchantProductGroup.POST("/categories", merchant.CreateCategory)
+				merchantProductGroup.PUT("/categories/:category_id", merchant.UpdateCategory)
+				merchantProductGroup.DELETE("/categories/:category_id", merchant.DeleteCategory)
+				merchantProductGroup.POST("/categories/sort", merchant.SortCategories)
 
-			merchantGroup.GET("/printers", merchant.GetPrinters)
-			merchantGroup.POST("/printers", merchant.CreatePrinter)
-			merchantGroup.PUT("/printers/:printer_id", merchant.UpdatePrinter)
-			merchantGroup.DELETE("/printers/:printer_id", merchant.DeletePrinter)
-			merchantGroup.POST("/printers/:printer_id/test", merchant.TestPrinter)
-			merchantGroup.GET("/print-logs", merchant.GetPrintLogs)
+				// 商品管理
+				merchantProductGroup.GET("/products", merchant.GetProducts)
+				merchantProductGroup.GET("/products/:product_id", merchant.GetProduct)
+				merchantProductGroup.POST("/products", merchant.CreateProduct)
+				merchantProductGroup.PUT("/products/:product_id", merchant.UpdateProduct)
+				merchantProductGroup.POST("/products/:product_id/on-sale", merchant.ProductOnSale)
+				merchantProductGroup.POST("/products/:product_id/off-sale", merchant.ProductOffSale)
+				merchantProductGroup.POST("/products/batch-status", merchant.BatchUpdateProductStatus)
+				merchantProductGroup.DELETE("/products/:product_id", merchant.DeleteProduct)
+				merchantProductGroup.PUT("/products/:product_id/stock", merchant.UpdateStock)
+				merchantProductGroup.GET("/products/:product_id/specs", merchant.GetProductSpecs)
+				merchantProductGroup.PUT("/products/:product_id/specs", merchant.UpdateProductSpecs)
+				merchantProductGroup.DELETE("/products/:product_id/specs", merchant.DeleteProductSpecs)
+			}
 		}
 
 		// 服务商小程序接口

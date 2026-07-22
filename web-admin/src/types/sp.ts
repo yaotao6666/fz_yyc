@@ -170,6 +170,7 @@ export interface MerchantProductUpsertPayload {
   stock?: number
   unit?: string
   sort?: number
+  sales?: number
   specs?: MerchantProductSpec[]
 }
 
