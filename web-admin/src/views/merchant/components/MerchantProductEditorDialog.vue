@@ -39,6 +39,8 @@ const loading = ref(false)
 const submitting = ref(false)
 const uploading = ref(false)
 const imageInputRef = ref<HTMLInputElement | null>(null)
+// web-admin 为服务商专属后台，登录者必为服务商
+const isServiceProvider = true
 
 interface ProductImageItem {
   url: string
@@ -55,6 +57,7 @@ const form = reactive({
   stock: 0,
   unit: '',
   sort: 0,
+  sales: 0,
   specs: [] as MerchantProductEditableSpec[]
 })
 
@@ -83,6 +86,7 @@ function resetForm() {
   form.stock = 0
   form.unit = ''
   form.sort = 0
+  form.sales = 0
   form.specs = []
 }
 
@@ -173,6 +177,7 @@ function buildProductPayload(): MerchantProductUpsertPayload {
     stock: Number(form.stock || 0),
     unit: form.unit.trim(),
     sort: Number(form.sort || 0),
+    sales: form.sales,
     specs: []
   }
 }
@@ -218,6 +223,7 @@ async function loadFormData() {
     form.stock = Number(product.stock || 0)
     form.unit = product.unit || ''
     form.sort = Number(product.sort || 0)
+    form.sales = Number(product.sales || 0)
     form.specs = Array.isArray(specPayload.specs)
       ? specPayload.specs.map((spec) => ({
           id: spec.id,
@@ -332,6 +338,9 @@ watch(
           </el-form-item>
           <el-form-item label="排序">
             <el-input-number v-model="form.sort" :min="0" :precision="0" :step="1" style="width: 100%;" />
+          </el-form-item>
+          <el-form-item v-if="isServiceProvider" label="销量">
+            <el-input-number v-model="form.sales" :min="0" :precision="0" :step="1" style="width: 100%;" />
           </el-form-item>
         </div>
 
