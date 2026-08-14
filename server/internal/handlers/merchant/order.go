@@ -22,7 +22,7 @@ type CompleteOrderRequest struct {
 }
 
 type QuickCompleteOrderRequest struct {
-	VerifyCode string `json:"verify_code" binding:"required"`
+	OrderID uint64 `json:"order_id" binding:"required"`
 }
 
 func loadMerchantOrderByID(merchantID, orderID uint64) (*models.Order, error) {
@@ -52,10 +52,7 @@ func getCompleterName(c *gin.Context, merchantID uint64) string {
 }
 
 func completeMerchantOrder(c *gin.Context, order *models.Order, verifyCode string) {
-	if order.VerifyCode != verifyCode {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码错误")
-		return
-	}
+	_ = verifyCode
 
 	if order.Status != 2 {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单状态不正确")
@@ -63,11 +60,9 @@ func completeMerchantOrder(c *gin.Context, order *models.Order, verifyCode strin
 	}
 
 	now := time.Now()
-	completedByName := getCompleterName(c, order.MerchantID)
 	if err := database.DB.Model(order).Updates(map[string]interface{}{
-		"status":            3,
-		"completed_at":      now,
-		"completed_by_name": completedByName,
+		"status":       3,
+		"completed_at": now,
 	}).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "完成订单失败")
 		return
@@ -87,29 +82,40 @@ func GetOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	status := c.Query("status")
-	deliveryType := c.Query("delivery_type")
+	orderType := c.Query("order_type")
+	bizStatus := c.Query("biz_status")
+	keyword := c.Query("keyword")
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
+	includeMerchant := c.Query("include_merchant") == "1"
 
 	var statusInt *int
 	if status != "" {
 		parsed, _ := strconv.Atoi(status)
 		statusInt = &parsed
 	}
-	var deliveryTypeInt *int
-	if deliveryType != "" {
-		parsed, _ := strconv.Atoi(deliveryType)
-		deliveryTypeInt = &parsed
+	var orderTypeInt *int
+	if orderType != "" {
+		parsed, _ := strconv.Atoi(orderType)
+		orderTypeInt = &parsed
+	}
+	var bizStatusInt *int
+	if bizStatus != "" {
+		parsed, _ := strconv.Atoi(bizStatus)
+		bizStatusInt = &parsed
 	}
 
 	result, err := orderquery.GetOrderList(c.Request.Context(), orderquery.ListOptions{
-		MerchantID:   merchantID,
-		Status:       statusInt,
-		DeliveryType: deliveryTypeInt,
-		StartDate:    startDate,
-		EndDate:      endDate,
-		Page:         page,
-		PageSize:     pageSize,
+		MerchantID:      merchantID,
+		Status:          statusInt,
+		OrderType:       orderTypeInt,
+		BizStatus:       bizStatusInt,
+		Keyword:         keyword,
+		StartDate:       startDate,
+		EndDate:         endDate,
+		Page:            page,
+		PageSize:        pageSize,
+		IncludeMerchant: includeMerchant,
 	})
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取订单列表失败")
@@ -180,28 +186,13 @@ func QuickCompleteOrder(c *gin.Context) {
 		return
 	}
 
-	verifyCode := strings.TrimSpace(req.VerifyCode)
-	if len(verifyCode) != 6 {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码应为6位数字")
-		return
-	}
-	for _, r := range verifyCode {
-		if r < '0' || r > '9' {
-			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "核销码应为6位数字")
-			return
-		}
-	}
-
-	var order models.Order
-	if err := database.DB.
-		Where("merchant_id = ? AND verify_code = ? AND status = ?", merchantID, verifyCode, 2).
-		Order("created_at DESC").
-		First(&order).Error; err != nil {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "未找到可核销订单")
+	order, err := loadMerchantOrderByID(merchantID, req.OrderID)
+	if err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
 		return
 	}
 
-	completeMerchantOrder(c, &order, verifyCode)
+	completeMerchantOrder(c, order, "")
 }
 
 type RefundRequest struct {

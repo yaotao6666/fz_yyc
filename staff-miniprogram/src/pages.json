@@ -1,0 +1,112 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/todo/index",
+      "style": {
+        "navigationBarTitleText": "待办",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/workorder/index",
+      "style": {
+        "navigationBarTitleText": "工单",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/workorder/detail",
+      "style": {
+        "navigationBarTitleText": "工单详情",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/schedule/index",
+      "style": {
+        "navigationBarTitleText": "排班",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/profile/index",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "财旭服务端",
+    "navigationBarBackgroundColor": "#517528",
+    "backgroundColor": "#F5F5F5"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#517528",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/todo/index",
+        "text": "待办",
+        "iconPath": "static/tabbar/todo.png",
+        "selectedIconPath": "static/tabbar/todo-active.png"
+      },
+      {
+        "pagePath": "pages/workorder/index",
+        "text": "工单",
+        "iconPath": "static/tabbar/workorder.png",
+        "selectedIconPath": "static/tabbar/workorder-active.png"
+      },
+      {
+        "pagePath": "pages/schedule/index",
+        "text": "排班",
+        "iconPath": "static/tabbar/schedule.png",
+        "selectedIconPath": "static/tabbar/schedule-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "static/tabbar/profile.png",
+        "selectedIconPath": "static/tabbar/profile-active.png"
+      }
+    ]
+  },
+  "condition": {
+    "current": 0,
+    "list": [
+      {
+        "name": "待办页",
+        "path": "pages/todo/index"
+      },
+      {
+        "name": "工单页",
+        "path": "pages/workorder/index"
+      },
+      {
+        "name": "排班页",
+        "path": "pages/schedule/index"
+      },
+      {
+        "name": "我的页",
+        "path": "pages/profile/index"
+      }
+    ]
+  }
+}

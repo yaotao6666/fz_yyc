@@ -1,35 +1,32 @@
-export interface ServiceProviderLoginRequest {
+export interface MerchantLoginRequest {
   username: string
   password: string
 }
 
-export interface ServiceProviderInfo {
+export interface MerchantStaffInfo {
   id: number
-  name: string
-  sp_name: string
+  merchant_id: number
+  username: string
+  name?: string
+  phone?: string
+  avatar?: string
+  status?: number
 }
 
-export interface ServiceProviderLoginResponse {
+export interface MerchantLoginResponse {
   token: string
-  service_provider: ServiceProviderInfo
+  merchant_id: number
+  staff: MerchantStaffInfo
 }
 
 export interface DashboardData {
-  total_merchants: number
-  pending_merchants?: number
+  total_orders: number
+  total_amount: number
   today_orders: number
-  today_revenue: number
-  distribution?: Array<{ category: string; count: number }>
-  trend?: Array<{ date: string; orders: number }>
-}
-
-export interface SpSettings {
-  service_provider_id?: number
-  name: string
-  sp_name: string
-  contact_phone: string
-  contact_email?: string
-  created_at?: string
+  today_amount: number
+  pending_orders: number
+  completed_orders: number
+  refunded_amount: number
 }
 
 export interface MerchantListItem {
@@ -45,14 +42,9 @@ export interface MerchantListItem {
   business_hours?: string
   announcement?: string
   sub_mch_id?: string
-  profit_sharing_enabled?: boolean
-  profit_sharing_ratio?: number
   payment_config_status?: number
   status: number
   created_at?: string
-  total_users: number
-  total_orders: number
-  total_amount: number
 }
 
 export interface MerchantDetail extends MerchantListItem {
@@ -62,30 +54,6 @@ export interface MerchantDetail extends MerchantListItem {
   admin_name?: string
   admin_phone?: string
   admin_status?: number
-}
-
-export interface MerchantPickupPoint {
-  id: number
-  merchant_id: number
-  name: string
-  address: string
-  lat: number
-  lng: number
-  is_default: boolean
-  status: number
-  sort: number
-  created_at?: string
-  updated_at?: string
-}
-
-export interface MerchantPickupPointPayload {
-  name: string
-  address: string
-  lat: number
-  lng: number
-  is_default?: boolean
-  status?: number
-  sort?: number
 }
 
 export interface MerchantCategory {
@@ -115,6 +83,8 @@ export interface MerchantProductQuery {
   page_size?: number
   category_id?: number
   status?: number | string
+  sale_type?: number | string
+  product_type?: number | string
   keyword?: string
 }
 
@@ -142,6 +112,13 @@ export interface MerchantProduct {
   original_price: number
   stock: number
   unit: string
+  product_type: number
+  service_content?: WellnessPackageContent | Record<string, unknown> | null
+  sale_type: number
+  rental_unit: number
+  rental_price: number
+  deposit: number
+  max_rental_duration: number
   sales: number
   sort: number
   status: number
@@ -149,6 +126,22 @@ export interface MerchantProduct {
   specs: MerchantProductSpec[]
   created_at?: string
   updated_at?: string
+}
+
+// 康养套餐内容：服务项列表
+export interface WellnessPackageItem {
+  id?: string
+  name: string // 服务项名称，如：血压测量
+  description?: string // 服务项描述
+  count?: number // 服务次数
+  unit?: string // 计量单位，如：次、小时
+}
+
+export interface WellnessPackageContent {
+  duration?: string // 套餐服务周期，如：一个月
+  items?: WellnessPackageItem[] // 服务项列表
+  notes?: string // 套餐备注
+  applicable_groups?: string // 适用人群
 }
 
 export interface MerchantProductListResponse {
@@ -169,6 +162,13 @@ export interface MerchantProductUpsertPayload {
   original_price?: number
   stock?: number
   unit?: string
+  product_type?: number
+  service_content?: WellnessPackageContent | Record<string, unknown> | null
+  sale_type?: number
+  rental_unit?: number
+  rental_price?: number
+  deposit?: number
+  max_rental_duration?: number
   sort?: number
   sales?: number
   specs?: MerchantProductSpec[]
@@ -190,35 +190,10 @@ export interface MerchantProductSpecsPayload {
   skus: unknown[]
 }
 
-export interface MerchantListResponse {
-  list: MerchantListItem[]
-  pagination: {
-    total: number
-    page: number
-    page_size: number
-  }
-}
-
-export interface SpMerchantFormData {
-  name: string
-  contact_name?: string
-  contact_phone?: string
-  contact_email?: string
-  address?: string
-  business_category?: string
-  business_hours?: string
-  announcement?: string
-  username: string
-  password: string
-  staff_name?: string
-  staff_phone?: string
-  sub_mch_id?: string
-  profit_sharing_enabled: boolean
-  profit_sharing_ratio: number
-}
-
 export interface UpdateSpMerchantFormData {
   name?: string
+  logo?: string
+  cover_image?: string
   contact_name?: string
   contact_phone?: string
   contact_email?: string
@@ -231,64 +206,6 @@ export interface UpdateSpMerchantFormData {
 
 export interface MerchantPaymentConfigFormData {
   sub_mch_id: string
-  profit_sharing_enabled: boolean
-  profit_sharing_ratio: number
-}
-
-export interface ProfitSharingRecord {
-  id: number
-  service_provider_id: number
-  merchant_id: number
-  order_id: number
-  order_no: string
-  transaction_id?: string
-  profit_sharing_order_no: string
-  profit_sharing_date: string
-  pay_amount: number
-  profit_sharing_ratio: number
-  profit_sharing_amount: number
-  merchant_received_amount: number
-  status: number
-  error_message?: string
-  created_at: string
-}
-
-export interface ProfitSharingRecordListResponse {
-  list: ProfitSharingRecord[]
-  pagination: {
-    total: number
-    page: number
-    page_size: number
-  }
-}
-
-export interface SpMerchantConversionItem {
-  merchant_id: number
-  merchant_name: string
-  merchant_logo?: string
-  visit_users: number
-  order_users: number
-  paid_orders: number
-  order_amount: number
-  avg_order_amount: number
-  visit_rate: number
-  order_rate: number
-}
-
-export interface MerchantDistributionData {
-  merchants: SpMerchantConversionItem[]
-  totals: {
-    merchant_count: number
-    visit_users: number
-    order_users: number
-    paid_orders: number
-    order_amount: number
-  }
-  pagination?: {
-    total: number
-    page: number
-    page_size: number
-  }
 }
 
 export const SpOrderStatusText: Record<number, string> = {
@@ -298,12 +215,6 @@ export const SpOrderStatusText: Record<number, string> = {
   4: '已取消',
   5: '退款中',
   6: '已退款'
-}
-
-export const SpDeliveryTypeText: Record<number, string> = {
-  1: '配送',
-  2: '堂食',
-  3: '自提'
 }
 
 export interface SpOrderUser {
@@ -332,6 +243,13 @@ export interface SpOrderItem {
   specs?: string
   spec_info?: string
   subtotal?: number
+  sale_type?: number
+  rental_unit?: number
+  rental_duration?: number
+  unit_rental_price?: number
+  rental_subtotal?: number
+  deposit?: number
+  deposit_deduct?: number
 }
 
 export interface SpOrderDeliveryInfo {
@@ -352,20 +270,19 @@ export interface SpOrder {
   delivery_fee: number
   discount_amount: number
   pay_amount: number
-  delivery_type?: number
-  delivery_distance?: number
+  total_deposit?: number
+  deposit_status?: number
+  deposit_refund_amount?: number
+  deposit_deduct_amount?: number
+  deposit_refunded_at?: string
+  rental_returned_at?: string
+  rental_return_remark?: string
   delivery_info?: SpOrderDeliveryInfo
   delivery_address?: string
   contact_name?: string
   contact_phone?: string
-  pickup_point_id?: number
-  pickup_point_name?: string
-  pickup_point_address?: string
-  pickup_point_lat?: number
-  pickup_point_lng?: number
   status: number
   remark?: string
-  verify_code?: string
   transaction_id?: string
   created_at: string
   paid_at?: string
@@ -373,6 +290,13 @@ export interface SpOrder {
   completed_by_name?: string
   cancelled_at?: string
   refunded_at?: string
+  // 工单字段
+  order_type?: number
+  biz_status?: number
+  assigned_staff_id?: number
+  scheduled_at?: string
+  actual_started_at?: string
+  actual_ended_at?: string
 }
 
 export interface SpOrderListResponse {
@@ -403,21 +327,6 @@ export interface AmountTrendData {
   }>
 }
 
-export interface TopMerchantRanking {
-  rank: number
-  metric: string
-  merchant_id: number
-  merchant_name: string
-  merchant_logo?: string
-  visit_rate: number
-  order_rate: number
-  order_amount: number
-  avg_order_amount: number
-  visit_users: number
-  order_users: number
-  paid_orders: number
-}
-
 export interface UploadTokenResponse {
   token: string
   domain: string
@@ -425,27 +334,47 @@ export interface UploadTokenResponse {
   upload_url?: string
 }
 
-export interface AnnouncementItem {
-  id: number
-  service_provider_id: number
-  title: string
-  content: string
-  status: number
-  created_at: string
-  updated_at: string
+// 订单类型文案（order_type）
+export const OrderTypeText: Record<number, string> = {
+  1: '零售',
+  2: '租赁',
+  3: '康养上门',
+  4: '陪诊服务',
+  5: '科普体验',
+  6: '长护险服务'
 }
 
-export interface AnnouncementListResponse {
-  list: AnnouncementItem[]
+// 工单业务状态文案（biz_status）
+export const BizStatusText: Record<number, string> = {
+  0: '无',
+  1: '待接单',
+  2: '待出发',
+  3: '服务中',
+  4: '待支付尾款',
+  5: '已完成',
+  6: '已取消'
+}
+
+// 服务人员（PC 后台管理）
+export interface ServiceStaffItem {
+  id: number
+  merchant_id: number
+  username: string
+  name: string
+  phone: string
+  openid?: string
+  avatar?: string
+  status: number // 0=待审核 1=启用 2=禁用
+  last_login_at?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ServiceStaffListResponse {
+  list: ServiceStaffItem[]
+  total: number
   pagination: {
-    total: number
     page: number
     page_size: number
   }
-}
-
-export interface AnnouncementFormData {
-  title: string
-  content: string
-  status: number
 }

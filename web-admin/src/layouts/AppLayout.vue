@@ -11,21 +11,15 @@ const authStore = useAuthStore()
 
 const menuItems = [
   { index: '/dashboard', label: '工作台' },
-  { index: '/merchants', label: '商家列表' },
   { index: '/orders', label: '订单管理' },
-  { index: '/announcements', label: '公告管理' },
-  { index: '/profit-sharing', label: '分账历史' },
+  { index: '/products', label: '商品管理' },
+  { index: '/categories', label: '分类管理' },
+  { index: '/staff', label: '服务人员' },
   { index: '/analytics', label: '数据分析' },
-  { index: '/settings', label: '服务商设置' }
+  { index: '/profile', label: '商家资料' }
 ]
 
 const activeMenu = computed(() => {
-  if (route.path.startsWith('/merchants')) {
-    return '/merchants'
-  }
-  if (route.path.startsWith('/announcements')) {
-    return '/announcements'
-  }
   if (route.path.startsWith('/orders')) {
     return '/orders'
   }
@@ -53,7 +47,7 @@ async function handleLogout() {
     <el-aside class="layout-aside" width="240px">
       <div class="brand-block">
         <div class="brand-title">{{ APP_TITLE }}</div>
-        <div class="brand-subtitle">服务商后台管理</div>
+        <div class="brand-subtitle">商家后台管理</div>
       </div>
       <el-menu router :default-active="activeMenu" class="side-menu">
         <el-menu-item v-for="item in menuItems" :key="item.index" :index="item.index">
@@ -65,11 +59,11 @@ async function handleLogout() {
     <el-container>
       <el-header class="layout-header">
         <div>
-          <div class="header-page-title">{{ route.meta.title || '服务商后台' }}</div>
-          <div class="header-page-subtitle">{{ authStore.serviceProviderName }}</div>
+          <div class="header-page-title">{{ route.meta.title || '商家后台' }}</div>
+          <div class="header-page-subtitle">{{ authStore.staffName }}</div>
         </div>
         <div class="header-actions">
-          <span class="operator-name">{{ authStore.operatorName }}</span>
+          <span class="operator-name">{{ authStore.staffName }}</span>
           <el-button type="primary" plain @click="handleLogout">退出登录</el-button>
         </div>
       </el-header>

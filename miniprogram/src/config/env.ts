@@ -9,7 +9,7 @@
  */
 
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8080'
-const DEFAULT_APP_NAME = '寻梦私域管家'
+const DEFAULT_APP_NAME = '财旭商贸'
 
 function trimTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '')
@@ -44,5 +44,3 @@ export const WS_BASE_URL = trimTrailingSlash(
 )
 
 export const APP_NAME = getEnvValue('VITE_APP_NAME', DEFAULT_APP_NAME)
-
-export const MERCHANT_SOCKET_URL = `${WS_BASE_URL}/api/v1/ws/merchant`

@@ -12,13 +12,23 @@
 
     <!-- 商品信息 -->
     <view class="product-info">
-      <view class="price-row">
+      <view class="price-row" v-if="product.sale_type === 2">
+        <text class="current-price">¥{{ product.rental_price.toFixed(2) }}/{{ getRentalUnitText(product.rental_unit) }}</text>
+        <text class="deposit-tag">押金 ¥{{ product.deposit.toFixed(2) }}</text>
+      </view>
+      <view class="price-row" v-else>
         <text class="current-price">¥{{ selectedPrice.toFixed(2) }}</text>
         <text v-if="product.original_price > 0" class="original-price">
           ¥{{ product.original_price.toFixed(2) }}
         </text>
       </view>
-      <view class="product-name">{{ product.name }}</view>
+      <view class="product-name">
+        {{ product.name }}
+        <text v-if="product.product_type === 2 || product.sale_type === 2" class="rental-badge">租赁</text>
+        <text v-else-if="product.product_type === 3" class="wellness-badge">套餐</text>
+        <text v-else-if="product.product_type === 4" class="escort-badge">陪诊</text>
+        <text v-else-if="product.product_type === 5" class="info-badge">资讯</text>
+      </view>
       <view class="product-meta">
         <text>库存: {{ selectedStock }}</text>
         <text>销量: {{ product.sales || 0 }}</text>
@@ -26,6 +36,68 @@
       </view>
       <view class="product-desc" v-if="product.description">
         {{ product.description }}
+      </view>
+    </view>
+
+    <!-- 康养套餐服务内容 -->
+    <view class="wellness-section" v-if="product.product_type === 3 && wellnessServices.length">
+      <view class="section-title">🌿 套餐包含服务</view>
+      <view class="wellness-meta" v-if="wellnessMeta.cycle || wellnessMeta.target_audience">
+        <view class="wellness-meta-item" v-if="wellnessMeta.cycle">
+          <text class="meta-label">套餐周期：</text>
+          <text class="meta-value">{{ wellnessMeta.cycle }}</text>
+        </view>
+        <view class="wellness-meta-item" v-if="wellnessMeta.target_audience">
+          <text class="meta-label">适用人群：</text>
+          <text class="meta-value">{{ wellnessMeta.target_audience }}</text>
+        </view>
+      </view>
+      <view class="wellness-service-list">
+        <view
+          v-for="(svc, idx) in wellnessServices"
+          :key="idx"
+          class="wellness-service-item"
+        >
+          <view class="svc-index">{{ idx + 1 }}</view>
+          <view class="svc-content">
+            <view class="svc-name">
+              {{ svc.name }}
+              <text class="svc-count" v-if="svc.count">
+                {{ svc.count }}{{ svc.unit || '次' }}
+              </text>
+            </view>
+            <view class="svc-desc" v-if="svc.description">{{ svc.description }}</view>
+          </view>
+        </view>
+      </view>
+      <view class="wellness-remark" v-if="wellnessMeta.remark">
+        💡 {{ wellnessMeta.remark }}
+      </view>
+    </view>
+
+    <!-- 陪诊服务说明 -->
+    <view class="service-section" v-if="product.product_type === 4">
+      <view class="section-title">🏥 服务说明</view>
+      <view class="service-info-box">
+        <view class="service-info-row">服务类型：专业陪诊服务</view>
+        <view class="service-info-row">服务人员：经审核认证的专业陪诊师</view>
+        <view class="service-info-row" v-if="product.service_content?.duration">
+          服务时长：{{ product.service_content.duration }}
+        </view>
+        <view class="service-info-row" v-if="product.service_content?.includes">
+          服务包含：{{ product.service_content.includes }}
+        </view>
+      </view>
+    </view>
+
+    <!-- 科普资讯 -->
+    <view class="info-section" v-if="product.product_type === 5">
+      <view class="section-title">📚 内容介绍</view>
+      <view class="info-content-box">
+        <view class="info-type-tag">科普资讯</view>
+        <view class="info-text" v-if="product.service_content?.content">
+          {{ product.service_content.content }}
+        </view>
       </view>
     </view>
 
@@ -54,6 +126,31 @@
               <text v-if="option.price > 0" class="option-price">+¥{{ option.price.toFixed(2) }}</text>
             </view>
           </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 租赁时长选择 -->
+    <view class="rental-section" v-if="product.sale_type === 2">
+      <view class="section-title">租赁时长</view>
+      <view class="duration-options">
+        <view
+          v-for="d in availableDurations"
+          :key="d"
+          class="duration-option"
+          :class="{ active: rentalDuration === d }"
+          @click="rentalDuration = d"
+        >
+          {{ d }}{{ getRentalUnitText(product.rental_unit) }}
+        </view>
+      </view>
+      <view class="rental-summary">
+        <view class="rental-summary-row">
+          <text>租金：¥{{ (product.rental_price * rentalDuration).toFixed(2) }}</text>
+          <text>押金：¥{{ product.deposit.toFixed(2) }}</text>
+        </view>
+        <view class="rental-summary-total">
+          合计：¥{{ (product.rental_price * rentalDuration + product.deposit).toFixed(2) }}
         </view>
       </view>
     </view>
@@ -109,7 +206,7 @@ import { getStoreProduct } from '../../api/store'
 import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
 import { parseStoreProductEntryOptions } from '@utils/storeEntry'
-import type { Product, SpecOption } from '@types'
+import type { Product, SpecOption, WellnessPackageItem } from '@types'
 import { BrandAsset } from '../../utils/constants'
 
 const cartStore = useCartStore()
@@ -117,12 +214,46 @@ const { trackProductView } = useAnalytics()
 
 const product = ref<Product | null>(null)
 const quantity = ref(1)
+const rentalDuration = ref(1)
 const selectedSpecs = reactive<Record<string, string>>({})
 const merchantId = ref(1)
 const productId = ref(1)
 const entrySource = ref('scan')
 
 const cartCount = computed(() => cartStore.totalCount)
+
+// 康养套餐：服务项列表
+const wellnessServices = computed<WellnessPackageItem[]>(() => {
+  if (!product.value || Number(product.value.product_type) !== 3) return []
+  const sc = product.value.service_content
+  if (sc && Array.isArray(sc.services)) return sc.services as WellnessPackageItem[]
+  return []
+})
+// 康养套餐：其他元数据
+const wellnessMeta = computed<{ cycle?: string; target_audience?: string; remark?: string }>(() => {
+  if (!product.value || Number(product.value.product_type) !== 3) return {}
+  const sc = product.value.service_content
+  if (!sc) return {}
+  return {
+    cycle: sc.cycle || '',
+    target_audience: sc.target_audience || '',
+    remark: sc.remark || ''
+  }
+})
+
+function getRentalUnitText(unit?: number): string {
+  return { 1: '天', 2: '周', 3: '月' }[Number(unit || 0)] || ''
+}
+
+const availableDurations = computed(() => {
+  if (!product.value || product.value.sale_type !== 2) return []
+  const max = Number(product.value.max_rental_duration || 0)
+  if (max > 0) {
+    return Array.from({ length: max }, (_, i) => i + 1)
+  }
+  // 默认提供 1-12 的时长选项
+  return [1, 2, 3, 5, 7, 10, 15, 30]
+})
 
 const selectedPrice = computed(() => {
   if (!product.value) return 0
@@ -232,6 +363,11 @@ function getSpecString(): string {
 function addToCart() {
   if (!product.value) return
 
+  if (product.value.sale_type === 2 && rentalDuration.value <= 0) {
+    uni.showToast({ title: '请选择租赁时长', icon: 'none' })
+    return
+  }
+
   cartStore.addItem({
     merchant_id: merchantId.value,
     merchant_name: cartStore.merchantName || '',
@@ -241,7 +377,13 @@ function addToCart() {
     price: selectedPrice.value,
     quantity: quantity.value,
     specs: getSpecString(),
-    max_stock: selectedStock.value
+    max_stock: selectedStock.value,
+    product_type: product.value.product_type,
+    sale_type: product.value.sale_type,
+    rental_unit: product.value.rental_unit,
+    rental_price: product.value.rental_price,
+    deposit: product.value.deposit,
+    rental_duration: product.value.sale_type === 2 ? rentalDuration.value : 0
   })
 
   uni.showToast({
@@ -253,7 +395,30 @@ function addToCart() {
 function buyNow() {
   if (!product.value) return
 
-  // 直接跳转确认订单页
+  if (product.value.sale_type === 2 && rentalDuration.value <= 0) {
+    uni.showToast({ title: '请选择租赁时长', icon: 'none' })
+    return
+  }
+
+  const item = {
+    merchant_id: merchantId.value,
+    merchant_name: cartStore.merchantName || '',
+    product_id: product.value.id,
+    product_name: product.value.name,
+    image: product.value.images?.[0] || '',
+    price: selectedPrice.value,
+    quantity: quantity.value,
+    specs: getSpecString(),
+    max_stock: selectedStock.value,
+    product_type: product.value.product_type,
+    sale_type: product.value.sale_type,
+    rental_unit: product.value.rental_unit,
+    rental_price: product.value.rental_price,
+    deposit: product.value.deposit,
+    rental_duration: product.value.sale_type === 2 ? rentalDuration.value : 0
+  }
+  cartStore.setBuyNowItem(item)
+
   uni.navigateTo({
     url: `/pages/store/confirm?merchant_id=${merchantId.value}&buy_now=1`
   })
@@ -310,6 +475,249 @@ function goCart() {
   color: #999999;
   text-decoration: line-through;
   margin-left: 16rpx;
+}
+
+.deposit-tag {
+  font-size: 26rpx;
+  color: #ff9500;
+  margin-left: 16rpx;
+  background: #fff7e6;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.rental-badge {
+  font-size: 24rpx;
+  color: #ffffff;
+  background: #ff9500;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  margin-left: 12rpx;
+  vertical-align: middle;
+}
+
+.wellness-badge {
+  font-size: 24rpx;
+  color: #ffffff;
+  background: #22c55e;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  margin-left: 12rpx;
+  vertical-align: middle;
+}
+
+.escort-badge {
+  font-size: 24rpx;
+  color: #ffffff;
+  background: #6366f1;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  margin-left: 12rpx;
+  vertical-align: middle;
+}
+
+.info-badge {
+  font-size: 24rpx;
+  color: #ffffff;
+  background: #64748b;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  margin-left: 12rpx;
+  vertical-align: middle;
+}
+
+/* 康养套餐服务内容 */
+.wellness-section {
+  background: #ffffff;
+  padding: 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.wellness-meta {
+  background: #f0fdf4;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 24rpx;
+  border-left: 6rpx solid #22c55e;
+}
+
+.wellness-meta-item {
+  font-size: 26rpx;
+  color: #166534;
+  margin-bottom: 8rpx;
+}
+.wellness-meta-item:last-child { margin-bottom: 0; }
+
+.meta-label {
+  color: #166534;
+  font-weight: 500;
+}
+.meta-value {
+  color: #14532d;
+}
+
+.wellness-service-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.wellness-service-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 20rpx;
+  background: #f9fafb;
+  border-radius: 12rpx;
+}
+
+.svc-index {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.svc-content { flex: 1; min-width: 0; }
+
+.svc-name {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #1a1a1a;
+  margin-bottom: 6rpx;
+}
+
+.svc-count {
+  display: inline-block;
+  margin-left: 10rpx;
+  font-size: 22rpx;
+  color: #16a34a;
+  background: #dcfce7;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+}
+
+.svc-desc {
+  font-size: 24rpx;
+  color: #666666;
+  line-height: 1.5;
+}
+
+.wellness-remark {
+  margin-top: 24rpx;
+  padding: 16rpx 20rpx;
+  background: #fffbeb;
+  border-radius: 10rpx;
+  font-size: 24rpx;
+  color: #92400e;
+  line-height: 1.6;
+}
+
+/* 陪诊服务说明 */
+.service-section {
+  background: #ffffff;
+  padding: 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.service-info-box {
+  background: #eef2ff;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  border-left: 6rpx solid #6366f1;
+}
+
+.service-info-row {
+  font-size: 26rpx;
+  color: #3730a3;
+  margin-bottom: 10rpx;
+  line-height: 1.6;
+}
+.service-info-row:last-child { margin-bottom: 0; }
+
+/* 科普资讯 */
+.info-section {
+  background: #ffffff;
+  padding: 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.info-content-box {
+  background: #f8fafc;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  border-left: 6rpx solid #64748b;
+}
+
+.info-type-tag {
+  display: inline-block;
+  font-size: 22rpx;
+  color: #ffffff;
+  background: #64748b;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  margin-bottom: 14rpx;
+}
+
+.info-text {
+  font-size: 26rpx;
+  color: #334155;
+  line-height: 1.8;
+}
+
+.rental-section {
+  background: #ffffff;
+  padding: 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.duration-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.duration-option {
+  padding: 16rpx 32rpx;
+  background: #f5f5f5;
+  border-radius: 12rpx;
+  border: 2rpx solid transparent;
+  font-size: 28rpx;
+  color: #1a1a1a;
+}
+
+.duration-option.active {
+  background: #e6f0ff;
+  border-color: #007AFF;
+  color: #007AFF;
+}
+
+.rental-summary {
+  background: #f9fafb;
+  border-radius: 12rpx;
+  padding: 24rpx;
+}
+
+.rental-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 28rpx;
+  color: #666666;
+  margin-bottom: 12rpx;
+}
+
+.rental-summary-total {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #ff4d4f;
 }
 
 .product-name {

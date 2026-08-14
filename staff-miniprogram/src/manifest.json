@@ -1,0 +1,39 @@
+{
+  "name": "财旭商贸-服务人员端",
+  "appid": "wx71a54b66552dc9e8",
+  "description": "财旭商贸服务人员端 - 处理康养上门、陪诊、辅具租赁归还、科普活动等服务工单",
+  "versionName": "0.1.0",
+  "versionCode": "1",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "wx71a54b66552dc9e8",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "postcss": true,
+      "minified": true,
+      "lazyCodeLoading": "requiredComponents"
+    },
+    "usingComponents": true,
+    "lazyCodeLoading": "requiredComponents",
+    "permission": {
+      "scope.userLocation": {
+        "desc": "获取您的位置信息用于上门签到打卡"
+      }
+    },
+    "requiredPrivateInfos": [
+      "getLocation",
+      "chooseLocation"
+    ]
+  },
+  "h5": {
+    "devServer": {
+      "port": 3001,
+      "disableHostCheck": true
+    },
+    "router": {
+      "mode": "hash"
+    },
+    "title": "财旭商贸-服务端"
+  }
+}

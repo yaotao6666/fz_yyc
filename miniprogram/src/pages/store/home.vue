@@ -155,17 +155,84 @@
                   mode="aspectFill"
                 />
                 <view class="product-info">
-                  <view class="product-name">{{ product.name }}</view>
+                  <view class="product-name">
+                    {{ product.name }}
+                    <text v-if="Number(product.sale_type) === 2" class="product-rental-tag">租赁</text>
+                    <text v-else-if="Number(product.product_type) === 3" class="product-wellness-tag">套餐</text>
+                    <text v-else-if="Number(product.product_type) === 4" class="product-escort-tag">陪诊</text>
+                    <text v-else-if="Number(product.product_type) === 5" class="product-info-tag">资讯</text>
+                  </view>
                   <view class="product-bottom">
                     <view class="product-price">
-                      <text class="price">¥{{ product.price.toFixed(2) }}</text>
-                      <text v-if="(product.original_price || 0) > 0" class="original-price">
-                        ¥{{ (product.original_price || 0).toFixed(2) }}
-                      </text>
+                      <template v-if="Number(product.sale_type) === 2">
+                        <text class="price">¥{{ Number(product.rental_price || 0).toFixed(2) }}/{{ getRentalUnitText(product.rental_unit) }}</text>
+                      </template>
+                      <template v-else>
+                        <text class="price">¥{{ product.price.toFixed(2) }}</text>
+                        <text v-if="(product.original_price || 0) > 0" class="original-price">
+                          ¥{{ (product.original_price || 0).toFixed(2) }}
+                        </text>
+                      </template>
                     </view>
-                    <view class="add-btn" @click.stop="addToCart(product)">+</view>
+                    <view class="add-btn" @click.stop="onProductQuickAdd(product)">+</view>
                   </view>
                   <view class="product-sales">已售 {{ product.sales || 0 }}</view>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <!-- 按商品类型分区展示 -->
+          <view class="type-sections" v-if="hasProductTypeSections">
+            <view
+              v-for="section in productTypeSections"
+              :key="section.key"
+              class="type-section"
+            >
+              <view class="type-section-header">
+                <text class="type-section-icon">{{ section.icon }}</text>
+                <text class="type-section-title">{{ section.title }}</text>
+                <text class="type-section-count">{{ section.products.length }} 件</text>
+              </view>
+              <view class="type-section-grid">
+                <view
+                  v-for="product in section.products.slice(0, 6)"
+                  :key="product.id"
+                  class="type-section-card"
+                  @click="goProductDetail(product.id)"
+                >
+                  <image
+                    class="type-card-image"
+                    :src="getProductImage(product)"
+                    mode="aspectFill"
+                  />
+                  <view class="type-card-info">
+                    <view class="type-card-name">
+                      {{ product.name }}
+                      <text v-if="Number(section.key) === 2" class="product-rental-tag">租赁</text>
+                      <text v-else-if="Number(section.key) === 3" class="product-wellness-tag">套餐</text>
+                      <text v-else-if="Number(section.key) === 4" class="product-escort-tag">陪诊</text>
+                      <text v-else-if="Number(section.key) === 5" class="product-info-tag">资讯</text>
+                    </view>
+                    <view class="type-card-desc" v-if="product.description && Number(section.key) === 3">
+                      {{ getWellnessPackagePreview(product) }}
+                    </view>
+                    <view class="type-card-bottom">
+                      <view class="type-card-price">
+                        <template v-if="Number(section.key) === 2">
+                          <text class="price">¥{{ Number(product.rental_price || 0).toFixed(2) }}/{{ getRentalUnitText(product.rental_unit) }}</text>
+                          <text class="rental-deposit-tip">押金 ¥{{ Number(product.deposit || 0).toFixed(2) }}</text>
+                        </template>
+                        <template v-else>
+                          <text class="price">¥{{ product.price.toFixed(2) }}</text>
+                          <text v-if="(product.original_price || 0) > 0" class="original-price">
+                            ¥{{ (product.original_price || 0).toFixed(2) }}
+                          </text>
+                        </template>
+                      </view>
+                      <view class="add-btn" @click.stop="onProductQuickAdd(product)">+</view>
+                    </view>
+                  </view>
                 </view>
               </view>
             </view>
@@ -204,16 +271,28 @@
                     mode="aspectFill"
                   />
                   <view class="item-info">
-                    <view class="item-name">{{ product.name }}</view>
+                    <view class="item-name">
+                      {{ product.name }}
+                      <text v-if="Number(product.product_type) === 2 || Number(product.sale_type) === 2" class="product-rental-tag">租赁</text>
+                      <text v-else-if="Number(product.product_type) === 3" class="product-wellness-tag">套餐</text>
+                      <text v-else-if="Number(product.product_type) === 4" class="product-escort-tag">陪诊</text>
+                      <text v-else-if="Number(product.product_type) === 5" class="product-info-tag">资讯</text>
+                    </view>
                     <view class="item-desc" v-if="product.description">{{ product.description }}</view>
                     <view class="item-bottom">
                       <view class="item-price">
-                        <text class="price">¥{{ product.price.toFixed(2) }}</text>
-                        <text v-if="(product.original_price || 0) > 0" class="original-price">
-                          ¥{{ (product.original_price || 0).toFixed(2) }}
-                        </text>
+                        <template v-if="Number(product.sale_type) === 2">
+                          <text class="price">¥{{ Number(product.rental_price || 0).toFixed(2) }}/{{ getRentalUnitText(product.rental_unit) }}</text>
+                          <text class="rental-deposit-tip">押金 ¥{{ Number(product.deposit || 0).toFixed(2) }}</text>
+                        </template>
+                        <template v-else>
+                          <text class="price">¥{{ product.price.toFixed(2) }}</text>
+                          <text v-if="(product.original_price || 0) > 0" class="original-price">
+                            ¥{{ (product.original_price || 0).toFixed(2) }}
+                          </text>
+                        </template>
                       </view>
-                      <view class="add-btn" @click.stop="addToCart(product)">+</view>
+                      <view class="add-btn" @click.stop="onProductQuickAdd(product)">+</view>
                     </view>
                   </view>
                 </view>
@@ -347,7 +426,7 @@
           </view>
           <view class="guide-item">
             <view class="guide-step">4️⃣</view>
-            <view class="guide-text">到店出示核销码或等待配送</view>
+            <view class="guide-text">等待商品配送</view>
           </view>
         </view>
         <view class="guide-footer">
@@ -368,8 +447,27 @@ import { useCartStore } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
 import { getCachedImagePath, cacheImage } from '@utils/imageCache'
 import { parseStoreEntryOptions } from '@utils/storeEntry'
-import type { StoreHomeInfo, Product, SpecOption, StoreProductGroup } from '@types'
+import type { StoreHomeInfo, Product, SpecOption, StoreProductGroup, ProductType } from '@types'
 import { BrandAsset } from '../../utils/constants'
+
+// 商品类型分区配置
+const PRODUCT_TYPE_SECTIONS: Array<{
+  key: ProductType
+  title: string
+  icon: string
+  tagClass: string
+  tagText: string
+}> = [
+  { key: 1, title: '辅具零售', icon: '🛍️', tagClass: 'pt-retail-tag', tagText: '一口价' },
+  { key: 2, title: '辅具租赁', icon: '🔑', tagClass: 'pt-rental-tag', tagText: '租赁' },
+  { key: 3, title: '康养套餐', icon: '🌿', tagClass: 'pt-wellness-tag', tagText: '套餐' },
+  { key: 4, title: '陪诊服务', icon: '🏥', tagClass: 'pt-escort-tag', tagText: '陪诊' },
+  { key: 5, title: '科普资讯', icon: '📚', tagClass: 'pt-info-tag', tagText: '资讯' }
+]
+
+function getProductTypeSection(productType: ProductType | number) {
+  return PRODUCT_TYPE_SECTIONS.find(s => s.key === productType)
+}
 
 const cartStore = useCartStore()
 const { trackVisit, trackPageView } = useAnalytics()
@@ -415,6 +513,20 @@ const productSections = computed<StoreProductGroup[]>(() => {
     products: categoryProductsMap[category.id] || []
   }))
 })
+// 所有已加载商品（跨分类聚合）
+const allProducts = computed<Product[]>(() => {
+  const list: Product[] = []
+  Object.values(categoryProductsMap).forEach(items => list.push(...items))
+  return list
+})
+// 按商品类型分区（用于首页按类型展示）
+const productTypeSections = computed(() => {
+  return PRODUCT_TYPE_SECTIONS.map(section => ({
+    ...section,
+    products: allProducts.value.filter(p => Number(p.product_type) === section.key)
+  })).filter(section => section.products.length > 0)
+})
+const hasProductTypeSections = computed(() => productTypeSections.value.length > 0)
 const hasLoadedAnyProducts = computed(() => productSections.value.some(section => section.products.length > 0))
 const showProductEmpty = computed(() => !loadingProducts.value && !hasLoadedAnyProducts.value && !showHotProducts.value)
 const showPageError = computed(() => !!pageErrorMessage.value && !storeInfo.value)
@@ -776,6 +888,33 @@ function goProductDetail(productId: number) {
   uni.navigateTo({
     url: `/pages/store/product?merchant_id=${merchantId}&product_id=${productId}`
   })
+}
+
+function getRentalUnitText(unit?: number): string {
+  return { 1: '天', 2: '周', 3: '月' }[Number(unit || 0)] || ''
+}
+
+// 首页快捷加购：租赁/康养套餐/陪诊/资讯 跳详情页；普通一口价商品走原加购弹窗
+function onProductQuickAdd(product: any) {
+  const pt = Number(product.product_type ?? 0)
+  if (pt === 2 || pt === 3 || pt === 4 || pt === 5 || Number(product.sale_type) === 2) {
+    goProductDetail(product.id)
+    return
+  }
+  addToCart(product)
+}
+
+// 康养套餐预览：展示前 N 个服务项名称
+function getWellnessPackagePreview(product: Product): string {
+  try {
+    const sc = product.service_content
+    if (sc && Array.isArray(sc.services) && sc.services.length > 0) {
+      const names = sc.services.slice(0, 3).map((s: any) => s?.name || '').filter(Boolean)
+      if (names.length) return '包含：' + names.join('、')
+    }
+  } catch (_) {}
+  if (product.description) return product.description
+  return '查看详情了解套餐内容'
 }
 
 async function addToCart(product: any) {
@@ -1422,6 +1561,57 @@ function goMyOrders() {
   white-space: nowrap;
 }
 
+.product-rental-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: #ff9500;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}
+
+.product-wellness-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: #22c55e;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}
+
+.product-escort-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: #6366f1;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}
+
+.product-info-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: #64748b;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}
+
+.rental-deposit-tip {
+  display: block;
+  font-size: 22rpx;
+  color: #ff9500;
+  margin-top: 4rpx;
+}
+
 .product-bottom {
   display: flex;
   justify-content: space-between;
@@ -1635,6 +1825,105 @@ function goMyOrders() {
   font-size: 24rpx;
   color: #888888;
   line-height: 1.6;
+}
+
+/* 按商品类型分区展示 */
+.type-sections {
+  margin-bottom: 20rpx;
+}
+
+.type-section {
+  margin-bottom: 28rpx;
+  padding: 20rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  border: 1rpx solid #f0f0f0;
+}
+
+.type-section-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.type-section-icon {
+  font-size: 36rpx;
+  margin-right: 10rpx;
+}
+
+.type-section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  flex: 1;
+}
+
+.type-section-count {
+  font-size: 22rpx;
+  color: #999999;
+}
+
+.type-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+}
+
+.type-section-card {
+  background: #fafafa;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.type-card-image {
+  width: 100%;
+  height: 220rpx;
+  background: #e0e0e0;
+}
+
+.type-card-info {
+  padding: 14rpx;
+}
+
+.type-card-name {
+  font-size: 26rpx;
+  color: #1a1a1a;
+  line-height: 1.4;
+  margin-bottom: 8rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.type-card-desc {
+  font-size: 22rpx;
+  color: #666666;
+  margin-bottom: 10rpx;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.type-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.type-card-price {
+  flex: 1;
+  min-width: 0;
+}
+
+.type-card-price .price {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #ff4d4f;
 }
 
 .cart-bar {

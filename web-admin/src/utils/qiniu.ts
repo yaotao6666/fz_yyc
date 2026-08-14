@@ -8,8 +8,8 @@ function joinQiniuFileUrl(domain: string, key: string): string {
   return `${normalizedDomain.replace(/\/+$/, '')}/${key.replace(/^\/+/, '')}`
 }
 
-export async function uploadSpImage(file: File, merchantId?: number): Promise<{ url: string; key: string }> {
-  const uploadData = await getUploadToken(merchantId ? { merchant_id: merchantId } : undefined)
+export async function uploadSpImage(file: File): Promise<{ url: string; key: string }> {
+  const uploadData = await getUploadToken()
   const ext = file.name.split('.').pop() || 'jpg'
   const key = `${uploadData.prefix}/${Date.now()}.${ext}`
   const formData = new FormData()

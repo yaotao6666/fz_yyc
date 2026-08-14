@@ -1,19 +1,8 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
-import { useAuthStore } from '@/stores/auth'
 
 onLaunch(() => {
   console.log('App Launch')
-  const authStore = useAuthStore()
-
-  // 统一收口商家登录失效事件，避免 401 跳转时残留 WebSocket 连接。
-  uni.$off('merchant-session-expired')
-  uni.$on('merchant-session-expired', () => {
-    authStore.handleSessionExpired()
-  })
-
-  // 检查登录状态
-  authStore.checkLogin()
 })
 
 onShow(() => {

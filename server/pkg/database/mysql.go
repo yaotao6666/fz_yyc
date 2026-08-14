@@ -50,6 +50,10 @@ func InitDB(cfg *config.Database) error {
 		return fmt.Errorf("初始化商家扩展字段失败: %w", ensureErr)
 	}
 
+	if ensureErr := ensureServiceStaffTable(DB); ensureErr != nil {
+		return fmt.Errorf("初始化服务人员表失败: %w", ensureErr)
+	}
+
 	// 获取底层 sql.DB
 	sqlDB, err := DB.DB()
 	if err != nil {
@@ -165,6 +169,10 @@ func ensureUserBehaviorEventsTable(db *gorm.DB) error {
 	return db.AutoMigrate(&models.UserBehaviorEvent{})
 }
 
+func ensureServiceStaffTable(db *gorm.DB) error {
+	return db.AutoMigrate(&models.ServiceStaff{})
+}
+
 func ensureUserTables(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&models.User{},
@@ -176,11 +184,6 @@ func ensureOrderColumns(db *gorm.DB) error {
 	orderColumns := map[string]string{
 		"completed_by_name":      "ADD COLUMN completed_by_name VARCHAR(64) DEFAULT NULL COMMENT '核销人' AFTER completed_at",
 		"pay_notify_payload":     "ADD COLUMN pay_notify_payload JSON DEFAULT NULL COMMENT '支付回调原始数据' AFTER paid_at",
-		"profit_sharing_status":  "ADD COLUMN profit_sharing_status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '分账状态' AFTER refunded_at",
-		"profit_sharing_amount":  "ADD COLUMN profit_sharing_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '分账金额' AFTER profit_sharing_status",
-		"profit_sharing_order_no":"ADD COLUMN profit_sharing_order_no VARCHAR(64) DEFAULT NULL COMMENT '分账单号' AFTER profit_sharing_amount",
-		"profit_sharing_at":      "ADD COLUMN profit_sharing_at DATETIME DEFAULT NULL COMMENT '分账时间' AFTER profit_sharing_order_no",
-		"profit_sharing_error":   "ADD COLUMN profit_sharing_error VARCHAR(256) DEFAULT NULL COMMENT '分账错误信息' AFTER profit_sharing_at",
 	}
 
 	for columnName, addSQL := range orderColumns {
@@ -189,7 +192,7 @@ func ensureOrderColumns(db *gorm.DB) error {
 		}
 	}
 
-	return db.AutoMigrate(&models.MerchantProfitSharingRecord{})
+	return nil
 }
 
 func ensureMerchantColumns(db *gorm.DB) error {
@@ -203,9 +206,7 @@ func ensureMerchantColumns(db *gorm.DB) error {
 		{name: "takeout_enabled", addSQL: "ADD COLUMN takeout_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否支持配送' AFTER min_order_amount"},
 		{name: "dine_in_enabled", addSQL: "ADD COLUMN dine_in_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否支持堂食' AFTER takeout_enabled"},
 		{name: "pickup_enabled", addSQL: "ADD COLUMN pickup_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否支持自提' AFTER dine_in_enabled"},
-		{name: "profit_sharing_enabled", addSQL: "ADD COLUMN profit_sharing_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否开启分账' AFTER sub_mch_id"},
-		{name: "profit_sharing_ratio", addSQL: "ADD COLUMN profit_sharing_ratio DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT '分账比例' AFTER profit_sharing_enabled"},
-		{name: "payment_config_status", addSQL: "ADD COLUMN payment_config_status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '支付配置状态' AFTER profit_sharing_ratio"},
+		{name: "payment_config_status", addSQL: "ADD COLUMN payment_config_status TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '支付配置状态' AFTER sub_mch_id"},
 	}
 
 	for _, column := range merchantColumns {

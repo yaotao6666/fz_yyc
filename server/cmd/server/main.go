@@ -5,8 +5,9 @@ import (
 	"os"
 
 	"fz_yyc_api/internal/config"
+	"fz_yyc_api/internal/handlers/callbacks"
 	"fz_yyc_api/internal/handlers/merchant"
-	"fz_yyc_api/internal/handlers/sp"
+	serviceStaff "fz_yyc_api/internal/handlers/service_staff"
 	"fz_yyc_api/internal/handlers/upload"
 	"fz_yyc_api/internal/handlers/user"
 	wsHandler "fz_yyc_api/internal/handlers/ws"
@@ -82,6 +83,13 @@ func setupRoutes(r *gin.Engine) {
 			devGroup.POST("/store-visit-notify", wsHandler.DevStoreVisitNotify)
 		}
 
+		// 微信支付回调（不需要鉴权）
+		callbackGroup := v1.Group("/callback/wechatpay")
+		{
+			callbackGroup.POST("/pay", callbacks.WechatPayPayCallback)
+			callbackGroup.POST("/refund", callbacks.WechatPayRefundCallback)
+		}
+
 		// 认证相关
 		authGroup := v1.Group("/auth")
 		{
@@ -110,9 +118,6 @@ func setupRoutes(r *gin.Engine) {
 			storeGroup.GET("/home", user.GetStoreHome)
 			storeGroup.GET("/products", user.GetProducts)
 			storeGroup.GET("/products/:product_id", user.GetProductDetail)
-			storeGroup.GET("/delivery-rules", user.GetDeliveryRules)
-			storeGroup.GET("/pickup-points", user.GetPickupPoints)
-			storeGroup.GET("/full-reduction-rules", user.GetStoreFullReductionRules)
 			storeGroup.POST("/visit", user.RecordUserVisit)
 			storeGroup.POST("/event", user.RecordBehaviorEvent)
 
@@ -154,13 +159,9 @@ func setupRoutes(r *gin.Engine) {
 				merchantGroup.DELETE("/account/wechat/bind", merchant.UnbindWechat)
 				merchantGroup.POST("/status", merchant.UpdateStatus)
 				merchantGroup.GET("/qrcode", merchant.GetQRCode)
-				merchantGroup.GET("/delivery-settings", merchant.GetDeliverySettings)
-				merchantGroup.PUT("/delivery-settings", merchant.UpdateDeliverySettings)
-				merchantGroup.GET("/full-reduction-rules", merchant.GetFullReductionRules)
-				merchantGroup.PUT("/full-reduction-rules", merchant.UpdateFullReductionRules)
-				merchantGroup.GET("/subscriptions", merchant.GetSubscriptions)
-				merchantGroup.PUT("/subscriptions", merchant.UpdateSubscriptions)
-				merchantGroup.GET("/profit-sharing-records", sp.GetMerchantProfitSharingRecords)
+
+				// 支付配置
+				merchantOnlyGroup.PUT("/payment-config", merchant.UpdatePaymentConfig)
 
 				// 员工管理
 				merchantOnlyGroup.GET("/staff", merchant.GetStaffList)
@@ -168,6 +169,12 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.PUT("/staff/:id", merchant.UpdateStaff)
 				merchantOnlyGroup.DELETE("/staff/:id", merchant.DeleteStaff)
 				merchantOnlyGroup.POST("/staff/:id/reset-password", merchant.ResetStaffPassword)
+
+				// 服务人员管理（接单小程序账号审核与管理）
+				merchantOnlyGroup.GET("/service-staff", merchant.GetServiceStaffList)
+				merchantOnlyGroup.PUT("/service-staff/:id/status", merchant.UpdateServiceStaffStatus)
+				merchantOnlyGroup.POST("/service-staff/:id/reset-password", merchant.ResetServiceStaffPassword)
+				merchantOnlyGroup.DELETE("/service-staff/:id", merchant.DeleteServiceStaff)
 
 				// 系统公告（商家查看）
 				merchantOnlyGroup.GET("/announcements", merchant.GetAnnouncements)
@@ -179,6 +186,7 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.POST("/orders/quick-complete", merchant.QuickCompleteOrder)
 				merchantOnlyGroup.POST("/orders/:order_id/complete", merchant.CompleteOrder)
 				merchantOnlyGroup.POST("/orders/:order_id/refund", merchant.RefundOrder)
+				merchantOnlyGroup.POST("/orders/:order_id/return", merchant.ReturnRentalOrder)
 				merchantOnlyGroup.GET("/orders/statistics", merchant.GetOrderStatistics)
 
 				// 数据分析
@@ -189,17 +197,10 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.GET("/analytics/stock-alert", merchant.GetStockAlert)
 				merchantOnlyGroup.GET("/analytics/customers", merchant.GetCustomerAnalysis)
 				merchantOnlyGroup.GET("/analytics/customer-trend", merchant.GetCustomerTrend)
-
-				merchantOnlyGroup.GET("/printers", merchant.GetPrinters)
-				merchantOnlyGroup.POST("/printers", merchant.CreatePrinter)
-				merchantOnlyGroup.PUT("/printers/:printer_id", merchant.UpdatePrinter)
-				merchantOnlyGroup.DELETE("/printers/:printer_id", merchant.DeletePrinter)
-				merchantOnlyGroup.POST("/printers/:printer_id/test", merchant.TestPrinter)
-				merchantOnlyGroup.GET("/print-logs", merchant.GetPrintLogs)
 			}
 
 			merchantProductGroup := merchantGroup.Group("")
-			merchantProductGroup.Use(middleware.MerchantOrSpAuth())
+			merchantProductGroup.Use(middleware.MerchantAuth())
 			{
 				// 商品分类
 				merchantProductGroup.GET("/categories", merchant.GetCategories)
@@ -220,91 +221,30 @@ func setupRoutes(r *gin.Engine) {
 				merchantProductGroup.PUT("/products/:product_id/stock", merchant.UpdateStock)
 				merchantProductGroup.GET("/products/:product_id/specs", merchant.GetProductSpecs)
 				merchantProductGroup.PUT("/products/:product_id/specs", merchant.UpdateProductSpecs)
-				merchantProductGroup.DELETE("/products/:product_id/specs", merchant.DeleteProductSpecs)
-			}
+			merchantProductGroup.DELETE("/products/:product_id/specs", merchant.DeleteProductSpecs)
 		}
 
-		// 服务商小程序接口
-		spPublicGroup := v1.Group("/sp")
+		// 服务人员接单小程序接口
+		staffPublicGroup := v1.Group("/service-staff")
 		{
-			spPublicGroup.POST("/auth/login", sp.Login)
-
-			spGroup := spPublicGroup.Group("")
-			spGroup.Use(middleware.JWTAuth(), middleware.SpAuth())
-			{
-				spGroup.POST("/auth/logout", sp.Logout)
-				spGroup.GET("/dashboard", sp.GetDashboard)
-				spGroup.POST("/merchants", sp.CreateMerchant)
-				spGroup.PUT("/merchants/:merchant_id", sp.UpdateMerchant)
-				spGroup.GET("/merchants/:merchant_id", sp.GetMerchantDetail)
-				spGroup.POST("/merchants/:merchant_id/admin/reset-password", sp.ResetMerchantAdminPassword)
-				spGroup.PUT("/merchants/:merchant_id/payment-config", sp.UpdateMerchantPaymentConfig)
-				spGroup.PUT("/merchants/:merchant_id/assets", sp.UpdateMerchantAssets)
-				spGroup.GET("/merchants/analytics/distribution", sp.GetMerchantDistribution)
-				spGroup.GET("/merchants/list", sp.GetMerchantList)
-				spGroup.GET("/merchants/:merchant_id/fee", sp.GetMerchantFee)
-				spGroup.GET("/merchants/:merchant_id/rate", sp.GetMerchantRate)
-				spGroup.POST("/merchants/:merchant_id/rate", sp.SetMerchantRate)
-				spGroup.GET("/merchants/:merchant_id/qrcode", sp.GetMerchantQRCode)
-				spGroup.GET("/merchants/:merchant_id/categories", sp.GetMerchantCategories)
-				spGroup.POST("/merchants/:merchant_id/categories", sp.CreateMerchantCategory)
-				spGroup.PUT("/merchants/:merchant_id/categories/:category_id", sp.UpdateMerchantCategory)
-				spGroup.DELETE("/merchants/:merchant_id/categories/:category_id", sp.DeleteMerchantCategory)
-				spGroup.POST("/merchants/:merchant_id/categories/sort", sp.SortMerchantCategories)
-				spGroup.GET("/merchants/:merchant_id/products", sp.GetMerchantProducts)
-				spGroup.GET("/merchants/:merchant_id/products/:product_id", sp.GetMerchantProduct)
-				spGroup.POST("/merchants/:merchant_id/products", sp.CreateMerchantProduct)
-				spGroup.PUT("/merchants/:merchant_id/products/:product_id", sp.UpdateMerchantProduct)
-				spGroup.POST("/merchants/:merchant_id/products/:product_id/on-sale", sp.MerchantProductOnSale)
-				spGroup.POST("/merchants/:merchant_id/products/:product_id/off-sale", sp.MerchantProductOffSale)
-				spGroup.POST("/merchants/:merchant_id/products/batch-status", sp.BatchUpdateMerchantProductStatus)
-				spGroup.DELETE("/merchants/:merchant_id/products/:product_id", sp.DeleteMerchantProduct)
-				spGroup.PUT("/merchants/:merchant_id/products/:product_id/stock", sp.UpdateMerchantProductStock)
-				spGroup.GET("/merchants/:merchant_id/products/:product_id/specs", sp.GetMerchantProductSpecs)
-				spGroup.PUT("/merchants/:merchant_id/products/:product_id/specs", sp.UpdateMerchantProductSpecs)
-				spGroup.DELETE("/merchants/:merchant_id/products/:product_id/specs", sp.DeleteMerchantProductSpecs)
-				spGroup.GET("/merchants/:merchant_id/pickup-points", sp.GetMerchantPickupPoints)
-				spGroup.POST("/merchants/:merchant_id/pickup-points", sp.CreateMerchantPickupPoint)
-				spGroup.PUT("/merchants/:merchant_id/pickup-points/:id", sp.UpdateMerchantPickupPoint)
-				spGroup.DELETE("/merchants/:merchant_id/pickup-points/:id", sp.DeleteMerchantPickupPoint)
-				spGroup.GET("/orders/analytics", sp.GetOrderAnalytics)
-				spGroup.GET("/orders/refunds", sp.GetRefunds)
-				spGroup.GET("/orders", sp.GetOrders)
-				spGroup.GET("/orders/:order_id", sp.GetOrderDetail)
-				spGroup.GET("/amount/analytics", sp.GetAmountAnalytics)
-				spGroup.GET("/amount/top-merchants", sp.GetTopMerchants)
-				spGroup.GET("/profit-sharing-records", sp.GetProfitSharingRecords)
-				spGroup.GET("/settings", sp.GetSettings)
-				spGroup.PUT("/settings", sp.UpdateSettings)
-				spGroup.POST("/account/change-password", sp.ChangePassword)
-				spGroup.GET("/announcements", sp.GetAnnouncements)
-				spGroup.GET("/announcements/:id", sp.GetAnnouncementDetail)
-				spGroup.POST("/announcements", sp.CreateAnnouncement)
-				spGroup.PUT("/announcements/:id", sp.UpdateAnnouncement)
-				spGroup.DELETE("/announcements/:id", sp.DeleteAnnouncement)
-
-				// 活动管理
-				spGroup.GET("/activities", sp.GetActivities)
-				spGroup.POST("/activities", sp.CreateActivity)
-				spGroup.PUT("/activities/:id", sp.UpdateActivity)
-				spGroup.DELETE("/activities/:id", sp.DeleteActivity)
-
-				// 服务号配置
-				spGroup.GET("/wechat-config", sp.GetWechatConfig)
-				spGroup.PUT("/wechat-config", sp.UpdateWechatConfig)
-			}
+			staffPublicGroup.POST("/register", serviceStaff.Register)
+			staffPublicGroup.POST("/login", serviceStaff.Login)
+			staffPublicGroup.POST("/wechat-login", serviceStaff.WechatLogin)
 		}
 
-		// 微信支付回调
-		notifyGroup := v1.Group("/notify")
+		staffAuthedGroup := v1.Group("/service-staff")
+		staffAuthedGroup.Use(middleware.JWTAuth(), middleware.ServiceStaffAuth())
 		{
-			notifyGroup.POST("/payment", sp.PaymentNotify)
+			staffAuthedGroup.GET("/profile", serviceStaff.GetProfile)
+			staffAuthedGroup.GET("/todo", serviceStaff.GetTodoList)
+			staffAuthedGroup.GET("/orders/pending", serviceStaff.PendingOrders)
+			staffAuthedGroup.GET("/orders/accepted", serviceStaff.AcceptedOrders)
+			staffAuthedGroup.GET("/orders/:id", serviceStaff.OrderDetail)
+			staffAuthedGroup.POST("/orders/:id/accept", serviceStaff.AcceptOrder)
+			staffAuthedGroup.POST("/orders/:id/check-in", serviceStaff.CheckIn)
+			staffAuthedGroup.POST("/orders/:id/check-out", serviceStaff.CheckOut)
+			staffAuthedGroup.GET("/statistics", serviceStaff.GetStatistics)
 		}
-
-		// 微信支付回调（PRD口径）
-		callbackGroup := v1.Group("/callback")
-		{
-			callbackGroup.POST("/wechat", sp.PaymentNotify)
 		}
 	}
 }

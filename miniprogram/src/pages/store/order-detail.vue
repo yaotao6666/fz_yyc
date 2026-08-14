@@ -24,16 +24,8 @@
 
     <view class="section">
       <view class="section-title">配送信息</view>
-      <view class="info-row">
-        <text class="label">取货方式</text>
-        <text class="value">{{ getDeliveryTypeText() }}</text>
-      </view>
-      <view v-if="pickupPointNameText" class="info-row">
-        <text class="label">自提点</text>
-        <text class="value">{{ pickupPointNameText }}</text>
-      </view>
       <view v-if="deliveryAddressText" class="info-row">
-        <text class="label">{{ isPickupOrder ? '自提点地址' : '收货地址' }}</text>
+        <text class="label">收货地址</text>
         <text class="value">{{ deliveryAddressText }}</text>
       </view>
       <view v-if="contactNameText" class="info-row">
@@ -43,10 +35,6 @@
       <view v-if="contactPhoneText" class="info-row">
         <text class="label">联系电话</text>
         <text class="value">{{ contactPhoneText }}</text>
-      </view>
-      <view v-if="!isPickupOrder && order.delivery_distance" class="info-row">
-        <text class="label">配送距离</text>
-        <text class="value">{{ Number(order.delivery_distance || 0).toFixed(2) }} 公里</text>
       </view>
     </view>
 
@@ -75,13 +63,6 @@
         <text class="label">退款时间</text>
         <text class="value">{{ formatDateTime(order.refunded_at) }}</text>
       </view>
-      <view class="info-row" v-if="order.verify_code && order.status === OrderStatus.PAID">
-        <text class="label">核销码</text>
-        <view class="inline-value">
-          <text class="value">{{ order.verify_code }}</text>
-          <text class="copy-btn" @click="copyVerifyCode">复制</text>
-        </view>
-      </view>
       <view class="info-row" v-if="order.remark">
         <text class="label">备注</text>
         <text class="value">{{ order.remark }}</text>
@@ -97,8 +78,15 @@
       >
         <image class="goods-image" :src="getOrderItemImage(item)" mode="aspectFill" />
         <view class="goods-info">
-          <view class="goods-name">{{ item.product_name }}</view>
+          <view class="goods-name">
+            {{ item.product_name }}
+            <text v-if="Number(item.sale_type) === 2" class="goods-rental-tag">租赁</text>
+          </view>
           <view class="goods-spec" v-if="item.specs">{{ item.specs }}</view>
+          <view class="goods-rental-info" v-if="Number(item.sale_type) === 2">
+            <text class="rental-info-text">¥{{ Number(item.unit_rental_price || 0).toFixed(2) }}/{{ getRentalUnitText(item.rental_unit) }} × {{ item.rental_duration || 0 }}{{ getRentalUnitText(item.rental_unit) }}</text>
+            <text class="rental-info-deposit">押金 ¥{{ Number(item.deposit || 0).toFixed(2) }} × {{ item.quantity }}</text>
+          </view>
         </view>
         <view class="goods-right">
           <view class="goods-price">¥{{ Number(item.price || 0).toFixed(2) }}</view>
@@ -113,6 +101,10 @@
         <text class="amount-label">商品金额</text>
         <text class="amount-value">¥{{ Number(order.total_amount || 0).toFixed(2) }}</text>
       </view>
+      <view v-if="Number(order.total_deposit || 0) > 0" class="amount-row deposit-row">
+        <text class="amount-label">押金</text>
+        <text class="amount-value deposit-value">¥{{ Number(order.total_deposit || 0).toFixed(2) }}</text>
+      </view>
       <view class="amount-row">
         <text class="amount-label">配送费</text>
         <text class="amount-value">¥{{ Number(order.delivery_fee || 0).toFixed(2) }}</text>
@@ -125,6 +117,34 @@
         <text class="amount-label total-label">支付金额</text>
         <text class="amount-value total-value">¥{{ Number(order.pay_amount || 0).toFixed(2) }}</text>
       </view>
+
+      <view v-if="isRentalOrder" class="rental-deposit-block">
+        <view class="rental-deposit-title">押金状态</view>
+        <view class="amount-row">
+          <text class="amount-label">状态</text>
+          <text class="amount-value">{{ getDepositStatusText(order.deposit_status) }}</text>
+        </view>
+        <view v-if="Number(order.deposit_deduct_amount || 0) > 0" class="amount-row">
+          <text class="amount-label">扣除金额</text>
+          <text class="amount-value">¥{{ Number(order.deposit_deduct_amount || 0).toFixed(2) }}</text>
+        </view>
+        <view v-if="Number(order.deposit_refund_amount || 0) > 0" class="amount-row">
+          <text class="amount-label">退还金额</text>
+          <text class="amount-value">¥{{ Number(order.deposit_refund_amount || 0).toFixed(2) }}</text>
+        </view>
+        <view v-if="order.deposit_refunded_at" class="amount-row">
+          <text class="amount-label">退还时间</text>
+          <text class="amount-value">{{ order.deposit_refunded_at }}</text>
+        </view>
+        <view v-if="order.rental_returned_at" class="amount-row">
+          <text class="amount-label">归还时间</text>
+          <text class="amount-value">{{ order.rental_returned_at }}</text>
+        </view>
+        <view v-if="order.rental_return_remark" class="amount-row">
+          <text class="amount-label">归还备注</text>
+          <text class="amount-value">{{ order.rental_return_remark }}</text>
+        </view>
+      </view>
     </view>
 
     <view class="bottom-bar">
@@ -134,27 +154,6 @@
       <button v-if="canRefund" class="btn warning" :disabled="submitting" @click="contactMerchantForRefund">
         联系商家退款
       </button>
-      <button v-if="order.verify_code && order.status === OrderStatus.PAID" class="btn primary" @click="showVerifyDialog">
-        查看核销码
-      </button>
-    </view>
-
-    <view v-if="showVerify" class="dialog-mask" @click="closeVerifyDialog">
-      <view class="dialog-content" @click.stop>
-        <view class="dialog-title">核销码</view>
-        <image
-          v-if="order.verify_qrcode_url"
-          class="verify-qrcode"
-          :src="order.verify_qrcode_url"
-          mode="aspectFit"
-          show-menu-by-longpress
-        />
-        <view class="verify-code-display">
-          <text class="code">{{ order.verify_code || '------' }}</text>
-        </view>
-        <view class="verify-hint">请将核销码出示给商家扫描</view>
-        <view class="dialog-close" @click="closeVerifyDialog">关闭</view>
-      </view>
     </view>
 
   </view>
@@ -164,27 +163,29 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { cancelMyOrder, getMyOrderDetail } from '@api'
-import { DeliveryTypeText, OrderStatus, OrderStatusText } from '@types'
+import { OrderStatus, OrderStatusText } from '@types'
 import type { Order } from '@types'
 import { BrandAsset } from '../../utils/constants'
 import { useAuth } from '../../utils/useAuth'
 
 const order = ref<Order | null>(null)
-const showVerify = ref(false)
 const submitting = ref(false)
 
 const canCancel = computed(() => order.value?.status === OrderStatus.PENDING_PAYMENT)
 const canRefund = computed(() => {
   return order.value?.status === OrderStatus.PAID
 })
-const isPickupOrder = computed(() => order.value?.delivery_type === 3)
-const pickupPointNameText = computed(() => {
-  return order.value?.pickup_point_name || ''
-})
+const isRentalOrder = computed(() => Number(order.value?.total_deposit || 0) > 0)
+
+function getRentalUnitText(unit?: number): string {
+  return { 1: '天', 2: '周', 3: '月' }[Number(unit || 0)] || ''
+}
+
+function getDepositStatusText(status?: number): string {
+  return { 1: '待退还', 2: '已退还', 3: '已扣除' }[Number(status || 0)] || '未收取'
+}
+
 const deliveryAddressText = computed(() => {
-  if (isPickupOrder.value) {
-    return order.value?.pickup_point_address || order.value?.delivery_info?.address || order.value?.delivery_address || ''
-  }
   return order.value?.delivery_info?.address || order.value?.delivery_address || ''
 })
 const contactNameText = computed(() => {
@@ -224,7 +225,7 @@ function getStatusDesc() {
   if (!order.value) return ''
   const descMap: Record<number, string> = {
     [OrderStatus.PENDING_PAYMENT]: '订单待支付，可取消',
-    [OrderStatus.PAID]: '订单已支付，请出示核销码',
+    [OrderStatus.PAID]: '订单已支付，等待配送',
     [OrderStatus.COMPLETED]: '订单已完成',
     [OrderStatus.CANCELLED]: '订单已取消',
     [OrderStatus.REFUNDING]: '退款处理中，请耐心等待',
@@ -244,11 +245,6 @@ function getStatusIcon() {
     [OrderStatus.REFUNDED]: '💸'
   }
   return iconMap[order.value.status] || '❓'
-}
-
-function getDeliveryTypeText() {
-  if (!order.value?.delivery_type) return ''
-  return DeliveryTypeText[order.value.delivery_type] || ''
 }
 
 function formatDateTime(value?: string) {
@@ -276,19 +272,6 @@ function getOrderItemImage(item: any) {
 function copyOrderNo() {
   if (!order.value?.order_no) return
   uni.setClipboardData({ data: order.value.order_no, success: () => uni.showToast({ title: '已复制', icon: 'success' }) })
-}
-
-function copyVerifyCode() {
-  if (!order.value?.verify_code) return
-  uni.setClipboardData({ data: order.value.verify_code, success: () => uni.showToast({ title: '已复制', icon: 'success' }) })
-}
-
-function showVerifyDialog() {
-  showVerify.value = true
-}
-
-function closeVerifyDialog() {
-  showVerify.value = false
 }
 
 async function cancelOrder() {
@@ -469,6 +452,36 @@ function contactMerchantForRefund() {
   color: #86909c;
 }
 
+.goods-rental-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: #ff9500;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}
+
+.goods-rental-info {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8rpx;
+  padding: 8rpx 12rpx;
+  background: #fff7e6;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+
+.rental-info-text {
+  color: #ff9500;
+}
+
+.rental-info-deposit {
+  color: #86909c;
+  margin-top: 4rpx;
+}
+
 .goods-right {
   text-align: right;
 }
@@ -502,6 +515,27 @@ function contactMerchantForRefund() {
 
 .discount-value {
   color: #ff4d4f;
+}
+
+.deposit-row .amount-label {
+  color: #ff9500;
+}
+
+.deposit-value {
+  color: #ff9500;
+}
+
+.rental-deposit-block {
+  margin-top: 24rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx dashed #ffd591;
+}
+
+.rental-deposit-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #d46b08;
+  margin-bottom: 16rpx;
 }
 
 .total-label {
@@ -549,67 +583,6 @@ function contactMerchantForRefund() {
 .btn.warning {
   color: #ffffff;
   background: #fa8c16;
-}
-
-.dialog-mask {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 48rpx;
-  background: rgba(0, 0, 0, 0.45);
-}
-
-.dialog-content {
-  width: 100%;
-  padding: 36rpx 32rpx;
-  border-radius: 24rpx;
-  background: #ffffff;
-}
-
-.dialog-title {
-  text-align: center;
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #1f2329;
-}
-
-.verify-code-display {
-  margin: 24rpx 0 20rpx;
-  padding: 24rpx;
-  border-radius: 20rpx;
-  background: #f7f8fa;
-  text-align: center;
-}
-
-.verify-qrcode {
-  width: 320rpx;
-  height: 320rpx;
-  margin: 32rpx auto 0;
-  display: block;
-  border-radius: 20rpx;
-  background: #f7f8fa;
-}
-
-.code {
-  font-size: 48rpx;
-  font-weight: 700;
-  letter-spacing: 8rpx;
-  color: #1677ff;
-}
-
-.verify-hint {
-  text-align: center;
-  font-size: 24rpx;
-  color: #86909c;
-}
-
-.dialog-close {
-  margin-top: 32rpx;
-  text-align: center;
-  color: #1677ff;
-  font-size: 28rpx;
 }
 
 </style>

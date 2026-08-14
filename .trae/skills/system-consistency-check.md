@@ -2,7 +2,7 @@
 
 ## 概述
 
-对"私域助手"项目进行全链路一致性检测，覆盖 PRD 文档、数据库表结构、后端接口模型、前端页面接入四个层面，输出差异清单并生成修复脚本。
+对"适老化项目助手"项目进行全链路一致性检测，覆盖 PRD 文档、数据库表结构、后端接口模型、前端页面接入四个层面，输出差异清单并生成修复脚本。
 
 **适用场景**：
 - 新项目启动前的完整检测
@@ -76,7 +76,6 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
 | orders | 订单 |
 | order_items | 订单商品 |
 | refunds | 退款 |
-| merchant_profit_sharing_records | 商家分账记录 |
 | activities | 活动 |
 | announcements | 公告 |
 | merchant_fees | 商家年费 |
@@ -187,8 +186,8 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
 
 | 身份 | 页面目录 | 页面数 | 关键页面 |
 |------|----------|--------|----------|
-| 商家端 | pages/merchant/ | 12 | 工作台、商品列表/编辑、订单列表/详情、分类管理、数据分析、设置、员工、配送、通知、分账 |
-| 服务商端 | pages/sp/ | 10 | 登录、仪表盘、商家列表/详情/编辑、统计、公告列表/编辑、设置、分账 |
+| 商家端 | pages/merchant/ | 11 | 工作台、商品列表/编辑、订单列表/详情、分类管理、数据分析、设置、员工、配送、通知 |
+| 服务商端 | pages/sp/ | 9 | 登录、仪表盘、商家列表/详情/编辑、统计、公告列表/编辑、设置 |
 | 用户端 | pages/store/ | 7 | 店铺首页、商品详情、购物车、确认订单、我的订单、声音测试 |
 | 认证页 | pages/auth/ | 1 | 商家登录 |
 
@@ -381,7 +380,7 @@ fz_yyc/
 │   │   │   ├── sp/                           # 服务商handler
 │   │   │   │   ├── handler.go                # 登录、设置
 │   │   │   │   ├── announcement.go           # 公告管理
-│   │   │   │   └── payment.go                # 支付/分账
+│   │   │   │   └── payment.go                # 支付
 │   │   │   ├── user/                         # C端用户handler
 │   │   │   │   └── handler.go                # 店铺、订单、地址
 │   │   │   ├── upload/upload.go              # 文件上传
@@ -392,8 +391,7 @@ fz_yyc/
 │   │   └── middleware/auth.go                # JWT认证中间件
 │   ├── migrations/                           # 迁移脚本
 │   │   ├── 20240101000000_full_init.sql      # 全量初始化
-│   │   ├── 20260511120000_mock_seed.sql      # 模拟数据
-│   │   └── 20260513120000_service_provider_payment_refactor.sql  # 分账重构
+│   │   └── 20260511120000_mock_seed.sql      # 模拟数据
 │   └── docker-compose.yml                    # Docker配置
 └── miniprogram/
     └── src/
@@ -402,7 +400,7 @@ fz_yyc/
         ├── utils/request.ts                  # 请求工具
         ├── pages/
         │   ├── auth/login.vue                # 商家登录
-        │   ├── merchant/                     # 商家端（12页面）
+        │   │   ├── merchant/                     # 商家端（11页面）
         │   │   ├── home.vue                  # 工作台
         │   │   ├── categories.vue            # 分类管理
         │   │   ├── settings.vue              # 设置
@@ -413,9 +411,8 @@ fz_yyc/
         │   │   ├── products/edit.vue         # 商品编辑
         │   │   ├── orders/list.vue           # 订单列表
         │   │   ├── orders/detail.vue         # 订单详情
-        │   │   ├── analytics/index.vue       # 数据分析
-        │   │   └── settlements/history.vue   # 分账历史
-        │   ├── sp/                           # 服务商端（10页面）
+        │   │   └── analytics/index.vue       # 数据分析
+        │   ├── sp/                           # 服务商端（9页面）
         │   │   ├── login.vue                 # 登录
         │   │   ├── home.vue                  # 仪表盘
         │   │   ├── settings.vue              # 设置
@@ -424,8 +421,7 @@ fz_yyc/
         │   │   ├── merchants/edit.vue        # 商家编辑
         │   │   ├── analytics/merchant-stats.vue  # 商家统计
         │   │   ├── announcements/index.vue   # 公告列表
-        │   │   ├── announcements/edit.vue    # 公告编辑
-        │   │   └── settlements/history.vue   # 分账历史
+        │   │   └── announcements/edit.vue    # 公告编辑
         │   └── store/                        # 用户端（7页面）
         │       ├── home.vue                  # 店铺首页
         │       ├── product.vue               # 商品详情

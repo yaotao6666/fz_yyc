@@ -2,18 +2,17 @@ import { get, post } from '../utils/request'
 import type {
   CreateOrderRequest,
   CreateOrderResponse,
-  MerchantFullReductionRule,
   MerchantBehaviorEventRequest,
   Product,
   ProductApiResponse,
   ProductApiSpec,
   ProductApiSpecOption,
   ProductListResponse,
-  PickupPoint,
+  ProductType,
   SpecOption,
   StoreDeliveryRules,
-  StoreFullReductionRulesResponse,
-  StoreHomeInfo
+  StoreHomeInfo,
+  WellnessPackageContent
 } from '../types'
 
 function parseDistanceRules(value: unknown): { min_distance: number; max_distance: number; fee: number }[] {
@@ -48,23 +47,7 @@ function normalizeDeliverySettings(data: any) {
 
 function normalizeStoreDeliveryRules(data: any): StoreDeliveryRules {
   return {
-    ...normalizeDeliverySettings(data),
-    takeout_enabled: !!data?.takeout_enabled,
-    dine_in_enabled: !!data?.dine_in_enabled,
-    pickup_enabled: !!data?.pickup_enabled
-  }
-}
-
-function normalizeMerchantFullReductionRule(data: Partial<MerchantFullReductionRule> | null | undefined): MerchantFullReductionRule {
-  return {
-    id: normalizeNumberValue(data?.id),
-    merchant_id: normalizeNumberValue(data?.merchant_id),
-    threshold_amount: normalizeRequiredNumber(data?.threshold_amount),
-    discount_amount: normalizeRequiredNumber(data?.discount_amount),
-    sort: normalizeNumberValue(data?.sort),
-    status: normalizeRequiredNumber(data?.status, 1),
-    created_at: data?.created_at ? String(data.created_at) : undefined,
-    updated_at: data?.updated_at ? String(data.updated_at) : undefined
+    ...normalizeDeliverySettings(data)
   }
 }
 
@@ -150,7 +133,21 @@ function normalizeSpecs(value: ProductApiResponse['specs']): Product['specs'] {
   }))
 }
 
+function normalizeServiceContent(value: unknown): WellnessPackageContent | undefined {
+  if (value === null || value === undefined || value === '') return undefined
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as WellnessPackageContent
+    } catch {
+      return undefined
+    }
+  }
+  return value as WellnessPackageContent
+}
+
 function normalizeProduct(product: ProductApiResponse | null | undefined): Product {
+  const pt = normalizeNumberValue(product?.product_type)
+  const productType: ProductType = (pt === 1 || pt === 2 || pt === 3 || pt === 4 || pt === 5) ? pt : (Number(product?.sale_type) === 2 ? 2 : 1)
   return {
     ...product,
     id: normalizeRequiredNumber(product?.id),
@@ -163,6 +160,13 @@ function normalizeProduct(product: ProductApiResponse | null | undefined): Produ
     sort: normalizeNumberValue(product?.sort),
     images: normalizeStringArray(product?.images).map(normalizeImageUrl),
     specs: normalizeSpecs(product?.specs),
+    product_type: productType,
+    service_content: normalizeServiceContent(product?.service_content),
+    sale_type: normalizeRequiredNumber(product?.sale_type, 1),
+    rental_unit: normalizeRequiredNumber(product?.rental_unit, 0),
+    rental_price: normalizeRequiredNumber(product?.rental_price),
+    deposit: normalizeRequiredNumber(product?.deposit),
+    max_rental_duration: normalizeRequiredNumber(product?.max_rental_duration, 0),
     created_at: String(product?.created_at || ''),
     updated_at: product?.updated_at ? String(product.updated_at) : undefined
   } as Product
@@ -186,7 +190,12 @@ export function getStoreHome(merchantId: number) {
           images: normalized.images || [],
           price: normalized.price,
           original_price: normalized.original_price,
-          sales: Number(normalized.sales || 0)
+          sales: Number(normalized.sales || 0),
+          product_type: normalized.product_type,
+          sale_type: normalized.sale_type,
+          rental_unit: normalized.rental_unit,
+          rental_price: normalized.rental_price,
+          deposit: normalized.deposit
         }
       })
     }
@@ -213,18 +222,6 @@ export function getStoreProduct(merchantId: number, productId: number) {
 
 export function getStoreDeliveryRules(merchantId: number) {
   return get<StoreDeliveryRules>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeStoreDeliveryRules)
-}
-
-export function getStorePickupPoints(merchantId: number) {
-  return get<PickupPoint[]>(`/api/v1/store/${merchantId}/pickup-points`).then((list) => (
-    Array.isArray(list) ? list : []
-  ))
-}
-
-export function getStoreFullReductionRules(merchantId: number) {
-  return get<StoreFullReductionRulesResponse>(`/api/v1/store/${merchantId}/full-reduction-rules`).then((response) => ({
-    rules: Array.isArray(response?.rules) ? response.rules.map(normalizeMerchantFullReductionRule) : []
-  }))
 }
 
 export function createOrder(merchantId: number, data: CreateOrderRequest) {

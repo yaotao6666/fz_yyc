@@ -1,7 +1,7 @@
 {
   "name": "xm-mall",
   "version": "1.0.0",
-  "description": "寻梦私域管家 - 商家管理系统",
+  "description": "财旭商贸 - 商家管理系统",
   "main": "dist/build/mp-weixin/app.js",
   "scripts": {
     "dev:mp-weixin": "uni -p mp-weixin",

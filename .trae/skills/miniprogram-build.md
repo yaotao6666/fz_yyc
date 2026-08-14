@@ -1,7 +1,7 @@
 # 小程序编译技能
 
 ## 概述
-寻梦私域管家小程序基于 uni-app + Vue 3 + TypeScript 开发，支持微信小程序和 H5 平台。
+财旭商贸小程序基于 uni-app + Vue 3 + TypeScript 开发，支持微信小程序和 H5 平台。
 
 ## 前置条件
 

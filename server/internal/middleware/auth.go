@@ -108,19 +108,6 @@ func OptionalJWTAuth() gin.HandlerFunc {
 	}
 }
 
-// SpAuth 服务商认证中间件
-func SpAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userType, exists := c.Get("user_type")
-		if !exists || userType != "sp" {
-			response.Forbidden(c, "需要服务商权限")
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
-}
-
 // MerchantAuth 商家认证中间件
 func MerchantAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -134,12 +121,12 @@ func MerchantAuth() gin.HandlerFunc {
 	}
 }
 
-// MerchantOrSpAuth 商家或服务商认证中间件
-func MerchantOrSpAuth() gin.HandlerFunc {
+// UserAuth 用户认证中间件
+func UserAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userType, exists := c.Get("user_type")
-		if !exists || (userType != "merchant" && userType != "sp") {
-			response.Forbidden(c, "需要商家或服务商权限")
+		if !exists || userType != "user" {
+			response.Forbidden(c, "需要用户权限")
 			c.Abort()
 			return
 		}
@@ -147,12 +134,12 @@ func MerchantOrSpAuth() gin.HandlerFunc {
 	}
 }
 
-// UserAuth 用户认证中间件
-func UserAuth() gin.HandlerFunc {
+// ServiceStaffAuth 服务人员认证中间件
+func ServiceStaffAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userType, exists := c.Get("user_type")
-		if !exists || userType != "user" {
-			response.Forbidden(c, "需要用户权限")
+		if !exists || userType != "service_staff" {
+			response.Forbidden(c, "需要服务人员权限")
 			c.Abort()
 			return
 		}

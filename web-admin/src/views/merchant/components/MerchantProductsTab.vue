@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   batchUpdateMerchantProductStatus,
@@ -11,12 +11,16 @@ import {
   updateMerchantProductStock
 } from '@/api/sp'
 import type { MerchantCategory, MerchantProduct } from '@/types/sp'
-import { formatAmount, formatDateTime, getProductStatusText } from '@/utils/format'
+import {
+  formatAmount,
+  formatDateTime,
+  getProductStatusText,
+  getProductTypeTagType,
+  getProductTypeText,
+  getRentalUnitText,
+  ProductTypeTabs
+} from '@/utils/format'
 import MerchantProductEditorDialog from './MerchantProductEditorDialog.vue'
-
-const props = defineProps<{
-  merchantId: number
-}>()
 
 const loading = ref(false)
 const categories = ref<MerchantCategory[]>([])
@@ -27,26 +31,37 @@ const editorVisible = ref(false)
 const editingProductId = ref<number | null>(null)
 const actionLoadingId = ref<number | null>(null)
 
+const activeTab = ref('all')
+
 const filters = reactive({
   category_id: undefined as number | undefined,
   status: '' as '' | '1' | '2',
+  sale_type: '' as '' | '1' | '2',
+  product_type: undefined as number | undefined,
   keyword: '',
   page: 1,
   page_size: 10
 })
 
+function handleTabChange(key: string) {
+  const tab = ProductTypeTabs.find((t) => t.key === key)
+  filters.product_type = tab?.product_type
+  filters.page = 1
+  void loadProducts()
+}
+
 async function loadCategories() {
-  if (!props.merchantId) return
-  categories.value = await getMerchantCategories(props.merchantId)
+  categories.value = await getMerchantCategories()
 }
 
 async function loadProducts() {
-  if (!props.merchantId) return
   loading.value = true
   try {
-    const result = await getMerchantProducts(props.merchantId, {
+    const result = await getMerchantProducts({
       category_id: filters.category_id,
       status: filters.status,
+      sale_type: filters.sale_type || undefined,
+      product_type: filters.product_type,
       keyword: filters.keyword.trim() || undefined,
       page: filters.page,
       page_size: filters.page_size
@@ -59,7 +74,6 @@ async function loadProducts() {
 }
 
 async function loadData() {
-  if (!props.merchantId) return
   await Promise.all([loadCategories(), loadProducts()])
 }
 
@@ -69,8 +83,11 @@ function handleSearch() {
 }
 
 function handleReset() {
+  activeTab.value = 'all'
   filters.category_id = undefined
   filters.status = ''
+  filters.sale_type = ''
+  filters.product_type = undefined
   filters.keyword = ''
   filters.page = 1
   void loadProducts()
@@ -97,14 +114,13 @@ function handleEditorSuccess() {
 }
 
 async function handleToggleStatus(product: MerchantProduct) {
-  if (!props.merchantId) return
   actionLoadingId.value = product.id
   try {
     if (Number(product.status || 0) === 1) {
-      await merchantProductOffSale(props.merchantId, product.id)
+      await merchantProductOffSale(product.id)
       ElMessage.success('商品已下架')
     } else {
-      await merchantProductOnSale(props.merchantId, product.id)
+      await merchantProductOnSale(product.id)
       ElMessage.success('商品已上架')
     }
     await loadProducts()
@@ -114,7 +130,6 @@ async function handleToggleStatus(product: MerchantProduct) {
 }
 
 async function handleDelete(product: MerchantProduct) {
-  if (!props.merchantId) return
   try {
     await ElMessageBox.confirm(`确认删除商品「${product.name}」？`, '删除商品', {
       type: 'warning',
@@ -127,7 +142,7 @@ async function handleDelete(product: MerchantProduct) {
 
   actionLoadingId.value = product.id
   try {
-    await deleteMerchantProduct(props.merchantId, product.id)
+    await deleteMerchantProduct(product.id)
     ElMessage.success('删除成功')
     await loadProducts()
   } finally {
@@ -136,8 +151,6 @@ async function handleDelete(product: MerchantProduct) {
 }
 
 async function handleUpdateStock(product: MerchantProduct) {
-  if (!props.merchantId) return
-
   try {
     const result = await ElMessageBox.prompt('请输入新的库存数量', '修改库存', {
       inputValue: String(product.stock || 0),
@@ -149,7 +162,7 @@ async function handleUpdateStock(product: MerchantProduct) {
 
     const stock = Number(result.value || 0)
     actionLoadingId.value = product.id
-    await updateMerchantProductStock(props.merchantId, product.id, stock)
+    await updateMerchantProductStock(product.id, stock)
     ElMessage.success('库存更新成功')
     await loadProducts()
   } catch (error) {
@@ -162,7 +175,6 @@ async function handleUpdateStock(product: MerchantProduct) {
 }
 
 async function handleBatchUpdate(status: number) {
-  if (!props.merchantId) return
   if (selectedIds.value.length === 0) {
     ElMessage.warning('请先选择商品')
     return
@@ -181,7 +193,7 @@ async function handleBatchUpdate(status: number) {
 
   loading.value = true
   try {
-    await batchUpdateMerchantProductStatus(props.merchantId, selectedIds.value, status)
+    await batchUpdateMerchantProductStatus(selectedIds.value, status)
     ElMessage.success(`批量${actionText}成功`)
     selectedIds.value = []
     await loadProducts()
@@ -190,19 +202,20 @@ async function handleBatchUpdate(status: number) {
   }
 }
 
-watch(
-  () => props.merchantId,
-  (merchantId) => {
-    if (merchantId) {
-      void loadData()
-    }
-  },
-  { immediate: true }
-)
+onMounted(loadData)
 </script>
 
 <template>
   <div class="tab-block">
+    <el-tabs v-model="activeTab" class="product-tabs" @tab-change="handleTabChange">
+      <el-tab-pane
+        v-for="tab in ProductTypeTabs"
+        :key="tab.key"
+        :label="tab.label"
+        :name="tab.key"
+      />
+    </el-tabs>
+
     <div class="toolbar">
       <el-form inline>
         <el-form-item label="分类">
@@ -219,6 +232,12 @@ watch(
           <el-select v-model="filters.status" clearable placeholder="全部状态" style="width: 140px;">
             <el-option label="上架" value="1" />
             <el-option label="下架" value="2" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="销售模式">
+          <el-select v-model="filters.sale_type" clearable placeholder="全部模式" style="width: 140px;">
+            <el-option label="一口价" value="1" />
+            <el-option label="租赁" value="2" />
           </el-select>
         </el-form-item>
         <el-form-item label="关键词">
@@ -266,9 +285,28 @@ watch(
             {{ row.category_name || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="售价" width="110">
+        <el-table-column label="商品类型" width="110">
           <template #default="{ row }">
-            ¥{{ formatAmount(row.price) }}
+            <el-tag :type="getProductTypeTagType(row.product_type)" size="small">
+              {{ getProductTypeText(row.product_type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="销售模式" width="90">
+          <template #default="{ row }">
+            <el-tag :type="Number(row.sale_type) === 2 ? 'warning' : 'success'" size="small">
+              {{ Number(row.sale_type) === 2 ? '租赁' : '一口价' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="售价" width="120">
+          <template #default="{ row }">
+            <template v-if="Number(row.sale_type) === 2">
+              ¥{{ formatAmount(row.rental_price) }}/{{ getRentalUnitText(row.rental_unit) }}
+            </template>
+            <template v-else>
+              ¥{{ formatAmount(row.price) }}
+            </template>
           </template>
         </el-table-column>
         <el-table-column label="库存" width="100">
@@ -335,7 +373,6 @@ watch(
 
     <MerchantProductEditorDialog
       v-model="editorVisible"
-      :merchant-id="merchantId"
       :categories="categories"
       :product-id="editingProductId"
       @success="handleEditorSuccess"

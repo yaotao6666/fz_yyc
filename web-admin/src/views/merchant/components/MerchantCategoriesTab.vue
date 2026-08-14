@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createMerchantCategory,
@@ -10,10 +10,6 @@ import {
 } from '@/api/sp'
 import type { MerchantCategory, MerchantCategoryPayload } from '@/types/sp'
 import { formatDateTime, getCategoryStatusText } from '@/utils/format'
-
-const props = defineProps<{
-  merchantId: number
-}>()
 
 const loading = ref(false)
 const savingSort = ref(false)
@@ -49,10 +45,9 @@ function openEdit(category: MerchantCategory) {
 }
 
 async function loadData() {
-  if (!props.merchantId) return
   loading.value = true
   try {
-    categories.value = await getMerchantCategories(props.merchantId)
+    categories.value = await getMerchantCategories()
   } finally {
     loading.value = false
   }
@@ -67,7 +62,7 @@ function buildPayload(status?: number): MerchantCategoryPayload {
 }
 
 async function submitForm() {
-  if (!props.merchantId || dialogSubmitting.value) return
+  if (dialogSubmitting.value) return
 
   const payload = buildPayload()
   if (!payload.name) {
@@ -78,10 +73,10 @@ async function submitForm() {
   dialogSubmitting.value = true
   try {
     if (editingCategory.value) {
-      await updateMerchantCategory(props.merchantId, editingCategory.value.id, payload)
+      await updateMerchantCategory(editingCategory.value.id, payload)
       ElMessage.success('分类更新成功')
     } else {
-      await createMerchantCategory(props.merchantId, payload)
+      await createMerchantCategory(payload)
       ElMessage.success('分类创建成功')
     }
     dialogVisible.value = false
@@ -92,7 +87,6 @@ async function submitForm() {
 }
 
 async function handleDelete(category: MerchantCategory) {
-  if (!props.merchantId) return
   try {
     await ElMessageBox.confirm(`确认删除分类「${category.name}」？`, '删除分类', {
       type: 'warning',
@@ -103,15 +97,14 @@ async function handleDelete(category: MerchantCategory) {
     return
   }
 
-  await deleteMerchantCategory(props.merchantId, category.id)
+  await deleteMerchantCategory(category.id)
   ElMessage.success('删除成功')
   await loadData()
 }
 
 async function toggleStatus(category: MerchantCategory) {
-  if (!props.merchantId) return
   const nextStatus = Number(category.status || 0) === 1 ? 0 : 1
-  await updateMerchantCategory(props.merchantId, category.id, {
+  await updateMerchantCategory(category.id, {
     name: category.name,
     sort: category.sort,
     status: nextStatus
@@ -121,11 +114,11 @@ async function toggleStatus(category: MerchantCategory) {
 }
 
 async function saveSort() {
-  if (!props.merchantId || savingSort.value) return
+  if (savingSort.value) return
 
   savingSort.value = true
   try {
-    await sortMerchantCategories(props.merchantId, categories.value.map((item) => ({
+    await sortMerchantCategories(categories.value.map((item) => ({
       id: item.id,
       sort: Number(item.sort || 0)
     })))
@@ -136,15 +129,7 @@ async function saveSort() {
   }
 }
 
-watch(
-  () => props.merchantId,
-  (merchantId) => {
-    if (merchantId) {
-      void loadData()
-    }
-  },
-  { immediate: true }
-)
+onMounted(loadData)
 </script>
 
 <template>

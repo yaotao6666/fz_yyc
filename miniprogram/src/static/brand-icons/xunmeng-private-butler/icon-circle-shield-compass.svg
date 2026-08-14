@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
-  <title id="title">寻梦私域管家 - 圆形图标（安全护盾×私域向导）</title>
-  <desc id="desc">圆形底内置护盾轮廓与指南针指向，体现可靠安全与私域运营引导。</desc>
+  <title id="title">财旭商贸 - 圆形图标（安全护盾×适老化项目向导）</title>
+  <desc id="desc">圆形底内置护盾轮廓与指南针指向，体现可靠安全与适老化项目运营引导。</desc>
   <circle cx="512" cy="512" r="416" fill="#0B1F3A"/>
   <path d="M512 246c132 74 256 74 256 74v214c0 152-104 282-256 334-152-52-256-182-256-334V320s124 0 256-74Z" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linejoin="round" opacity="0.85"/>
   <circle cx="512" cy="540" r="192" fill="#FFFFFF" opacity="0.10"/>

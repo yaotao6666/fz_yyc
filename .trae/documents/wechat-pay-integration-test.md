@@ -72,8 +72,6 @@ WHERE id = 1;
 ```sql
 UPDATE merchants SET
   sub_mch_id = '你的子商户号',
-  profit_sharing_enabled = 1,
-  profit_sharing_ratio = 你的分账比例,
   payment_config_status = 1
 WHERE id = 你的商家ID;
 ```
@@ -81,7 +79,7 @@ WHERE id = 你的商家ID;
 **方式B：通过 SP 小程序操作**
 1. 登录 SP 端（admin/admin123）
 2. 进入商家列表 → 选择商家 → 编辑
-3. 在"支付与分账配置"区域填写子商户号、分账开关和比例
+3. 在“支付配置”区域填写子商户号
 4. 保存
 
 ### 步骤5：配置公网回调地址（内网穿透）
@@ -117,8 +115,7 @@ curl -s http://localhost:8080/api/v1/sp/settings -H "Authorization: Bearer <SP_T
 2. **下单**：选择商品 → 确认订单 → 提交
 3. **支付**：拉起微信支付 → 完成支付
 4. **回调验证**：检查后端日志确认支付回调收到并处理
-5. **分账验证**：检查分账记录是否正确创建
-6. **商家端验证**：商家端订单列表查看订单状态变为"已支付"
+5. **商家端验证**：商家端订单列表查看订单状态变为“已支付”
 
 ## 需要用户确认的信息
 
@@ -132,7 +129,6 @@ curl -s http://localhost:8080/api/v1/sp/settings -H "Authorization: Bearer <SP_T
 | 小程序AppID | 微信小程序的AppID | wx1234567890 |
 | 小程序AppSecret | 微信小程序的AppSecret | xxxxxxxxxxxxxxxx |
 | 子商户号 | 已进件商户的子商户号 | 15xxxxx |
-| 分账比例 | 服务商抽佣百分比 | 5.0 |
 | 公网回调地址 | 内网穿透后的公网URL | https://xxx.ngrok.io/api/v1/notify/payment |
 
 ## 涉及修改的文件
@@ -142,7 +138,7 @@ curl -s http://localhost:8080/api/v1/sp/settings -H "Authorization: Bearer <SP_T
 | `server/.env` | 填入真实微信支付和小程序配置 |
 | `server/docker-compose.yml` | 补充 `WECHAT_PAY_SP_*` 环境变量传递 |
 | 数据库 `service_providers` | 更新服务商支付信息 |
-| 数据库 `merchants` | 回填子商户号和分账配置 |
+| 数据库 `merchants` | 回填子商户号 |
 
 ## 注意事项
 

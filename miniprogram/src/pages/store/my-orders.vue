@@ -84,9 +84,6 @@
             <view class="action-btn cancel" @click="cancelOrder(order)">取消订单</view>
           </template>
           <template v-if="order.status === 2">
-            <view class="action-btn verify" @click="showVerifyCode(order)">核销码</view>
-          </template>
-          <template v-if="order.status === 2">
             <view class="action-btn refund" @click="contactMerchantForRefund(order)">联系商家退款</view>
           </template>
           <view class="action-btn primary" @click="goDetail(order.id)">查看详情</view>
@@ -102,25 +99,6 @@
       </view>
     </scroll-view>
 
-    <!-- 核销码弹窗 -->
-    <view v-if="showVerify" class="dialog-mask" @click="closeVerifyDialog">
-      <view class="dialog-content" @click.stop>
-        <view class="dialog-title">核销码</view>
-        <image
-          v-if="currentOrder?.verify_qrcode_url"
-          class="verify-qrcode"
-          :src="currentOrder.verify_qrcode_url"
-          mode="aspectFit"
-          show-menu-by-longpress
-        />
-        <view class="verify-code-display">
-          <text class="code">{{ currentOrder?.verify_code || '------' }}</text>
-        </view>
-        <view class="verify-hint">请将核销码出示给商家扫描</view>
-        <view class="dialog-close" @click="closeVerifyDialog">关闭</view>
-      </view>
-    </view>
-
   </view>
 </template>
 
@@ -128,7 +106,7 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { getMyOrders, cancelMyOrder } from '@api'
-import { DeliveryTypeText, OrderStatus, OrderStatusText } from '@types'
+import { OrderStatus, OrderStatusText } from '@types'
 import type { Order } from '@types'
 import { BrandAsset } from '../../utils/constants'
 import { useAuth } from '../../utils/useAuth'
@@ -146,11 +124,8 @@ const loading = ref(false)
 const noMore = ref(false)
 const page = ref(1)
 const pageSize = 10
-const merchantId = ref<number>(0) // 当前商家ID
-const merchantName = ref<string>('') // 当前商家名称
-
-const showVerify = ref(false)
-const currentOrder = ref<Order | null>(null)
+const merchantId = ref<number>(0)
+const merchantName = ref<string>('')
 
 onShow(async () => {
   const pages = getCurrentPages()
@@ -271,17 +246,8 @@ function formatTime(time: string): string {
 }
 
 function getOrderSummary(order: Order): string {
-  const deliveryTypeText = DeliveryTypeText[order.delivery_type || 0] || '未知方式'
-  if (order.delivery_type === 3) {
-    const pickupPointName = order.pickup_point_name || '未设置自提点'
-    const pickupPointAddress = order.pickup_point_address || order.delivery_info?.address || ''
-    return pickupPointAddress
-      ? `取货方式：${deliveryTypeText} · ${pickupPointName} · ${pickupPointAddress}`
-      : `取货方式：${deliveryTypeText} · ${pickupPointName}`
-  }
-
   const deliveryAddress = order.delivery_info?.address || order.delivery_address || '未填写收货地址'
-  return `取货方式：${deliveryTypeText} · ${deliveryAddress}`
+  return deliveryAddress
 }
 
 function getOrderItemImage(item: any) {
@@ -305,7 +271,7 @@ function goDetail(orderId: number) {
 }
 
 function goShopping() {
-  const targetMerchantId = merchantId.value || currentOrder.value?.merchant?.id || orders.value[0]?.merchant?.id || 1
+  const targetMerchantId = merchantId.value || orders.value[0]?.merchant?.id || 1
   uni.navigateTo({ url: `/pages/store/home?merchant_id=${targetMerchantId}` })
 }
 
@@ -328,15 +294,6 @@ function cancelOrder(order: Order) {
       }
     }
   })
-}
-
-function showVerifyCode(order: Order) {
-  currentOrder.value = order
-  showVerify.value = true
-}
-
-function closeVerifyDialog() {
-  showVerify.value = false
 }
 
 function contactMerchantForRefund(order: Order) {
@@ -626,111 +583,5 @@ function contactMerchantForRefund(order: Order) {
   color: #ffffff;
   border-radius: 40rpx;
   font-size: 28rpx;
-}
-
-.dialog-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-
-.dialog-content {
-  width: 600rpx;
-  background: #ffffff;
-  border-radius: 24rpx;
-  padding: 48rpx;
-}
-
-.dialog-title {
-  font-size: 34rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-  text-align: center;
-  margin-bottom: 32rpx;
-}
-
-.verify-code-display {
-  text-align: center;
-  margin-bottom: 24rpx;
-}
-
-.verify-qrcode {
-  width: 320rpx;
-  height: 320rpx;
-  margin: 0 auto 24rpx;
-  display: block;
-  border-radius: 20rpx;
-  background: #f7f8fa;
-}
-
-.code {
-  font-size: 64rpx;
-  font-weight: 700;
-  letter-spacing: 16rpx;
-  color: #007AFF;
-}
-
-.verify-hint {
-  text-align: center;
-  font-size: 28rpx;
-  color: #999999;
-  margin-bottom: 32rpx;
-}
-
-.dialog-close {
-  text-align: center;
-  font-size: 30rpx;
-  color: #666666;
-  padding: 16rpx;
-}
-
-.refund-reason {
-  margin-bottom: 32rpx;
-}
-
-.reason-input {
-  width: 100%;
-  height: 200rpx;
-  background: #f8f9fa;
-  border-radius: 12rpx;
-  padding: 24rpx;
-  font-size: 28rpx;
-  box-sizing: border-box;
-}
-
-.dialog-actions {
-  display: flex;
-  gap: 24rpx;
-}
-
-.btn-cancel, .btn-confirm {
-  flex: 1;
-  height: 88rpx;
-  border-radius: 44rpx;
-  font-size: 30rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-cancel {
-  background: #f5f5f5;
-  color: #666666;
-}
-
-.btn-confirm {
-  background: #007AFF;
-  color: #ffffff;
-}
-
-.btn-confirm[disabled] {
-  background: #cccccc;
 }
 </style>

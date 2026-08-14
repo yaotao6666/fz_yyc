@@ -7,7 +7,7 @@ import (
 	"fz_yyc_api/internal/config"
 	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/internal/models"
-	"fz_yyc_api/internal/services/fullreduction"
+	"fz_yyc_api/internal/services/orderquery"
 	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
@@ -40,22 +40,29 @@ type StoreProductSpecResponse struct {
 }
 
 type StoreProductResponse struct {
-	ID            uint64                     `json:"id"`
-	MerchantID    uint64                     `json:"merchant_id"`
-	CategoryID    uint64                     `json:"category_id"`
-	Name          string                     `json:"name"`
-	Description   string                     `json:"description"`
-	Images        []string                   `json:"images"`
-	Price         float64                    `json:"price"`
-	OriginalPrice float64                    `json:"original_price"`
-	Stock         uint                       `json:"stock"`
-	Unit          string                     `json:"unit"`
-	Sales         uint                       `json:"sales"`
-	Sort          uint                       `json:"sort"`
-	Status        uint8                      `json:"status"`
-	Specs         []StoreProductSpecResponse `json:"specs"`
-	CreatedAt     time.Time                  `json:"created_at"`
-	UpdatedAt     time.Time                  `json:"updated_at"`
+	ID                uint64                     `json:"id"`
+	MerchantID        uint64                     `json:"merchant_id"`
+	CategoryID        uint64                     `json:"category_id"`
+	Name              string                     `json:"name"`
+	Description       string                     `json:"description"`
+	Images            []string                   `json:"images"`
+	Price             float64                    `json:"price"`
+	OriginalPrice     float64                    `json:"original_price"`
+	Stock             uint                       `json:"stock"`
+	Unit              string                     `json:"unit"`
+	ProductType       uint8                      `json:"product_type"`
+	ServiceContent    interface{}                `json:"service_content"`
+	SaleType          uint8                      `json:"sale_type"`
+	RentalUnit        uint8                      `json:"rental_unit"`
+	RentalPrice       float64                    `json:"rental_price"`
+	Deposit           float64                    `json:"deposit"`
+	MaxRentalDuration uint                       `json:"max_rental_duration"`
+	Sales             uint                       `json:"sales"`
+	Sort              uint                       `json:"sort"`
+	Status            uint8                      `json:"status"`
+	Specs             []StoreProductSpecResponse `json:"specs"`
+	CreatedAt         time.Time                  `json:"created_at"`
+	UpdatedAt         time.Time                  `json:"updated_at"`
 }
 
 func getOrCreateStoreUser(openID string, now time.Time) (*models.User, bool, error) {
@@ -121,6 +128,17 @@ func parseProductImages(raw models.JSON) []string {
 	}
 
 	return []string{}
+}
+
+func parseServiceContent(raw models.JSON) interface{} {
+	if len(raw) == 0 {
+		return nil
+	}
+	var result interface{}
+	if err := json.Unmarshal(raw, &result); err == nil {
+		return result
+	}
+	return nil
 }
 
 func parseStoreSpecOptions(raw models.JSON) []StoreProductSpecOptionResponse {
@@ -233,13 +251,6 @@ func buildAccessibleOrder(order models.Order) models.Order {
 		order.Items[index].Image = buildAccessibleOrderItemImage(order.Items[index].Image)
 	}
 
-	if order.VerifyCode != "" {
-		verifyQRCodeURL, err := utils.BuildVerifyCodeQRCodeDataURL(order.VerifyCode)
-		if err == nil {
-			order.VerifyQRCodeURL = verifyQRCodeURL
-		}
-	}
-
 	return order
 }
 
@@ -259,22 +270,29 @@ func buildStoreProductResponse(product models.Product) StoreProductResponse {
 	}
 
 	return StoreProductResponse{
-		ID:            product.ID,
-		MerchantID:    product.MerchantID,
-		CategoryID:    categoryID,
-		Name:          product.Name,
-		Description:   product.Description,
-		Images:        buildStoreAccessibleImages(parseProductImages(product.Images)),
-		Price:         product.Price,
-		OriginalPrice: product.OriginalPrice,
-		Stock:         product.Stock,
-		Unit:          product.Unit,
-		Sales:         product.Sales,
-		Sort:          product.Sort,
-		Status:        product.Status,
-		Specs:         specs,
-		CreatedAt:     product.CreatedAt,
-		UpdatedAt:     product.UpdatedAt,
+		ID:                product.ID,
+		MerchantID:        product.MerchantID,
+		CategoryID:        categoryID,
+		Name:              product.Name,
+		Description:       product.Description,
+		Images:            buildStoreAccessibleImages(parseProductImages(product.Images)),
+		Price:             product.Price,
+		OriginalPrice:     product.OriginalPrice,
+		Stock:             product.Stock,
+		Unit:              product.Unit,
+		ProductType:       product.ProductType,
+		ServiceContent:    parseServiceContent(product.ServiceContent),
+		SaleType:          product.SaleType,
+		RentalUnit:        product.RentalUnit,
+		RentalPrice:       product.RentalPrice,
+		Deposit:           product.Deposit,
+		MaxRentalDuration: product.MaxRentalDuration,
+		Sales:             product.Sales,
+		Sort:              product.Sort,
+		Status:            product.Status,
+		Specs:             specs,
+		CreatedAt:         product.CreatedAt,
+		UpdatedAt:         product.UpdatedAt,
 	}
 }
 
@@ -454,9 +472,6 @@ func GetProducts(c *gin.Context) {
 		return
 	}
 
-	var merchant models.Merchant
-	database.DB.Select("id", "min_order_amount", "takeout_enabled", "dine_in_enabled", "pickup_enabled").First(&merchant, id)
-
 	list := make([]StoreProductResponse, 0, len(products))
 	for _, product := range products {
 		list = append(list, buildStoreProductResponse(product))
@@ -464,12 +479,6 @@ func GetProducts(c *gin.Context) {
 
 	response.Success(c, gin.H{
 		"list": list,
-		"merchant": gin.H{
-			"min_order_amount": merchant.MinOrderAmount,
-			"takeout_enabled":  merchant.TakeoutEnabled,
-			"dine_in_enabled":  merchant.DineInEnabled,
-			"pickup_enabled":   merchant.PickupEnabled,
-		},
 		"pagination": gin.H{
 			"total":     total,
 			"page":      page,
@@ -491,52 +500,6 @@ func GetProductDetail(c *gin.Context) {
 	}
 
 	response.Success(c, buildStoreProductResponse(product))
-}
-
-func GetDeliveryRules(c *gin.Context) {
-	merchantID := c.Param("merchant_id")
-	id, _ := strconv.ParseUint(merchantID, 10, 64)
-
-	var merchant models.Merchant
-	if err := database.DB.Select("id", "takeout_enabled", "dine_in_enabled", "pickup_enabled").First(&merchant, id).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.CodeMerchantNotFound, "商家不存在")
-		return
-	}
-
-	var settings models.MerchantDeliverySettings
-	if err := database.DB.Where("merchant_id = ?", id).First(&settings).Error; err != nil {
-		response.Success(c, gin.H{
-			"enabled":              false,
-			"base_fee":             0,
-			"free_delivery_amount": 0,
-			"max_distance":         0,
-			"distance_rules":       []struct{}{},
-			"takeout_enabled":      merchant.TakeoutEnabled,
-			"dine_in_enabled":      merchant.DineInEnabled,
-			"pickup_enabled":       merchant.PickupEnabled,
-		})
-		return
-	}
-
-	var distanceRules []struct {
-		MinDistance float64 `json:"min_distance"`
-		MaxDistance float64 `json:"max_distance"`
-		Fee         float64 `json:"fee"`
-	}
-	if settings.DistanceRules != nil {
-		json.Unmarshal(settings.DistanceRules, &distanceRules)
-	}
-
-	response.Success(c, gin.H{
-		"enabled":              settings.Enabled,
-		"base_fee":             settings.BaseFee,
-		"free_delivery_amount": settings.FreeDeliveryAmount,
-		"max_distance":         settings.MaxDistance,
-		"distance_rules":       distanceRules,
-		"takeout_enabled":      merchant.TakeoutEnabled,
-		"dine_in_enabled":      merchant.DineInEnabled,
-		"pickup_enabled":       merchant.PickupEnabled,
-	})
 }
 
 func RecordUserVisit(c *gin.Context) {
@@ -660,19 +623,21 @@ func RecordBehaviorEvent(c *gin.Context) {
 }
 
 type CreateOrderRequest struct {
-	MerchantID       uint64  `json:"merchant_id"`
-	DeliveryType     uint8   `json:"delivery_type" binding:"required,oneof=1 2 3"`
-	DeliveryDistance float64 `json:"delivery_distance"`
-	DeliveryAddress  string  `json:"delivery_address"`
-	ContactName      string  `json:"contact_name"`
-	ContactPhone     string  `json:"contact_phone"`
-	PickupPointID    uint64  `json:"pickup_point_id"`
-	Remark           string  `json:"remark"`
-	Items            []struct {
-		ProductID uint64  `json:"product_id" binding:"required"`
-		Quantity  uint    `json:"quantity" binding:"required,min=1"`
-		SpecInfo  string  `json:"spec_info"`
-		Price     float64 `json:"price"`
+	MerchantID      uint64  `json:"merchant_id"`
+	OrderType       uint8   `json:"order_type"`
+	BizStatus       uint8   `json:"biz_status"`
+	ScheduledAt     string  `json:"scheduled_at"`
+	AssignedStaffID uint64  `json:"assigned_staff_id"`
+	DeliveryAddress string  `json:"delivery_address"`
+	ContactName     string  `json:"contact_name"`
+	ContactPhone    string  `json:"contact_phone"`
+	Remark          string  `json:"remark"`
+	Items           []struct {
+		ProductID      uint64  `json:"product_id" binding:"required"`
+		Quantity       uint    `json:"quantity" binding:"required,min=1"`
+		SpecInfo       string  `json:"spec_info"`
+		Price          float64 `json:"price"`
+		RentalDuration uint    `json:"rental_duration"`
 	} `json:"items" binding:"required,min=1"`
 }
 
@@ -707,71 +672,34 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	var pickupPoint *models.MerchantPickupPoint
-	switch req.DeliveryType {
-	case 1:
-		if !merchant.TakeoutEnabled {
-			response.Fail(c, http.StatusBadRequest, response.CodeForbidden, "商家暂未开启配送")
-			return
+	var scheduledAt *time.Time
+	if req.ScheduledAt != "" {
+		if parsed, err := time.Parse(time.RFC3339, req.ScheduledAt); err == nil {
+			scheduledAt = &parsed
+		} else if parsed, err := time.Parse("2006-01-02 15:04:05", req.ScheduledAt); err == nil {
+			scheduledAt = &parsed
 		}
-		if req.DeliveryAddress == "" {
-			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请输入收货地址")
-			return
-		}
-		if req.ContactName == "" {
-			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请输入联系人")
-			return
-		}
-		if req.ContactPhone == "" {
-			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请输入联系电话")
-			return
-		}
-		if req.DeliveryDistance <= 0 {
-			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请选择配送距离档位")
-			return
-		}
-	case 2:
-		if !merchant.DineInEnabled {
-			response.Fail(c, http.StatusBadRequest, response.CodeForbidden, "商家暂未开启堂食")
-			return
-		}
-		req.DeliveryDistance = 0
-		req.DeliveryAddress = ""
-		req.ContactName = ""
-		req.ContactPhone = ""
-	case 3:
-		if !merchant.PickupEnabled {
-			response.Fail(c, http.StatusBadRequest, response.CodeForbidden, "商家暂未开启自提")
-			return
-		}
-		if req.PickupPointID == 0 {
-			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请选择自提点")
-			return
-		}
+	}
 
-		var selected models.MerchantPickupPoint
-		if err := database.DB.
-			Where("id = ? AND merchant_id = ? AND status = 1", req.PickupPointID, req.MerchantID).
-			First(&selected).Error; err != nil {
-			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "自提点不可用，请重新选择")
-			return
-		}
-		pickupPoint = &selected
-
-		req.DeliveryDistance = 0
-		req.DeliveryAddress = ""
-		req.ContactName = ""
-		req.ContactPhone = ""
+	var assignedStaffID *uint64
+	if req.AssignedStaffID > 0 {
+		assignedStaffID = &req.AssignedStaffID
 	}
 
 	var totalAmount float64
+	var totalDeposit float64
 	var orderItems []models.OrderItem
+	var maxProductType uint8 // 跟踪最高商品类型以推断 order_type
 
 	for _, item := range req.Items {
 		var product models.Product
 		if err := database.DB.First(&product, item.ProductID).Error; err != nil {
 			response.Fail(c, http.StatusBadRequest, response.CodeProductNotFound, "商品不存在")
 			return
+		}
+
+		if product.ProductType > maxProductType {
+			maxProductType = product.ProductType
 		}
 
 		if product.MerchantID != req.MerchantID {
@@ -794,15 +722,6 @@ func CreateOrder(c *gin.Context) {
 			}
 		}
 
-		price, err := calculateOrderItemUnitPrice(product, item.SpecInfo)
-		if err != nil {
-			response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
-			return
-		}
-
-		subtotal := price * float64(item.Quantity)
-		totalAmount += subtotal
-
 		var images []string
 		if product.Images != nil {
 			json.Unmarshal(product.Images, &images)
@@ -812,84 +731,116 @@ func CreateOrder(c *gin.Context) {
 			image = images[0]
 		}
 
-		orderItems = append(orderItems, models.OrderItem{
-			MerchantID:  req.MerchantID,
-			ProductID:   item.ProductID,
-			ProductName: product.Name,
-			Image:       image,
-			Price:       price,
-			Quantity:    item.Quantity,
-			SpecInfo:    specInfo,
-			Subtotal:    subtotal,
-		})
-	}
+		if product.SaleType == 2 {
+			if item.RentalDuration == 0 {
+				response.Fail(c, http.StatusBadRequest, response.CodeParamError, "租赁商品必须选择租赁时长")
+				return
+			}
+			if product.MaxRentalDuration > 0 && item.RentalDuration > product.MaxRentalDuration {
+				response.Fail(c, http.StatusBadRequest, response.CodeParamError, "租赁时长超出限制")
+				return
+			}
+			rentalSubtotal := product.RentalPrice * float64(item.RentalDuration) * float64(item.Quantity)
+			itemDeposit := product.Deposit * float64(item.Quantity)
+			totalAmount += rentalSubtotal
+			totalDeposit += itemDeposit
 
-	if totalAmount < merchant.MinOrderAmount {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单金额未达到最低消费")
-		return
+			orderItems = append(orderItems, models.OrderItem{
+				MerchantID:      req.MerchantID,
+				ProductID:       item.ProductID,
+				ProductName:     product.Name,
+				Image:           image,
+				Price:           product.RentalPrice,
+				Quantity:        item.Quantity,
+				SpecInfo:        specInfo,
+				Subtotal:        rentalSubtotal,
+				SaleType:        2,
+				RentalUnit:      product.RentalUnit,
+				RentalDuration:  item.RentalDuration,
+				UnitRentalPrice: product.RentalPrice,
+				RentalSubtotal:  rentalSubtotal,
+				Deposit:         itemDeposit,
+			})
+		} else {
+			price, err := calculateOrderItemUnitPrice(product, item.SpecInfo)
+			if err != nil {
+				response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
+				return
+			}
+
+			subtotal := price * float64(item.Quantity)
+			totalAmount += subtotal
+
+			orderItems = append(orderItems, models.OrderItem{
+				MerchantID:  req.MerchantID,
+				ProductID:   item.ProductID,
+				ProductName: product.Name,
+				Image:       image,
+				Price:       price,
+				Quantity:    item.Quantity,
+				SpecInfo:    specInfo,
+				Subtotal:    subtotal,
+				SaleType:    1,
+			})
+		}
 	}
 
 	var deliveryFee float64
-	if req.DeliveryType == 1 {
-		var settings models.MerchantDeliverySettings
-		if err := database.DB.Where("merchant_id = ?", req.MerchantID).First(&settings).Error; err != nil || !settings.Enabled {
-			response.Fail(c, http.StatusBadRequest, response.CodeForbidden, "商家暂未开启配送")
-			return
-		}
-		if req.DeliveryDistance > float64(settings.MaxDistance) {
-			response.Fail(c, http.StatusBadRequest, response.CodeOutOfRange, "超出配送范围")
-			return
-		}
 
-		var rules []map[string]interface{}
-		if settings.DistanceRules != nil {
-			_ = json.Unmarshal(settings.DistanceRules, &rules)
-		}
-		deliveryFee = utils.CalculateDeliveryFee(totalAmount, settings.BaseFee, settings.FreeDeliveryAmount, req.DeliveryDistance, rules)
-	}
+	discountAmount := 0.0
 
-	// 满减按商品金额匹配，不包含配送费；最终支付金额再减去命中的优惠金额。
-	fullReductionRules, err := fullreduction.GetActiveRulesByMerchantID(req.MerchantID)
-	if err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取满减规则失败")
-		return
-	}
-	discountAmount, _ := fullreduction.CalculateDiscount(totalAmount, fullReductionRules)
-
-	payAmount := totalAmount + deliveryFee - discountAmount
+	payAmount := totalAmount + deliveryFee - discountAmount + totalDeposit
 	if payAmount < 0 {
 		payAmount = 0
 	}
 
 	orderNo := utils.GenerateOrderNo(req.MerchantID)
-	verifyCode := utils.GenerateVerifyCode()
+
+	// 根据 product_type 推断 order_type 和 biz_status
+	orderType := req.OrderType
+	bizStatus := req.BizStatus
+
+	if orderType == 0 {
+		switch maxProductType {
+		case 2: // 辅具租赁
+			orderType = 2 // 租赁商品
+		case 3: // 康养套餐
+			orderType = 5 // 上门服务
+		case 4: // 陪诊服务
+			orderType = 4 // 预约服务
+		default: // 零售/资讯
+			orderType = 1 // 普通商品
+		}
+	}
+
+	// 服务类订单（康养/陪诊）支付后需要派工，初始 biz_status=1（待接单）
+	if bizStatus == 0 && (orderType == 3 || orderType == 4 || orderType == 5) {
+		bizStatus = 1 // 待接单
+	}
 
 	tx := database.DB.Begin()
 
 	order := models.Order{
-		OrderNo:          orderNo,
-		UserID:           userID,
-		MerchantID:       req.MerchantID,
-		TotalAmount:      totalAmount,
-		DeliveryFee:      deliveryFee,
-		DiscountAmount:   discountAmount,
-		PayAmount:        payAmount,
-		DeliveryType:     req.DeliveryType,
-		DeliveryDistance: req.DeliveryDistance,
-		DeliveryAddress:  req.DeliveryAddress,
-		ContactName:      req.ContactName,
-		ContactPhone:     req.ContactPhone,
-		Remark:           req.Remark,
-		VerifyCode:       verifyCode,
-		Status:           1,
+		OrderNo:         orderNo,
+		UserID:          userID,
+		MerchantID:      req.MerchantID,
+		OrderType:       orderType,
+		BizStatus:       bizStatus,
+		ScheduledAt:     scheduledAt,
+		AssignedStaffID: assignedStaffID,
+		TotalAmount:     totalAmount,
+		DeliveryFee:     deliveryFee,
+		DiscountAmount:  discountAmount,
+		PayAmount:       payAmount,
+		TotalDeposit:    totalDeposit,
+		DeliveryAddress: req.DeliveryAddress,
+		ContactName:     req.ContactName,
+		ContactPhone:    req.ContactPhone,
+		Remark:          req.Remark,
+		Status:          1,
 	}
-	if pickupPoint != nil {
-		pickupPointID := pickupPoint.ID
-		order.PickupPointID = &pickupPointID
-		order.PickupPointName = pickupPoint.Name
-		order.PickupPointAddress = pickupPoint.Address
-		order.PickupPointLat = pickupPoint.Lat
-		order.PickupPointLng = pickupPoint.Lng
+	if totalDeposit > 0 {
+		order.DepositStatus = 1
 	}
 
 	if err := tx.Create(&order).Error; err != nil {
@@ -907,7 +858,6 @@ func CreateOrder(c *gin.Context) {
 		}
 	}
 
-	// 扣减库存
 	for _, item := range orderItems {
 		if err := tx.Model(&models.Product{}).
 			Where("id = ?", item.ProductID).
@@ -918,7 +868,6 @@ func CreateOrder(c *gin.Context) {
 		}
 	}
 
-	// 增加销量
 	for _, item := range orderItems {
 		if err := tx.Model(&models.Product{}).
 			Where("id = ?", item.ProductID).
@@ -937,7 +886,6 @@ func CreateOrder(c *gin.Context) {
 
 	database.DB.Preload("Items").First(&order, order.ID)
 
-	// 更新用户下单统计
 	database.DB.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 		"has_ordered":  true,
 		"total_orders": gorm.Expr("total_orders + 1"),
@@ -945,12 +893,10 @@ func CreateOrder(c *gin.Context) {
 	})
 
 	recordUserBehaviorEvent(req.MerchantID, userID, "", "submit_order", "store_confirm", nil, &order.ID, "store", map[string]interface{}{
-		"delivery_type":     req.DeliveryType,
-		"delivery_distance": req.DeliveryDistance,
-		"pay_amount":        payAmount,
+		"order_type": orderType,
+		"pay_amount": payAmount,
 	})
 
-	// 如果是支付金额大于0的订单，更新支付状态
 	if payAmount > 0 {
 		now := time.Now()
 		database.DB.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
@@ -959,38 +905,55 @@ func CreateOrder(c *gin.Context) {
 		})
 	}
 
-	// 如果需要支付，创建微信支付订单
 	var payParams gin.H
+	var payHint string
 	if payAmount > 0 {
 		var merchant models.Merchant
 		if err := database.DB.First(&merchant, order.MerchantID).Error; err == nil {
 			client, clientErr := wechatpay.NewServiceProviderClient()
-			if clientErr != nil {
-				response.Fail(c, http.StatusInternalServerError, response.CodeServerError, clientErr.Error())
-				return
-			}
-
-			payResponse, payErr := createWechatPayOrder(context.Background(), client, &merchant, order, int64(payAmount*100), currentUser.OpenID)
-			if payErr != nil {
-				response.Fail(c, http.StatusBadRequest, response.CodeParamError, payErr.Error())
-				return
-			}
-			payParams = gin.H{
-				"appId":     payResponse.AppID,
-				"timeStamp": payResponse.TimeStamp,
-				"nonceStr":  payResponse.NonceStr,
-				"package":   payResponse.Package,
-				"signType":  payResponse.SignType,
-				"paySign":   payResponse.PaySign,
-				"prepay_id": payResponse.PrepayID,
+			merchantReady := merchant.SubMchID != "" && merchant.PaymentConfigStatus == 1
+			if clientErr != nil || !merchantReady {
+				// 降级：不阻断下单，提示支付凭证未配置
+				var reasons []string
+				if clientErr != nil {
+					reasons = append(reasons, fmt.Sprintf("服务商支付凭证未配置: %s", clientErr.Error()))
+				}
+				if merchant.SubMchID == "" {
+					reasons = append(reasons, "商家尚未绑定收款商户号")
+				}
+				if merchant.PaymentConfigStatus != 1 {
+					reasons = append(reasons, "商家支付配置未完成")
+				}
+				payHint = strings.Join(reasons, "；")
+				log.Printf("[CREATE-ORDER-DEGRADE] order_no=%s, hint=%s", order.OrderNo, payHint)
+			} else {
+				payResponse, payErr := createWechatPayOrder(context.Background(), client, &merchant, order, int64(payAmount*100), currentUser.OpenID)
+				if payErr != nil {
+					payHint = fmt.Sprintf("创建支付单失败: %s", payErr.Error())
+					log.Printf("[CREATE-ORDER-DEGRADE] order_no=%s, pay_error=%s", order.OrderNo, payHint)
+				} else {
+					payParams = gin.H{
+						"appId":     payResponse.AppID,
+						"timeStamp": payResponse.TimeStamp,
+						"nonceStr":  payResponse.NonceStr,
+						"package":   payResponse.Package,
+						"signType":  payResponse.SignType,
+						"paySign":   payResponse.PaySign,
+						"prepay_id": payResponse.PrepayID,
+					}
+				}
 			}
 		}
 	}
 
-	response.Success(c, gin.H{
+	respBody := gin.H{
 		"order":      order,
 		"pay_params": payParams,
-	})
+	}
+	if payHint != "" {
+		respBody["pay_hint"] = payHint
+	}
+	response.Success(c, respBody)
 }
 
 func createWechatPayOrder(
@@ -1008,7 +971,7 @@ func createWechatPayOrder(
 		return nil, fmt.Errorf("商家尚未配置收款商户号")
 	}
 	if merchant.PaymentConfigStatus != 1 {
-		return nil, fmt.Errorf("商家支付配置未完成，请联系服务商")
+		return nil, fmt.Errorf("商家支付配置未完成，请在 PC 后台完成支付配置")
 	}
 	if openID == "" {
 		return nil, fmt.Errorf("缺少用户支付标识")
@@ -1190,8 +1153,43 @@ func ApplyRefund(c *gin.Context) {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新订单状态失败")
 		return
 	}
-
 	tx.Commit()
 
+	// 同步调用微信退款接口（仅当订单已完成支付回调、商家已配置子商户号时）
+	if strings.TrimSpace(order.TransactionID) != "" && order.PayAmount > 0 {
+		var merchant models.Merchant
+		if err := database.DB.First(&merchant, order.MerchantID).Error; err == nil && merchant.SubMchID != "" {
+			notifyURL := config.Config.WechatPay.CallbackURL
+			client, cliErr := wechatpay.NewServiceProviderClient()
+			if cliErr == nil && notifyURL != "" {
+				refundResp, callErr := client.CreatePartnerRefund(context.Background(), wechatpay.RefundRequest{
+					SubMchID:     merchant.SubMchID,
+					OrderNo:      order.OrderNo,
+					RefundNo:     refund.RefundNo,
+					Reason:       req.Reason,
+					NotifyURL:    notifyURL,
+					RefundAmount: int64(order.PayAmount * 100),
+					TotalAmount:  int64(order.PayAmount * 100),
+				})
+				if callErr == nil {
+					refundID := strings.TrimSpace(refundResp.RefundID)
+					_ = orderquery.SyncRefundAndOrderStatus(database.DB, &order, &refund, refundResp.Status, refundID, refundResp.SuccessTime)
+					refundStatus := strings.ToUpper(strings.TrimSpace(refundResp.Status))
+					if refundStatus != "SUCCESS" {
+						if refreshed, queryErr := client.QueryPartnerRefundByRefundNo(context.Background(), refund.RefundNo); queryErr == nil {
+							_ = orderquery.SyncRefundAndOrderStatus(database.DB, &order, &refund, refreshed.Status, refreshed.RefundID, refreshed.SuccessTime)
+						}
+					}
+				} else {
+					_ = database.DB.Model(&refund).Updates(map[string]any{
+						"status": 2,
+					}).Error
+					log.Printf("[ApplyRefund] 调用微信退款失败: refund_no=%s, err=%v", refund.RefundNo, callErr)
+				}
+			}
+		}
+	}
+
+	database.DB.First(&refund, refund.ID)
 	response.Success(c, refund)
 }

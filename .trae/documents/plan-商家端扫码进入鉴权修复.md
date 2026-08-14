@@ -59,7 +59,7 @@
 2. 在以下商家端页面生命周期入口调用守卫（优先 `onLoad`/`onShow`）
    - `miniprogram/src/pages/merchant/orders/detail.vue`
    - `miniprogram/src/pages/merchant/orders/list.vue`
-   - （可选）其它商家端非 Tab 页面：商品编辑、分账历史、配送设置等（根据扫描入口是否可能直达决定）
+   - （可选）其它商家端非 Tab 页面：商品编辑、配送设置等（根据扫描入口是否可能直达决定）
 
 ### B. 登录页支持 “redirect 回跳”
 

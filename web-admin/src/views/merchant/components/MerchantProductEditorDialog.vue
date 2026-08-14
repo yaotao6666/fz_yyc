@@ -12,13 +12,14 @@ import type {
   MerchantCategory,
   MerchantProductEditableSpec,
   MerchantProductSpecsPayload,
-  MerchantProductUpsertPayload
+  MerchantProductUpsertPayload,
+  WellnessPackageContent
 } from '@/types/sp'
+import WellnessPackageEditor from './WellnessPackageEditor.vue'
 import { uploadSpImage } from '@/utils/qiniu'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
-  merchantId: number
   categories: MerchantCategory[]
   productId?: number | null
 }>(), {
@@ -39,8 +40,6 @@ const loading = ref(false)
 const submitting = ref(false)
 const uploading = ref(false)
 const imageInputRef = ref<HTMLInputElement | null>(null)
-// web-admin 为服务商专属后台，登录者必为服务商
-const isServiceProvider = true
 
 interface ProductImageItem {
   url: string
@@ -56,10 +55,54 @@ const form = reactive({
   original_price: 0,
   stock: 0,
   unit: '',
+  product_type: 1 as number,
+  service_content: null as WellnessPackageContent | Record<string, unknown> | null,
+  sale_type: 1 as number,
+  rental_unit: 0 as number,
+  rental_price: 0 as number,
+  deposit: 0 as number,
+  max_rental_duration: 0 as number,
   sort: 0,
   sales: 0,
   specs: [] as MerchantProductEditableSpec[]
 })
+
+// 商品类型选项：1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务 5=科普资讯
+const PRODUCT_TYPE_OPTIONS = [
+  { label: '辅具零售', value: 1 },
+  { label: '辅具租赁', value: 2 },
+  { label: '康养套餐', value: 3 },
+  { label: '陪诊服务', value: 4 },
+  { label: '科普资讯', value: 5 }
+]
+
+// 商品类型切换时自动归一化 sale_type：租赁=2，其他=1
+function handleProductTypeChange(value: number) {
+  if (!value) return
+  if (value === 2) {
+    form.sale_type = 2
+  } else {
+    form.sale_type = 1
+    // 切换到非租赁时清理租赁字段，避免脏数据
+    form.rental_unit = 0
+    form.rental_price = 0
+    form.deposit = 0
+    form.max_rental_duration = 0
+  }
+  // 康养套餐自动初始化 service_content 空结构
+  if (value === 3 && !form.service_content) {
+    form.service_content = {
+      duration: '',
+      items: [],
+      notes: '',
+      applicable_groups: ''
+    }
+  }
+  // 非康养套餐清理 service_content
+  if (value !== 3) {
+    form.service_content = null
+  }
+}
 
 const dialogTitle = computed(() => props.productId ? '编辑商品' : '新增商品')
 
@@ -85,6 +128,13 @@ function resetForm() {
   form.original_price = 0
   form.stock = 0
   form.unit = ''
+  form.product_type = 1
+  form.service_content = null
+  form.sale_type = 1
+  form.rental_unit = 0
+  form.rental_price = 0
+  form.deposit = 0
+  form.max_rental_duration = 0
   form.sort = 0
   form.sales = 0
   form.specs = []
@@ -139,7 +189,7 @@ async function handleImageChange(event: Event) {
   uploading.value = true
   try {
     for (const file of files) {
-      const uploaded = await uploadSpImage(file, props.merchantId)
+      const uploaded = await uploadSpImage(file)
       form.images.push({
         url: uploaded.url,
         previewUrl: URL.createObjectURL(file)
@@ -176,6 +226,13 @@ function buildProductPayload(): MerchantProductUpsertPayload {
     original_price: Number(form.original_price || 0),
     stock: Number(form.stock || 0),
     unit: form.unit.trim(),
+    product_type: Number(form.product_type || 1),
+    service_content: form.product_type === 3 ? form.service_content : null,
+    sale_type: Number(form.sale_type || 1),
+    rental_unit: Number(form.rental_unit || 0),
+    rental_price: Number(form.rental_price || 0),
+    deposit: Number(form.deposit || 0),
+    max_rental_duration: Number(form.max_rental_duration || 0),
     sort: Number(form.sort || 0),
     sales: form.sales,
     specs: []
@@ -189,11 +246,34 @@ function validatePayload(payload: MerchantProductUpsertPayload) {
   if (!Number.isFinite(payload.price) || payload.price < 0) {
     return '请输入正确的售价'
   }
+  if (payload.sale_type === 2) {
+    if (!payload.rental_unit) return '租赁商品必须选择计费周期'
+    const rentalPrice = Number(payload.rental_price ?? 0)
+    if (!Number.isFinite(rentalPrice) || rentalPrice <= 0) {
+      return '租赁商品单位租金必须大于 0'
+    }
+    const deposit = Number(payload.deposit ?? 0)
+    if (!Number.isFinite(deposit) || deposit < 0) {
+      return '押金不能小于 0'
+    }
+  }
+  // 康养套餐校验
+  if (payload.product_type === 3) {
+    const content = payload.service_content as WellnessPackageContent | null | undefined
+    if (content && Array.isArray(content.items)) {
+      for (let i = 0; i < content.items.length; i++) {
+        const item = content.items[i]
+        if (!item?.name?.trim()) {
+          return `服务项 ${i + 1} 请填写服务项名称`
+        }
+      }
+    }
+  }
   return ''
 }
 
 async function loadFormData() {
-  if (!dialogVisible.value || !props.merchantId) return
+  if (!dialogVisible.value) return
 
   if (!props.productId) {
     resetForm()
@@ -203,8 +283,8 @@ async function loadFormData() {
   loading.value = true
   try {
     const [product, specPayload] = await Promise.all([
-      getMerchantProduct(props.merchantId, props.productId),
-      getMerchantProductSpecs(props.merchantId, props.productId)
+      getMerchantProduct(props.productId),
+      getMerchantProductSpecs(props.productId)
     ])
 
     form.name = product.name || ''
@@ -222,6 +302,18 @@ async function loadFormData() {
     form.original_price = Number(product.original_price || 0)
     form.stock = Number(product.stock || 0)
     form.unit = product.unit || ''
+    form.product_type = Number(product.product_type || 1)
+    // 康养套餐读取 service_content，其他类型置空
+    if (form.product_type === 3 && product.service_content) {
+      form.service_content = product.service_content as WellnessPackageContent
+    } else {
+      form.service_content = null
+    }
+    form.sale_type = Number(product.sale_type || 1)
+    form.rental_unit = Number(product.rental_unit || 0)
+    form.rental_price = Number(product.rental_price || 0)
+    form.deposit = Number(product.deposit || 0)
+    form.max_rental_duration = Number(product.max_rental_duration || 0)
     form.sort = Number(product.sort || 0)
     form.sales = Number(product.sales || 0)
     form.specs = Array.isArray(specPayload.specs)
@@ -237,7 +329,7 @@ async function loadFormData() {
 }
 
 async function submit() {
-  if (!props.merchantId || submitting.value) return
+  if (submitting.value) return
 
   const payload = buildProductPayload()
   const message = validatePayload(payload)
@@ -249,10 +341,10 @@ async function submit() {
   submitting.value = true
   try {
     const product = props.productId
-      ? await updateMerchantProduct(props.merchantId, props.productId, payload)
-      : await createMerchantProduct(props.merchantId, payload)
+      ? await updateMerchantProduct(props.productId, payload)
+      : await createMerchantProduct(payload)
 
-    await updateMerchantProductSpecs(props.merchantId, product.id, normalizeSpecsPayload())
+    await updateMerchantProductSpecs(product.id, normalizeSpecsPayload())
     ElMessage.success(props.productId ? '商品更新成功' : '商品创建成功')
     emit('success')
     closeDialog()
@@ -262,7 +354,7 @@ async function submit() {
 }
 
 watch(
-  () => [props.modelValue, props.productId, props.merchantId],
+  () => [props.modelValue, props.productId],
   ([visible]) => {
     if (visible) {
       void loadFormData()
@@ -336,13 +428,57 @@ watch(
           <el-form-item label="单位">
             <el-input v-model="form.unit" placeholder="如：份、件、杯" />
           </el-form-item>
+          <el-form-item label="商品类型" required>
+            <el-select
+              v-model="form.product_type"
+              placeholder="请选择商品类型"
+              style="width: 100%;"
+              @change="handleProductTypeChange"
+            >
+              <el-option
+                v-for="opt in PRODUCT_TYPE_OPTIONS"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="销售模式">
+            <el-tag :type="form.sale_type === 2 ? 'warning' : 'success'" effect="light">
+              {{ form.sale_type === 2 ? '租赁（由商品类型自动）' : '一口价（由商品类型自动）' }}
+            </el-tag>
+          </el-form-item>
+          <template v-if="form.sale_type === 2">
+            <el-form-item label="计费周期" required>
+              <el-select v-model="form.rental_unit" placeholder="选择计费周期" style="width: 100%;">
+                <el-option label="按天" :value="1" />
+                <el-option label="按周" :value="2" />
+                <el-option label="按月" :value="3" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="单位租金" required>
+              <el-input-number v-model="form.rental_price" :min="0" :precision="2" :step="1" style="width: 100%;" />
+            </el-form-item>
+            <el-form-item label="押金">
+              <el-input-number v-model="form.deposit" :min="0" :precision="2" :step="1" style="width: 100%;" />
+            </el-form-item>
+            <el-form-item label="最大租赁时长">
+              <el-input-number v-model="form.max_rental_duration" :min="0" :precision="0" :step="1" style="width: 100%;" placeholder="0=不限" />
+            </el-form-item>
+          </template>
           <el-form-item label="排序">
             <el-input-number v-model="form.sort" :min="0" :precision="0" :step="1" style="width: 100%;" />
           </el-form-item>
-          <el-form-item v-if="isServiceProvider" label="销量">
+          <el-form-item label="销量">
             <el-input-number v-model="form.sales" :min="0" :precision="0" :step="1" style="width: 100%;" />
           </el-form-item>
         </div>
+
+        <template v-if="form.product_type === 3">
+          <el-form-item label="康养套餐配置" required>
+            <WellnessPackageEditor v-model="form.service_content" />
+          </el-form-item>
+        </template>
 
         <el-form-item label="商品规格">
           <div class="spec-editor">

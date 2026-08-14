@@ -23,41 +23,7 @@ export interface ApiResponse<T = any> {
   data: T
 }
 
-export interface Announcement {
-  id: number
-  service_provider_id: number
-  title: string
-  content: string
-  summary?: string
-  published_at?: string
-  status: number
-  created_at: string
-  updated_at: string
-}
-
-export interface AnnouncementListResponse {
-  list: Announcement[]
-  pagination: {
-    total: number
-    page: number
-    page_size: number
-  }
-}
-
 // ============ 认证相关 ============
-
-// 商家登录请求
-export interface MerchantLoginRequest {
-  username: string
-  password: string
-}
-
-// 商家登录响应
-export interface MerchantLoginResponse {
-  token: string
-  merchant_id: number
-  staff: MerchantStaff
-}
 
 // C端用户登录请求
 export interface WechatLoginRequest {
@@ -74,175 +40,8 @@ export interface WechatLoginResponse {
   user: UserInfo
 }
 
-export enum PaymentConfigStatus {
-  INCOMPLETE = 0,
-  COMPLETED = 1
-}
+// ============ 配送设置 ============
 
-export const PaymentConfigStatusText: Record<number, string> = {
-  [PaymentConfigStatus.INCOMPLETE]: '待完善',
-  [PaymentConfigStatus.COMPLETED]: '已完成'
-}
-
-export interface ProfitSharingRecord {
-  id: number
-  service_provider_id: number
-  merchant_id: number
-  order_id: number
-  order_no: string
-  transaction_id?: string
-  profit_sharing_order_no: string
-  profit_sharing_date: string
-  pay_amount: number
-  profit_sharing_ratio: number
-  profit_sharing_amount: number
-  merchant_received_amount: number
-  status: number
-  error_message?: string
-  created_at: string
-}
-
-export interface ProfitSharingRecordListResponse {
-  list: ProfitSharingRecord[]
-  pagination: {
-    total: number
-    page: number
-    page_size: number
-  }
-}
-
-export interface ProfitSharingRecordQuery extends PaginationParams {
-  merchant_id?: number
-  status?: number
-  start_date?: string
-  end_date?: string
-}
-
-// ============ 商家相关 ============
-
-// 商家员工
-export interface MerchantStaff {
-  id: number
-  merchant_id: number
-  username: string
-  name: string
-  phone: string
-  openid?: string
-  unionid?: string
-  wechat_bound_at?: string
-  role: string
-  notify_enabled?: boolean
-  browse_notify_enabled?: boolean
-  status: number
-  last_login_at?: string
-  last_wechat_login_at?: string
-}
-
-// 商家信息
-export interface MerchantInfo {
-  id: number
-  name: string
-  logo: string
-  cover_image?: string
-  contact_name: string
-  contact_phone: string
-  address: string
-  business_category: string
-  status: number
-  settings?: MerchantSettings
-  wechat_pay?: WechatPayInfo
-  sub_mch_id?: string
-  profit_sharing_enabled?: boolean
-  profit_sharing_ratio?: number
-  payment_config_status?: number
-  qrcode_url?: string
-  created_at: string
-}
-
-// 商家设置
-export interface MerchantSettings {
-  announcement: string
-  business_hours: string
-  min_order_amount: number
-  takeout_enabled: boolean
-  dine_in_enabled: boolean
-  pickup_enabled: boolean
-  notify_enabled?: boolean
-  browse_notify_enabled?: boolean
-  wechat_bound?: boolean
-  unionid?: string
-  wechat_bound_at?: string
-  delivery_settings?: DeliverySettings
-}
-
-export interface MerchantFullReductionRule {
-  id?: number
-  merchant_id?: number
-  threshold_amount: number
-  discount_amount: number
-  sort?: number
-  status: number
-  created_at?: string
-  updated_at?: string
-}
-
-export interface MerchantFullReductionRulesResponse {
-  rules: MerchantFullReductionRule[]
-  active_rules: MerchantFullReductionRule[]
-}
-
-export interface StoreFullReductionRulesResponse {
-  rules: MerchantFullReductionRule[]
-}
-
-export interface UpdateMerchantFullReductionRulesRequest {
-  rules: Array<{
-    threshold_amount: number
-    discount_amount: number
-    status?: number
-  }>
-}
-
-export type MerchantPrinterType = 'yilianyun' | 'feie' | string
-export type MerchantPrinterPrintType = string
-
-export interface MerchantPrinter {
-  id: number
-  merchant_id: number
-  name: string
-  type: MerchantPrinterType
-  device_no: string
-  api_url?: string
-  feie_user?: string
-  feie_sn?: string
-  print_types: MerchantPrinterPrintType[]
-  status: number
-  auto_print: boolean
-  is_default: boolean
-  print_count: number
-  last_print_at?: string
-  has_api_key?: boolean
-  has_feie_ukey?: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface MerchantPrinterPayload {
-  name: string
-  type: MerchantPrinterType
-  device_no: string
-  api_key?: string
-  api_url?: string
-  feie_user?: string
-  feie_ukey?: string
-  feie_sn?: string
-  print_types?: MerchantPrinterPrintType[]
-  status?: number
-  auto_print?: boolean
-  is_default?: boolean
-}
-
-// 配送设置
 export interface DeliverySettings {
   enabled: boolean
   base_fee: number
@@ -251,53 +50,13 @@ export interface DeliverySettings {
   max_distance: number
 }
 
-export interface MerchantDeliverySettings extends DeliverySettings {
-  takeout_enabled: boolean
-  dine_in_enabled: boolean
-  pickup_enabled: boolean
-}
-
-export interface StoreDeliveryRules extends MerchantDeliverySettings {
-}
-
-export interface PickupPoint {
-  id: number
-  merchant_id: number
-  name: string
-  address: string
-  lat: number
-  lng: number
-  is_default: boolean
-  status: number
-  sort: number
-  created_at: string
-  updated_at: string
-}
+export interface StoreDeliveryRules extends DeliverySettings {}
 
 // 配送距离规则
 export interface DistanceRule {
   min_distance: number
   max_distance: number
   fee: number
-}
-
-// 微信支付信息
-export interface WechatPayInfo {
-  sub_mch_id: string
-  status: string
-  payment_config_status?: number
-}
-
-// ============ 商品分类相关 ============
-
-// 商品分类
-export interface Category {
-  id: number
-  name: string
-  sort: number
-  product_count?: number
-  status: number
-  created_at: string
 }
 
 // ============ 商品相关 ============
@@ -318,6 +77,23 @@ export interface ProductApiSpec {
   options?: ProductApiSpecOption[] | null
 }
 
+// 商品类型: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务 5=科普资讯
+export type ProductType = 1 | 2 | 3 | 4 | 5
+
+// 康养套餐服务内容配置
+export interface WellnessPackageItem {
+  name: string
+  description?: string
+  count?: number
+  unit?: string
+}
+export interface WellnessPackageContent {
+  cycle?: string
+  target_audience?: string
+  services: WellnessPackageItem[]
+  remark?: string
+}
+
 export interface ProductApiResponse {
   id?: number | string
   merchant_id?: number | string
@@ -333,6 +109,13 @@ export interface ProductApiResponse {
   sort?: number | string | null
   unit?: string
   description?: string
+  product_type?: number | string | null
+  service_content?: any
+  sale_type?: number | string | null
+  rental_unit?: number | string | null
+  rental_price?: OptionalCompatibleAmountValue
+  deposit?: OptionalCompatibleAmountValue
+  max_rental_duration?: number | string | null
   specs?: ProductApiSpec[] | null
   created_at?: string
   updated_at?: string
@@ -354,6 +137,13 @@ export interface Product {
   sort?: number
   unit?: string
   description?: string
+  product_type: ProductType
+  service_content?: WellnessPackageContent | any
+  sale_type: number
+  rental_unit: number
+  rental_price: number
+  deposit: number
+  max_rental_duration: number
   specs?: ProductSpec[]
   created_at: string
   updated_at?: string
@@ -372,32 +162,6 @@ export interface SpecOption {
   name: string
   price: number
   stock?: number
-}
-
-// 商品保存载荷
-export interface ProductSpecOptionPayload {
-  name: string
-  price: number
-  stock?: number
-}
-
-export interface ProductSpecPayload {
-  id?: number
-  name: string
-  options: ProductSpecOptionPayload[]
-}
-
-export interface ProductUpsertPayload {
-  name: string
-  description?: string
-  images: string[]
-  category_id: number
-  price: number
-  original_price?: number
-  stock?: number
-  unit?: string
-  sort?: number
-  specs?: ProductSpecPayload[]
 }
 
 // 商品列表响应
@@ -432,20 +196,6 @@ export const OrderStatusText: Record<number, string> = {
   [OrderStatus.REFUNDED]: '已退款'
 }
 
-// 配送类型
-export enum DeliveryType {
-  DELIVERY = 1,  // 配送
-  DINE_IN = 2,   // 堂食
-  PICKUP = 3     // 自提
-}
-
-// 配送类型文本
-export const DeliveryTypeText: Record<number, string> = {
-  [DeliveryType.DELIVERY]: '配送',
-  [DeliveryType.DINE_IN]: '堂食',
-  [DeliveryType.PICKUP]: '自提'
-}
-
 // 订单用户信息
 export interface OrderUser {
   id: number
@@ -473,6 +223,13 @@ export interface OrderItem {
   quantity: number
   specs?: string
   subtotal?: number
+  sale_type?: number
+  rental_unit?: number
+  rental_duration?: number
+  unit_rental_price?: number
+  rental_subtotal?: number
+  deposit?: number
+  deposit_deduct?: number
 }
 
 // 订单信息
@@ -486,22 +243,20 @@ export interface Order {
   delivery_fee: number
   discount_amount: number
   pay_amount: number
-  delivery_type?: number
-  delivery_distance?: number
+  total_deposit?: number
+  deposit_status?: number
+  deposit_refund_amount?: number
+  deposit_deduct_amount?: number
+  deposit_refunded_at?: string
+  rental_returned_at?: string
+  rental_return_remark?: string
   delivery_address?: string
   contact_name?: string
   contact_phone?: string
-  pickup_point_id?: number
-  pickup_point_name?: string
-  pickup_point_address?: string
-  pickup_point_lat?: number
-  pickup_point_lng?: number
   delivery_info?: DeliveryInfo
   status: number
   status_text?: string
   remark?: string
-  verify_code?: string
-  verify_qrcode_url?: string
   transaction_id?: string
   created_at: string
   paid_at?: string
@@ -528,30 +283,18 @@ export interface OrderListResponse {
   page_size: number
 }
 
-// 订单统计
-export interface OrderStatistics {
-  total_orders: number
-  total_amount: number
-  today_orders: number
-  today_amount: number
-  pending_orders: number
-  completed_orders: number
-  refunded_amount: number
-}
-
 // 创建订单请求
 export interface CreateOrderRequest {
   items: {
     product_id: number
     spec_info?: string
     quantity: number
+    rental_duration?: number
   }[]
-  delivery_type: number
   delivery_distance?: number
   delivery_address?: string
   contact_name?: string
   contact_phone?: string
-  pickup_point_id?: number
   remark?: string
 }
 
@@ -559,15 +302,18 @@ export interface CreateOrderRequest {
 export interface CreateOrderResponse {
   order: Order
   pay_params?: WechatPayParams
+  pay_hint?: string
 }
 
 // 微信支付参数
 export interface WechatPayParams {
+  appId?: string
   timeStamp: string
   nonceStr: string
   package: string
   signType: string
   paySign: string
+  prepay_id?: string
 }
 
 // ============ C端用户相关 ============
@@ -627,6 +373,11 @@ export interface StoreHomeInfo {
     price: number
     original_price?: number
     sales: number
+    product_type?: ProductType
+    sale_type?: number
+    rental_unit?: number
+    rental_price?: number
+    deposit?: number
   }[]
 }
 
@@ -639,115 +390,13 @@ export interface StoreProductGroup {
   products: Product[]
 }
 
-// ============ 数据分析相关 ============
-
-// 销售概览
-export interface SalesOverview {
-  total_sales: number
-  total_orders: number
-  total_customers: number
-  avg_order_amount: number
-  sales_growth: number
-  orders_growth: number
-  customers_growth: number
-  visit_count?: number
-  visit_users?: number
-  pay_success_users?: number
-}
-
-// 销售趋势
-export interface SalesTrend {
-  date: string
-  sales: number
-  orders: number
-  customers?: number
-  visit_users?: number
-  submit_order_users?: number
-}
-
-// 商品排行
-export interface ProductRanking {
-  product_id: number
-  product_name: string
-  image: string
-  sales_count: number
-  sales_amount: number
-}
-
-// 时段分析
-export interface HourlyAnalysis {
-  hour: number
-  orders: number
-  sales: number
-}
-
-// 库存预警
-export interface StockAlert {
-  id?: number
-  product_id: number
-  product_name: string
-  image?: string
-  stock: number
-  status?: string | number
-}
-
-export interface CustomerAnalysis {
-  total_customers: number
-  new_customers: number
-  repeat_rate: number
-  visit_users?: number
-  visit_count?: number
-  submit_order_users?: number
-  pay_success_users?: number
-}
-
-export interface CustomerTrend {
-  date: string
-  total_users: number
-  new_users: number
-  order_count: number
-}
-
-export interface MerchantStaffListResponse {
-  list: MerchantStaff[]
-  pagination: {
-    total: number
-    page: number
-    page_size: number
-  }
-}
-
-export interface CreateMerchantStaffRequest {
-  name: string
-  phone: string
-  username: string
-  password: string
-  role?: string
-}
-
-export interface UpdateMerchantStaffRequest {
-  name?: string
-  phone?: string
-  role?: string
-  notify_enabled?: boolean
-  browse_notify_enabled?: boolean
-  status?: number
-}
-
-export interface ChangePasswordRequest {
-  old_password: string
-  new_password: string
-}
+// ============ 通用 ============
 
 export interface UploadTokenResponse {
   token: string
   domain: string
   prefix: string
   upload_url: string
-}
-
-export interface MerchantWechatLoginRequest {
-  code: string
 }
 
 export interface MerchantBehaviorEventRequest {

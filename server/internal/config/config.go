@@ -62,13 +62,13 @@ type JWT struct {
 
 // WechatPay 微信支付配置
 type WechatPay struct {
-	SPMchID      string
-	APIV3Key     string
-	CertSerialNo string
-	PrivateKey   string
-	PublicKey    string
-	CallbackURL  string
-	AppMode      string
+	SPMchID            string
+	APIV3Key           string
+	CertSerialNo       string
+	PrivateKey         string
+	PublicKey          string
+	CallbackURL        string
+	AppMode            string
 }
 
 // Qiniu 七牛云配置
@@ -424,13 +424,13 @@ func getDefaultConfig() *AppConfig {
 			SubAppSecret: "",
 		},
 		WechatPay: WechatPay{
-			SPMchID:      "",
-			APIV3Key:     "",
-			CertSerialNo: "",
-			PrivateKey:   "",
-			PublicKey:    "",
-			CallbackURL:  "",
-			AppMode:      "sp_app",
+			SPMchID:            "",
+			APIV3Key:           "",
+			CertSerialNo:       "",
+			PrivateKey:         "",
+			PublicKey:          "",
+			CallbackURL:        "",
+			AppMode:            "sp_app",
 		},
 		Qiniu: Qiniu{
 			AccessKey: "",

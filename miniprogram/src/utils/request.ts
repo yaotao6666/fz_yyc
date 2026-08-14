@@ -39,16 +39,24 @@ export interface RequestOptions {
 }
 
 /**
+ * 清理 C 端用户登录态
+ */
+function clearUserAuthState() {
+  uni.removeStorageSync('user_token')
+  uni.removeStorageSync('userInfo')
+  uni.removeStorageSync('openid')
+  uni.removeStorageSync('user_login_app_mode')
+  uni.removeStorageSync('user_login_app_id')
+}
+
+/**
  * 获取 Token
  */
 function getToken(url: string): string {
-  if (url.startsWith('/api/v1/user/')) {
+  if (url.startsWith('/api/v1/user/') || url.startsWith('/api/v1/store/')) {
     return uni.getStorageSync('user_token') || ''
   }
-  if (url.startsWith('/api/v1/store/')) {
-    return uni.getStorageSync('user_token') || ''
-  }
-  return uni.getStorageSync('token') || ''
+  return uni.getStorageSync('user_token') || ''
 }
 
 function getResponseMessage(response: unknown, fallbackMessage: string): string {
@@ -128,6 +136,20 @@ function sanitizeGetParams(data: unknown) {
 }
 
 /**
+ * 处理 401 未授权
+ */
+function handleUnauthorized(message: string, statusCode: number, response: unknown) {
+  clearUserAuthState()
+  uni.showToast({ title: '登录已过期，请重新进入', icon: 'none' })
+  return createRequestError({
+    message,
+    code: ResponseCode.UNAUTHORIZED,
+    statusCode,
+    response
+  })
+}
+
+/**
  * 请求核心方法
  */
 function request<T = any>(options: RequestOptions): Promise<T> {
@@ -146,9 +168,6 @@ function request<T = any>(options: RequestOptions): Promise<T> {
     showLoading(loadingText)
   }
 
-  const isMerchantRequest = url.startsWith('/api/v1/merchant/')
-  const isUserRequest = url.startsWith('/api/v1/user/')
-  const isStoreRequest = url.startsWith('/api/v1/store/')
   const requestData = method === 'GET' ? sanitizeGetParams(data) : data
 
   const requestToken = getToken(url)
@@ -172,38 +191,14 @@ function request<T = any>(options: RequestOptions): Promise<T> {
         }
 
         const { statusCode, data: response } = res
-        
+
         if (statusCode === 200) {
           const apiResponse = response as ApiResponse<T>
-          
+
           if (apiResponse.code === ResponseCode.SUCCESS) {
             resolve(apiResponse.data)
           } else if (apiResponse.code === ResponseCode.UNAUTHORIZED) {
-            if (isMerchantRequest) {
-              uni.removeStorageSync('token')
-              uni.removeStorageSync('merchantId')
-              uni.removeStorageSync('staff')
-              uni.removeStorageSync('merchantInfo')
-              uni.$emit('merchant-session-expired')
-              uni.showToast({ title: '登录已失效，请重新登录', icon: 'none' })
-              uni.reLaunch({ url: '/pages/auth/login' })
-            } else if (isUserRequest || isStoreRequest) {
-              uni.removeStorageSync('user_token')
-              uni.removeStorageSync('userInfo')
-              uni.removeStorageSync('openid')
-              uni.showToast({ title: '登录已过期，请重新进入', icon: 'none' })
-            } else {
-              uni.removeStorageSync('token')
-              uni.removeStorageSync('userInfo')
-              uni.removeStorageSync('openid')
-              uni.showToast({ title: '请先登录', icon: 'none' })
-              uni.reLaunch({ url: '/pages/auth/login' })
-            }
-            reject(createRequestError({
-              message: apiResponse.message || '未授权',
-              code: apiResponse.code,
-              statusCode
-            }))
+            reject(handleUnauthorized(apiResponse.message || '未授权', statusCode, response))
           } else {
             const errorMessage = apiResponse.message || '请求失败'
             if (showErrorToast) {
@@ -221,26 +216,8 @@ function request<T = any>(options: RequestOptions): Promise<T> {
           const errorMessage = getResponseMessage(response, `请求失败(${statusCode})`)
           const errorCode = getResponseCode(response)
           if (statusCode === 401 && errorCode === ResponseCode.UNAUTHORIZED) {
-            if (isMerchantRequest) {
-              uni.removeStorageSync('token')
-              uni.removeStorageSync('merchantId')
-              uni.removeStorageSync('staff')
-              uni.removeStorageSync('merchantInfo')
-              uni.$emit('merchant-session-expired')
-              uni.showToast({ title: '登录已失效，请重新登录', icon: 'none' })
-              uni.reLaunch({ url: '/pages/auth/login' })
-            } else if (isUserRequest || isStoreRequest) {
-              uni.removeStorageSync('user_token')
-              uni.removeStorageSync('userInfo')
-              uni.removeStorageSync('openid')
-              uni.showToast({ title: '登录已过期，请重新进入', icon: 'none' })
-            } else {
-              uni.removeStorageSync('token')
-              uni.removeStorageSync('userInfo')
-              uni.removeStorageSync('openid')
-              uni.showToast({ title: '请先登录', icon: 'none' })
-              uni.reLaunch({ url: '/pages/auth/login' })
-            }
+            reject(handleUnauthorized(errorMessage, statusCode, response))
+            return
           }
           if (showErrorToast) {
             uni.showToast({ title: errorMessage, icon: 'none' })
@@ -303,7 +280,7 @@ export function upload<T = any>(
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     uni.showLoading({ title: '上传中...', mask: true })
-    
+
     uni.uploadFile({
       url: `${API_BASE_URL}${url}`,
       filePath,

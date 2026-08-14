@@ -8,11 +8,13 @@ import { formatAmount } from '@/utils/format'
 const router = useRouter()
 const loading = ref(false)
 const dashboard = ref<DashboardData>({
-  total_merchants: 0,
+  total_orders: 0,
+  total_amount: 0,
   today_orders: 0,
-  today_revenue: 0,
-  distribution: [],
-  trend: []
+  today_amount: 0,
+  pending_orders: 0,
+  completed_orders: 0,
+  refunded_amount: 0
 })
 
 async function loadDashboard() {
@@ -28,11 +30,6 @@ function goTo(path: string) {
   router.push(path)
 }
 
-function getTrendWidth(orders: number) {
-  const max = Math.max(...(dashboard.value.trend || []).map((item) => Number(item.orders || 0)), 1)
-  return `${Math.max((Number(orders || 0) / max) * 100, 8)}%`
-}
-
 onMounted(loadDashboard)
 </script>
 
@@ -40,100 +37,102 @@ onMounted(loadDashboard)
   <div class="page-shell">
     <div class="page-header">
       <div class="page-title-wrap">
-        <h1 class="page-title">服务商工作台</h1>
-        <p class="page-subtitle">统一查看经营总览，并快速进入商家、分账和数据分析能力。</p>
+        <h1 class="page-title">商家工作台</h1>
+        <p class="page-subtitle">查看经营总览，快速进入订单、商品与服务人员管理。</p>
       </div>
-      <el-button type="primary" @click="goTo('/merchants/new')">新增商家</el-button>
     </div>
 
     <el-skeleton :rows="8" animated :loading="loading">
       <div class="metric-grid">
-        <div class="metric-card">
-          <div class="metric-label">商家总数</div>
-          <div class="metric-value">{{ dashboard.total_merchants }}</div>
-        </div>
         <div class="metric-card">
           <div class="metric-label">今日订单</div>
           <div class="metric-value">{{ dashboard.today_orders }}</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">今日成交</div>
-          <div class="metric-value">¥{{ formatAmount(dashboard.today_revenue) }}</div>
+          <div class="metric-value">¥{{ formatAmount(dashboard.today_amount) }}</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">待补配置商家</div>
-          <div class="metric-value">{{ dashboard.pending_merchants || 0 }}</div>
+          <div class="metric-label">待处理订单</div>
+          <div class="metric-value">{{ dashboard.pending_orders }}</div>
         </div>
-      </div>
-
-      <div class="section-grid">
-        <el-card class="page-card" shadow="never">
-          <template #header>
-            <span>快捷入口</span>
-          </template>
-          <div class="simple-list">
-            <div class="simple-list-item">
-              <div>
-                <div>商家列表</div>
-                <small>统一查看资料、支付配置与经营概览</small>
-              </div>
-              <el-button text type="primary" @click="goTo('/merchants')">进入</el-button>
-            </div>
-            <div class="simple-list-item">
-              <div>
-                <div>分账历史</div>
-                <small>按商家、状态和日期筛选抽佣记录</small>
-              </div>
-              <el-button text type="primary" @click="goTo('/profit-sharing')">进入</el-button>
-            </div>
-            <div class="simple-list-item">
-              <div>
-                <div>数据分析</div>
-                <small>查看订单趋势、转化排行和金额走势</small>
-              </div>
-              <el-button text type="primary" @click="goTo('/analytics')">进入</el-button>
-            </div>
-            <div class="simple-list-item">
-              <div>
-                <div>服务商设置</div>
-                <small>维护联系方式并修改登录密码</small>
-              </div>
-              <el-button text type="primary" @click="goTo('/settings')">进入</el-button>
-            </div>
-          </div>
-        </el-card>
-
-        <el-card class="page-card" shadow="never">
-          <template #header>
-            <span>商家行业分布</span>
-          </template>
-          <div v-if="dashboard.distribution?.length" class="simple-list">
-            <div v-for="item in dashboard.distribution" :key="item.category || 'unknown'" class="simple-list-item">
-              <span>{{ item.category || '未分类' }}</span>
-              <strong>{{ item.count }}</strong>
-            </div>
-          </div>
-          <el-empty v-else description="暂无行业分布数据" />
-        </el-card>
+        <div class="metric-card">
+          <div class="metric-label">累计订单</div>
+          <div class="metric-value">{{ dashboard.total_orders }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">累计成交</div>
+          <div class="metric-value">¥{{ formatAmount(dashboard.total_amount) }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">已完成订单</div>
+          <div class="metric-value">{{ dashboard.completed_orders }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">累计退款</div>
+          <div class="metric-value">¥{{ formatAmount(dashboard.refunded_amount) }}</div>
+        </div>
       </div>
 
       <el-card class="page-card" shadow="never" style="margin-top: 20px;">
         <template #header>
-          <span>近 7 日订单趋势</span>
+          <span>快捷入口</span>
         </template>
-        <div v-if="dashboard.trend?.length" class="simple-list">
-          <div v-for="item in dashboard.trend" :key="item.date" class="simple-list-item">
-            <div style="min-width: 92px;">{{ item.date }}</div>
-            <div class="progress-row" style="flex: 1;">
-              <div class="progress-track">
-                <div class="progress-bar" :style="{ width: getTrendWidth(item.orders) }"></div>
-              </div>
-              <strong>{{ item.orders }}</strong>
-            </div>
+        <div class="quick-grid">
+          <div class="quick-item" @click="goTo('/orders')">
+            <div class="quick-title">订单管理</div>
+            <small>查看与核销订单、工单状态筛选</small>
+          </div>
+          <div class="quick-item" @click="goTo('/products')">
+            <div class="quick-title">商品管理</div>
+            <small>维护辅具、租赁、康养套餐等商品</small>
+          </div>
+          <div class="quick-item" @click="goTo('/staff')">
+            <div class="quick-title">服务人员</div>
+            <small>审核与管理接单小程序账号</small>
+          </div>
+          <div class="quick-item" @click="goTo('/profile')">
+            <div class="quick-title">商家资料</div>
+            <small>维护商家信息与支付配置</small>
+          </div>
+          <div class="quick-item" @click="goTo('/analytics')">
+            <div class="quick-title">数据分析</div>
+            <small>订单趋势与商品排行</small>
           </div>
         </div>
-        <el-empty v-else description="暂无订单趋势数据" />
       </el-card>
     </el-skeleton>
   </div>
 </template>
+
+<style scoped>
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.quick-item {
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-item:hover {
+  border-color: #3b82f6;
+  background: #f0f7ff;
+}
+
+.quick-title {
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.quick-item small {
+  color: #6b7280;
+  font-size: 13px;
+}
+</style>

@@ -9,11 +9,11 @@
     <view class="cart-list" v-if="cartStore.items.length > 0">
       <view
         v-for="item in cartStore.items"
-        :key="`${item.product_id}-${item.specs}`"
+        :key="`${item.product_id}-${item.specs}-${item.rental_duration || 0}`"
         class="cart-item"
       >
         <view class="item-checkbox" @click="toggleSelect(item)">
-          <checkbox :checked="selectedItems.has(`${item.product_id}-${item.specs}`)" />
+          <checkbox :checked="selectedItems.has(`${item.product_id}-${item.specs}-${item.rental_duration || 0}`)" />
         </view>
         <image
           class="item-image"
@@ -21,10 +21,20 @@
           mode="aspectFill"
         />
         <view class="item-info">
-          <view class="item-name">{{ item.product_name }}</view>
+          <view class="item-name">
+            {{ item.product_name }}
+            <text v-if="Number(item.product_type) === 2 || Number(item.sale_type) === 2" class="rental-badge">租赁</text>
+            <text v-else-if="Number(item.product_type) === 3" class="wellness-badge">套餐</text>
+            <text v-else-if="Number(item.product_type) === 4" class="escort-badge">陪诊</text>
+            <text v-else-if="Number(item.product_type) === 5" class="info-badge">资讯</text>
+          </view>
           <view class="item-spec" v-if="item.specs">{{ item.specs }}</view>
+          <view class="item-rental" v-if="Number(item.sale_type) === 2">
+            <text class="rental-text">租金 ¥{{ Number(item.rental_price || 0).toFixed(2) }}/{{ getRentalUnitText(item.rental_unit) }} × {{ item.rental_duration || 0 }}{{ getRentalUnitText(item.rental_unit) }}</text>
+            <text class="rental-deposit">押金 ¥{{ Number(item.deposit || 0).toFixed(2) }}</text>
+          </view>
           <view class="item-bottom">
-            <text class="item-price">¥{{ item.price.toFixed(2) }}</text>
+            <text class="item-price">¥{{ getItemPayAmount(item).toFixed(2) }}</text>
             <view class="quantity-control">
               <view
                 class="quantity-btn"
@@ -58,6 +68,7 @@
       <view class="total-info">
         <text class="total-label">合计:</text>
         <text class="total-amount">¥{{ selectedAmount.toFixed(2) }}</text>
+        <text v-if="selectedDeposit > 0" class="total-deposit">(含押金 ¥{{ selectedDeposit.toFixed(2) }})</text>
       </view>
       <view class="checkout-btn" @click="goCheckout">
         去结算 ({{ selectedCount }})
@@ -69,7 +80,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { useCartStore } from '../../stores/cart'
+import { useCartStore, getItemPayAmount, getItemDeposit, getRentalUnitText } from '../../stores/cart'
 import type { CartItem } from '../../stores/cart'
 
 const cartStore = useCartStore()
@@ -78,17 +89,17 @@ const merchantId = ref(1)
 
 onShow(() => {
   cartStore.restoreFromStorage()
-  
+
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
   merchantId.value = Number(currentPage?.options?.merchant_id) || 1
-  
+
   // 默认全选
   selectAllItems()
 })
 
 function getItemKey(item: CartItem): string {
-  return `${item.product_id}-${item.specs}`
+  return `${item.product_id}-${item.specs}-${item.rental_duration || 0}`
 }
 
 function toggleSelect(item: CartItem) {
@@ -126,7 +137,13 @@ const selectedCount = computed(() => {
 const selectedAmount = computed(() => {
   return cartStore.items
     .filter(item => selectedItems.value.has(getItemKey(item)))
-    .reduce((sum, item) => sum + item.price * item.quantity, 0)
+    .reduce((sum, item) => sum + getItemPayAmount(item), 0)
+})
+
+const selectedDeposit = computed(() => {
+  return cartStore.items
+    .filter(item => selectedItems.value.has(getItemKey(item)))
+    .reduce((sum, item) => sum + getItemDeposit(item), 0)
 })
 
 function decreaseQuantity(item: CartItem) {
@@ -233,6 +250,66 @@ function goCheckout() {
   font-size: 26rpx;
   color: #999999;
   margin-bottom: 16rpx;
+}
+
+.rental-badge {
+  font-size: 22rpx;
+  color: #ffffff;
+  background: #ff9500;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 12rpx;
+  vertical-align: middle;
+}
+
+.wellness-badge {
+  font-size: 22rpx;
+  color: #ffffff;
+  background: #22c55e;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 12rpx;
+  vertical-align: middle;
+}
+
+.escort-badge {
+  font-size: 22rpx;
+  color: #ffffff;
+  background: #6366f1;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 12rpx;
+  vertical-align: middle;
+}
+
+.info-badge {
+  font-size: 22rpx;
+  color: #ffffff;
+  background: #64748b;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 12rpx;
+  vertical-align: middle;
+}
+
+.item-rental {
+  display: flex;
+  flex-direction: column;
+  font-size: 24rpx;
+  color: #ff9500;
+  margin-bottom: 12rpx;
+  background: #fff7e6;
+  padding: 8rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.rental-text {
+  color: #ff9500;
+}
+
+.rental-deposit {
+  color: #666666;
+  margin-top: 4rpx;
 }
 
 .item-bottom {
@@ -353,6 +430,12 @@ function goCheckout() {
   font-size: 40rpx;
   font-weight: 600;
   color: #ff4d4f;
+  margin-left: 8rpx;
+}
+
+.total-deposit {
+  font-size: 22rpx;
+  color: #ff9500;
   margin-left: 8rpx;
 }
 

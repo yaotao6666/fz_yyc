@@ -14,22 +14,22 @@ import (
 )
 
 type ListOptions struct {
-	MerchantID        uint64
-	ServiceProviderID uint64
-	Status            *int
-	DeliveryType      *int
-	StartDate         string
-	EndDate           string
-	Keyword           string
-	Page              int
-	PageSize          int
-	IncludeMerchant   bool
+	MerchantID      uint64
+	Status          *int
+	OrderType       *int
+	BizStatus       *int
+	AssignedStaffID *uint64
+	StartDate       string
+	EndDate         string
+	Keyword         string
+	Page            int
+	PageSize        int
+	IncludeMerchant bool
 }
 
 type DetailOptions struct {
-	MerchantID        uint64
-	ServiceProviderID uint64
-	IncludeMerchant   bool
+	MerchantID      uint64
+	IncludeMerchant bool
 }
 
 type ListResult struct {
@@ -166,18 +166,20 @@ func normalizePagination(page, pageSize int) (int, int) {
 
 func applyOrderScopes(query *gorm.DB, options ListOptions) *gorm.DB {
 	scopedQuery := query
-	if options.ServiceProviderID > 0 {
-		scopedQuery = scopedQuery.Joins("JOIN merchants ON merchants.id = orders.merchant_id").
-			Where("merchants.service_provider_id = ?", options.ServiceProviderID)
-	}
 	if options.MerchantID > 0 {
 		scopedQuery = scopedQuery.Where("orders.merchant_id = ?", options.MerchantID)
 	}
 	if options.Status != nil {
 		scopedQuery = scopedQuery.Where("orders.status = ?", *options.Status)
 	}
-	if options.DeliveryType != nil {
-		scopedQuery = scopedQuery.Where("orders.delivery_type = ?", *options.DeliveryType)
+	if options.OrderType != nil {
+		scopedQuery = scopedQuery.Where("orders.order_type = ?", *options.OrderType)
+	}
+	if options.BizStatus != nil {
+		scopedQuery = scopedQuery.Where("orders.biz_status = ?", *options.BizStatus)
+	}
+	if options.AssignedStaffID != nil {
+		scopedQuery = scopedQuery.Where("orders.assigned_staff_id = ?", *options.AssignedStaffID)
 	}
 	if trimmedKeyword := strings.TrimSpace(options.Keyword); trimmedKeyword != "" {
 		scopedQuery = scopedQuery.Where("orders.order_no LIKE ?", "%"+trimmedKeyword+"%")
@@ -195,10 +197,6 @@ func applyOrderScopes(query *gorm.DB, options ListOptions) *gorm.DB {
 
 func applyDetailScopes(query *gorm.DB, options DetailOptions) *gorm.DB {
 	scopedQuery := query
-	if options.ServiceProviderID > 0 {
-		scopedQuery = scopedQuery.Joins("JOIN merchants ON merchants.id = orders.merchant_id").
-			Where("merchants.service_provider_id = ?", options.ServiceProviderID)
-	}
 	if options.MerchantID > 0 {
 		scopedQuery = scopedQuery.Where("orders.merchant_id = ?", options.MerchantID)
 	}
@@ -220,9 +218,8 @@ func refreshOrderListRefundStatus(ctx context.Context, options ListOptions, orde
 	}
 	for index := range orders {
 		refreshSingleOrderRefundStatus(ctx, client, &orders[index], DetailOptions{
-			MerchantID:        options.MerchantID,
-			ServiceProviderID: options.ServiceProviderID,
-			IncludeMerchant:   options.IncludeMerchant,
+			MerchantID:      options.MerchantID,
+			IncludeMerchant: options.IncludeMerchant,
 		})
 	}
 }

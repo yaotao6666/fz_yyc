@@ -14,7 +14,7 @@
   - `BroadcastStoreVisitNotify(merchantID, visitorOpenID, source)`
 - 顾客进店埋点 `server/internal/handlers/user/handler.go` 在 `TrackVisit` 路径中已经调用 `BroadcastStoreVisitNotify(...)`，因此“扫码进店提醒”链路是通的。
 - 支付成功回调处理在 `server/internal/handlers/sp/payment.go` 的 `PaymentNotify()` / `processPaymentSuccess()`。
-- 当前 `processPaymentSuccess()` 只更新订单支付状态、分账状态和记录，没有调用 `BroadcastOrderNotify(...)`，因此商家端收不到“订单成功提醒”消息。
+- 当前 `processPaymentSuccess()` 只更新订单支付状态和记录，没有调用 `BroadcastOrderNotify(...)`，因此商家端收不到“订单成功提醒”消息。
 - 商家小程序播放声音逻辑在 `miniprogram/src/stores/auth.ts`：
   - 收到 `order_notify` 时播放 `/static/sounds/order.mp3`
   - 收到 `store_visit_notify` 时播放 `/static/sounds/browse.mp3`
@@ -148,7 +148,7 @@
   - 包含商家 ID
   - 包含随机段
   - 长度不超过 32
-- 回归微信支付回调、订单查询、退款、分账等所有依赖 `order_no` 的链路，确保兼容。
+- 回归微信支付回调、订单查询、退款等所有依赖 `order_no` 的链路，确保兼容。
 
 ### 3. 确认页 0 元问题
 - 在 `pages/store/confirm` 提交订单并拉起支付时，确认页金额不应归零。

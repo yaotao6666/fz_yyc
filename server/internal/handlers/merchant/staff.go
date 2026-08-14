@@ -254,9 +254,6 @@ func GetAnnouncements(c *gin.Context) {
 		return
 	}
 
-	var sp models.ServiceProvider
-	database.DB.First(&sp)
-
 	response.Success(c, gin.H{
 		"list": announcements,
 		"pagination": gin.H{

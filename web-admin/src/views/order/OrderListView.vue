@@ -1,20 +1,15 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getMerchantList, getSpOrders } from '@/api/sp'
-import type { MerchantListItem, SpOrder } from '@/types/sp'
-import { SpDeliveryTypeText, SpOrderStatusText } from '@/types/sp'
+import { getOrders } from '@/api/sp'
+import type { SpOrder } from '@/types/sp'
+import { SpOrderStatusText, OrderTypeText, BizStatusText } from '@/types/sp'
 import { formatAmount, formatDateTime } from '@/utils/format'
 
-type SelectOptionValue = number | ''
-type MerchantSelectOption = { label: string; value: SelectOptionValue }
-
-const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const orders = ref<SpOrder[]>([])
-const merchantOptions = ref<MerchantSelectOption[]>([{ label: '全部商家', value: '' }])
 
 const pagination = reactive({
   page: 1,
@@ -22,10 +17,13 @@ const pagination = reactive({
   total: 0
 })
 
+type SelectOptionValue = number | ''
+
 const filters = reactive({
-  merchant_id: route.query.merchant_id ? Number(route.query.merchant_id) : '' as SelectOptionValue,
   status: '' as SelectOptionValue,
-  keyword: typeof route.query.keyword === 'string' ? route.query.keyword : '',
+  order_type: '' as SelectOptionValue,
+  biz_status: '' as SelectOptionValue,
+  keyword: '',
   dateRange: [] as string[]
 })
 
@@ -39,16 +37,25 @@ const statusOptions = [
   { label: '已退款', value: 6 }
 ]
 
-async function loadMerchantOptions() {
-  const response = await getMerchantList({ page: 1, page_size: 100 })
-  merchantOptions.value = [
-    { label: '全部商家', value: '' },
-    ...response.list.map((item: MerchantListItem): MerchantSelectOption => ({
-      label: item.name,
-      value: item.id
-    }))
-  ]
-}
+const orderTypeOptions = [
+  { label: '全部类型', value: '' },
+  { label: '零售', value: 1 },
+  { label: '租赁', value: 2 },
+  { label: '康养上门', value: 3 },
+  { label: '陪诊服务', value: 4 },
+  { label: '科普体验', value: 5 },
+  { label: '长护险服务', value: 6 }
+]
+
+const bizStatusOptions = [
+  { label: '全部工单', value: '' },
+  { label: '待接单', value: 1 },
+  { label: '待出发', value: 2 },
+  { label: '服务中', value: 3 },
+  { label: '待支付尾款', value: 4 },
+  { label: '已完成', value: 5 },
+  { label: '已取消', value: 6 }
+]
 
 function validateDateRange() {
   if (filters.dateRange.length !== 2) {
@@ -68,11 +75,12 @@ async function loadOrders() {
 
   loading.value = true
   try {
-    const response = await getSpOrders({
+    const response = await getOrders({
       page: pagination.page,
       page_size: pagination.page_size,
-      merchant_id: filters.merchant_id === '' ? undefined : filters.merchant_id,
       status: filters.status === '' ? undefined : filters.status,
+      order_type: filters.order_type === '' ? undefined : filters.order_type,
+      biz_status: filters.biz_status === '' ? undefined : filters.biz_status,
       keyword: filters.keyword.trim() || undefined,
       start_date: filters.dateRange[0],
       end_date: filters.dateRange[1]
@@ -90,8 +98,9 @@ function handleSearch() {
 }
 
 function handleReset() {
-  filters.merchant_id = ''
   filters.status = ''
+  filters.order_type = ''
+  filters.biz_status = ''
   filters.keyword = ''
   filters.dateRange = []
   pagination.page = 1
@@ -138,10 +147,7 @@ function goDetail(orderId: number) {
   router.push(`/orders/${orderId}`)
 }
 
-onMounted(async () => {
-  await loadMerchantOptions()
-  await loadOrders()
-})
+onMounted(loadOrders)
 </script>
 
 <template>
@@ -149,23 +155,31 @@ onMounted(async () => {
     <div class="page-header">
       <div class="page-title-wrap">
         <h1 class="page-title">订单管理</h1>
-        <p class="page-subtitle">支持按商家、状态、日期和订单号查看服务商名下商家的订单记录。</p>
+        <p class="page-subtitle">按订单状态、类型与工单状态筛选，并查看订单记录。</p>
       </div>
     </div>
 
     <el-card class="page-card" shadow="never">
       <el-form class="toolbar-form" inline>
-        <el-select v-model="filters.merchant_id" clearable placeholder="选择商家">
+        <el-select v-model="filters.status" clearable placeholder="订单状态" style="width: 130px;">
           <el-option
-            v-for="item in merchantOptions"
+            v-for="item in statusOptions"
             :key="String(item.value ?? 'all')"
             :label="item.label"
             :value="item.value"
           />
         </el-select>
-        <el-select v-model="filters.status" clearable placeholder="选择订单状态">
+        <el-select v-model="filters.order_type" clearable placeholder="订单类型" style="width: 140px;">
           <el-option
-            v-for="item in statusOptions"
+            v-for="item in orderTypeOptions"
+            :key="String(item.value ?? 'all')"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
+        <el-select v-model="filters.biz_status" clearable placeholder="工单状态" style="width: 140px;">
+          <el-option
+            v-for="item in bizStatusOptions"
             :key="String(item.value ?? 'all')"
             :label="item.label"
             :value="item.value"
@@ -186,9 +200,10 @@ onMounted(async () => {
 
       <el-table :data="orders" v-loading="loading" style="margin-top: 20px; width: 100%;">
         <el-table-column prop="order_no" label="订单号" min-width="180" />
-        <el-table-column label="商家" min-width="150">
+        <el-table-column label="订单类型" width="110">
           <template #default="scope">
-            {{ scope.row.merchant?.name || '-' }}
+            <el-tag v-if="scope.row.order_type" size="small">{{ OrderTypeText[scope.row.order_type] || '-' }}</el-tag>
+            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column label="用户" min-width="140">
@@ -201,21 +216,24 @@ onMounted(async () => {
             {{ getGoodsSummary(scope.row) }}
           </template>
         </el-table-column>
-        <el-table-column label="配送方式" width="100">
-          <template #default="scope">
-            {{ SpDeliveryTypeText[scope.row.delivery_type || 0] || '-' }}
-          </template>
-        </el-table-column>
         <el-table-column label="订单金额" width="120">
           <template #default="scope">
             ¥{{ formatAmount(scope.row.pay_amount) }}
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="订单状态" width="100">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)">
               {{ SpOrderStatusText[scope.row.status] || '未知状态' }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="工单状态" width="110">
+          <template #default="scope">
+            <el-tag v-if="scope.row.biz_status && scope.row.biz_status > 0" type="warning" size="small">
+              {{ BizStatusText[scope.row.biz_status] || '-' }}
+            </el-tag>
+            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column label="下单时间" min-width="170">

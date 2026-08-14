@@ -9,7 +9,7 @@
 ## 当前角色范围
 
 - 当前小程序仅承载商家端与 C 端用户链路。
-- 原服务商登录、商家管理、分账历史、数据分析、服务商设置等能力已迁移至仓库根目录的 `web-admin/` 服务商 Web/PC 后台。
+- 原服务商登录、商家管理、数据分析、服务商设置等能力已迁移至仓库根目录的 `web-admin/` 服务商 Web/PC 后台。
 - 小程序交付验收仍以 `npm run build:mp-weixin` 为准。
 
 ## 安装依赖
@@ -93,7 +93,7 @@ npm run build:mp-weixin
 - 发布命令：
 
 ```bash
-# 寻梦私域管家
+# 财旭商贸
 npm run build:mp-weixin:xunmeng
 
 # 财旭商贸

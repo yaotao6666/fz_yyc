@@ -29,23 +29,30 @@ type ProductSpecResponse struct {
 }
 
 type ProductResponse struct {
-	ID            uint64                `json:"id"`
-	MerchantID    uint64                `json:"merchant_id"`
-	CategoryID    uint64                `json:"category_id"`
-	Name          string                `json:"name"`
-	Description   string                `json:"description"`
-	Images        []string              `json:"images"`
-	Price         float64               `json:"price"`
-	OriginalPrice float64               `json:"original_price"`
-	Stock         uint                  `json:"stock"`
-	Unit          string                `json:"unit"`
-	Sales         uint                  `json:"sales"`
-	Sort          uint                  `json:"sort"`
-	Status        uint8                 `json:"status"`
-	CategoryName  string                `json:"category_name,omitempty"`
-	Specs         []ProductSpecResponse `json:"specs"`
-	CreatedAt     time.Time             `json:"created_at"`
-	UpdatedAt     time.Time             `json:"updated_at"`
+	ID                 uint64                `json:"id"`
+	MerchantID         uint64                `json:"merchant_id"`
+	CategoryID         uint64                `json:"category_id"`
+	Name               string                `json:"name"`
+	Description        string                `json:"description"`
+	Images             []string              `json:"images"`
+	Price              float64               `json:"price"`
+	OriginalPrice      float64               `json:"original_price"`
+	Stock              uint                  `json:"stock"`
+	Unit               string                `json:"unit"`
+	ProductType        uint8                 `json:"product_type"`
+	ServiceContent     interface{}           `json:"service_content"`
+	SaleType           uint8                 `json:"sale_type"`
+	RentalUnit         uint8                 `json:"rental_unit"`
+	RentalPrice        float64               `json:"rental_price"`
+	Deposit            float64               `json:"deposit"`
+	MaxRentalDuration  uint                  `json:"max_rental_duration"`
+	Sales              uint                  `json:"sales"`
+	Sort               uint                  `json:"sort"`
+	Status             uint8                 `json:"status"`
+	CategoryName       string                `json:"category_name,omitempty"`
+	Specs              []ProductSpecResponse `json:"specs"`
+	CreatedAt          time.Time             `json:"created_at"`
+	UpdatedAt          time.Time             `json:"updated_at"`
 }
 
 func parseStringArray(raw models.JSON) []string {
@@ -115,6 +122,18 @@ func parseSpecOptions(raw models.JSON) []ProductSpecOptionResponse {
 	return []ProductSpecOptionResponse{}
 }
 
+// parseServiceContent 将 JSON 字段解析为 interface{}，为 nil 时返回 nil
+func parseServiceContent(raw models.JSON) interface{} {
+	if len(raw) == 0 {
+		return nil
+	}
+	var content interface{}
+	if err := json.Unmarshal(raw, &content); err == nil {
+		return content
+	}
+	return nil
+}
+
 func buildProductResponse(product models.Product) ProductResponse {
 	categoryID := uint64(0)
 	if product.CategoryID != nil {
@@ -136,23 +155,30 @@ func buildProductResponse(product models.Product) ProductResponse {
 	}
 
 	return ProductResponse{
-		ID:            product.ID,
-		MerchantID:    product.MerchantID,
-		CategoryID:    categoryID,
-		Name:          product.Name,
-		Description:   product.Description,
-		Images:        buildAccessibleImages(parseStringArray(product.Images)),
-		Price:         product.Price,
-		OriginalPrice: product.OriginalPrice,
-		Stock:         product.Stock,
-		Unit:          product.Unit,
-		Sales:         product.Sales,
-		Sort:          product.Sort,
-		Status:        product.Status,
-		CategoryName:  categoryName,
-		Specs:         specs,
-		CreatedAt:     product.CreatedAt,
-		UpdatedAt:     product.UpdatedAt,
+		ID:                 product.ID,
+		MerchantID:         product.MerchantID,
+		CategoryID:         categoryID,
+		Name:               product.Name,
+		Description:        product.Description,
+		Images:             buildAccessibleImages(parseStringArray(product.Images)),
+		Price:              product.Price,
+		OriginalPrice:      product.OriginalPrice,
+		Stock:              product.Stock,
+		Unit:               product.Unit,
+		ProductType:        product.ProductType,
+		ServiceContent:     parseServiceContent(product.ServiceContent),
+		SaleType:           product.SaleType,
+		RentalUnit:         product.RentalUnit,
+		RentalPrice:        product.RentalPrice,
+		Deposit:            product.Deposit,
+		MaxRentalDuration:  product.MaxRentalDuration,
+		Sales:              product.Sales,
+		Sort:               product.Sort,
+		Status:             product.Status,
+		CategoryName:       categoryName,
+		Specs:              specs,
+		CreatedAt:          product.CreatedAt,
+		UpdatedAt:          product.UpdatedAt,
 	}
 }
 
@@ -380,6 +406,8 @@ func GetProducts(c *gin.Context) {
 	categoryID := c.Query("category_id")
 	status := c.Query("status")
 	keyword := c.Query("keyword")
+	saleType := c.Query("sale_type")
+	productType := c.Query("product_type")
 
 	if page < 1 {
 		page = 1
@@ -397,6 +425,14 @@ func GetProducts(c *gin.Context) {
 	if status != "" {
 		statusInt, _ := strconv.Atoi(status)
 		query = query.Where("status = ?", statusInt)
+	}
+	if saleType != "" {
+		saleTypeInt, _ := strconv.Atoi(saleType)
+		query = query.Where("sale_type = ?", saleTypeInt)
+	}
+	if productType != "" {
+		productTypeInt, _ := strconv.Atoi(productType)
+		query = query.Where("product_type = ?", productTypeInt)
 	}
 	if keyword != "" {
 		query = query.Where("name LIKE ?", "%"+keyword+"%")
@@ -428,23 +464,52 @@ func GetProducts(c *gin.Context) {
 }
 
 type ProductRequest struct {
-	CategoryID    *uint64  `json:"category_id"`
-	Name          string   `json:"name" binding:"required"`
-	Description   string   `json:"description"`
-	Images        []string `json:"images"`
-	Price         float64  `json:"price" binding:"required"`
-	OriginalPrice float64  `json:"original_price"`
-	Stock         uint     `json:"stock"`
-	Unit          string   `json:"unit"`
-	Sort          uint     `json:"sort"`
-	Sales         *uint    `json:"sales"`
-	Specs         []struct {
+	CategoryID        *uint64     `json:"category_id"`
+	Name              string      `json:"name" binding:"required"`
+	Description       string      `json:"description"`
+	Images            []string    `json:"images"`
+	Price             float64     `json:"price" binding:"required"`
+	OriginalPrice     float64     `json:"original_price"`
+	Stock             uint        `json:"stock"`
+	Unit              string      `json:"unit"`
+	ProductType       uint8       `json:"product_type"`
+	ServiceContent    interface{} `json:"service_content"`
+	SaleType          uint8       `json:"sale_type"`
+	RentalUnit        uint8       `json:"rental_unit"`
+	RentalPrice       float64     `json:"rental_price"`
+	Deposit           float64     `json:"deposit"`
+	MaxRentalDuration uint        `json:"max_rental_duration"`
+	Sort              uint        `json:"sort"`
+	Sales             *uint       `json:"sales"`
+	Specs             []struct {
 		Name    string `json:"name" binding:"required"`
 		Options []struct {
 			Name  string  `json:"name" binding:"required"`
 			Price float64 `json:"price"`
 		} `json:"options"`
 	} `json:"specs"`
+}
+
+// normalizeProductType 根据 product_type 和 sale_type 自动归一化，保持业务语义一致
+// product_type: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务 5=科普资讯
+// sale_type:    1=一口价 2=租赁
+// 规则：辅具租赁固定 sale_type=2；其他类型固定 sale_type=1
+func normalizeProductType(productType uint8, saleType uint8) (uint8, uint8) {
+	if productType == 0 {
+		// 未指定 product_type 时，按 sale_type 反推：sale_type=2 则为辅具租赁，否则默认辅具零售
+		if saleType == 2 {
+			productType = 2
+		} else {
+			productType = 1
+		}
+	}
+	switch productType {
+	case 2: // 辅具租赁
+		saleType = 2
+	default: // 辅具零售/康养套餐/陪诊/科普
+		saleType = 1
+	}
+	return productType, saleType
 }
 
 func CreateProduct(c *gin.Context) {
@@ -459,20 +524,50 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
+	// 商品类型与销售类型归一化
+	productType, saleType := normalizeProductType(req.ProductType, req.SaleType)
+
+	// 租赁类型校验
+	if saleType == 2 {
+		if req.RentalUnit == 0 {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "租赁商品必须选择计费周期")
+			return
+		}
+		if req.RentalPrice <= 0 {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "租赁商品单位租金必须大于0")
+			return
+		}
+	}
+
 	imagesJSON, _ := json.Marshal(req.Images)
 
+	// service_content JSON 序列化
+	var serviceContentJSON models.JSON
+	if req.ServiceContent != nil {
+		if raw, err := json.Marshal(req.ServiceContent); err == nil {
+			serviceContentJSON = models.JSON(raw)
+		}
+	}
+
 	product := models.Product{
-		MerchantID:    merchantID,
-		CategoryID:    req.CategoryID,
-		Name:          req.Name,
-		Description:   req.Description,
-		Images:        models.JSON(imagesJSON),
-		Price:         req.Price,
-		OriginalPrice: req.OriginalPrice,
-		Stock:         req.Stock,
-		Unit:          req.Unit,
-		Sort:          req.Sort,
-		Status:        1,
+		MerchantID:         merchantID,
+		CategoryID:         req.CategoryID,
+		Name:               req.Name,
+		Description:        req.Description,
+		Images:             models.JSON(imagesJSON),
+		Price:              req.Price,
+		OriginalPrice:      req.OriginalPrice,
+		Stock:              req.Stock,
+		Unit:               req.Unit,
+		ProductType:        productType,
+		ServiceContent:     serviceContentJSON,
+		SaleType:           saleType,
+		RentalUnit:         req.RentalUnit,
+		RentalPrice:        req.RentalPrice,
+		Deposit:            req.Deposit,
+		MaxRentalDuration:  req.MaxRentalDuration,
+		Sort:               req.Sort,
+		Status:             1,
 	}
 
 	tx := database.DB.Begin()
@@ -524,6 +619,21 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
+	// 商品类型与销售类型归一化
+	productType, saleType := normalizeProductType(req.ProductType, req.SaleType)
+
+	// 租赁类型校验
+	if saleType == 2 {
+		if req.RentalUnit == 0 {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "租赁商品必须选择计费周期")
+			return
+		}
+		if req.RentalPrice <= 0 {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "租赁商品单位租金必须大于0")
+			return
+		}
+	}
+
 	var product models.Product
 	if err := database.DB.Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).First(&product).Error; err != nil {
 		respondProductQueryError(c, err, "商品不存在", "查询商品失败")
@@ -532,16 +642,31 @@ func UpdateProduct(c *gin.Context) {
 
 	imagesJSON, _ := json.Marshal(req.Images)
 
+	// service_content JSON 序列化
+	var serviceContentJSON models.JSON
+	if req.ServiceContent != nil {
+		if raw, err := json.Marshal(req.ServiceContent); err == nil {
+			serviceContentJSON = models.JSON(raw)
+		}
+	}
+
 	updates := map[string]interface{}{
-		"category_id":    req.CategoryID,
-		"name":           req.Name,
-		"description":    req.Description,
-		"images":         models.JSON(imagesJSON),
-		"price":          req.Price,
-		"original_price": req.OriginalPrice,
-		"stock":          req.Stock,
-		"unit":           req.Unit,
-		"sort":           req.Sort,
+		"category_id":         req.CategoryID,
+		"name":                req.Name,
+		"description":         req.Description,
+		"images":              models.JSON(imagesJSON),
+		"price":               req.Price,
+		"original_price":      req.OriginalPrice,
+		"stock":               req.Stock,
+		"unit":                req.Unit,
+		"product_type":        productType,
+		"service_content":     serviceContentJSON,
+		"sale_type":           saleType,
+		"rental_unit":         req.RentalUnit,
+		"rental_price":        req.RentalPrice,
+		"deposit":             req.Deposit,
+		"max_rental_duration": req.MaxRentalDuration,
+		"sort":                req.Sort,
 	}
 	if req.Sales != nil {
 		updates["sales"] = *req.Sales

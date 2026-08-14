@@ -17,7 +17,7 @@ const form = reactive({
 
 async function handleSubmit() {
   if (!form.username.trim()) {
-    ElMessage.warning('请输入服务商账号')
+    ElMessage.warning('请输入商家账号')
     return
   }
   if (!form.password.trim()) {
@@ -41,14 +41,14 @@ async function handleSubmit() {
   <div class="login-page">
     <div class="login-card">
       <div class="title-wrap">
-        <div class="eyebrow">Service Provider Admin</div>
+        <div class="eyebrow">Merchant Admin</div>
         <h1>{{ APP_TITLE }}</h1>
-        <p>服务商小程序能力已迁移到 PC 后台，请在此完成登录与管理操作。</p>
+        <p>商家后台管理系统，请使用商家账号登录以管理商品、订单与服务人员。</p>
       </div>
 
       <el-form label-position="top" @submit.prevent>
-        <el-form-item label="服务商账号">
-          <el-input v-model="form.username" placeholder="请输入服务商账号" size="large" @keyup.enter="handleSubmit" />
+        <el-form-item label="商家账号">
+          <el-input v-model="form.username" placeholder="请输入商家账号" size="large" @keyup.enter="handleSubmit" />
         </el-form-item>
         <el-form-item label="登录密码">
           <el-input v-model="form.password" show-password type="password" placeholder="请输入密码" size="large" @keyup.enter="handleSubmit" />
