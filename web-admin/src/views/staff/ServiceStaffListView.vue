@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getServiceStaffList, updateServiceStaffStatus, resetServiceStaffPassword, deleteServiceStaff } from '@/api/sp'
+import { createServiceStaff, deleteServiceStaff, getServiceStaffList, resetServiceStaffPassword, updateServiceStaffStatus } from '@/api/sp'
 import type { ServiceStaffItem } from '@/types/sp'
 
 const loading = ref(false)
@@ -83,6 +83,34 @@ function handlePageChange(p: number) {
   loadData()
 }
 
+/* ----- 添加服务人员 ----- */
+const dialogVisible = ref(false)
+const saving = ref(false)
+const form = ref({ username: '', password: '', name: '', phone: '' })
+
+function openCreate() {
+  form.value = { username: '', password: '', name: '', phone: '' }
+  dialogVisible.value = true
+}
+
+async function handleCreate() {
+  if (!form.value.username || !form.value.password || !form.value.name || !form.value.phone) {
+    ElMessage.warning('请完整填写服务人员信息')
+    return
+  }
+  saving.value = true
+  try {
+    await createServiceStaff(form.value)
+    ElMessage.success('添加成功')
+    dialogVisible.value = false
+    loadData()
+  } catch (e) {
+    // 错误已由拦截器提示
+  } finally {
+    saving.value = false
+  }
+}
+
 onMounted(loadData)
 </script>
 
@@ -94,7 +122,29 @@ onMounted(loadData)
       </el-select>
       <el-input v-model="keyword" placeholder="姓名/手机号/用户名" style="width: 220px" clearable @clear="() => { page = 1; loadData() }" @keyup.enter="() => { page = 1; loadData() }" />
       <el-button type="primary" @click="() => { page = 1; loadData() }">搜索</el-button>
+      <el-button type="primary" v-permission="'staff:create'" @click="openCreate">添加服务人员</el-button>
     </div>
+
+    <el-dialog v-model="dialogVisible" title="添加服务人员" width="500px">
+      <el-form :model="form" label-width="90px">
+        <el-form-item label="姓名" required>
+          <el-input v-model="form.name" placeholder="服务人员姓名" />
+        </el-form-item>
+        <el-form-item label="手机号" required>
+          <el-input v-model="form.phone" placeholder="手机号" />
+        </el-form-item>
+        <el-form-item label="登录账号" required>
+          <el-input v-model="form.username" placeholder="登录用户名（2-64位）" />
+        </el-form-item>
+        <el-form-item label="登录密码" required>
+          <el-input v-model="form.password" type="password" placeholder="登录密码（至少6位）" show-password />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="handleCreate">确认添加</el-button>
+      </template>
+    </el-dialog>
 
     <el-table v-loading="loading" :data="list" stripe>
       <el-table-column prop="id" label="ID" width="70" />

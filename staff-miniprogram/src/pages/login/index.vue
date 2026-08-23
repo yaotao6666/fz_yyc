@@ -66,6 +66,17 @@
           :adjust-position="false"
         />
       </view>
+      <view class="form-item">
+        <view class="form-label">资质材料（选填，加快审核）</view>
+        <view class="qual-list">
+          <view v-for="(q, i) in registerForm.qualifications" :key="i" class="qual-item">
+            <input v-model="q.name" placeholder="材料名称（如执业证书）" class="qual-input" />
+            <image v-if="q.url" :src="q.url" class="qual-img" mode="aspectFill" @click="previewQual(i)" />
+            <text class="qual-remove" @click="registerForm.qualifications.splice(i, 1)">移除</text>
+          </view>
+          <view class="qual-add" @click="pickQualification">+ 添加材料</view>
+        </view>
+      </view>
       <button class="btn-primary" @click="handleRegister" :loading="loading">提交注册申请</button>
       <view class="form-footer">
         <text class="link-text" @click="mode = 'login'">已有账号？去登录</text>
@@ -76,7 +87,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { staffAuthApi } from '@/api'
+import { staffAuthApi, uploadQualificationFile } from '@/api'
 import { useStaffAuthStore } from '@/stores/auth'
 
 const authStore = useStaffAuthStore()
@@ -92,8 +103,29 @@ const registerForm = reactive({
   name: '',
   phone: '',
   username: '',
-  password: ''
+  password: '',
+  qualifications: [] as { type: string; name: string; url: string }[]
 })
+
+function previewQual(index: number) {
+  const q = registerForm.qualifications[index]
+  if (q?.url) uni.previewImage({ urls: [q.url] })
+}
+
+function pickQualification() {
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    success: (res) => {
+      const filePath = res.tempFilePaths[0]
+      uploadQualificationFile(filePath)
+        .then(({ url }) => {
+          registerForm.qualifications.push({ type: 'certificate', name: '', url })
+        })
+        .catch(() => {})
+    }
+  })
+}
 
 async function handleLogin() {
   if (!loginForm.username || !loginForm.password) {
@@ -138,7 +170,8 @@ async function handleRegister() {
       username: registerForm.username,
       password: registerForm.password,
       name: registerForm.name,
-      phone: registerForm.phone
+      phone: registerForm.phone,
+      qualifications: registerForm.qualifications
     })
     if (res.code === 0) {
       uni.showToast({ title: '注册申请已提交，请等待审核', icon: 'none', duration: 2500 })
@@ -248,5 +281,62 @@ async function handleRegister() {
 .link-text {
   font-size: 28rpx;
   color: #517528;
+}
+
+.form-label {
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 16rpx;
+}
+
+.qual-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.qual-item {
+  width: 200rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qual-input {
+  width: 100%;
+  height: 60rpx;
+  background: #f8f8f8;
+  border: 2rpx solid #eee;
+  border-radius: 10rpx;
+  padding: 0 16rpx;
+  font-size: 22rpx;
+  box-sizing: border-box;
+  margin-bottom: 10rpx;
+}
+
+.qual-img {
+  width: 200rpx;
+  height: 150rpx;
+  border-radius: 12rpx;
+  background: #f0f0f0;
+}
+
+.qual-remove {
+  font-size: 22rpx;
+  color: #f56c6c;
+  margin-top: 8rpx;
+}
+
+.qual-add {
+  width: 200rpx;
+  height: 150rpx;
+  border: 2rpx dashed #ccc;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 26rpx;
+  background: #fafafa;
 }
 </style>

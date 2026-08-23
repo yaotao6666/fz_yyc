@@ -298,6 +298,9 @@ type Order struct {
 	DepositRefundedAt    *time.Time  `gorm:"comment:押金退还时间" json:"deposit_refunded_at"`
 	RentalReturnedAt     *time.Time  `gorm:"comment:租赁归还时间" json:"rental_returned_at"`
 	RentalReturnRemark   string      `gorm:"size:256;comment:归还备注(验机情况)" json:"rental_return_remark"`
+	RentalEndAt          *time.Time  `gorm:"index;comment:租赁到期时间(支付时=paid_at+租赁时长)" json:"rental_end_at"`
+	ParentOrderID        *uint64     `gorm:"index;comment:续租关联原订单ID(0/空=普通订单)" json:"parent_order_id,omitempty"`
+	RenewFlag            uint8       `gorm:"not null;default:0;comment:是否续租单: 1=续租 0=非" json:"renew_flag"`
 	DeliveryAddress      string      `gorm:"size:256;comment:收货地址(配送时填写)" json:"delivery_address"`
 	ContactName          string      `gorm:"size:64;comment:联系人姓名(配送时填写)" json:"contact_name"`
 	ContactPhone         string      `gorm:"size:20;comment:联系电话(配送时填写)" json:"contact_phone"`
@@ -492,7 +495,10 @@ type ServiceStaff struct {
 	Phone         string     `gorm:"size:20;comment:手机号" json:"phone"`
 	OpenID        string     `gorm:"column:openid;size:64;index;comment:微信OpenID(用于快捷登录)" json:"openid"`
 	Avatar        string     `gorm:"size:512;comment:头像URL" json:"avatar"`
+	Qualifications JSON     `gorm:"type:json;comment:资质材料列表JSON[{type,name,url}]" json:"qualifications,omitempty"`
 	Status        uint8      `gorm:"not null;default:0;comment:状态: 0=待审核 1=启用 2=禁用" json:"status"`
+	AuditStatus   uint8      `gorm:"not null;default:0;comment:审核状态: 0=无/已通过 1=待审核(与status解耦)" json:"audit_status"`
+	PendingFields JSON       `gorm:"type:json;comment:审核中待变更字段快照" json:"pending_fields,omitempty"`
 	LastLoginAt   *time.Time `gorm:"comment:最后登录时间" json:"last_login_at"`
 	CreatedAt     time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
 	UpdatedAt     time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
@@ -500,6 +506,31 @@ type ServiceStaff struct {
 
 func (ServiceStaff) TableName() string {
 	return "service_staffs"
+}
+
+// ============================================
+// 服务人员审核记录表 (service_staff_audit_records)
+// 用途：注册申请/信息变更/资质提交/状态变更的审核留痕
+// 命名约定：服务人员相关表统一 `service_` 前缀（含 service_staffs）
+// ============================================
+type StaffAuditRecord struct {
+	ID            uint64     `gorm:"primaryKey;autoIncrement;comment:审核记录ID" json:"id"`
+	StaffID       uint64     `gorm:"not null;index;comment:服务人员ID" json:"staff_id"`
+	AuditType     uint8      `gorm:"not null;default:1;comment:审核类型:1=注册申请 2=信息变更 3=资质提交 4=状态变更" json:"audit_type"`
+	ApplyType     uint8      `gorm:"not null;default:1;comment:申请来源:1=自注册 2=PC添加 3=端上变更" json:"apply_type"`
+	BeforeData    JSON       `gorm:"type:json;comment:变更前字段快照" json:"before_data,omitempty"`
+	AfterData     JSON       `gorm:"type:json;comment:变更后字段快照" json:"after_data,omitempty"`
+	Qualifications JSON      `gorm:"type:json;comment:资质材料URL列表" json:"qualifications,omitempty"`
+	Status        uint8      `gorm:"not null;default:0;index;comment:审核状态:0=待审 1=通过 2=驳回" json:"status"`
+	ReviewerID    *uint64    `gorm:"comment:审核人工员ID(merchant_staffs.id)" json:"reviewer_id,omitempty"`
+	ReviewRemark  string     `gorm:"size:256;comment:审核备注" json:"review_remark"`
+	ReviewAt      *time.Time `gorm:"comment:审核时间" json:"review_at,omitempty"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+}
+
+func (StaffAuditRecord) TableName() string {
+	return "service_staff_audit_records"
 }
 
 // ============================================

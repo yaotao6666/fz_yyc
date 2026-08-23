@@ -27,6 +27,8 @@ const menuGroups = computed(() => [
   {
     title: '账户',
     items: [
+      { icon: '📝', label: '资料变更（需审核）', path: '/pages/profile/edit' },
+      { icon: '📋', label: '我的审核记录', path: '/pages/profile/my-audits' },
       { icon: '🔔', label: '消息通知', path: '' },
       { icon: '⚙️', label: '设置', path: '' },
       { icon: '❓', label: '帮助与反馈', path: '' }

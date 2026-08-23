@@ -7,7 +7,9 @@ import ProductsView from '@/views/product/ProductsView.vue'
 import CategoriesView from '@/views/product/CategoriesView.vue'
 import OrderListView from '@/views/order/OrderListView.vue'
 import OrderDetailView from '@/views/order/OrderDetailView.vue'
+import RentalDueListView from '@/views/order/RentalDueListView.vue'
 import ServiceStaffListView from '@/views/staff/ServiceStaffListView.vue'
+import StaffAuditListView from '@/views/staff/StaffAuditListView.vue'
 import MerchantProfileView from '@/views/merchant/MerchantProfileView.vue'
 import MerchantStatsView from '@/views/analytics/MerchantStatsView.vue'
 import MenuManagementView from '@/views/system/MenuManagementView.vue'
@@ -47,6 +49,12 @@ const routes = [
         meta: { title: '订单管理', requiresAuth: true, permission: 'orders:view' }
       },
       {
+        path: '/orders/rental-due',
+        name: 'rental-due',
+        component: RentalDueListView,
+        meta: { title: '租赁到期提醒', requiresAuth: true, permission: 'orderrental:view' }
+      },
+      {
         path: '/orders/:id',
         name: 'order-detail',
         component: OrderDetailView,
@@ -69,6 +77,12 @@ const routes = [
         name: 'service-staff',
         component: ServiceStaffListView,
         meta: { title: '服务人员', requiresAuth: true, permission: 'staff:view' }
+      },
+      {
+        path: '/staff/audits',
+        name: 'staff-audits',
+        component: StaffAuditListView,
+        meta: { title: '服务人员审核', requiresAuth: true, permission: 'staffaudit:view' }
       },
       {
         path: '/profile',

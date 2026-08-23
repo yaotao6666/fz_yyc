@@ -20,10 +20,11 @@ import (
 
 // RegisterRequest 注册申请请求
 type RegisterRequest struct {
-	Username string `json:"username" binding:"required,min=2,max=64"`
-	Password string `json:"password" binding:"required,min=6"`
-	Name     string `json:"name" binding:"required"`
-	Phone    string `json:"phone" binding:"required"`
+	Username       string `json:"username" binding:"required,min=2,max=64"`
+	Password       string `json:"password" binding:"required,min=6"`
+	Name           string `json:"name" binding:"required"`
+	Phone          string `json:"phone" binding:"required"`
+	Qualifications []QualificationItem `json:"qualifications"`
 }
 
 // LoginRequest 账号密码登录
@@ -59,18 +60,38 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	qualificationsRaw, _ := json.Marshal(req.Qualifications)
+
 	staff := models.ServiceStaff{
-		Username: req.Username,
-		Password: string(hashedPassword),
-		Name:     req.Name,
-		Phone:    req.Phone,
-		Status:   0, // 待审核
+		Username:       req.Username,
+		Password:       string(hashedPassword),
+		Name:           req.Name,
+		Phone:          req.Phone,
+		Qualifications: models.JSON(qualificationsRaw),
+		Status:         0, // 待审核（启用前需审核通过）
+		AuditStatus:    1, // 审核中
 	}
 
 	if err := database.DB.Create(&staff).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "注册失败")
 		return
 	}
+
+	// 写一条注册申请审核记录（留痕）
+	afterData, _ := json.Marshal(map[string]interface{}{
+		"username": req.Username,
+		"name":     req.Name,
+		"phone":    req.Phone,
+	})
+	record := models.StaffAuditRecord{
+		StaffID:        staff.ID,
+		AuditType:      1, // 1=注册申请
+		ApplyType:      1, // 1=自注册
+		AfterData:      models.JSON(afterData),
+		Qualifications: models.JSON(qualificationsRaw),
+		Status:         0, // 待审
+	}
+	database.DB.Create(&record)
 
 	response.SuccessWithMessage(c, "注册申请已提交，请等待审核", gin.H{
 		"id":     staff.ID,

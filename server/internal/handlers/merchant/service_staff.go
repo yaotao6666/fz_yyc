@@ -1,6 +1,7 @@
 package merchant
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -11,6 +12,65 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// CreateServiceStaffRequest PC 后台添加服务人员请求
+type CreateServiceStaffRequest struct {
+	Username string `json:"username" binding:"required,min=2,max=64"`
+	Password string `json:"password" binding:"required,min=6"`
+	Name     string `json:"name" binding:"required"`
+	Phone    string `json:"phone" binding:"required"`
+}
+
+// CreateServiceStaff PC 后台直接添加服务人员（默认启用，区别于小程序自注册的待审核）
+func CreateServiceStaff(c *gin.Context) {
+	var req CreateServiceStaffRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var count int64
+	database.DB.Model(&models.ServiceStaff{}).Where("username = ?", req.Username).Count(&count)
+	if count > 0 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "用户名已存在")
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "密码加密失败")
+		return
+	}
+
+	staff := models.ServiceStaff{
+		Username: req.Username,
+		Password: string(hashedPassword),
+		Name:     req.Name,
+		Phone:    req.Phone,
+		Status:   1, // 后台直接添加默认为启用
+	}
+
+	if err := database.DB.Create(&staff).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "添加失败")
+		return
+	}
+
+	// PC 添加留痕：写一条已通过的注册申请记录（admin 直接添加默认启用）
+	after, _ := json.Marshal(map[string]interface{}{
+		"username": req.Username,
+		"name":     req.Name,
+		"phone":    req.Phone,
+	})
+	database.DB.Create(&models.StaffAuditRecord{
+		StaffID:   staff.ID,
+		AuditType: 1, // 注册申请
+		ApplyType: 2, // PC 添加
+		AfterData: models.JSON(after),
+		Status:    1, // 直接通过
+	})
+
+	response.SuccessWithMessage(c, "添加成功", gin.H{"id": staff.ID})
+}
 
 // GetServiceStaffList 服务人员列表（PC 后台管理）
 func GetServiceStaffList(c *gin.Context) {
@@ -86,6 +146,18 @@ func UpdateServiceStaffStatus(c *gin.Context) {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "服务人员不存在")
 		return
 	}
+
+	// 状态变更留痕（审核记录）
+	after, _ := json.Marshal(map[string]interface{}{
+		"status": req.Status,
+	})
+	database.DB.Model(&models.StaffAuditRecord{}).Create(&models.StaffAuditRecord{
+		StaffID:   id,
+		AuditType: 4, // 状态变更
+		ApplyType: 2, // 管理员操作
+		AfterData: models.JSON(after),
+		Status:    1, // 管理员直接操作，视为已生效
+	})
 
 	response.SuccessWithMessage(c, "状态更新成功", gin.H{"id": id, "status": req.Status})
 }

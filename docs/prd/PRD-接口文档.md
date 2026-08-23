@@ -107,6 +107,11 @@
 - 系统公告：`/api/v1/merchant/announcements*`
 - 数据分析：`/api/v1/merchant/analytics/*`
 - 服务人员管理：`/api/v1/merchant/service-staff*`
+- 服务人员审核中心：`/api/v1/merchant/staff-audits*`
+  - 审核列表：`GET /api/v1/merchant/staff-audits`（`staffaudit:view`）
+  - 审核详情：`GET /api/v1/merchant/staff-audits/:id`（`staffaudit:view`，含资质材料 URL 与变更前后数据）
+  - 审核通过：`POST /api/v1/merchant/staff-audits/:id/approve`（`staffaudit:approve`；注册申请通过则启用账号，信息变更通过则回写正式字段）
+  - 审核驳回：`POST /api/v1/merchant/staff-audits/:id/reject`（`staffaudit:reject`）
 
 当前重点约束：
 
@@ -189,11 +194,16 @@
 - 商户退款
 - 订单统计
 - **归还租赁商品（退押金）**：`POST /api/v1/merchant/orders/{order_id}/return`
+- **派单（指派服务人员）**：`GET /api/v1/merchant/orders/dispatchable-staff`（`order:dispatch`，返回已审核通过服务人员）、`POST /api/v1/merchant/orders/{order_id}/dispatch`（`order:dispatch`，入参 `staff_id`）
+- **租赁到期提醒**：`GET /api/v1/merchant/orders/rental-due`（`orderrental:view`，`due_range`=soon/overdue，返回未归还租赁订单与剩余天数）
+- **续租**：`POST /api/v1/merchant/orders/{order_id}/renew`（`order:renew`，生成 `parent_order_id=原单`、`renew_flag=1` 的新待支付订单，可选 `duration`）
 - C 端订单列表 / 详情 / 取消 / 申请退款
 
 当前重点约束：
 
-- 商户订单详情应返回：
+- 派单仅可选择**已审核通过**的服务人员（`service_staffs.status=1 AND audit_status=0`）；指派后订单 `biz_status=2`（待出发），服务人员在工单「已接订单/待办」可见并可签到/签退。
+- 租赁订单支付成功时按 `paid_at + 最长租赁时长`（天/周/月折算）写入 `rental_end_at`，供到期提醒使用。
+- 订单详情应返回：
   - `verify_code`
   - `completed_at`
   - `completed_by_name`
@@ -305,11 +315,17 @@
 
 服务人员接单小程序专用接口，独立身份，与 C 端用户、商户管理员账号体系分离。
 
+> **表命名规范**：服务人员相关业务表统一使用 `service_` 前缀（如 `service_staffs`、`service_staff_audit_records`）。后续新增服务人员相关的表/列/记录表时须保持一致前缀，避免混用 `staff_*` 等无前缀命名。
+
 - 注册申请：`POST /api/v1/service-staff/register`
-  - 请求：包含服务人员基本信息
-  - 提交后进入待审核状态，由商户管理员在 PC 后台审核
+  - 请求：包含服务人员基本信息，可选资质材料 `qualifications:[{type,name,url}]`
+  - 提交后进入待审核状态（`status=0`、`audit_status=1`），并生成注册申请审核记录，由商户管理员在 PC 后台审核
 - 账号密码登录：`POST /api/v1/service-staff/login`
 - 微信快捷登录：`POST /api/v1/service-staff/wechat-login`
+- 资料变更申请：`PUT /api/v1/service-staff/profile`
+  - 请求：`{name, phone, avatar?, qualifications?:[{type,name,url}]}`
+  - 服务人员端上提交 → 生成信息变更审核记录（`audit_type=2`），置 `audit_status=1`，不直接改正式字段；审核通过后回写生效，且不影响启用/禁用状态
+- 我的审核记录：`GET /api/v1/service-staff/audits`
 - 待接订单列表：`GET /api/v1/service-staff/orders/pending`
 - 接单：`POST /api/v1/service-staff/orders/:id/accept`
   - 接单成功后订单写入 `accepted_by_staff_id`、`accepted_at`
@@ -360,6 +376,10 @@
 | 随访任务 | `followup:view`（id=86） | 执行/登记 `followup:update`（id=861） |
 | 生命体征 | `monitor:view`（id=87） | 录入 `monitor:create`（id=871） |
 | 健康宣教 | `education:view`（id=88） | 新增/编辑 `education:create`（id=881） |
+| 服务人员 | `staff:view`（id=4/747） | 添加 `staff:create`（id=44）· 审核/启停 `staff:update`（id=41）· 重置密码 `staff:reset-password`（id=42）· 删除 `staff:delete`（id=43） |
+| 服务人员审核 | `staffaudit:view`（id=75，菜单 `/staff/audits`） | 审核通过 `staffaudit:approve`（id=751）· 驳回 `staffaudit:reject`（id=752） |
+| 订单（派单/续租） | `orders:view`（id=2/745） | 派单 `order:dispatch`（id=930）· 续租 `order:renew`（id=931） |
+| 租赁到期提醒 | `orderrental:view`（id=93，菜单 `/orders/rental-due`） | 续租 `orderrental:renew`（id=932）· 归还 `orderrental:return`（id=933） |
 
 #### 阶段一：居民健康档案与人群健康评估
 

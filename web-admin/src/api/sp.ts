@@ -45,6 +45,8 @@ import type {
   ProfitSharingRecordListResponse,
   RbacPermissions,
   ServiceStaffListResponse,
+  StaffAuditDetailResponse,
+  StaffAuditListResponse,
   SpOrder,
   SpOrderListResponse,
   SysDepartment,
@@ -181,10 +183,35 @@ export function returnRentalOrder(orderId: number, data: { deduct_amount?: numbe
   return request.post(`/api/v1/merchant/orders/${orderId}/return`, data).then(unwrapApiResponse<SpOrder>)
 }
 
+/* ============ 订单派单 / 租赁到期 / 续租 ============ */
+export function getDispatchableStaffList() {
+  return request.get('/api/v1/merchant/orders/dispatchable-staff').then(unwrapApiResponse<{ id: number; name: string; phone?: string }[]>)
+}
+
+export function dispatchOrder(orderId: number, staff_id: number) {
+  return request.post(`/api/v1/merchant/orders/${orderId}/dispatch`, { staff_id }).then(unwrapApiResponse<{ id: number; assigned_staff_id: number; biz_status: number }>)
+}
+
+export function getRentalDueOrders(params?: Record<string, unknown>) {
+  return request.get('/api/v1/merchant/orders/rental-due', { params }).then(unwrapApiResponse<{
+    list: { order: SpOrder; rental_end_at?: string; is_overdue?: boolean; days_left?: number }[]
+    total: number
+    pagination: { total: number; page: number; page_size: number }
+  }>)
+}
+
+export function renewOrder(orderId: number, duration?: number) {
+  return request.post(`/api/v1/merchant/orders/${orderId}/renew`, { duration }).then(unwrapApiResponse<{ order: SpOrder }>)
+}
+
 /* ============ 服务人员管理 ============ */
 
 export function getServiceStaffList(params?: { status?: number; keyword?: string; page?: number; page_size?: number }) {
   return request.get('/api/v1/merchant/service-staff', { params }).then(unwrapApiResponse<ServiceStaffListResponse>)
+}
+
+export function createServiceStaff(data: { username: string; password: string; name: string; phone: string }) {
+  return request.post('/api/v1/merchant/service-staff', data).then(unwrapApiResponse<{ id: number }>)
 }
 
 export function updateServiceStaffStatus(id: number, status: number) {
@@ -197,6 +224,23 @@ export function resetServiceStaffPassword(id: number, new_password: string) {
 
 export function deleteServiceStaff(id: number) {
   return request.delete(`/api/v1/merchant/service-staff/${id}`).then(unwrapApiResponse<{ id: number }>)
+}
+
+/* ============ 服务人员审核中心 ============ */
+export function listStaffAudits(params?: { audit_type?: number; status?: number; keyword?: string; page?: number; page_size?: number }) {
+  return request.get('/api/v1/merchant/staff-audits', { params }).then(unwrapApiResponse<StaffAuditListResponse>)
+}
+
+export function getStaffAuditDetail(id: number) {
+  return request.get(`/api/v1/merchant/staff-audits/${id}`, {}).then(unwrapApiResponse<StaffAuditDetailResponse>)
+}
+
+export function approveStaffAudit(id: number, remark?: string) {
+  return request.post(`/api/v1/merchant/staff-audits/${id}/approve`, { remark }).then(unwrapApiResponse<{ id: number; status: number }>)
+}
+
+export function rejectStaffAudit(id: number, remark?: string) {
+  return request.post(`/api/v1/merchant/staff-audits/${id}/reject`, { remark }).then(unwrapApiResponse<{ id: number; status: number }>)
 }
 
 /* ============ 数据分析 ============ */

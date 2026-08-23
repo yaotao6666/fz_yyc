@@ -114,6 +114,22 @@
         "navigationBarBackgroundColor": "#517528",
         "navigationBarTextStyle": "white"
       }
+    },
+    {
+      "path": "pages/profile/edit",
+      "style": {
+        "navigationBarTitleText": "资料变更",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/profile/my-audits",
+      "style": {
+        "navigationBarTitleText": "我的审核记录",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
     }
   ],
   "globalStyle": {

@@ -4,8 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   completeOrder,
+  dispatchOrder,
+  getDispatchableStaffList,
   getOrderDetail,
   quickCompleteOrder,
+  renewOrder,
   returnRentalOrder
 } from '@/api/sp'
 import type { SpOrder, SpOrderItem } from '@/types/sp'
@@ -56,6 +59,79 @@ const canComplete = computed(() => {
   // 已支付且未完成时可核销
   return o.status === 2
 })
+
+const canDispatch = computed(() => {
+  const o = order.value
+  if (!o) return false
+  // 已支付可派单；已指派则显示可重新指派
+  return o.status === 2
+})
+
+const canRenew = computed(() => {
+  const o = order.value
+  if (!o) return false
+  // 租赁订单且非待支付状态时可续租
+  return isRentalOrder.value && o.status !== 1
+})
+
+// 派单
+const staffLoading = ref(false)
+const dispatchDialogVisible = ref(false)
+const staffOptions = ref<{ id: number; name: string; phone?: string }[]>([])
+const selectedStaffId = ref<number | null>(null)
+const dispatching = ref(false)
+
+async function openDispatchDialog() {
+  staffLoading.value = true
+  dispatchDialogVisible.value = true
+  selectedStaffId.value = order.value?.assigned_staff_id || null
+  try {
+    staffOptions.value = await getDispatchableStaffList()
+  } catch (error: any) {
+    ElMessage.error(error?.message || '获取服务人员失败')
+  } finally {
+    staffLoading.value = false
+  }
+}
+
+async function confirmDispatch() {
+  if (!order.value || !selectedStaffId.value) {
+    ElMessage.warning('请选择服务人员')
+    return
+  }
+  dispatching.value = true
+  try {
+    await dispatchOrder(order.value.id, selectedStaffId.value)
+    ElMessage.success('派单成功')
+    dispatchDialogVisible.value = false
+    loadOrderDetail()
+  } catch (error: any) {
+    ElMessage.error(error?.message || '派单失败')
+  } finally {
+    dispatching.value = false
+  }
+}
+
+// 续租
+const renewing = ref(false)
+async function handleRenew() {
+  if (!order.value) return
+  try {
+    await ElMessageBox.confirm('确认对该租赁订单发起续租？将生成待支付续租单。', '续租', { type: 'warning' })
+  } catch {
+    return
+  }
+  renewing.value = true
+  try {
+    const res: any = await renewOrder(order.value.id)
+    ElMessage.success(`续租单已生成，新订单号：${res?.order?.order_no}`)
+    loadOrderDetail()
+  } catch (error: any) {
+    ElMessage.error(error?.message || '续租失败')
+  } finally {
+    renewing.value = false
+  }
+}
 
 function formatOptionalDateTime(value?: string) {
   return value ? formatDateTime(value) : '-'
@@ -186,10 +262,12 @@ onMounted(loadOrderDetail)
         <div class="summary-subtitle">
           订单号：{{ order.order_no }}，下单时间：{{ formatDateTime(order.created_at) }}
         </div>
-        <div v-if="canComplete || canReturnRental" class="summary-actions">
+        <div v-if="canComplete || canReturnRental || canDispatch || canRenew" class="summary-actions">
           <el-button v-if="canComplete" type="primary" :loading="completing" @click="handleQuickComplete">快速核销</el-button>
           <el-button v-if="canComplete" plain @click="openVerifyDialog">核销码核销</el-button>
           <el-button v-if="canReturnRental" type="primary" @click="openReturnDialog">归还退押金</el-button>
+          <el-button v-if="canDispatch" v-permission="'order:dispatch'" type="primary" plain @click="openDispatchDialog">派单</el-button>
+          <el-button v-if="canRenew" v-permission="'order:renew'" type="warning" plain :loading="renewing" @click="handleRenew">续租</el-button>
         </div>
       </el-card>
 
@@ -211,8 +289,8 @@ onMounted(loadOrderDetail)
         <el-card v-if="isServiceOrder" class="page-card" shadow="never">
           <template #header>工单信息</template>
           <div class="info-list">
-            <div class="info-row"><span>工单状态</span><span>{{ order.biz_status ? (BizStatusText[order.biz_status] || '-') : '-' }}</span></div>
-            <div class="info-row"><span>服务人员ID</span><span>{{ order.assigned_staff_id || '未指派' }}</span></div>
+            <div class="info-row"><span>工单状态</span><span>{{ order.biz_status ? (BizStatusText[order.biz_status] || '-') : '未派单' }}</span></div>
+            <div class="info-row"><span>服务人员</span><span>{{ order.assigned_staff?.name || (order.assigned_staff_id ? `服务人员#${order.assigned_staff_id}` : '未指派') }}</span></div>
             <div class="info-row"><span>预约时间</span><span>{{ formatOptionalDateTime(order.scheduled_at) }}</span></div>
             <div class="info-row"><span>开始服务</span><span>{{ formatOptionalDateTime(order.actual_started_at) }}</span></div>
             <div class="info-row"><span>结束服务</span><span>{{ formatOptionalDateTime(order.actual_ended_at) }}</span></div>
@@ -250,6 +328,7 @@ onMounted(loadOrderDetail)
               <div v-if="Number(order.deposit_deduct_amount || 0) > 0" class="info-row"><span>押金扣除</span><span>¥{{ formatAmount(order.deposit_deduct_amount) }}</span></div>
               <div v-if="Number(order.deposit_refund_amount || 0) > 0" class="info-row"><span>押金退还</span><span>¥{{ formatAmount(order.deposit_refund_amount) }}</span></div>
               <div v-if="order.deposit_refunded_at" class="info-row"><span>退还时间</span><span>{{ formatDateTime(order.deposit_refunded_at) }}</span></div>
+              <div v-if="order.rental_end_at" class="info-row"><span>租赁到期</span><span>{{ formatDateTime(order.rental_end_at) }}</span></div>
               <div v-if="order.rental_returned_at" class="info-row"><span>归还时间</span><span>{{ formatDateTime(order.rental_returned_at) }}</span></div>
               <div v-if="order.rental_return_remark" class="info-row"><span>归还备注</span><span>{{ order.rental_return_remark }}</span></div>
             </template>
@@ -320,6 +399,15 @@ onMounted(loadOrderDetail)
       <template #footer>
         <el-button @click="verifyDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="completing" @click="confirmVerifyComplete">确认核销</el-button>
+      </template>
+    </el-dialog>
+  <el-dialog v-model="dispatchDialogVisible" title="派单给服务人员" width="440px">
+      <el-select v-model="selectedStaffId" v-loading="staffLoading" placeholder="选择已审核服务人员" style="width: 100%;" filterable>
+        <el-option v-for="s in staffOptions" :key="s.id" :label="`${s.name} (${s.phone || '无手机号'})`" :value="s.id" />
+      </el-select>
+      <template #footer>
+        <el-button @click="dispatchDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="dispatching" @click="confirmDispatch">确认派单</el-button>
       </template>
     </el-dialog>
   </div>

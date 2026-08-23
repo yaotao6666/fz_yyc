@@ -193,9 +193,16 @@ func setupRoutes(r *gin.Engine) {
 
 				// 服务人员管理（接单小程序账号审核与管理）
 				merchantOnlyGroup.GET("/service-staff", middleware.RBAC("staff:view"), merchant.GetServiceStaffList)
+				merchantOnlyGroup.POST("/service-staff", middleware.RBAC("staff:create"), merchant.CreateServiceStaff)
 				merchantOnlyGroup.PUT("/service-staff/:id/status", middleware.RBAC("staff:update"), merchant.UpdateServiceStaffStatus)
 				merchantOnlyGroup.POST("/service-staff/:id/reset-password", middleware.RBAC("staff:reset-password"), merchant.ResetServiceStaffPassword)
 				merchantOnlyGroup.DELETE("/service-staff/:id", middleware.RBAC("staff:delete"), merchant.DeleteServiceStaff)
+
+				// 服务人员审核中心（独立权限）
+				merchantOnlyGroup.GET("/staff-audits", middleware.RBAC("staffaudit:view"), merchant.ListStaffAudits)
+				merchantOnlyGroup.GET("/staff-audits/:id", middleware.RBAC("staffaudit:view"), merchant.StaffAuditDetail)
+				merchantOnlyGroup.POST("/staff-audits/:id/approve", middleware.RBAC("staffaudit:approve"), merchant.ApproveStaffAudit)
+				merchantOnlyGroup.POST("/staff-audits/:id/reject", middleware.RBAC("staffaudit:reject"), merchant.RejectStaffAudit)
 
 				// 系统公告（商家查看）
 				merchantOnlyGroup.GET("/announcements", middleware.RBAC("dashboard:view"), merchant.GetAnnouncements)
@@ -203,11 +210,15 @@ func setupRoutes(r *gin.Engine) {
 
 				// 订单管理
 				merchantOnlyGroup.GET("/orders", middleware.RBAC("orders:view"), merchant.GetOrders)
+				merchantOnlyGroup.GET("/orders/dispatchable-staff", middleware.RBAC("order:dispatch"), merchant.GetDispatchableStaffList)
+				merchantOnlyGroup.GET("/orders/rental-due", middleware.RBAC("orderrental:view"), merchant.ListRentalDueOrders)
 				merchantOnlyGroup.GET("/orders/:order_id", middleware.RBAC("orders:view"), merchant.GetOrderDetail)
 				merchantOnlyGroup.POST("/orders/quick-complete", middleware.RBAC("orders:complete"), merchant.QuickCompleteOrder)
 				merchantOnlyGroup.POST("/orders/:order_id/complete", middleware.RBAC("orders:complete"), merchant.CompleteOrder)
 				merchantOnlyGroup.POST("/orders/:order_id/refund", middleware.RBAC("orders:refund"), merchant.RefundOrder)
 				merchantOnlyGroup.POST("/orders/:order_id/return", middleware.RBAC("orders:return"), merchant.ReturnRentalOrder)
+				merchantOnlyGroup.POST("/orders/:order_id/dispatch", middleware.RBAC("order:dispatch"), merchant.DispatchOrder)
+				merchantOnlyGroup.POST("/orders/:order_id/renew", middleware.RBAC("order:renew"), merchant.RenewOrder)
 				merchantOnlyGroup.GET("/orders/statistics", middleware.RBAC("orders:view"), merchant.GetOrderStatistics)
 
 				// 数据分析
@@ -317,6 +328,8 @@ func setupRoutes(r *gin.Engine) {
 		staffAuthedGroup.Use(middleware.JWTAuth(), middleware.ServiceStaffAuth())
 		{
 			staffAuthedGroup.GET("/profile", serviceStaff.GetProfile)
+			staffAuthedGroup.PUT("/profile", serviceStaff.RequestProfileChange)
+			staffAuthedGroup.GET("/audits", serviceStaff.GetMyAuditList)
 			staffAuthedGroup.GET("/todo", serviceStaff.GetTodoList)
 			staffAuthedGroup.GET("/orders/pending", serviceStaff.PendingOrders)
 			staffAuthedGroup.GET("/orders/accepted", serviceStaff.AcceptedOrders)

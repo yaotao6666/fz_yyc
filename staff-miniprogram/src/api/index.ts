@@ -56,6 +56,57 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
 
 /* ============ 认证接口 ============ */
 
+/** 获取七牛上传凭证 */
+async function getUploadToken() {
+  const res: any = await request({ url: '/api/v1/upload/token' })
+  if (res?.code !== 0) throw new Error(res?.message || '获取上传凭证失败')
+  return res?.data
+}
+
+/** 资质材料上传 - 客户端直传七牛云 */
+export async function uploadQualificationFile(filePath: string): Promise<{ url: string; key: string }> {
+  uni.showLoading({ title: '上传中...', mask: true })
+  try {
+    const data = await getUploadToken()
+    const ext = (filePath.split('.').pop() || 'jpg')
+    const key = `${data.prefix}/${Date.now()}.${ext}`
+    const domain = (data.domain || '').replace(/\/+$/, '')
+    return new Promise((resolve, reject) => {
+      uni.uploadFile({
+        url: data.upload_url || 'https://up.qiniup.com',
+        method: 'POST',
+        filePath,
+        name: 'file',
+        formData: { token: data.token, key },
+        success: (res) => {
+          uni.hideLoading()
+          if (res.statusCode === 200) {
+            const parsed = JSON.parse(res.data)
+            if (parsed.key) {
+              resolve({ url: `${domain}/${String(parsed.key).replace(/^\/+/, '')}`, key: parsed.key })
+            } else {
+              uni.showToast({ title: '上传失败', icon: 'none' })
+              reject(new Error('上传失败'))
+            }
+          } else {
+            uni.showToast({ title: '上传失败', icon: 'none' })
+            reject(new Error(`上传失败: ${res.statusCode}`))
+          }
+        },
+        fail: (err) => {
+          uni.hideLoading()
+          uni.showToast({ title: '上传失败', icon: 'none' })
+          reject(err)
+        }
+      })
+    })
+  } catch (error) {
+    uni.hideLoading()
+    uni.showToast({ title: '获取上传凭证失败', icon: 'none' })
+    throw error
+  }
+}
+
 export const staffAuthApi = {
   /** 账号密码登录 */
   login: (username: string, password: string) =>
@@ -65,8 +116,8 @@ export const staffAuthApi = {
   wechatLogin: (code: string) =>
     request({ url: '/api/v1/service-staff/wechat-login', method: 'POST', needAuth: false, data: { code } }),
 
-  /** 注册申请 */
-  register: (data: { username: string; password: string; name: string; phone: string }) =>
+  /** 注册申请（可携带资质材料） */
+  register: (data: { username: string; password: string; name: string; phone: string; qualifications?: { type: string; name: string; url: string }[] }) =>
     request({ url: '/api/v1/service-staff/register', method: 'POST', needAuth: false, data })
 }
 
@@ -107,6 +158,14 @@ export const staffWorkorderApi = {
 export const staffProfileApi = {
   getProfile: () =>
     request({ url: '/api/v1/service-staff/profile' }),
+
+  /** 资料变更申请（进入待审核） */
+  requestProfileChange: (data: { name: string; phone: string; avatar?: string; qualifications?: { type: string; name: string; url: string }[] }) =>
+    request({ url: '/api/v1/service-staff/profile', method: 'PUT', data }),
+
+  /** 我的审核记录 */
+  getMyAuditList: () =>
+    request({ url: '/api/v1/service-staff/audits' }),
 
   /** 接单统计 */
   getStatistics: () =>

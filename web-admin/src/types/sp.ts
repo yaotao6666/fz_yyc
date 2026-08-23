@@ -311,9 +311,13 @@ export interface SpOrder {
   order_type?: number
   biz_status?: number
   assigned_staff_id?: number
+  assigned_staff?: { id: number; name?: string; phone?: string }
   scheduled_at?: string
   actual_started_at?: string
   actual_ended_at?: string
+  rental_end_at?: string
+  parent_order_id?: number
+  renew_flag?: number
   // 分账字段
   profit_sharing_status?: number
   profit_sharing_amount?: number
@@ -399,6 +403,40 @@ export interface ServiceStaffListResponse {
     page: number
     page_size: number
   }
+}
+
+// ===================== 服务人员审核 =====================
+
+export interface StaffAuditItem {
+  id: number
+  staff_id: number
+  audit_type: number // 1=注册申请 2=信息变更 3=资质提交 4=状态变更
+  apply_type: number // 1=自注册 2=PC添加 3=端上变更
+  before_data?: any
+  after_data?: any
+  qualifications?: any
+  status: number // 0=待审 1=通过 2=驳回
+  reviewer_id?: number
+  review_remark?: string
+  review_at?: string
+  created_at?: string
+  staff_name?: string
+  staff_phone?: string
+  staff_username?: string
+}
+
+export interface StaffAuditListResponse {
+  list: StaffAuditItem[]
+  total: number
+  pagination: { page: number; page_size: number }
+}
+
+export interface StaffAuditDetailResponse {
+  record: StaffAuditItem
+  staff: ServiceStaffItem
+  qualifications?: any[]
+  before_data?: any
+  after_data?: any
 }
 
 // ===================== RBAC 类型 =====================

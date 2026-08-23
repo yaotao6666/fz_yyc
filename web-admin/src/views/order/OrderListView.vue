@@ -11,6 +11,30 @@ const router = useRouter()
 const loading = ref(false)
 const orders = ref<SpOrder[]>([])
 
+// 派单选择弹窗（列表页简化：仅详情页提供派单；此处续租入口复用）
+import { renewOrder } from '@/api/sp'
+import { ElMessageBox } from 'element-plus'
+
+const renewingId = ref<number | null>(null)
+async function handleRenewFromList(row: SpOrder) {
+  if (!row.id) return
+  try {
+    await ElMessageBox.confirm(`确认对订单「${row.order_no}」发起续租？`, '续租', { type: 'warning' })
+  } catch {
+    return
+  }
+  renewingId.value = row.id
+  try {
+    const res: any = await renewOrder(row.id)
+    ElMessage.success(`续租单已生成，新订单号：${res?.order?.order_no}`)
+    loadOrders()
+  } catch (error: any) {
+    ElMessage.error(error?.message || '续租失败')
+  } finally {
+    renewingId.value = null
+  }
+}
+
 const pagination = reactive({
   page: 1,
   page_size: 20,
@@ -236,14 +260,21 @@ onMounted(loadOrders)
             <span v-else>-</span>
           </template>
         </el-table-column>
+        <el-table-column label="租赁到期" width="170">
+          <template #default="scope">
+            <span v-if="scope.row.rental_end_at">{{ formatDateTime(scope.row.rental_end_at) }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="下单时间" min-width="170">
           <template #default="scope">
             {{ formatDateTime(scope.row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="goDetail(scope.row.id)">查看详情</el-button>
+            <el-button v-if="Number(scope.row.order_type) === 2 && scope.row.status !== 1" link type="warning" v-permission="'order:renew'" :loading="renewingId === scope.row.id" @click="handleRenewFromList(scope.row)">续租</el-button>
           </template>
         </el-table-column>
       </el-table>

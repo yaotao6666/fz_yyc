@@ -138,6 +138,21 @@ func markOrderPaid(orderNo, transactionID string, payload []byte) error {
 	if result.RowsAffected > 0 && (order.OrderType == 1 || order.OrderType == 2) {
 		db.Model(&models.Order{}).Where("id = ?", order.ID).Update("biz_status", 1)
 	}
+	// 租赁订单：支付成功时计算到期时间 rental_end_at = paid_at + 最长租赁时长
+	if result.RowsAffected > 0 && order.OrderType == 2 {
+		var durationDays uint
+		db.Raw(`SELECT COALESCE(MAX(
+			CASE rental_unit
+				WHEN 1 THEN rental_duration        -- 天
+				WHEN 2 THEN rental_duration * 7    -- 周
+				WHEN 3 THEN rental_duration * 30   -- 月(按30天)
+				ELSE rental_duration
+			END), 0) FROM order_items WHERE order_id = ?`, order.ID).Scan(&durationDays)
+		if durationDays > 0 {
+			rentalEndAt := now.AddDate(0, 0, int(durationDays))
+			db.Model(&models.Order{}).Where("id = ?", order.ID).Update("rental_end_at", rentalEndAt)
+		}
+	}
 	return nil
 }
 
