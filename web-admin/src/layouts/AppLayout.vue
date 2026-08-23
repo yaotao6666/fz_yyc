@@ -1,23 +1,41 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { APP_TITLE } from '@/config/env'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessageBox } from 'element-plus'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import type { SysMenu } from '@/types/sp'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-const menuItems = [
-  { index: '/dashboard', label: '工作台' },
-  { index: '/orders', label: '订单管理' },
-  { index: '/products', label: '商品管理' },
-  { index: '/categories', label: '分类管理' },
-  { index: '/staff', label: '服务人员' },
-  { index: '/analytics', label: '数据分析' },
-  { index: '/profile', label: '商家资料' }
-]
+// 根据菜单图标名动态渲染 Element Plus 图标
+function renderIcon(icon?: string) {
+  if (!icon) return null
+  const iconComponent = (ElementPlusIconsVue as Record<string, unknown>)[icon]
+  return iconComponent ? () => h('el-icon', {}, [h(iconComponent as never)]) : null
+}
+
+// 递归生成菜单渲染数据：仅保留「菜单/目录」类型，剔除按钮(menu_type=2)
+function buildMenuNodes(nodes: SysMenu[]): SysMenu[] {
+  return nodes
+    .filter((node) => node.menu_type === 1)
+    .map((node) => {
+      const children = buildMenuNodes(node.children || [])
+      if (children.length > 0) {
+        return { ...node, children }
+      }
+      if (node.path) {
+        return node
+      }
+      return null
+    })
+    .filter((node): node is SysMenu => Boolean(node))
+}
+
+const menuNodes = computed<SysMenu[]>(() => buildMenuNodes(authStore.menus))
 
 const activeMenu = computed(() => {
   if (route.path.startsWith('/orders')) {
@@ -49,10 +67,31 @@ async function handleLogout() {
         <div class="brand-title">{{ APP_TITLE }}</div>
         <div class="brand-subtitle">商家后台管理</div>
       </div>
-      <el-menu router :default-active="activeMenu" class="side-menu">
-        <el-menu-item v-for="item in menuItems" :key="item.index" :index="item.index">
-          {{ item.label }}
-        </el-menu-item>
+      <el-menu router :default-active="activeMenu" class="side-menu" unique-opened>
+        <template v-for="menu in menuNodes" :key="menu.id">
+          <!-- 含子菜单的目录：一级目录/二级子菜单 -->
+          <el-sub-menu v-if="menu.children && menu.children.length" :index="String(menu.id)">
+            <template #title>
+              <el-icon v-if="renderIcon(menu.icon)">
+                <component :is="renderIcon(menu.icon)" />
+              </el-icon>
+              <span>{{ menu.name }}</span>
+            </template>
+            <el-menu-item v-for="child in menu.children" :key="child.id" :index="child.path || ''">
+              <el-icon v-if="child.icon && renderIcon(child.icon)">
+                <component :is="renderIcon(child.icon)" />
+              </el-icon>
+              <span>{{ child.name }}</span>
+            </el-menu-item>
+          </el-sub-menu>
+          <!-- 一级菜单 -->
+          <el-menu-item v-else-if="menu.path" :index="menu.path">
+            <el-icon v-if="renderIcon(menu.icon)">
+              <component :is="renderIcon(menu.icon)" />
+            </el-icon>
+            <span>{{ menu.name }}</span>
+          </el-menu-item>
+        </template>
       </el-menu>
     </el-aside>
 
@@ -105,6 +144,11 @@ async function handleLogout() {
   background: transparent;
 }
 
+/* 二级子菜单容器：继承透明背景，避免 Element Plus 默认白底导致白色文字不可见 */
+:deep(.side-menu .el-menu--inline) {
+  background: transparent;
+}
+
 :deep(.side-menu .el-menu-item) {
   margin: 6px 12px;
   border-radius: 12px;
@@ -117,6 +161,16 @@ async function handleLogout() {
 }
 
 :deep(.side-menu .el-menu-item:hover) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:deep(.side-menu .el-sub-menu__title) {
+  margin: 6px 12px;
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+:deep(.side-menu .el-sub-menu__title:hover) {
   background: rgba(255, 255, 255, 0.08);
 }
 

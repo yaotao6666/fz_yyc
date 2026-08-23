@@ -1,12 +1,12 @@
-# 接入微信支付服务商真实密钥与测试商户计划
+# 接入微信支付真实密钥与测试商户计划
 
 ## 背景
 
-用户已拥有微信支付服务商的真实资料和密钥，且已线下进件完成1个商户。需要将这些真实配置接入系统，使支付链路可以真实跑通测试。
+用户已拥有微信支付的真实资料和密钥，且已线下进件完成1个商户。需要将这些真实配置接入系统，使支付链路可以真实跑通测试。
 
 ## 当前状态
 
-- 数据库中的服务商和商户数据均为 mock 值
+- 数据库中的商户数据均为 mock 值
 - `.env` 文件中微信支付配置为空或 mock 值
 - `docker-compose.yml` 未传递 `WECHAT_PAY_SP_*` 新版环境变量
 - 支付回调地址需要公网可访问（微信支付服务器需回调通知）
@@ -14,16 +14,16 @@
 
 ## 实施步骤
 
-### 步骤1：配置 `.env` 文件中的微信支付服务商密钥
+### 步骤1：配置 `.env` 文件中的微信支付密钥
 
-修改 `server/.env` 文件，填入真实的服务商支付配置：
+修改 `server/.env` 文件，填入真实的支付配置：
 
 ```env
-# 微信支付服务商配置（优先使用 SP_ 前缀变量）
-WECHAT_PAY_SP_MCH_ID=你的服务商商户号
+# 微信支付配置（优先使用 SP_ 前缀变量）
+WECHAT_PAY_SP_MCH_ID=你的商户号
 WECHAT_PAY_SP_API_V3_KEY=你的APIv3密钥（32字节）
 WECHAT_PAY_SP_CERT_SERIAL_NO=你的证书序列号
-WECHAT_PAY_SP_PRIVATE_KEY=你的服务商私钥PEM内容（或文件路径）
+WECHAT_PAY_SP_PRIVATE_KEY=你的私钥PEM内容（或文件路径）
 WECHAT_PAY_SP_PUBLIC_KEY=微信支付平台公钥/证书PEM内容（或文件路径）
 WECHAT_PAY_SP_CALLBACK_URL=你的公网回调地址（如 https://yourdomain.com/api/v1/notify/payment）
 
@@ -47,24 +47,7 @@ WECHAT_PAY_SP_PUBLIC_KEY: ${WECHAT_PAY_SP_PUBLIC_KEY:-}
 WECHAT_PAY_SP_CALLBACK_URL: ${WECHAT_PAY_SP_CALLBACK_URL:-}
 ```
 
-### 步骤3：更新数据库中的服务商支付信息
-
-通过 SQL 更新 `service_providers` 表中的真实信息：
-
-```sql
-UPDATE service_providers SET
-  mch_id = '你的服务商商户号',
-  api_v3_key = '你的APIv3密钥',
-  cert_serial_no = '你的证书序列号',
-  private_key = '你的私钥PEM',
-  public_key = '你的公钥/证书PEM',
-  callback_url = '你的公网回调地址'
-WHERE id = 1;
-```
-
-> 注意：`service_providers` 表中的字段与 `.env` 配置存在双重存储。当前支付逻辑使用的是 `.env` 中的配置（通过 `config.Config.WechatPay`），数据库中的字段主要用于 SP 设置页面展示。两边需要保持一致。
-
-### 步骤4：更新已进件商户的子商户号
+### 步骤3：更新已进件商户的子商户号
 
 通过 SQL 或 SP 小程序商家编辑页面，回填已进件商户的 `sub_mch_id`：
 
@@ -82,7 +65,7 @@ WHERE id = 你的商家ID;
 3. 在“支付配置”区域填写子商户号
 4. 保存
 
-### 步骤5：配置公网回调地址（内网穿透）
+### 步骤4：配置公网回调地址（内网穿透）
 
 微信支付回调需要公网可访问的 URL。开发环境需使用内网穿透工具：
 
@@ -97,19 +80,18 @@ ngrok http 8080
 
 将公网地址填入：
 1. `.env` 的 `WECHAT_PAY_SP_CALLBACK_URL`
-2. 数据库 `service_providers.callback_url`
 
-### 步骤6：重启服务并验证配置
+### 步骤5：重启服务并验证配置
 
 ```bash
 # 重新构建并启动
 cd server && docker compose up -d --build
 
 # 验证配置是否加载
-curl -s http://localhost:8080/api/v1/sp/settings -H "Authorization: Bearer <SP_TOKEN>"
+curl -s http://localhost:8080/api/v1/merchant/profile -H "Authorization: Bearer <SP_TOKEN>"
 ```
 
-### 步骤7：端到端支付测试
+### 步骤6：端到端支付测试
 
 1. **C端用户登录**：在小程序中扫码进入店铺，获取 OpenID
 2. **下单**：选择商品 → 确认订单 → 提交
@@ -121,10 +103,10 @@ curl -s http://localhost:8080/api/v1/sp/settings -H "Authorization: Bearer <SP_T
 
 | 信息项 | 说明 | 示例 |
 |--------|------|------|
-| 服务商商户号 | 微信支付服务商平台的商户号 | 14xxxxx |
+| 商户号 | 微信支付平台的商户号 | 14xxxxx |
 | APIv3密钥 | 32字节字符串 | xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx |
-| 证书序列号 | 服务商API证书序列号 | 5A7Bxxxxx |
-| 服务商私钥 | PEM格式，可粘贴内容或提供文件路径 | -----BEGIN PRIVATE KEY----- ... |
+| 证书序列号 | API证书序列号 | 5A7Bxxxxx |
+| 私钥 | PEM格式，可粘贴内容或提供文件路径 | -----BEGIN PRIVATE KEY----- ... |
 | 微信支付平台公钥/证书 | PEM格式，用于验签回调 | -----BEGIN CERTIFICATE----- ... |
 | 小程序AppID | 微信小程序的AppID | wx1234567890 |
 | 小程序AppSecret | 微信小程序的AppSecret | xxxxxxxxxxxxxxxx |
@@ -137,13 +119,12 @@ curl -s http://localhost:8080/api/v1/sp/settings -H "Authorization: Bearer <SP_T
 |------|----------|
 | `server/.env` | 填入真实微信支付和小程序配置 |
 | `server/docker-compose.yml` | 补充 `WECHAT_PAY_SP_*` 环境变量传递 |
-| 数据库 `service_providers` | 更新服务商支付信息 |
 | 数据库 `merchants` | 回填子商户号 |
 
 ## 注意事项
 
 1. **密钥安全**：私钥和密钥属于敏感信息，不应提交到 Git。`.env` 文件已在 `.gitignore` 中排除
-2. **双存储一致性**：`.env` 配置和数据库 `service_providers` 表都存储了支付信息，需保持一致
+2. **配置存储**：`.env` 配置存储支付信息
 3. **回调地址必须HTTPS**：微信支付要求回调地址为 HTTPS
-4. **小程序需关联服务商**：小程序的 AppID 需要在微信支付服务商平台关联
+4. **小程序需关联商户**：小程序的 AppID 需要在微信支付平台关联
 5. **测试金额**：微信支付沙箱环境已下线，测试使用真实金额，建议使用0.01元测试

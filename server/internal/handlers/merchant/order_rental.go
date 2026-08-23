@@ -3,10 +3,11 @@ package merchant
 import (
 	"context"
 	"fz_yyc_api/internal/config"
-	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/followup"
 	"fz_yyc_api/internal/services/orderquery"
 	"fz_yyc_api/internal/services/wechatpay"
+	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
 	"net/http"
@@ -24,7 +25,6 @@ type ReturnRentalOrderRequest struct {
 
 // ReturnRentalOrder 归还租赁商品并退还押金
 func ReturnRentalOrder(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
 	orderID := c.Param("order_id")
 	id, _ := strconv.ParseUint(orderID, 10, 64)
 
@@ -32,7 +32,7 @@ func ReturnRentalOrder(c *gin.Context) {
 	_ = c.ShouldBindJSON(&req)
 
 	var order models.Order
-	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&order).Error; err != nil {
+	if err := database.DB.Where("id = ?", id).First(&order).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
 		return
 	}
@@ -88,7 +88,7 @@ func ReturnRentalOrder(c *gin.Context) {
 	// 若有退款金额，发起微信退款
 	if refundAmount > 0 && strings.TrimSpace(order.TransactionID) != "" {
 		var merchant models.Merchant
-		if err := database.DB.First(&merchant, merchantID).Error; err != nil {
+		if err := database.DB.First(&merchant, utils.DefaultMerchantID).Error; err != nil {
 			response.Fail(c, http.StatusNotFound, response.CodeMerchantNotFound, "商家不存在")
 			return
 		}
@@ -137,6 +137,13 @@ func ReturnRentalOrder(c *gin.Context) {
 		refundID := strings.TrimSpace(refundResp.RefundID)
 		_ = orderquery.SyncRefundAndOrderStatus(database.DB, &order, &depositRefundRecord, refundResp.Status, refundID, refundResp.SuccessTime)
 	}
+
+	// 租赁归还自动生成租后回访随访任务（失败仅记录，不影响归还原有逻辑）
+	assignedStaffID := uint64(0)
+	if order.AssignedStaffID != nil {
+		assignedStaffID = *order.AssignedStaffID
+	}
+	_ = followup.CreateFollowUpTask(order.UserID, utils.FollowUpTypeReturnVisit, utils.FollowUpSourceRentalReturn, order.ID, assignedStaffID)
 
 	// 重新加载订单
 	database.DB.Preload("Items").First(&order, id)

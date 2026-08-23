@@ -70,6 +70,80 @@
         "navigationBarTitleText": "订单详情",
         "navigationBarBackgroundColor": "#FFFFFF"
       }
+    },
+    {
+      "path": "pages/store/my-health",
+      "style": {
+        "navigationBarTitleText": "我的健康",
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/store/health-record-edit",
+      "style": {
+        "navigationBarTitleText": "健康档案",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/store/health-assessment",
+      "style": {
+        "navigationBarTitleText": "自助健康评估",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/store/my-fitting",
+      "style": {
+        "navigationBarTitleText": "我的适配建议",
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/store/my-care-plans",
+      "style": {
+        "navigationBarTitleText": "我的照护计划",
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/store/care-plan-detail",
+      "style": {
+        "navigationBarTitleText": "照护计划详情",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/store/my-follow-ups",
+      "style": {
+        "navigationBarTitleText": "我的康复随访",
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/store/health-education",
+      "style": {
+        "navigationBarTitleText": "健康宣教",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/store/education-detail",
+      "style": {
+        "navigationBarTitleText": "文章详情",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/store/my-monitoring",
+      "style": {
+        "navigationBarTitleText": "生命体征记录",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
     }
   ],
   "globalStyle": {
@@ -90,14 +164,8 @@
         "path": "pages/store/order-sound-test"
       },
       {
-        "name": "C端店铺首页(商家1)",
-        "path": "pages/store/home",
-        "query": "merchant_id=1"
-      },
-      {
-        "name": "C端店铺首页(商家2)",
-        "path": "pages/store/home",
-        "query": "merchant_id=2"
+        "name": "C端店铺首页",
+        "path": "pages/store/home"
       }
     ]
   }

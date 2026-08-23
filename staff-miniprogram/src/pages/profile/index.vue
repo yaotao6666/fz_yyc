@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { staffProfileApi } from '@/api'
+import { staffProfileApi, staffHealthApi } from '@/api'
 
 const profile = ref<any>(null)
 const stats = ref({
@@ -10,14 +10,18 @@ const stats = ref({
   totalAmount: 0
 })
 const loading = ref(false)
+// 待执行随访任务数（角标）
+const pendingFollowUps = ref(0)
 
-const menuGroups = [
+const menuGroups = computed(() => [
   {
     title: '服务',
     items: [
       { icon: '📋', label: '全部工单', path: '/pages/workorder/index' },
       { icon: '📊', label: '接单统计', path: '' },
-      { icon: '🧰', label: '验机归还', path: '' }
+      { icon: '🧰', label: '验机归还', path: '' },
+      { icon: '🩺', label: '我的照护计划', path: '/pages/health/care-plans' },
+      { icon: '📞', label: '随访任务', path: '/pages/health/follow-ups', badge: pendingFollowUps.value }
     ]
   },
   {
@@ -28,7 +32,7 @@ const menuGroups = [
       { icon: '❓', label: '帮助与反馈', path: '' }
     ]
   }
-]
+])
 
 async function loadData() {
   loading.value = true
@@ -51,6 +55,16 @@ async function loadData() {
     console.error('[Profile] loadData error', e)
   } finally {
     loading.value = false
+  }
+}
+
+// 加载待执行随访任务数，用于入口角标
+async function loadPendingFollowUps() {
+  try {
+    const res: any = await staffHealthApi.getMyFollowUpTasks({ status: 0, page: 1, page_size: 1 })
+    pendingFollowUps.value = res?.total || 0
+  } catch (e) {
+    console.error('[Profile] loadPendingFollowUps error', e)
   }
 }
 
@@ -81,9 +95,13 @@ function onLogout() {
   })
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  loadPendingFollowUps()
+})
 onShow(() => {
-  // 每次显示时刷新统计数据
+  // 每次显示时刷新统计数据与待执行随访任务数
+  loadPendingFollowUps()
   if (profile.value) {
     staffProfileApi.getStatistics().then((res: any) => {
       if (res.code === 0) {
@@ -140,6 +158,7 @@ onShow(() => {
         >
           <text class="icon">{{ item.icon }}</text>
           <text class="label">{{ item.label }}</text>
+          <text v-if="item.badge" class="badge">{{ item.badge }}</text>
           <text class="arrow">›</text>
         </view>
       </view>
@@ -191,6 +210,18 @@ onShow(() => {
   &.border-top { border-top: 2rpx solid var(--border-color); }
   .icon { font-size: 36rpx; margin-right: 20rpx; }
   .label { flex: 1; font-size: 30rpx; color: #333; }
+  .badge {
+    min-width: 36rpx;
+    height: 36rpx;
+    line-height: 36rpx;
+    text-align: center;
+    padding: 0 12rpx;
+    border-radius: 18rpx;
+    background: var(--danger-color);
+    color: #fff;
+    font-size: 22rpx;
+    box-sizing: border-box;
+  }
   .arrow { font-size: 36rpx; color: #ccc; }
 }
 

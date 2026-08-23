@@ -124,13 +124,10 @@ const loading = ref(false)
 const noMore = ref(false)
 const page = ref(1)
 const pageSize = 10
-const merchantId = ref<number>(0)
-const merchantName = ref<string>('')
 
 onShow(async () => {
   const pages = getCurrentPages()
   const currentPage = pages[pages.length - 1] as any
-  const mid = currentPage?.options?.merchant_id
   const status = currentPage?.options?.status
 
   const { ensureAuth } = useAuth()
@@ -149,13 +146,7 @@ onShow(async () => {
     }
   }
 
-  if (mid) {
-    merchantId.value = Number(mid)
-    loadOrders(true)
-  } else {
-    merchantId.value = 0
-    loadOrders(true)
-  }
+  loadOrders(true)
 })
 
 async function loadOrders(reset = false) {
@@ -179,28 +170,12 @@ async function loadOrders(reset = false) {
       params.status = currentStatus.value
     }
 
-    if (merchantId.value > 0) {
-      params.merchant_id = merchantId.value
-    }
-
     const res = await getMyOrders(params)
 
-    if (merchantId.value > 0) {
-      const filteredOrders = res.list.filter(order => order.merchant?.id === merchantId.value || (order as any).merchant_id === merchantId.value)
-      if (reset) {
-        orders.value = filteredOrders
-      } else {
-        orders.value.push(...filteredOrders)
-      }
-      if (filteredOrders.length > 0 && filteredOrders[0].merchant) {
-        merchantName.value = filteredOrders[0].merchant.name || ''
-      }
+    if (reset) {
+      orders.value = res.list
     } else {
-      if (reset) {
-        orders.value = res.list
-      } else {
-        orders.value.push(...res.list)
-      }
+      orders.value.push(...res.list)
     }
 
     if (res.list.length < pageSize) {
@@ -271,8 +246,7 @@ function goDetail(orderId: number) {
 }
 
 function goShopping() {
-  const targetMerchantId = merchantId.value || orders.value[0]?.merchant?.id || 1
-  uni.navigateTo({ url: `/pages/store/home?merchant_id=${targetMerchantId}` })
+  uni.navigateTo({ url: `/pages/store/home` })
 }
 
 function cancelOrder(order: Order) {

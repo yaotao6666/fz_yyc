@@ -6,7 +6,6 @@ import { defineStore } from 'pinia'
 import type { ProductType } from '../types'
 
 export interface CartItem {
-  merchant_id?: number
   merchant_name?: string
   product_id: number
   product_name: string
@@ -25,7 +24,6 @@ export interface CartItem {
 
 interface CartState {
   items: CartItem[]
-  merchantId: number | null
   merchantName: string
   buyNowItem: CartItem | null
 }
@@ -33,7 +31,6 @@ interface CartState {
 export const useCartStore = defineStore('cart', {
   state: (): CartState => ({
     items: uni.getStorageSync('cartItems') || [],
-    merchantId: uni.getStorageSync('cartMerchantId') || null,
     merchantName: uni.getStorageSync('cartMerchantName') || '',
     buyNowItem: uni.getStorageSync('cartBuyNowItem') || null
   }),
@@ -55,16 +52,8 @@ export const useCartStore = defineStore('cart', {
   actions: {
     // 添加商品到购物车
     addItem(item: CartItem) {
-      const incomingMerchantId = item.merchant_id ?? null
       const incomingMerchantName = item.merchant_name ?? ''
 
-      if (incomingMerchantId && this.merchantId && this.merchantId !== incomingMerchantId) {
-        this.clearCart()
-      }
-
-      if (incomingMerchantId) {
-        this.merchantId = incomingMerchantId
-      }
       if (incomingMerchantName) {
         this.merchantName = incomingMerchantName
       }
@@ -135,25 +124,21 @@ export const useCartStore = defineStore('cart', {
     // 清空购物车
     clearCart() {
       this.items = []
-      this.merchantId = null
       this.merchantName = ''
 
       uni.removeStorageSync('cartItems')
-      uni.removeStorageSync('cartMerchantId')
       uni.removeStorageSync('cartMerchantName')
     },
 
     // 保存到本地存储
     saveToStorage() {
       uni.setStorageSync('cartItems', this.items)
-      uni.setStorageSync('cartMerchantId', this.merchantId)
       uni.setStorageSync('cartMerchantName', this.merchantName)
     },
 
     // 从存储恢复
     restoreFromStorage() {
       this.items = uni.getStorageSync('cartItems') || []
-      this.merchantId = uni.getStorageSync('cartMerchantId') || null
       this.merchantName = uni.getStorageSync('cartMerchantName') || ''
       this.buyNowItem = uni.getStorageSync('cartBuyNowItem') || null
     }

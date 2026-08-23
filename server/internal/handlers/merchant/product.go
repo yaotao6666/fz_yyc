@@ -3,7 +3,9 @@ package merchant
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"fz_yyc_api/internal/models"
+	categorypkg "fz_yyc_api/internal/services/category"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
@@ -30,7 +32,6 @@ type ProductSpecResponse struct {
 
 type ProductResponse struct {
 	ID                 uint64                `json:"id"`
-	MerchantID         uint64                `json:"merchant_id"`
 	CategoryID         uint64                `json:"category_id"`
 	Name               string                `json:"name"`
 	Description        string                `json:"description"`
@@ -156,7 +157,6 @@ func buildProductResponse(product models.Product) ProductResponse {
 
 	return ProductResponse{
 		ID:                 product.ID,
-		MerchantID:         product.MerchantID,
 		CategoryID:         categoryID,
 		Name:               product.Name,
 		Description:        product.Description,
@@ -195,10 +195,10 @@ func respondProductQueryError(c *gin.Context, err error, notFoundMessage string,
 	response.Fail(c, http.StatusInternalServerError, response.CodeServerError, serverErrorMessage)
 }
 
-func loadProductWithRelations(id uint64, merchantID uint64) (*models.Product, error) {
+func loadProductWithRelations(id uint64) (*models.Product, error) {
 	var product models.Product
 	err := database.DB.
-		Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).
+		Where("id = ? AND deleted_at IS NULL", id).
 		Preload("Category").
 		First(&product).Error
 	if err != nil {
@@ -220,49 +220,118 @@ func loadProductWithRelations(id uint64, merchantID uint64) (*models.Product, er
 }
 
 func GetCategories(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
+	_, _ = resolveTargetMerchantID(c)
+
+	parentParam := c.Query("parent_id")
+
+	// 不带 parent_id：返回以一级分类为根的分类树
+	if parentParam == "" {
+		tree, err := categorypkg.BuildTree(database.DB)
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取分类列表失败")
+			return
+		}
+		response.Success(c, tree)
 		return
 	}
 
-	var categories []models.Category
-	if err := database.DB.Where("merchant_id = ?", merchantID).Order("sort ASC, id ASC").Find(&categories).Error; err != nil {
+	// 带 parent_id：返回该父分类下的直接子级平铺列表
+	parentID, _ := strconv.ParseUint(parentParam, 10, 64)
+	var children []models.Category
+	if err := database.DB.Where("parent_id = ?", parentID).Order("sort ASC, id ASC").Find(&children).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取分类列表失败")
 		return
 	}
 
-	var result []map[string]interface{}
-	for _, cat := range categories {
-		var count int64
-		database.DB.Model(&models.Product{}).Where("category_id = ? AND merchant_id = ? AND deleted_at IS NULL", cat.ID, merchantID).Count(&count)
-
-		catMap := map[string]interface{}{
-			"id":            cat.ID,
-			"merchant_id":   cat.MerchantID,
-			"name":          cat.Name,
-			"sort":          cat.Sort,
-			"status":        cat.Status,
-			"created_at":    cat.CreatedAt,
-			"updated_at":    cat.UpdatedAt,
-			"product_count": count,
-		}
-		result = append(result, catMap)
+	result := make([]categorypkg.Node, 0, len(children))
+	for _, cat := range children {
+		count, _ := categorypkg.SubtreeProductCount(database.DB, cat.ID)
+		result = append(result, categorypkg.Node{
+			ID:           cat.ID,
+			Name:         cat.Name,
+			ParentID:     cat.ParentID,
+			Level:        cat.Level,
+			Sort:         cat.Sort,
+			Status:       cat.Status,
+			ProductCount: count,
+			CreatedAt:    cat.CreatedAt,
+			UpdatedAt:    cat.UpdatedAt,
+		})
 	}
-
 	response.Success(c, result)
 }
 
 type CategoryRequest struct {
-	Name   string `json:"name" binding:"required"`
-	Sort   *uint  `json:"sort"`
-	Status uint8  `json:"status"`
+	Name     string  `json:"name" binding:"required"`
+	ParentID *uint64 `json:"parent_id"`
+	Sort     *uint   `json:"sort"`
+	Status   uint8   `json:"status"`
+}
+
+// loadCategory 按 id 加载分类
+func loadCategory(id uint64) (*models.Category, error) {
+	var category models.Category
+	if err := database.DB.Where("id = ?", id).First(&category).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("分类不存在")
+		}
+		return nil, err
+	}
+	return &category, nil
+}
+
+// validateParentLevel 校验父分类并返回本节点应有的 level（空父=一级）
+func validateParentLevel(parentID *uint64) (uint8, error) {
+	if parentID == nil {
+		return 1, nil
+	}
+	parent, err := loadCategory(*parentID)
+	if err != nil {
+		return 0, err
+	}
+	level := parent.Level + 1
+	if level > 3 {
+		return 0, errors.New("最多支持三级分类")
+	}
+	return level, nil
+}
+
+// countDirectChildren 统计直接子分类数量
+func countDirectChildren(id uint64) (int64, error) {
+	var cnt int64
+	err := database.DB.Model(&models.Category{}).Where("parent_id = ?", id).Count(&cnt).Error
+	return cnt, err
+}
+
+// categoryMaxDescendantDepth 返回该分类子树从自身算起的最大后代层级数（自身为0，子为1，孙为2）
+func categoryMaxDescendantDepth(id uint64) uint8 {
+	subtree, err := categorypkg.CollectSubtreeIDs(database.DB, id)
+	if err != nil {
+		return 0
+	}
+	self, err := loadCategory(id)
+	if err != nil {
+		return 0
+	}
+	var maxDepth uint8
+	for _, sid := range subtree {
+		if sid == id {
+			continue
+		}
+		cat, err := loadCategory(sid)
+		if err != nil {
+			continue
+		}
+		depth := cat.Level - self.Level
+		if depth > maxDepth {
+			maxDepth = depth
+		}
+	}
+	return maxDepth
 }
 
 func CreateCategory(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 
 	var req CategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -270,11 +339,23 @@ func CreateCategory(c *gin.Context) {
 		return
 	}
 
+	level, err := validateParentLevel(req.ParentID)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
+		return
+	}
+
+	// 同级名称唯一校验
+	if dupNameUnderParent(c, req.Name, req.ParentID, 0) {
+		return
+	}
+
 	category := models.Category{
-		MerchantID: merchantID,
-		Name:       req.Name,
-		Sort:       0,
-		Status:     1,
+		Name:     req.Name,
+		ParentID: req.ParentID,
+		Level:    level,
+		Sort:     0,
+		Status:   1,
 	}
 	if req.Sort != nil {
 		category.Sort = *req.Sort
@@ -291,11 +372,28 @@ func CreateCategory(c *gin.Context) {
 	response.Success(c, category)
 }
 
-func UpdateCategory(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
+// dupNameUnderParent 检测同级（同一父下）是否已存在同名分类；存在则返回 false 并写失败响应
+func dupNameUnderParent(c *gin.Context, name string, parentID *uint64, excludeID uint64) bool {
+	query := database.DB.Model(&models.Category{}).Where("name = ?", name)
+	if excludeID > 0 {
+		query = query.Where("id <> ?", excludeID)
 	}
+	if parentID == nil {
+		query = query.Where("parent_id IS NULL")
+	} else {
+		query = query.Where("parent_id = ?", *parentID)
+	}
+	var count int64
+	query.Count(&count)
+	if count > 0 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "同级已存在同名分类")
+		return true
+	}
+	return false
+}
+
+func UpdateCategory(c *gin.Context) {
+	_, _ = resolveTargetMerchantID(c)
 	categoryID := c.Param("category_id")
 	id, _ := strconv.ParseUint(categoryID, 10, 64)
 
@@ -305,14 +403,17 @@ func UpdateCategory(c *gin.Context) {
 		return
 	}
 
-	var category models.Category
-	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&category).Error; err != nil {
-		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "分类不存在")
+	category, err := loadCategory(id)
+	if err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, err.Error())
 		return
 	}
 
 	updates := map[string]interface{}{}
-	if req.Name != "" {
+	if req.Name != "" && req.Name != category.Name {
+		if dupNameUnderParent(c, req.Name, category.ParentID, id) {
+			return
+		}
 		updates["name"] = req.Name
 	}
 	if req.Sort != nil {
@@ -322,24 +423,71 @@ func UpdateCategory(c *gin.Context) {
 		updates["status"] = req.Status
 	}
 
-	if err := database.DB.Model(&category).Updates(updates).Error; err != nil {
+	// 父级变更（仅支持显式指定新的父 id；如需恢复一级可另行支持，此处保证向下分层正确）
+	if req.ParentID != nil {
+		newParent := *req.ParentID
+		if newParent == category.ID {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "父分类不能是自身")
+			return
+		}
+		if category.ParentID == nil || *category.ParentID != newParent {
+			// 新父不能是自己子孙（防环）
+			subtree, err := categorypkg.CollectSubtreeIDs(database.DB, category.ID)
+			if err != nil {
+				response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "校验分类层级失败")
+				return
+			}
+			for _, sid := range subtree {
+				if sid == newParent {
+					response.Fail(c, http.StatusBadRequest, response.CodeParamError, "父分类不能是自己的子分类")
+					return
+				}
+			}
+			level, err := validateParentLevel(req.ParentID)
+			if err != nil {
+				response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
+				return
+			}
+			// 迁移后自身子树最大深度仍 ≤3
+			if uint8(level)+categoryMaxDescendantDepth(category.ID) > 3 {
+				response.Fail(c, http.StatusBadRequest, response.CodeParamError, "移动后子分类将超过三级")
+				return
+			}
+			updates["parent_id"] = newParent
+			updates["level"] = level
+		}
+	}
+
+	if len(updates) == 0 {
+		response.Success(c, category)
+		return
+	}
+
+	if err := database.DB.Model(category).Updates(updates).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新分类失败")
 		return
 	}
 
-	database.DB.First(&category, id)
+	database.DB.First(category, id)
 	response.Success(c, category)
 }
 
 func DeleteCategory(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	categoryID := c.Param("category_id")
 	id, _ := strconv.ParseUint(categoryID, 10, 64)
 
-	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).Delete(&models.Category{}).Error; err != nil {
+	childCount, err := countDirectChildren(id)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "删除分类失败")
+		return
+	}
+	if childCount > 0 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "请先删除该分类的子分类")
+		return
+	}
+
+	if err := database.DB.Where("id = ?", id).Delete(&models.Category{}).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "删除分类失败")
 		return
 	}
@@ -355,10 +503,7 @@ type SortCategoriesRequest struct {
 }
 
 func SortCategories(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 
 	var req SortCategoriesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -368,7 +513,7 @@ func SortCategories(c *gin.Context) {
 
 	tx := database.DB.Begin()
 	for _, item := range req.Categories {
-		if err := tx.Model(&models.Category{}).Where("id = ? AND merchant_id = ?", item.ID, merchantID).Update("sort", item.Sort).Error; err != nil {
+		if err := tx.Model(&models.Category{}).Where("id = ?", item.ID).Update("sort", item.Sort).Error; err != nil {
 			tx.Rollback()
 			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "排序失败")
 			return
@@ -380,14 +525,11 @@ func SortCategories(c *gin.Context) {
 }
 
 func GetProduct(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
-	product, err := loadProductWithRelations(id, merchantID)
+	product, err := loadProductWithRelations(id)
 	if err != nil {
 		respondProductQueryError(c, err, "商品不存在", "获取商品详情失败")
 		return
@@ -397,10 +539,7 @@ func GetProduct(c *gin.Context) {
 }
 
 func GetProducts(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	categoryID := c.Query("category_id")
@@ -416,7 +555,7 @@ func GetProducts(c *gin.Context) {
 		pageSize = 10
 	}
 
-	query := database.DB.Model(&models.Product{}).Where("merchant_id = ? AND deleted_at IS NULL", merchantID)
+	query := database.DB.Model(&models.Product{}).Where("deleted_at IS NULL")
 
 	if categoryID != "" {
 		id, _ := strconv.ParseUint(categoryID, 10, 64)
@@ -513,10 +652,7 @@ func normalizeProductType(productType uint8, saleType uint8) (uint8, uint8) {
 }
 
 func CreateProduct(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 
 	var req ProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -550,7 +686,6 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	product := models.Product{
-		MerchantID:         merchantID,
 		CategoryID:         req.CategoryID,
 		Name:               req.Name,
 		Description:        req.Description,
@@ -596,7 +731,7 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
-	productWithRelations, err := loadProductWithRelations(product.ID, merchantID)
+	productWithRelations, err := loadProductWithRelations(product.ID)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "读取商品详情失败")
 		return
@@ -606,10 +741,7 @@ func CreateProduct(c *gin.Context) {
 }
 
 func UpdateProduct(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
@@ -635,7 +767,7 @@ func UpdateProduct(c *gin.Context) {
 	}
 
 	var product models.Product
-	if err := database.DB.Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).First(&product).Error; err != nil {
+	if err := database.DB.Where("id = ? AND deleted_at IS NULL", id).First(&product).Error; err != nil {
 		respondProductQueryError(c, err, "商品不存在", "查询商品失败")
 		return
 	}
@@ -704,7 +836,7 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	productWithRelations, err := loadProductWithRelations(id, merchantID)
+	productWithRelations, err := loadProductWithRelations(id)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "读取商品详情失败")
 		return
@@ -714,14 +846,11 @@ func UpdateProduct(c *gin.Context) {
 }
 
 func ProductOnSale(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
-	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).Update("status", 1)
+	result := database.DB.Model(&models.Product{}).Where("id = ? AND deleted_at IS NULL", id).Update("status", 1)
 	if result.RowsAffected == 0 {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
@@ -731,14 +860,11 @@ func ProductOnSale(c *gin.Context) {
 }
 
 func ProductOffSale(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
-	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).Update("status", 2)
+	result := database.DB.Model(&models.Product{}).Where("id = ? AND deleted_at IS NULL", id).Update("status", 2)
 	if result.RowsAffected == 0 {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
@@ -753,10 +879,7 @@ type BatchStatusRequest struct {
 }
 
 func BatchUpdateProductStatus(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 
 	var req BatchStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -764,7 +887,7 @@ func BatchUpdateProductStatus(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&models.Product{}).Where("id IN ? AND merchant_id = ? AND deleted_at IS NULL", req.ProductIDs, merchantID).Update("status", req.Status).Error; err != nil {
+	if err := database.DB.Model(&models.Product{}).Where("id IN ? AND deleted_at IS NULL", req.ProductIDs).Update("status", req.Status).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "批量更新状态失败")
 		return
 	}
@@ -773,16 +896,13 @@ func BatchUpdateProductStatus(c *gin.Context) {
 }
 
 func DeleteProduct(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
 	now := time.Now()
 	result := database.DB.Model(&models.Product{}).
-		Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).
+		Where("id = ? AND deleted_at IS NULL", id).
 		Updates(map[string]interface{}{
 			"deleted_at": now,
 			"status":     2,
@@ -804,10 +924,7 @@ type StockRequest struct {
 }
 
 func UpdateStock(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	productID := c.Param("product_id")
 	id, _ := strconv.ParseUint(productID, 10, 64)
 
@@ -817,7 +934,7 @@ func UpdateStock(c *gin.Context) {
 		return
 	}
 
-	result := database.DB.Model(&models.Product{}).Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", id, merchantID).Update("stock", req.Stock)
+	result := database.DB.Model(&models.Product{}).Where("id = ? AND deleted_at IS NULL", id).Update("stock", req.Stock)
 	if result.RowsAffected == 0 {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return

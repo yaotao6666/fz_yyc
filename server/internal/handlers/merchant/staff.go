@@ -7,15 +7,17 @@ import (
 	"fz_yyc_api/pkg/response"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 func GetStaffList(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	keyword := strings.TrimSpace(c.Query("keyword"))
 
 	if page < 1 {
 		page = 1
@@ -24,12 +26,19 @@ func GetStaffList(c *gin.Context) {
 		pageSize = 10
 	}
 
+	query := database.DB.Model(&models.MerchantStaff{})
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		query = query.Where("username LIKE ? OR name LIKE ? OR phone LIKE ?", like, like, like)
+	}
+
 	var total int64
-	database.DB.Model(&models.MerchantStaff{}).Where("merchant_id = ?", merchantID).Count(&total)
+	query.Count(&total)
 
 	var staffList []models.MerchantStaff
 	offset := (page - 1) * pageSize
-	if err := database.DB.Where("merchant_id = ?", merchantID).Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&staffList).Error; err != nil {
+	if err := query.Preload("Roles").Preload("Department").
+		Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&staffList).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取员工列表失败")
 		return
 	}
@@ -45,16 +54,16 @@ func GetStaffList(c *gin.Context) {
 }
 
 type CreateStaffRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Phone    string `json:"phone" binding:"required"`
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Role     string `json:"role"`
+	Name         string   `json:"name" binding:"required"`
+	Phone        string   `json:"phone" binding:"required"`
+	Username     string   `json:"username" binding:"required"`
+	Password     string   `json:"password" binding:"required"`
+	Role         string   `json:"role"`
+	DepartmentID *uint64  `json:"department_id"`
+	RoleIDs      []uint64 `json:"role_ids"`
 }
 
 func CreateStaff(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
 	var req CreateStaffRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -62,7 +71,7 @@ func CreateStaff(c *gin.Context) {
 	}
 
 	var existCount int64
-	database.DB.Model(&models.MerchantStaff{}).Where("merchant_id = ? AND (username = ? OR phone = ?)", merchantID, req.Username, req.Phone).Count(&existCount)
+	database.DB.Model(&models.MerchantStaff{}).Where("(username = ? OR phone = ?)", req.Username, req.Phone).Count(&existCount)
 	if existCount > 0 {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "用户名或手机号已存在")
 		return
@@ -80,36 +89,44 @@ func CreateStaff(c *gin.Context) {
 	}
 
 	staff := models.MerchantStaff{
-		MerchantID:          merchantID,
 		Name:                req.Name,
 		Phone:               req.Phone,
 		Username:            req.Username,
 		Password:            string(hashedPassword),
 		Role:                role,
+		DepartmentID:        req.DepartmentID,
 		NotifyEnabled:       true,
 		BrowseNotifyEnabled: true,
 		Status:              1,
 	}
 
-	if err := database.DB.Create(&staff).Error; err != nil {
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&staff).Error; err != nil {
+			return err
+		}
+		return saveStaffRoles(tx, staff.ID, req.RoleIDs)
+	})
+	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建员工失败")
 		return
 	}
 
+	middleware.ClearRBACCache()
 	response.Success(c, gin.H{"id": staff.ID, "message": "创建成功"})
 }
 
 type UpdateStaffRequest struct {
-	Name                string `json:"name"`
-	Phone               string `json:"phone"`
-	Role                string `json:"role"`
-	NotifyEnabled       *bool  `json:"notify_enabled"`
-	BrowseNotifyEnabled *bool  `json:"browse_notify_enabled"`
-	Status              *uint8 `json:"status"`
+	Name                string   `json:"name"`
+	Phone               string   `json:"phone"`
+	Role                string   `json:"role"`
+	DepartmentID        *uint64  `json:"department_id"`
+	RoleIDs             []uint64 `json:"role_ids"`
+	NotifyEnabled       *bool    `json:"notify_enabled"`
+	BrowseNotifyEnabled *bool    `json:"browse_notify_enabled"`
+	Status              *uint8   `json:"status"`
 }
 
 func UpdateStaff(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
 	staffID := c.Param("id")
 	id, _ := strconv.ParseUint(staffID, 10, 64)
 
@@ -120,7 +137,7 @@ func UpdateStaff(c *gin.Context) {
 	}
 
 	var staff models.MerchantStaff
-	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&staff).Error; err != nil {
+	if err := database.DB.Where("id = ?", id).First(&staff).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "员工不存在")
 		return
 	}
@@ -135,6 +152,7 @@ func UpdateStaff(c *gin.Context) {
 	if req.Role != "" {
 		updates["role"] = req.Role
 	}
+	updates["department_id"] = req.DepartmentID
 	if req.NotifyEnabled != nil {
 		updates["notify_enabled"] = *req.NotifyEnabled
 	}
@@ -147,31 +165,62 @@ func UpdateStaff(c *gin.Context) {
 
 	if req.Role != "" && staff.Role == "owner" && req.Role != "owner" {
 		var ownerCount int64
-		database.DB.Model(&models.MerchantStaff{}).Where("merchant_id = ? AND role = ? AND status = ?", merchantID, "owner", 1).Count(&ownerCount)
+		database.DB.Model(&models.MerchantStaff{}).Where("role = ? AND status = ?", "owner", 1).Count(&ownerCount)
 		if ownerCount <= 1 {
 			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "至少保留一个店铺负责人")
 			return
 		}
 	}
 
-	if err := database.DB.Model(&staff).Updates(updates).Error; err != nil {
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&staff).Updates(updates).Error; err != nil {
+			return err
+		}
+		if req.RoleIDs != nil {
+			if err := saveStaffRoles(tx, staff.ID, req.RoleIDs); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新员工失败")
 		return
 	}
 
-	database.DB.First(&staff, id)
+	middleware.ClearRBACCache()
+	database.DB.Preload("Roles").Preload("Department").First(&staff, id)
 	response.Success(c, staff)
 }
 
+// saveStaffRoles 覆盖式保存员工角色绑定
+func saveStaffRoles(tx *gorm.DB, staffID uint64, roleIDs []uint64) error {
+	if err := tx.Where("staff_id = ?", staffID).Delete(&models.MerchantStaffRole{}).Error; err != nil {
+		return err
+	}
+	if len(roleIDs) == 0 {
+		return nil
+	}
+	seen := map[uint64]struct{}{}
+	rows := make([]models.MerchantStaffRole, 0, len(roleIDs))
+	for _, roleID := range roleIDs {
+		if _, ok := seen[roleID]; ok {
+			continue
+		}
+		seen[roleID] = struct{}{}
+		rows = append(rows, models.MerchantStaffRole{StaffID: staffID, RoleID: roleID})
+	}
+	return tx.Create(&rows).Error
+}
+
 func DeleteStaff(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
 	usernameValue, _ := c.Get("username")
 	currentUsername, _ := usernameValue.(string)
 	staffID := c.Param("id")
 	id, _ := strconv.ParseUint(staffID, 10, 64)
 
 	var staff models.MerchantStaff
-	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&staff).Error; err != nil {
+	if err := database.DB.Where("id = ?", id).First(&staff).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "员工不存在")
 		return
 	}
@@ -183,18 +232,25 @@ func DeleteStaff(c *gin.Context) {
 
 	if staff.Role == "owner" {
 		var ownerCount int64
-		database.DB.Model(&models.MerchantStaff{}).Where("merchant_id = ? AND role = ? AND status = ?", merchantID, "owner", 1).Count(&ownerCount)
+		database.DB.Model(&models.MerchantStaff{}).Where("role = ? AND status = ?", "owner", 1).Count(&ownerCount)
 		if ownerCount <= 1 {
 			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "至少保留一个店铺负责人")
 			return
 		}
 	}
 
-	if err := database.DB.Delete(&staff).Error; err != nil {
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("staff_id = ?", staff.ID).Delete(&models.MerchantStaffRole{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&staff).Error
+	})
+	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "删除员工失败")
 		return
 	}
 
+	middleware.ClearRBACCache()
 	response.Success(c, gin.H{"message": "删除成功"})
 }
 
@@ -203,7 +259,6 @@ type ResetStaffPasswordRequest struct {
 }
 
 func ResetStaffPassword(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
 	staffID := c.Param("id")
 	id, _ := strconv.ParseUint(staffID, 10, 64)
 
@@ -214,7 +269,7 @@ func ResetStaffPassword(c *gin.Context) {
 	}
 
 	var staff models.MerchantStaff
-	if err := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).First(&staff).Error; err != nil {
+	if err := database.DB.Where("id = ?", id).First(&staff).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "员工不存在")
 		return
 	}

@@ -3,8 +3,6 @@ package ws
 import (
 	"net/http"
 
-	"fz_yyc_api/internal/middleware"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -16,15 +14,14 @@ var upgrader = websocket.Upgrader{
 }
 
 func MerchantWS(c *gin.Context) {
-	merchantID := uint64(middleware.GetMerchantID(c))
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
 
-	AddMerchantConn(merchantID, conn)
+	AddMerchantConn(conn)
 	defer func() {
-		RemoveMerchantConn(merchantID, conn)
+		RemoveMerchantConn(conn)
 		_ = conn.Close()
 	}()
 

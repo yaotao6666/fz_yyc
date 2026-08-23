@@ -52,23 +52,27 @@
 
 ### 0.5 当前架构摘要
 
-- 系统采用单商家模式，不存在服务商与多商家管理能力。
+- 系统采用单商家模式。
 - 三端职责：
   - 客户端小程序：仅面向 C 端用户下单，商城式布局（tabBar 导航：首页/分类/购物车/我的），扫码进入商城首页，首页含轮播图、活动入口、分类图标宫格，支持浏览、加购、支付、查看订单与申请退款。
   - 服务人员接单小程序：独立身份，注册申请/登录、查看待接订单、接单、查看已接订单与历史。
   - 商户 PC 后台（`web-admin`）：单商户统一管理后台，承接商品/分类/订单/核销/满减/打印机/公告/服务人员/数据分析/设置。
 - 接单与核销分离：服务人员负责接单（订单记录 `accepted_by_staff_id`、`accepted_at`），核销由商户管理员在 PC 后台执行。
-- 支付：微信支付服务商凭证下沉为系统级配置；支付成功回调后更新订单状态。
+- 支付：微信支付商户凭证下沉为系统级配置；支付成功回调后更新订单状态。
 - C 端微信登录接口返回结构为 `code/message/data.token/data.app_mode/data.app_id/data.user`，前端缓存字段为 `user_token/userInfo/openid/user_login_app_mode/user_login_app_id`，下单接口使用 `user_token` 鉴权。
 - C 端订单退款状态口径：`status=5` 退款中、`status=6` 已退款；退款接口在收到微信退款响应后主动同步一次退款状态，若仍未拿到最终结果则继续等待微信退款成功回调把 5 更新为 6。
-- C 端访问/行为埋点接口使用 `openid` 作为用户唯一标识（`/api/v1/store/:merchant_id/visit`、`/api/v1/store/:merchant_id/event`）。
-- C 端订单详情独立为 `pages/store/order-detail`，支付完成、取消支付与“去购物”均保留当前 `merchant_id`。
+- C 端访问/行为埋点接口使用 `openid` 作为用户唯一标识（`/api/v1/store/visit`、`/api/v1/store/event`）。
+- C 端订单详情独立为 `pages/store/order-detail`，支付完成、取消支付与“去购物”均保留当前店铺入口。
+- **单商户重构（2026-08-18）**：全链路移除 `merchant_id` 关联字段/接口路径/参数/响应字段，`merchants` 表保留为全局单例配置（id=1）；C 端店铺接口统一为 `/api/v1/store/*`。
+- **通用 RBAC（2026-08-18）**：PC 管理端新增菜单/角色/部门/员工管理；多角色 + owner 超管直通；接口级（RBAC 中间件）→ 页面级（路由守卫）→ 按钮级（`v-permission` 指令）三层精准控制；登录响应含 `menus` 菜单树与 `permissions` 权限码，侧边菜单按权限动态加载；「商品管理」为一级目录，真实商品管理/分类管理为其二级菜单。
+- **基层健康服务闭环·阶段一（2026-08-18）**：新增居民健康档案与人群健康评估（健康档案 / 评估量表 / 评估记录，17 个接口、3 张表）。C 端可建档与自助评估，服务人员可上门评估（仅限本人服务过的客户，数据权限校验），web-admin 在「健康服务」菜单下管理档案/量表/记录（RBAC 权限码控制）；评估结果回写档案 `assessment_level`。详见 2.11 / 3.11 / 4.23-4.25 与 `docs/prd/PRD-接口文档.md` 2.11。
+- **基层健康服务闭环·阶段四（2026-08-18）**：新增持续康复随访、生命体征监测与健康宣教（随访任务 / 生命体征 / 宣教内容，21 个接口、3 张表）。服务完成/租赁归还/评估完成自动生成随访任务（计划随访时间=完成/评估时点+72 小时），服务人员执行随访（待认领自动认领）并选用宣教文章，C 端查看随访、体征记录与按本人慢病标签匹配的健康宣教；web-admin 在「健康服务」菜单下管理随访任务/体征/宣教（RBAC 权限码控制）。基层健康服务「评估→适配→照护→随访→监测→宣教」四阶段闭环已完成。详见 2.11 / 3.11 / 4.29-4.31 与 `docs/prd/PRD-接口文档.md` 2.11。
 
 ## 1. 项目概述
 
 ### 1.1 项目背景
 
-开发一套基于微信支付的单商家经营系统后端 API，为单商户提供商品管理、订单管理、服务人员接单等完整的经营工具。系统采用单商家模式，微信支付服务商凭证作为系统级配置管理。
+开发一套基于微信支付的单商家经营系统后端 API，为单商户提供商品管理、订单管理、服务人员接单等完整的经营工具。系统采用单商家模式，微信支付商户凭证作为系统级配置管理。
 
 ### 1.2 产品定位与三端架构
 
@@ -136,6 +140,7 @@
 | 商品详情 | 商品图片、价格、规格选择                      |
 | 下单支付 | 确认订单、微信支付                         |
 | 我的订单 | 订单列表、订单详情、退款申请                    |
+| 我的健康 | 健康档案查看/编辑、自助健康评估                 |
 
 **店铺二维码**：
 
@@ -165,6 +170,9 @@
 - `pages/store/order-detail`：订单详情
 - `pages/store/address-list`：收货地址列表
 - `pages/store/address-edit`：编辑地址
+- `pages/store/my-health`：我的健康首页（健康档案、自助评估入口）
+- `pages/store/health-record-edit`：健康档案编辑（建档/更新）
+- `pages/store/health-assessment`：自助健康评估
 
 **首页模块说明**：
 
@@ -234,6 +242,7 @@
 | 服务人员管理 | 添加/审核/启停服务人员账号                |
 | 数据分析   | 销售统计、商品排行、库存预警、时段分析           |
 | 商户设置   | 商户资料、支付配置、配送设置、营业状态           |
+| 健康服务   | 健康档案管理、评估量表配置、评估记录（RBAC 菜单）   |
 
 **数据权限**：
 
@@ -255,6 +264,7 @@
 | 已接订单   | 查看已接订单与历史                     |
 | 订单详情   | 查看订单商品、地址、金额等信息               |
 | 接单统计   | 查看今日/历史接单数与金额                 |
+| 健康档案/评估 | 查看客户健康档案、为客户上门登记健康评估（数据权限校验） |
 
 **身份管理**：
 
@@ -410,17 +420,17 @@ POST /api/v1/upload/callback  # 上传回调（可选）
 | 5 | refunding | 退款中 |
 | 6 | refunded  | 已退款 |
 
-### 1.9 微信支付服务商模式说明
+### 1.9 微信支付商户模式说明
 
-#### 1.9.1 服务商模式架构
+#### 1.9.1 商户模式架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  微信支付服务商凭证                      │
-│            (系统级配置，非可管理实体)                     │
+│                  微信支付商户凭证                      │
+│            (系统级配置)                                 │
 │                                                      │
 │  职责：                                              │
-│  - 提供服务商商户号与支付凭证                            │
+│  - 提供系统商户号与支付凭证                            │
 │  - 承载单商户的子商户号（sub_mch_id）                   │
 └─────────────────────┬───────────────────────────────┘
                       │
@@ -433,7 +443,7 @@ POST /api/v1/upload/callback  # 上传回调（可选）
           └───────────────────────┘
 ```
 
-> **说明**：微信支付服务商凭证（`mch_id`、`api_key`、`api_v3_key`、证书序列号、私钥、公钥、回调地址）作为系统级配置管理，不存在服务商管理实体。单商户通过回填 `sub_mch_id` 接入支付。
+> **说明**：微信支付商户凭证（`mch_id`、`api_key`、`api_v3_key`、证书序列号、私钥、公钥、回调地址）作为系统级配置管理，单商户通过回填 `sub_mch_id` 接入支付。
 
 #### 1.9.2 支付与结算流程
 
@@ -691,6 +701,70 @@ access_token过期 → 调用refresh接口 → 验证refresh_token → 返回新
 └────────┘    └────────────┘    └────────────┘    └────────────┘
 ```
 
+### 2.11 健康服务闭环模块（基层健康服务闭环）
+
+**阶段一：居民健康档案与人群健康评估**
+
+| 功能     | 描述                          | 优先级 |
+| ------ | --------------------------- | --- |
+| 居民健康档案 | C 端建档/更新，管理端列表/详情/编辑        | P0  |
+| 评估量表管理 | 管理端配置量表（维度/题目/评分规则/启停）     | P0  |
+| 人群健康评估 | C 端自助评估、服务人员上门评估，等级回写档案    | P0  |
+| 评估记录   | 评估历史查看（C 端/服务人员端/管理端）      | P0  |
+
+**三端承载**：
+
+- **C 端**：`pages/store/my-health`（我的健康首页）、`pages/store/health-record-edit`（档案编辑）、`pages/store/health-assessment`（自助评估）；首页"我的订单"区新增"我的健康"入口
+- **服务人员端**：`pages/health/resident`（居民健康档案查看）、`pages/health/assess`（健康评估）；工单详情增加"客户健康档案"入口
+- **管理端**：`/health/records` 健康档案管理、`/health/assessment-forms` 评估量表管理、`/health/assessments` 评估记录（对应 RBAC 菜单「健康服务」）
+
+**关键规则**：服务人员仅能查看/评估自己接单服务过的客户（数据权限校验，否则 403）；总分 = 各题选中 option 的 `score` 之和，等级取 `score_rule` 第一条命中规则；评估结果回写档案 `assessment_level`。接口与数据表明细见 `docs/prd/PRD-接口文档.md` 2.11 及第 4.23-4.25 节。
+
+**阶段二：康复辅具适配**
+
+| 功能 | 描述 | 优先级 |
+| --- | --- | --- |
+| 康复辅具适配建议 | 服务人员基于评估生成适配建议，C 端确认与选购，管理端编辑/删除 | P0 |
+
+**三端承载**：
+
+- **C 端**：`pages/store/my-fitting`（我的适配建议：列表/详情/确认，推荐商品"去选购"跳商品详情页复用现有下单链路）；`my-health` 入口网格新增"适配建议"入口
+- **服务人员端**：`pages/health/resident` 客户档案页增加"适配建议"区块与"生成适配建议"按钮；`pages/health/fitting-form`（生成适配建议：症状/结论/推荐商品多选+理由）
+- **管理端**：`/health/fitting` 适配建议管理（搜索/列表/详情抽屉/编辑弹窗(推荐商品远程搜索)/删除/分页，对应 RBAC 子菜单「适配建议」`fitting:view` / `fitting:update`）
+
+**关键规则**：适配建议由服务人员端基于评估生成（`status=0` 草稿），用户确认后 `status=1`，关联订单后 `status=2`；推荐商品保存快照 `{product_id, name, reason, sale_type}` 并在推荐时校验商品存在且上架；C 端"去选购"复用现有商品下单链路，实现"评估→适配→销售/租赁"闭环。接口与数据表明细见 `docs/prd/PRD-接口文档.md` 2.11 及第 4.26 节。
+
+**阶段三：居家康养照护**
+
+| 功能 | 描述 | 优先级 |
+| --- | --- | --- |
+| 照护计划管理 | web-admin 制定/指派照护计划，服务人员端查看执行，C 端查看 | P0 |
+| 上门照护记录 | 服务人员上门后录入护理项完成情况/生命体征/照片/下次随访建议 | P0 |
+
+**三端承载**：
+
+- **C 端**：`pages/store/my-care-plans`（我的照护计划：列表/详情）、`pages/store/care-plan-detail`（详情+照护记录）；`my-health` 入口网格新增"照护计划"
+- **服务人员端**：`pages/health/care-plans`（我的照护计划）、`care-plan-detail`（详情+历史照护记录）、`care-visit-form`（录入照护记录：护理项勾选/生命体征/照片/备注/下次随访建议）；profile 页"我的照护计划"入口；工单详情签退成功后提示"录入照护记录"（带 orderId）
+- **管理端**：`/health/care-plans` 照护计划管理（搜索/列表/详情抽屉(含照护记录表)/新增编辑弹窗(居民远程搜索+护理项动态行+指派服务人员)/删除/分页，对应 RBAC 子菜单「照护计划」`care:view` / `care:create`）
+
+**关键规则**：照护计划由 web-admin 创建并指派服务人员；照护记录 `plan_id` / `order_id` 至少提供一个且均须属于当前服务人员负责范围（数据权限），`user_id` 取 plan/order 对应且一致；存在照护记录的计划不可删除（保留历史溯源）。接口与数据表明细见 `docs/prd/PRD-接口文档.md` 2.11 及第 4.27-4.28 节。
+
+**阶段四：持续康复随访与健康宣教**
+
+| 功能 | 描述 | 优先级 |
+| --- | --- | --- |
+| 随访任务管理 | 服务完成/租赁归还/评估完成自动生成，web-admin 登记/代执行，服务人员执行/跳过，C 端查看 | P0 |
+| 生命体征监测 | 用户自助与服务人员上门录入（`recorded_by` 区分），C 端/服务人员端/管理端查看 | P0 |
+| 健康宣教 | 管理端维护文章（定向慢病标签），C 端按慢病标签匹配度阅读，随访时可选用推送 | P0 |
+
+**三端承载**：
+
+- **C 端**：`pages/store/my-follow-ups`（我的康复随访）、`health-education`（健康宣教列表）、`education-detail`（文章详情）、`my-monitoring`（体征记录列表+录入）；`my-health` 入口网格新增"康复随访/健康宣教/体征记录"
+- **服务人员端**：`pages/health/follow-ups`（我的随访任务：状态筛选，profile 页入口含待执行角标）、`follow-up-detail`（随访执行：方式/内容/宣教文章多选/满意度/跳过，待认领自动认领）；`resident` 客户档案页新增"生命体征"区块与录入
+- **管理端**：`/health/follow-ups` 随访任务管理（搜索/列表/登记/详情/执行弹窗(随访方式/内容/宣教文章多选/满意度)/分页）、`/health/monitoring` 生命体征监测（只读查询）、`/health/education` 健康宣教管理（列表/新增编辑(标题/分类/封面/正文/定向慢病标签/状态/发布时间)/删除），对应 RBAC 子菜单「随访任务」`followup:view` / `followup:update`、「生命体征」`monitor:view` / `monitor:create`、「健康宣教」`education:view` / `education:create`
+
+**关键规则**：随访任务由服务工单签退、租赁归还、健康评估完成三处自动生成（计划随访时间=完成/评估时点+72 小时，`server/internal/services/followup` 包 `CreateFollowUpTask` 统一实现，失败不影响主流程），`staff_id` 为空表示待认领，服务人员可执行并自动认领；生命体征录入区分用户自助（`recorded_by=0`）与服务人员（`recorded_by=服务人员ID`），记录时间用 RFC3339 带时区；宣教文章仅已发布对 C 端/服务人员端可见，C 端按本人慢病标签（`health_records.chronic_tags`）与文章 `tags` 匹配度排序。至此基层健康服务「评估→适配→照护→随访→监测→宣教」**四阶段闭环已完成**。接口与数据表明细见 `docs/prd/PRD-接口文档.md` 2.11 及第 4.29-4.31 节。
+
 ## 3. API 接口设计
 
 ### 3.1 认证相关接口
@@ -847,9 +921,9 @@ POST /api/v1/auth/user/wechat-login
 **鉴权使用：**
 
 - `Authorization: Bearer {user_token}` 用于 `GET/POST /api/v1/user/*`
-- `Authorization: Bearer {user_token}` 用于 `POST /api/v1/store/:merchant_id/orders`（下单）
-- `/api/v1/store/:merchant_id/home`、`/products`、`/products/:product_id`、`/delivery-rules` 为公开接口，不要求登录
-- `pages/home/index`、`pages/store/product`、`pages/store/confirm` 统一支持从 `merchant_id` 或 `scene` 解析商户入口参数
+- `Authorization: Bearer {user_token}` 用于 `POST /api/v1/store/orders`（下单）
+- `/api/v1/store/home`、`/products`、`/products/:product_id`、`/delivery-rules` 为公开接口，不要求登录
+- `pages/home/index`、`pages/store/product`、`pages/store/confirm` 统一解析店铺入口参数（单商户模式，入口固定单店）
 
 ### 3.2 服务人员接单接口（前缀 /api/v1/service-staff）
 
@@ -1315,7 +1389,7 @@ Authorization: Bearer {token}
 - 设置页重新进入或重新登录后，前端应以 `/api/v1/merchant/settings` 返回的员工维度开关与绑定状态为准。
 - `mp3` 提醒音使用静态资源文件，本轮不在后端或前端生成音频。
 - 本轮不包含优惠券、发券和复杂营销活动，但新增商家满减营销配置。
-- 满减规则通过 `GET/PUT /api/v1/merchant/full-reduction-rules` 维护，用户确认订单页通过 `GET /api/v1/store/{merchant_id}/full-reduction-rules` 获取当前启用规则。
+- 满减规则通过 `GET/PUT /api/v1/merchant/full-reduction-rules` 维护，用户确认订单页通过 `GET /api/v1/store/full-reduction-rules` 获取当前启用规则。
 
 **配送距离规则说明：**
 
@@ -1442,7 +1516,7 @@ Authorization: Bearer {token}
 **说明：**
 
 - 该接口固定为商家生成 C 端商城首页二维码，页面路径为 `pages/home/index`。
-- 二维码 `scene` 使用 `merchant_id={当前商家ID}`，以便 `parseStoreEntryOptions()` 按现有规则解析商家入口。
+- 二维码 `scene` 固定为店铺标识（单商户模式，不包含 `merchant_id`），前端 `parseStoreEntryOptions()` 按单店入口解析。
 - 返回体中的 `scene` 与 `page` 为调试字段，需与实际二维码生成配置保持一致。
 
 **响应：**
@@ -1452,7 +1526,7 @@ Authorization: Bearer {token}
   "code": 0,
   "data": {
     "qrcode_url": "小程序码图片URL",
-    "scene": "merchant_id=123",
+    "scene": "store=1",
     "page": "pages/home/index",
     "placeholder": false,
     "message": "微信小程序码生成成功",
@@ -1535,7 +1609,6 @@ Authorization: Bearer {token}
 {
   "type": "order_notify",
   "payload": {
-    "merchant_id": 1,
     "order_no": "202401010001"
   }
 }
@@ -1545,7 +1618,6 @@ Authorization: Bearer {token}
 {
   "type": "store_visit_notify",
   "payload": {
-    "merchant_id": 1,
     "visitor_openid": "wx_xxx",
     "source": "scan"
   }
@@ -1562,7 +1634,6 @@ POST /api/v1/dev/order-notify
 
 ```json
 {
-  "merchant_id": 1,
   "order_no": "202401010001"
 }
 ```
@@ -1590,7 +1661,6 @@ POST /api/v1/dev/store-visit-notify
 
 ```json
 {
-  "merchant_id": 1,
   "visitor_openid": "wx_test_visitor",
   "source": "dev"
 }
@@ -2557,16 +2627,15 @@ Authorization: Bearer {token}
 > **说明**：用于商家在 PC 后台订单详情对已支付的租赁订单发起归还，验机后退还押金。押金可通过 `deduct_amount` 扣除损坏赔偿后，剩余金额原路退还给用户。
 
 ```
-POST /api/v1/sp/merchants/{merchant_id}/orders/{order_id}/return
+POST /api/v1/merchant/orders/{order_id}/return
 Authorization: Bearer {token}
 ```
 
 **路径参数：**
 
-| 参数           | 类型 | 描述    |
-| ------------ | -- | ----- |
-| merchant\_id | int | 商家ID  |
-| order\_id    | int | 订单ID  |
+| 参数        | 类型 | 描述   |
+| --------- | -- | ---- |
+| order\_id | int | 订单ID |
 
 **请求参数：**
 
@@ -2885,12 +2954,12 @@ POST /api/v1/auth/user/wechat-login
 #### 3.9.2 商城首页（扫码进入）
 
 ```
-GET /api/v1/store/{merchant_id}/home
+GET /api/v1/store/home
 ```
 
 > 用户扫描商家二维码后，小程序调用此接口获取商城首页数据
 
-- `pages/home/index`、`pages/store/product`、`pages/store/confirm` 统一支持从 `merchant_id` 或 `scene` 解析商家入口参数。
+- `pages/home/index`、`pages/store/product`、`pages/store/confirm` 统一解析店铺入口参数（单商户模式，入口固定单店）。
 - 商城首页公开数据请求进入页面后立即发起，不依赖先完成登录。
 
 **响应：**
@@ -2969,7 +3038,7 @@ GET /api/v1/store/{merchant_id}/home
 #### 3.9.3 商家商品列表
 
 ```
-GET /api/v1/store/{merchant_id}/products
+GET /api/v1/store/products
 ```
 
 **请求参数：**
@@ -3032,7 +3101,7 @@ GET /api/v1/store/{merchant_id}/products
 #### 3.9.4 商品详情
 
 ```
-GET /api/v1/store/{merchant_id}/products/{product_id}
+GET /api/v1/store/products/{product_id}
 ```
 
 **响应：**
@@ -3071,7 +3140,7 @@ GET /api/v1/store/{merchant_id}/products/{product_id}
 #### 3.9.5 获取配送费规则
 
 ```
-GET /api/v1/store/{merchant_id}/delivery-rules
+GET /api/v1/store/delivery-rules
 ```
 
 > **说明**：获取商家的配送费规则，前端基于商家返回的配送档位供用户手动选择，实际配送费仍以后端创建订单时的校验和计算结果为准。
@@ -3113,7 +3182,7 @@ GET /api/v1/store/{merchant_id}/delivery-rules
 #### 3.9.6 创建订单
 
 ```
-POST /api/v1/store/{merchant_id}/orders
+POST /api/v1/store/orders
 Authorization: Bearer {token}
 ```
 
@@ -3356,23 +3425,21 @@ Authorization: Bearer {token}
 #### 3.10.1 创建支付订单
 
 ```
-POST /api/v1/store/{merchant_id}/orders
+POST /api/v1/store/orders
 ```
 
 > **说明**：用户在确认订单页面提交订单时调用此接口，系统自动创建微信支付订单。
 
-- `merchant_id` 以后端路由参数为准。
 - `delivery_type = 1` 时必须填写配送地址、联系人、联系电话和配送距离档位。
 - `delivery_type = 2/3` 时无需传配送信息。
 - 商家休息时会拒绝新的下单请求；已进入支付流程的订单不受营业状态切换影响。
-- 订单号按“14位时间戳 + 商家ID + 6位随机数”生成，长度不超过 32 位。
+- 订单号按“14位时间戳 + 6位随机数”生成，长度不超过 32 位。
 - 确认页在微信支付成功前不清空购物车；支付成功后清空，取消或失败时保留购物车。
 
 **请求参数：**
 
 ```json
 {
-  "merchant_id": 1,
   "delivery_type": 1,
   "delivery_distance": 2.5,
   "delivery_address": "XX市XX区XX路XX号",
@@ -3418,7 +3485,7 @@ POST /api/v1/store/{merchant_id}/orders
 
 **支付模式说明**：
 
-- 微信支付服务商凭证（`mch_id`、`api_key`、`api_v3_key`、证书序列号、私钥、公钥、回调地址）为系统级配置，不在商户维度暴露。
+- 微信支付商户凭证（`mch_id`、`api_key`、`api_v3_key`、证书序列号、私钥、公钥、回调地址）为系统级配置，不在商户维度暴露。
 - 单商户通过回填 `sub_mch_id` 接入支付，支付资金结算到商户子商户账户。
 - 全局配置 `WECHAT_PAY_APP_MODE` 控制小程序支付身份：`sp_app` 使用 `sp_appid + payer.sp_openid`；`sub_app` 使用 `sub_appid + payer.sub_openid`。
 
@@ -3446,6 +3513,94 @@ POST /api/v1/callback/wechat
   "time_end": "20240101120000"
 }
 ```
+
+### 3.11 健康服务接口
+
+阶段一健康服务接口共 17 个，阶段二康复辅具适配接口共 9 个，阶段三居家康养照护接口共 11 个，阶段四持续康复随访与健康宣教接口共 21 个，覆盖 C 端 / 服务人员端 / 管理端三组，接口明细与返回结构见 `docs/prd/PRD-接口文档.md` `2.11`。
+
+#### 阶段一：居民健康档案与人群健康评估
+
+##### C 端（前缀 /api/v1/user，需用户登录）
+
+- `GET /health-record`：我的健康档案（未建档返回 `data=null`）
+- `PUT /health-record`：有则更新、无则创建
+- `GET /assessment-forms`：仅启用的评估量表
+- `GET /assessments`：我的评估记录（分页）
+- `POST /assessments`：自助评估提交，后端计分返回 `total_score` / `level` / `conclusion`
+
+##### 服务人员端（前缀 /api/v1/service-staff，需服务人员登录）
+
+- `GET /assessment-forms`：仅启用的评估量表
+- `GET /residents/:user_id/health-record`：客户健康档案（数据权限校验）
+- `GET /residents/:user_id/assessments`：客户评估记录（分页，数据权限校验）
+- `POST /residents/:user_id/assessments`：上门评估登记（`assessor_type=2`）
+
+##### 管理端（前缀 /api/v1/merchant + RBAC）
+
+- `GET /health-records`（`health:view`）、`GET /health-records/:id`（`health:view`）、`PUT /health-records/:id`（`health:update`）
+- `GET /assessment-forms`（`assessment:view`）、`POST /assessment-forms`（`assessment:create`）、`PUT /assessment-forms/:id`（`assessment:update`）、`PATCH /assessment-forms/:id/status`（`assessment:update`）、`DELETE /assessment-forms/:id`（`assessment:delete`）
+- `GET /health-assessments`（`assessment:view`）
+
+#### 阶段二：康复辅具适配接口（共 9 个）
+
+- **C 端**（前缀 `/api/v1/user`，需用户登录）：
+  - `GET /fitting-recommendations`：我的适配建议（分页倒序）
+  - `GET /fitting-recommendations/:id`：我的适配建议详情（仅本人）
+  - `POST /fitting-recommendations/:id/confirm`：确认适配建议（草稿→已确认，`status=1`）
+- **服务人员端**（前缀 `/api/v1/service-staff`，需服务人员登录）：
+  - `GET /residents/:user_id/fitting-recommendations`：客户适配建议（分页，数据权限校验）
+  - `POST /residents/:user_id/fitting-recommendations`：生成适配建议，请求 `{assessment_id?, symptom_desc, fitting_result, recommended_products:[{product_id, reason}]}`，推荐商品校验并快照 name/sale_type，落库 `status=0`（数据权限校验）
+- **管理端**（前缀 `/api/v1/merchant` + RBAC）：
+  - `GET /fitting-recommendations`（`fitting:view`，`keyword` / `status` 筛选，分页）
+  - `GET /fitting-recommendations/:id`（`fitting:view`）
+  - `PUT /fitting-recommendations/:id`（`fitting:update`，更新结论/推荐商品/状态/order_id）
+  - `DELETE /fitting-recommendations/:id`（`fitting:update`）
+
+#### 阶段三：居家康养照护接口（共 11 个）
+
+- **C 端**（前缀 `/api/v1/user`，需用户登录）：
+  - `GET /care-plans`：我的照护计划（分页，仅本人）
+  - `GET /care-plans/:id`：我的照护计划详情（含照护记录，仅本人）
+- **服务人员端**（前缀 `/api/v1/service-staff`，需服务人员登录）：
+  - `GET /care-plans`：我的照护计划（仅 `assigned_staff_id` 为当前，分页）
+  - `GET /care-plans/:id`：我的照护计划详情（含照护记录，数据权限校验）
+  - `POST /care-visits`：录入上门照护记录，请求 `{plan_id?, order_id?, visit_at, nursing_items:[{name,done,remark}], vitals, photos, remark, follow_up_advice}`（plan_id/order_id 至少其一且均属当前服务人员，user_id 取 plan/order 对应且一致）
+- **管理端**（前缀 `/api/v1/merchant` + RBAC）：
+  - `GET /care-plans`（`care:view`，`keyword` / `plan_type` / `status` 筛选，分页，含 `visit_count`）
+  - `GET /care-plans/:id`（`care:view`，含照护记录）
+  - `POST /care-plans`（`care:create`）
+  - `PUT /care-plans/:id`（`care:create`）
+  - `DELETE /care-plans/:id`（`care:create`，存在照护记录时拒绝删除）
+  - `GET /care-visits`（`care:view`，`plan_id` / `user_id` 筛选，分页）
+
+#### 阶段四：持续康复随访与健康宣教接口（共 21 个）
+
+- **C 端**（前缀 `/api/v1/user`，需用户登录）：
+  - `GET /follow-ups`：我的随访任务（分页倒序，可按 `status` 筛选，仅本人）
+  - `GET /health-education`：已发布宣教文章，按本人档案慢病标签与文章 `tags` 匹配度排序，支持 `category` 筛选
+  - `GET /health-education/:id`：宣教文章详情（仅已发布可见，浏览量异步 +1）
+  - `GET /monitoring`：我的生命体征记录（分页倒序，可按 `record_type` 筛选）
+  - `POST /monitoring`：自助录入体征 `{record_type, value, unit, extra, recorded_at?, remark}`，`recorded_by=0` 表示本人
+- **服务人员端**（前缀 `/api/v1/service-staff`，需服务人员登录）：
+  - `GET /follow-up-tasks`：随访任务列表（`staff_id` 为当前 或 待认领，可按 `status` 筛选）
+  - `GET /follow-up-tasks/:id`：随访任务详情（须属于当前服务人员或待认领，否则 403）
+  - `POST /follow-up-tasks/:id/complete`：执行随访，请求 `{result:{contact_method, content, education_article_ids, satisfaction, remark}}`，待认领任务自动认领，`status`→已完成
+  - `POST /follow-up-tasks/:id/skip`：跳过随访（`status`→已跳过，待认领任务自动认领）
+  - `GET /health-education`：已发布宣教文章（供随访选用）
+  - `GET /residents/:user_id/monitoring`：客户生命体征记录（分页，数据权限校验）
+  - `POST /residents/:user_id/monitoring`：为客户录入体征（数据权限校验，`recorded_by`=当前服务人员）
+- **管理端**（前缀 `/api/v1/merchant` + RBAC）：
+  - `GET /follow-up-tasks`（`followup:view`，`keyword` / `status` / `task_type` 筛选，分页）
+  - `GET /follow-up-tasks/:id`（`followup:view`）
+  - `POST /follow-up-tasks`（`followup:update`，手动登记，`source_type` 固定为手动）
+  - `POST /follow-up-tasks/:id/complete`（`followup:update`，管理员代执行）
+  - `GET /monitoring`（`monitor:view`，`keyword` / `record_type` 筛选，分页）
+  - `GET /health-education`（`education:view`，含草稿，`keyword` / `category` / `status` 筛选）
+  - `POST /health-education`（`education:create`）
+  - `PUT /health-education/:id`（`education:create`）
+  - `DELETE /health-education/:id`（`education:create`）
+
+**自动生成触发**：服务工单签退完成（租赁订单→租后回访、其他服务订单→康复随访，执行人=当前服务人员）、租赁归还完成（租后回访）、健康评估完成（评估回访）三处自动生成随访任务，计划随访时间=完成/评估时点+72 小时，经 `server/internal/services/followup` 包 `CreateFollowUpTask` 实现，失败仅记录日志、不影响业务主流程。
 
 ## 4. 数据模型设计
 
@@ -3887,6 +4042,195 @@ pending_payment(待支付) → paid(已支付) → completed(已完成)
 - 注册申请提交后 `status=0`（待审核），由商户管理员在 PC 后台审核通过后 `status=1`（正常）。
 - 服务人员通过接单小程序执行接单操作，无核销权限。
 
+### 4.23 居民健康档案表 (health\_records)
+
+| 字段 | 类型 | 描述 |
+| --- | --- | --- |
+| id | BIGINT | 主键 |
+| user\_id | BIGINT | 用户ID（唯一键） |
+| real\_name | VARCHAR(64) | 真实姓名 |
+| gender | TINYINT | 性别：1男 2女 |
+| birth\_date | VARCHAR(16) | 出生日期 |
+| id\_card | VARCHAR(32) | 身份证号 |
+| phone | VARCHAR(20) | 联系电话 |
+| emergency\_contact | VARCHAR(64) | 紧急联系人 |
+| emergency\_phone | VARCHAR(20) | 紧急联系电话 |
+| address | VARCHAR(256) | 常住地址 |
+| height\_cm | DECIMAL(5,1) | 身高(cm) |
+| weight\_kg | DECIMAL(5,1) | 体重(kg) |
+| blood\_type | VARCHAR(8) | 血型 |
+| past\_history | JSON | 既往病史数组 |
+| allergy\_history | JSON | 过敏史数组 |
+| family\_history | JSON | 家族病史数组 |
+| surgery\_history | JSON | 手术史数组 |
+| medication\_list | JSON | 长期用药数组 |
+| chronic\_tags | JSON | 慢病标签数组（常见值：高血压/糖尿病/冠心病/脑卒中/慢阻肺/骨质疏松/帕金森/阿尔茨海默/关节炎/其他） |
+| smoking | VARCHAR(32) | 吸烟情况 |
+| drinking | VARCHAR(32) | 饮酒情况 |
+| assessment\_level | VARCHAR(32) | 最近一次评估等级（评估结果回写） |
+| remark | VARCHAR(512) | 备注 |
+| status | TINYINT | 状态：0未建档 1正常 2已归档 |
+| created\_at | DATETIME | 创建时间 |
+| updated\_at | DATETIME | 更新时间 |
+
+### 4.24 评估量表模板表 (health\_assessment\_forms)
+
+| 字段 | 类型 | 描述 |
+| --- | --- | --- |
+| id | BIGINT | 主键 |
+| name | VARCHAR(64) | 量表名称 |
+| dimension | VARCHAR(32) | 评估维度：adl/barthel/fall/nutrition/cognition/pressure/weak/geriatric/self |
+| description | TEXT | 量表说明 |
+| questions | JSON | 题目数组 `[{key,title,options:[{label,score}]}]` |
+| score\_rule | JSON | 评分规则 `[{min,max,level,conclusion}]` |
+| version | INT | 版本号 |
+| status | TINYINT | 状态：0草稿 1启用 |
+| created\_at | DATETIME | 创建时间 |
+| updated\_at | DATETIME | 更新时间 |
+
+- 量表维度枚举：adl 日常生活能力 / barthel 巴氏指数 / fall 跌倒风险 / nutrition 营养评估 / cognition 认知评估 / pressure 压疮风险 / weak 衰弱筛查 / geriatric 老年综合 / self 通用自评。
+
+### 4.25 评估记录表 (health\_assessments)
+
+| 字段 | 类型 | 描述 |
+| --- | --- | --- |
+| id | BIGINT | 主键 |
+| user\_id | BIGINT | 用户ID |
+| form\_id | BIGINT | 量表ID |
+| form\_name | VARCHAR(64) | 量表名称快照 |
+| assessor\_type | TINYINT | 评估方式：1自助 2服务人员 |
+| staff\_id | BIGINT | 评估服务人员ID |
+| answers | JSON | 答案 `{key:选中label}` |
+| total\_score | DECIMAL(6,1) | 总分（各题选中 option 的 score 之和） |
+| level | VARCHAR(32) | 评估等级（score\_rule 第一条命中 min<=total<=max） |
+| conclusion | VARCHAR(512) | 评估结论 |
+| suggestions | JSON | 建议数组 |
+| symptom\_desc | VARCHAR(512) | 症状描述 |
+| created\_at | DATETIME | 创建时间 |
+
+- 评估保存后，将 `level` 回写 `health_records.assessment_level`（仅档案已存在时生效）。
+- 服务人员评估客户前需校验服务关系（`orders.assigned_staff_id` 关联），无服务关系返回 403。
+
+### 4.26 康复辅具适配建议表 (fitting\_recommendations)
+
+| 字段 | 类型 | 描述 |
+| --- | --- | --- |
+| id | BIGINT | 主键 |
+| user\_id | BIGINT | 居民用户ID |
+| assessment\_id | BIGINT | 关联评估记录ID（可空） |
+| symptom\_desc | VARCHAR(512) | 症状/需求描述 |
+| fitting\_result | VARCHAR(512) | 适配结论 |
+| recommended\_products | JSON | 推荐商品快照 `[{product_id, name, reason, sale_type}]` |
+| staff\_id | BIGINT | 生成建议的服务人员ID（可空） |
+| status | TINYINT | 状态：0草稿 1已确认 2已下单 |
+| order\_id | BIGINT | 关联订单ID（可空） |
+| created\_at | DATETIME | 创建时间 |
+| updated\_at | DATETIME | 更新时间 |
+
+- 推荐商品生成/编辑时逐一校验商品存在且上架（`status=1`），快照 `product_id` / `name` / `reason` / `sale_type`，不满足返回"推荐商品不可用"。
+- 状态流转：服务人员端生成即 `0` 草稿 → C 端确认 `1` 已确认 → 关联订单 `2` 已下单。
+- 迁移脚本：`server/migrations/20260818110000_fitting_recommendations.sql`（含「适配建议」菜单种子，角色 1 自动绑定全部菜单）。
+
+### 4.27 照护计划表 (care\_plans)
+
+| 字段 | 类型 | 描述 |
+| --- | --- | --- |
+| id | BIGINT | 主键 |
+| user\_id | BIGINT | 居民用户ID |
+| name | VARCHAR(64) | 计划名称 |
+| plan\_type | TINYINT | 类型：1生活照料 2基础护理 3康复训练 4综合康养 |
+| start\_date | DATE | 开始日期（可空） |
+| end\_date | DATE | 结束日期（可空） |
+| frequency | VARCHAR(64) | 照护频次（可空） |
+| goals | VARCHAR(512) | 照护目标（可空） |
+| items | JSON | 护理项配置 `[{name,desc}]` |
+| assigned\_staff\_id | BIGINT | 指派服务人员ID（可空） |
+| order\_id | BIGINT | 关联服务订单ID（可空） |
+| status | TINYINT | 状态：0草稿 1执行中 2已暂停 3已完成 |
+| created\_at | DATETIME | 创建时间 |
+| updated\_at | DATETIME | 更新时间 |
+
+- 照护计划由 web-admin 创建并指派服务人员；服务人员端"我的照护计划"仅展示 `assigned_staff_id` 为当前人员的计划；C 端仅展示本人计划。
+
+### 4.28 上门照护记录表 (care\_visits)
+
+| 字段 | 类型 | 描述 |
+| --- | --- | --- |
+| id | BIGINT | 主键 |
+| plan\_id | BIGINT | 关联照护计划ID（可空） |
+| order\_id | BIGINT | 关联服务订单ID（可空） |
+| user\_id | BIGINT | 居民用户ID |
+| staff\_id | BIGINT | 录入服务人员ID |
+| visit\_at | DATETIME | 到访时间 |
+| nursing\_items | JSON | 完成的护理项 `[{name,done,remark}]` |
+| vitals | JSON | 生命体征 `{blood_pressure,blood_glucose,heart_rate,oxygen,weight}` |
+| photos | JSON | 照片URL数组 |
+| remark | VARCHAR(512) | 备注 |
+| follow\_up\_advice | VARCHAR(512) | 下次随访建议 |
+| created\_at | DATETIME | 创建时间 |
+
+- `plan_id` 与 `order_id` 至少提供一个，且均须属于当前服务人员负责范围（数据权限），`user_id` 取 plan/order 对应且一致。
+- 存在照护记录（care\_visits）的照护计划不可删除，保留历史溯源。
+- 迁移脚本：`server/migrations/20260818120000_care_plans_visits.sql`（含「照护计划」菜单种子 id=85/851，角色 1 自动绑定全部菜单）。
+
+### 4.29 随访任务表 (follow\_up\_tasks)
+
+| 字段 | 类型 | 描述 |
+| --- | --- | --- |
+| id | BIGINT | 主键 |
+| user\_id | BIGINT | 居民用户ID |
+| task\_type | TINYINT | 类型：1康复随访 2租后回访 3慢病随访 4评估回访 |
+| source\_type | TINYINT | 来源：1服务完成 2租赁归还 3评估完成 4手动 |
+| source\_id | BIGINT | 来源ID（订单/评估ID，可空） |
+| plan\_follow\_time | DATETIME | 计划随访时间（默认完成/评估时点+72小时） |
+| staff\_id | BIGINT | 执行服务人员ID（可空=待认领） |
+| contact\_method | TINYINT | 随访方式：0未定 1电话 2上门 3微信 |
+| status | TINYINT | 状态：0待执行 1已完成 2已跳过 |
+| result | JSON | 随访结果 `{contact_method, content, education_article_ids, satisfaction, remark}` |
+| completed\_at | DATETIME | 完成时间（可空） |
+| remark | VARCHAR(512) | 备注 |
+| created\_at | DATETIME | 创建时间 |
+
+- 随访任务由服务工单签退、租赁归还、健康评估完成三处自动生成，`staff_id` 为空表示待认领，服务人员可执行并自动认领。
+- 迁移脚本：`server/migrations/20260818130000_followup_monitoring_education.sql`（含「随访任务」菜单种子 id=86/861，角色 1 自动绑定全部菜单）。
+
+### 4.30 生命体征监测表 (health\_monitoring)
+
+| 字段 | 类型 | 描述 |
+| --- | --- | --- |
+| id | BIGINT | 主键 |
+| user\_id | BIGINT | 用户ID |
+| record\_type | TINYINT | 类型：1血压 2血糖 3心率 4血氧 5体重 |
+| value | DECIMAL(8,2) | 测量值 |
+| unit | VARCHAR(16) | 单位 |
+| extra | JSON | 扩展信息（如血压高低压） |
+| recorded\_by | BIGINT | 录入人（0=用户本人，其他=服务人员ID） |
+| recorded\_at | DATETIME | 测量时间（RFC3339 带时区） |
+| remark | VARCHAR(512) | 备注 |
+| created\_at | DATETIME | 创建时间 |
+
+- 录入支持用户自助（`recorded_by=0`）与服务人员上门（`recorded_by=服务人员ID`）；服务人员仅能查看/录入本人服务过客户的体征（数据权限校验）。
+- 迁移脚本：`server/migrations/20260818130000_followup_monitoring_education.sql`（含「生命体征」菜单种子 id=87/871，角色 1 自动绑定全部菜单）。
+
+### 4.31 健康宣教内容表 (health\_education\_articles)
+
+| 字段 | 类型 | 描述 |
+| --- | --- | --- |
+| id | BIGINT | 主键 |
+| title | VARCHAR(128) | 标题 |
+| category | VARCHAR(32) | 分类 |
+| cover | VARCHAR(512) | 封面图URL |
+| content | TEXT | 正文 |
+| tags | JSON | 定向慢病标签数组 |
+| status | TINYINT | 状态：0草稿 1发布 |
+| publish\_at | DATETIME | 发布时间（发布且未指定时回填当前时间） |
+| views | INT | 浏览量（C 端详情浏览异步 +1） |
+| created\_at | DATETIME | 创建时间 |
+| updated\_at | DATETIME | 更新时间 |
+
+- 宣教文章仅已发布（`status=1`）对 C 端/服务人员端可见；C 端按本人档案慢病标签（`health_records.chronic_tags`）与文章 `tags` 匹配度排序，交集多者优先，相同按发布时间倒序。
+- 迁移脚本：`server/migrations/20260818130000_followup_monitoring_education.sql`（含「健康宣教」菜单种子 id=88/881，角色 1 自动绑定全部菜单）。
+
 ## 5. 技术架构
 
 ### 5.1 技术栈
@@ -3961,8 +4305,8 @@ miniprogram/                    # 微信小程序
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  微信支付服务商凭证                      │
-│            (系统级配置，非可管理实体)                     │
+│                  微信支付商户凭证                      │
+│            (系统级配置)                                 │
 │  mch_id / api_key / api_v3_key / 证书序列号            │
 │  private_key / public_key / callback_url              │
 └─────────────────────┬───────────────────────────────┘
@@ -4072,7 +4416,7 @@ miniprogram/                    # 微信小程序
 - [ ] 服务人员接单小程序
 - [ ] 订单接单与核销分离
 
-- [ ] 微信支付对接（系统级服务商凭证配置）
+- [ ] 微信支付对接（系统级支付凭证配置）
 - [ ] 子商户绑定
 - [ ] 订单创建
 - [ ] 支付回调处理
@@ -4403,7 +4747,7 @@ miniprogram/                    # 微信小程序
 - `web-admin/`：商户 PC 后台项目入口
 - 服务人员接单小程序：独立小程序项目
 - `pages/store/test-entry`：C 端商城测试入口
-- `pages/home/index?merchant_id=...`：C 端商城首页直达方式
+- `pages/home/index`：C 端商城首页直达方式（单商户模式，入口固定单店）
 
 ### 9.1.1 双小程序发布约定
 
@@ -4533,20 +4877,18 @@ miniprogram/                    # 微信小程序
 
 ##### 页面能力
 
-1. 支持输入目标 `merchant_id`
-2. 支持手动发送"顾客进店提醒"
-3. 支持手动发送"订单成功提醒"
-4. 支持显示本次推送命中的在线连接数 `delivered`
-5. PC后台同步展示 WebSocket 当前状态、最近消息和接收时间
+1. 支持手动发送"顾客进店提醒"
+2. 支持手动发送"订单成功提醒"
+3. 支持显示本次推送命中的在线连接数 `delivered`
+4. PC后台同步展示 WebSocket 当前状态、最近消息和接收时间
 
 ##### 使用步骤
 
 1. 先使用商户管理员账号登录PC后台
 2. 确认PC后台已显示 WebSocket 连接状态
 3. 打开 `pages/store/order-sound-test`
-4. 输入目标 `merchant_id`
-5. 点击发送"顾客进店提醒"或"订单成功提醒"
-6. 根据页面返回的 `delivered` 数量和PC后台最近消息，确认是否已成功推送
+4. 点击发送"顾客进店提醒"或"订单成功提醒"
+5. 根据页面返回的 `delivered` 数量和PC后台最近消息，确认是否已成功推送
 
 #### 9.5.3 测试方法三：编译模式直接进入
 
@@ -4564,28 +4906,22 @@ miniprogram/                    # 微信小程序
 | 参数   | 值                  | 说明     |
 | ---- | ------------------ | ------ |
 | 编译模式 | `pages/home/index` | 商城首页   |
-| 启动参数 | `merchant_id=1`    | 商家ID参数 |
+| 启动参数 | `store=1`          | 店铺标识   |
 
 ##### 启动参数说明
 
-| 参数名          | 类型     | 必填 | 说明                 |
-| ------------ | ------ | -- | ------------------ |
-| merchant\_id | number | 是  | 商家ID，用于加载对应商家的商城数据 |
-| scene | string | 否 | 扫码场景值，支持解析 `merchant_id` 与业务扩展参数 |
+| 参数名  | 类型   | 必填 | 说明               |
+| ---- | ---- | -- | ---------------- |
+| store | string | 否 | 店铺标识（单商户模式默认单店，不区分商家ID） |
+| scene | string | 否 | 扫码场景值，支持解析业务扩展参数          |
 
 ##### 使用示例
 
 ```text
-启动参数：merchant_id=1
+启动参数：store=1
 ```
 
-访问商家ID为1的商城首页
-
-```text
-启动参数：merchant_id=2
-```
-
-访问商家ID为2的商城首页
+访问商城首页（单商户单店入口）
 
 #### 9.5.4 可测试功能模块
 
@@ -4681,9 +5017,9 @@ miniprogram/                    # 微信小程序
 - ✅ `CreateOrder` 按 `product_type` 自动设置 `order_type`/`biz_status`，服务单进入待派工池
 - ✅ 服务人员端：待办页、工单列表（5 状态 Tab）、工单详情（接单→签到定位→签退备注）
 
-### 10.5 第 4 期：单商户架构改造（去服务商身份）
+### 10.5 第 4 期：单商户架构改造
 
-> 目标：移除服务商（SP）多商户管理实体，保留微信支付服务商凭证作为系统级配置，PC 后台登录改为商家登录。
+> 目标：移除多商户管理实体，微信支付商户凭证作为系统级配置，PC 后台登录改为商家登录。
 
 - ✅ **后端**：`orderquery` 扩展 `OrderType`/`BizStatus`/`AssignedStaffID` 查询；`GetOrders` 透传工单字段；完善订单核销；新增服务人员管理接口；清理 SP 相关路由/中间件死代码
 - ✅ **PC 后台路由**：重写为单商户结构（/dashboard、/orders、/products、/categories、/staff、/profile、/analytics），移除多商家列表/编辑/详情路由
@@ -4692,7 +5028,48 @@ miniprogram/                    # 微信小程序
 - ✅ **组件解耦**：`MerchantProductsTab`/`MerchantCategoriesTab`/`MerchantProductEditorDialog` 去除 `merchantId` 依赖；`qiniu.ts` 上传接口去除 `merchantId` 参数；`api/sp.ts` 全量迁移至 `/api/v1/merchant/*`
 - ✅ **构建验证**：`go build ./...` 通过；`web-admin` `npm run build` 通过（输出 `sp/`）
 
-### 10.6 后续待启动
+### 10.6 第 5 期：基层健康服务闭环（阶段一 + 阶段二 + 阶段三 + 阶段四）
 
-- ⬜ 第 5 期：微信支付真实对接（系统级服务商凭证）、子商户绑定、支付回调、退款流程
-- ⬜ 第 6 期：员工管理、缓存与性能调优、监控告警、云打印
+> 目标：落地「居民健康档案 + 人群健康评估」+「康复辅具适配」+「居家康养照护」+「持续康复随访与健康宣教」，形成基层健康服务闭环阶段一至阶段四完整能力。
+
+**阶段一：居民健康档案与人群健康评估**
+
+- ✅ **数据表**：新增 `health_records` 居民健康档案、`health_assessment_forms` 评估量表模板、`health_assessments` 评估记录 3 张表，迁移脚本 `server/migrations/20260818100000_health_records_assessments.sql`
+- ✅ **后端接口**：新增 17 个健康服务接口（C 端 5 个、服务人员端 4 个、管理端 8 个），详见 `docs/prd/PRD-接口文档.md` 2.11
+- ✅ **RBAC 菜单**：新增顶级菜单「健康服务」`/health`（id=8），下含健康档案（`health:view` / `health:update`）、评估量表（`assessment:view` / `assessment:create/update/delete`）、评估记录（`assessment:view` / `assessment:create`）；迁移脚本自动将全部菜单绑定角色 1
+- ✅ **web-admin**：新增 `src/views/health/` 下 HealthRecordsView、HealthAssessmentFormsView、HealthAssessmentsView 三页，路由 `/health/records`、`/health/assessment-forms`、`/health/assessments`
+- ✅ **服务人员小程序**：新增 `pages/health/resident.vue`（居民健康档案查看）、`pages/health/assess.vue`（健康评估）；工单详情增加"客户健康档案"入口
+- ✅ **C 端小程序**：新增 `pages/store/my-health.vue`（我的健康首页）、`health-record-edit.vue`（档案编辑）、`health-assessment.vue`（自助评估）；首页"我的订单"区新增"我的健康"入口
+
+**阶段二：康复辅具适配**
+
+- ✅ **数据表**：新增 `fitting_recommendations` 康复辅具适配建议表，迁移脚本 `server/migrations/20260818110000_fitting_recommendations.sql`
+- ✅ **后端接口**：新增 9 个适配建议接口（C 端 3 个、服务人员端 2 个、管理端 4 个），详见 `docs/prd/PRD-接口文档.md` 2.11
+- ✅ **RBAC 菜单**：健康服务菜单（id=8）下新增子菜单「适配建议」`/health/fitting`（id=84，`fitting:view`）+ 按钮「编辑/确认」（id=841，`fitting:update`）；迁移脚本自动绑定角色 1
+- ✅ **web-admin**：新增 `src/views/health/FittingRecommendationsView.vue`，路由 `/health/fitting`（搜索/列表/详情抽屉/编辑弹窗(推荐商品远程搜索)/删除/分页）
+- ✅ **服务人员小程序**：`pages/health/resident.vue` 增加"适配建议"区块与"生成适配建议"按钮；新增 `pages/health/fitting-form.vue`（症状/结论/推荐商品多选+理由）
+- ✅ **C 端小程序**：新增 `pages/store/my-fitting.vue`（我的适配建议：列表/详情/确认/每件商品"去选购"跳商品页）；`my-health.vue` 入口网格新增"适配建议"
+
+**阶段三：居家康养照护**
+
+- ✅ **数据表**：新增 `care_plans` 照护计划表、`care_visits` 上门照护记录表，迁移脚本 `server/migrations/20260818120000_care_plans_visits.sql`
+- ✅ **后端接口**：新增 11 个居家康养照护接口（C 端 2 个、服务人员端 3 个、管理端 6 个），详见 `docs/prd/PRD-接口文档.md` 2.11
+- ✅ **RBAC 菜单**：健康服务菜单（id=8）下新增子菜单「照护计划」`/health/care-plans`（id=85，`care:view`）+ 按钮「新增/编辑」（id=851，`care:create`）；迁移脚本自动绑定角色 1
+- ✅ **web-admin**：新增 `src/views/health/CarePlansView.vue`，路由 `/health/care-plans`（搜索/列表/详情抽屉(含照护记录表)/新增编辑弹窗(居民远程搜索+护理项动态行+指派服务人员)/删除/分页）
+- ✅ **服务人员小程序**：新增 `pages/health/care-plans.vue`（我的照护计划）、`care-plan-detail.vue`（详情+历史照护记录）、`care-visit-form.vue`（录入照护记录：护理项勾选/生命体征/照片/备注）；profile 页"我的照护计划"入口；工单详情签退成功后提示"录入照护记录"（带 orderId）
+- ✅ **C 端小程序**：新增 `pages/store/my-care-plans.vue`（我的照护计划）、`care-plan-detail.vue`（详情+照护记录）；`my-health.vue` 入口网格新增"照护计划"
+
+**阶段四：持续康复随访与健康宣教**
+
+- ✅ **数据表**：新增 `follow_up_tasks` 随访任务表、`health_monitoring` 生命体征监测表、`health_education_articles` 健康宣教内容表，迁移脚本 `server/migrations/20260818130000_followup_monitoring_education.sql`
+- ✅ **后端接口**：新增 21 个持续康复随访与健康宣教接口（C 端 5 个、服务人员端 7 个、管理端 9 个），详见 `docs/prd/PRD-接口文档.md` 2.11
+- ✅ **自动生成**：服务工单签退（租赁订单→租后回访、其他服务订单→康复随访，执行人=当前服务人员）、租赁归还（租后回访）、健康评估完成（评估回访）三处自动生成随访任务，`server/internal/services/followup` 包 `CreateFollowUpTask` 统一实现，计划随访时间=完成/评估时点+72 小时
+- ✅ **RBAC 菜单**：健康服务菜单（id=8）下新增子菜单「随访任务」`/health/follow-ups`（id=86，`followup:view`）+ 按钮「执行/登记」（id=861，`followup:update`）、「生命体征」`/health/monitoring`（id=87，`monitor:view`）+ 按钮「录入」（id=871，`monitor:create`）、「健康宣教」`/health/education`（id=88，`education:view`）+ 按钮「新增/编辑」（id=881，`education:create`）；迁移脚本自动绑定角色 1
+- ✅ **web-admin**：新增 `src/views/health/FollowUpTasksView.vue`（路由 `/health/follow-ups`，搜索/列表/登记/详情/执行弹窗(随访方式/内容/宣教文章多选/满意度)/分页）、`HealthMonitoringView.vue`（路由 `/health/monitoring`，只读查询）、`EducationArticlesView.vue`（路由 `/health/education`，列表/新增编辑/删除）
+- ✅ **服务人员小程序**：新增 `pages/health/follow-ups.vue`（我的随访任务，状态筛选）、`follow-up-detail.vue`（随访执行：方式/内容/宣教文章多选/满意度/跳过）；`resident.vue` 新增"生命体征"区块与录入；profile 页"随访任务"入口（含待执行角标）
+- ✅ **C 端小程序**：新增 `pages/store/my-follow-ups.vue`（我的康复随访）、`health-education.vue`（健康宣教列表）、`education-detail.vue`（文章详情）、`my-monitoring.vue`（体征记录列表+录入）；`my-health.vue` 入口网格新增"康复随访/健康宣教/体征记录"
+
+### 10.7 后续待启动
+
+- ⬜ 第 6 期：微信支付真实对接（系统级支付凭证）、子商户绑定、支付回调、退款流程
+- ⬜ 第 7 期：员工管理、缓存与性能调优、监控告警、云打印

@@ -85,14 +85,9 @@ import type { CartItem } from '../../stores/cart'
 
 const cartStore = useCartStore()
 const selectedItems = ref<Set<string>>(new Set())
-const merchantId = ref(1)
 
 onShow(() => {
   cartStore.restoreFromStorage()
-
-  const pages = getCurrentPages()
-  const currentPage = pages[pages.length - 1] as any
-  merchantId.value = Number(currentPage?.options?.merchant_id) || 1
 
   // 默认全选
   selectAllItems()
@@ -175,7 +170,7 @@ function removeItem(item: CartItem) {
 
 function goShopping() {
   uni.navigateTo({
-    url: `/pages/store/home?merchant_id=${merchantId.value}`
+    url: `/pages/store/home`
   })
 }
 
@@ -185,7 +180,7 @@ function goCheckout() {
   }
   
   uni.navigateTo({
-    url: `/pages/store/confirm?merchant_id=${merchantId.value}`
+    url: `/pages/store/confirm`
   })
 }
 </script>

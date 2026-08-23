@@ -10,12 +10,10 @@ import (
 )
 
 type DevOrderNotifyRequest struct {
-	MerchantID uint64 `json:"merchant_id" binding:"required"`
-	OrderNo    string `json:"order_no"`
+	OrderNo string `json:"order_no"`
 }
 
 type DevStoreVisitNotifyRequest struct {
-	MerchantID    uint64 `json:"merchant_id" binding:"required"`
 	VisitorOpenID string `json:"visitor_openid"`
 	Source        string `json:"source"`
 }
@@ -35,13 +33,12 @@ func DevOrderNotify(c *gin.Context) {
 	payload := gin.H{
 		"type": "order_notify",
 		"payload": gin.H{
-			"merchant_id": req.MerchantID,
-			"order_no":    req.OrderNo,
+			"order_no": req.OrderNo,
 		},
 	}
 
 	msg, _ := json.Marshal(payload)
-	delivered := BroadcastToMerchant(req.MerchantID, msg)
+	delivered := BroadcastToMerchant(msg)
 
 	response.Success(c, gin.H{
 		"delivered": delivered,
@@ -66,7 +63,7 @@ func DevStoreVisitNotify(c *gin.Context) {
 		req.Source = "dev"
 	}
 
-	delivered := BroadcastStoreVisitNotify(req.MerchantID, req.VisitorOpenID, req.Source)
+	delivered := BroadcastStoreVisitNotify(req.VisitorOpenID, req.Source)
 	response.Success(c, gin.H{
 		"delivered": delivered,
 	})

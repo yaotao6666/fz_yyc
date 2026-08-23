@@ -67,8 +67,8 @@ type WechatPay struct {
 	CertSerialNo       string
 	PrivateKey         string
 	PublicKey          string
+	PublicKeyID        string // 微信支付公钥ID（新验签模式，对应响应头 Wechatpay-Serial）
 	CallbackURL        string
-	AppMode            string
 }
 
 // Qiniu 七牛云配置
@@ -223,11 +223,11 @@ func mergeConfig() {
 	if viper.IsSet("WECHAT_PAY_PUBLIC_KEY") && Config.WechatPay.PublicKey == "" {
 		Config.WechatPay.PublicKey = viper.GetString("WECHAT_PAY_PUBLIC_KEY")
 	}
+	if viper.IsSet("WECHAT_PAY_SP_PUBLIC_KEY_ID") {
+		Config.WechatPay.PublicKeyID = viper.GetString("WECHAT_PAY_SP_PUBLIC_KEY_ID")
+	}
 	if viper.IsSet("WECHAT_PAY_SP_CALLBACK_URL") {
 		Config.WechatPay.CallbackURL = viper.GetString("WECHAT_PAY_SP_CALLBACK_URL")
-	}
-	if viper.IsSet("WECHAT_PAY_APP_MODE") {
-		Config.WechatPay.AppMode = viper.GetString("WECHAT_PAY_APP_MODE")
 	}
 
 	if viper.IsSet("QINIU_ACCESS_KEY") {
@@ -362,11 +362,11 @@ func mergeEnvConfig() {
 	} else if env := os.Getenv("WECHAT_PAY_PUBLIC_KEY"); env != "" {
 		Config.WechatPay.PublicKey = env
 	}
+	if env := os.Getenv("WECHAT_PAY_SP_PUBLIC_KEY_ID"); env != "" {
+		Config.WechatPay.PublicKeyID = env
+	}
 	if env := os.Getenv("WECHAT_PAY_SP_CALLBACK_URL"); env != "" {
 		Config.WechatPay.CallbackURL = env
-	}
-	if env := os.Getenv("WECHAT_PAY_APP_MODE"); env != "" {
-		Config.WechatPay.AppMode = env
 	}
 
 	if env := os.Getenv("QINIU_ACCESS_KEY"); env != "" {
@@ -430,7 +430,6 @@ func getDefaultConfig() *AppConfig {
 			PrivateKey:         "",
 			PublicKey:          "",
 			CallbackURL:        "",
-			AppMode:            "sp_app",
 		},
 		Qiniu: Qiniu{
 			AccessKey: "",

@@ -2,7 +2,6 @@ package utils
 
 import (
 	"encoding/base64"
-	"fmt"
 )
 
 const MerchantStoreHomePage = "pages/store/home"
@@ -13,9 +12,9 @@ type MerchantStoreQRCodeResult struct {
 	Page      string
 }
 
-// GenerateMerchantStoreQRCode 统一生成商家店铺首页微信小程序码。
-func GenerateMerchantStoreQRCode(merchantID uint64, width int) (MerchantStoreQRCodeResult, error) {
-	scene := fmt.Sprintf("merchant_id=%d", merchantID)
+// GenerateMerchantStoreQRCode 统一生成商家店铺首页微信小程序码（单商户模式，scene 固定为 store=1）。
+func GenerateMerchantStoreQRCode(width int) (MerchantStoreQRCodeResult, error) {
+	scene := "store=1"
 	result := MerchantStoreQRCodeResult{
 		Scene: scene,
 		Page:  MerchantStoreHomePage,

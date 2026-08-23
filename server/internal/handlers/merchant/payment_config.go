@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
 
@@ -19,8 +19,6 @@ type PaymentConfigRequest struct {
 
 // UpdatePaymentConfig 更新商家支付配置
 func UpdatePaymentConfig(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
 	var req PaymentConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -37,12 +35,12 @@ func UpdatePaymentConfig(c *gin.Context) {
 		"sub_mch_id":            subMchID,
 		"payment_config_status": 1,
 	}
-	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Updates(updates).Error; err != nil {
+	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", utils.DefaultMerchantID).Updates(updates).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新支付配置失败")
 		return
 	}
 
 	var merchant models.Merchant
-	database.DB.First(&merchant, merchantID)
+	database.DB.First(&merchant, utils.DefaultMerchantID)
 	response.SuccessWithMessage(c, "支付配置已更新", merchant)
 }

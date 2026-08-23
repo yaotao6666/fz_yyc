@@ -3,7 +3,7 @@ package merchant
 import (
 	"encoding/json"
 	"fmt"
-	"fz_yyc_api/internal/middleware"
+	"fz_yyc_api/internal/handlers/rbac"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
@@ -31,7 +31,7 @@ func Login(c *gin.Context) {
 	}
 
 	var staff models.MerchantStaff
-	if err := database.DB.Preload("Merchant").Where("username = ? AND status = ?", req.Username, 1).First(&staff).Error; err != nil {
+	if err := database.DB.Where("username = ? AND status = ?", req.Username, 1).First(&staff).Error; err != nil {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "用户名或密码错误")
 		return
 	}
@@ -44,20 +44,25 @@ func Login(c *gin.Context) {
 	now := time.Now()
 	database.DB.Model(&models.MerchantStaff{}).Where("id = ?", staff.ID).Update("last_login_at", now)
 
-	// 使用商家ID而不是员工ID生成token
-	token, _ := utils.GenerateToken(staff.MerchantID, "merchant", staff.Username)
+	// 使用员工ID生成token（user_id 与 staff_id 均为员工ID）
+	token, _ := utils.GenerateToken(staff.ID, staff.ID, "merchant", staff.Username)
+	menus, permissions, rbacErr := rbac.BuildStaffMenusAndPermissions(&staff)
+	if rbacErr != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "加载权限失败")
+		return
+	}
 	response.Success(c, gin.H{
 		"token":       token,
-		"merchant_id": staff.MerchantID,
+		"merchant_id": utils.DefaultMerchantID,
 		"staff":       staff,
+		"menus":       menus,
+		"permissions": permissions,
 	})
 }
 
 func GetProfile(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
 	var merchant models.Merchant
-	if err := database.DB.First(&merchant, merchantID).Error; err != nil {
+	if err := database.DB.First(&merchant, utils.DefaultMerchantID).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
 		return
 	}
@@ -91,8 +96,6 @@ type UpdateProfileRequest struct {
 }
 
 func UpdateProfile(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
 	var req UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -134,27 +137,25 @@ func UpdateProfile(c *gin.Context) {
 		updates["announcement"] = req.Announcement
 	}
 
-	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Updates(updates).Error; err != nil {
+	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", utils.DefaultMerchantID).Updates(updates).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新商家信息失败")
 		return
 	}
 
 	var merchant models.Merchant
-	database.DB.First(&merchant, merchantID)
+	database.DB.First(&merchant, utils.DefaultMerchantID)
 	response.Success(c, merchant)
 }
 
 func GetSettings(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
 	var merchant models.Merchant
-	if err := database.DB.First(&merchant, merchantID).Error; err != nil {
+	if err := database.DB.First(&merchant, utils.DefaultMerchantID).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
 		return
 	}
 
 	var deliverySettings models.MerchantDeliverySettings
-	database.DB.Where("merchant_id = ?", merchantID).First(&deliverySettings)
+	database.DB.First(&deliverySettings)
 
 	notifyEnabled := true
 	browseNotifyEnabled := true
@@ -187,8 +188,6 @@ type UpdateSettingsRequest struct {
 }
 
 func UpdateSettings(c *gin.Context) {
-	_ = middleware.GetMerchantID(c)
-
 	var req UpdateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -226,8 +225,6 @@ type StatusRequest struct {
 }
 
 func UpdateStatus(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
 	var req StatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -242,7 +239,7 @@ func UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", merchantID).Update("status", *req.Status).Error; err != nil {
+	if err := database.DB.Model(&models.Merchant{}).Where("id = ?", utils.DefaultMerchantID).Update("status", *req.Status).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新状态失败")
 		return
 	}
@@ -251,15 +248,13 @@ func UpdateStatus(c *gin.Context) {
 }
 
 func GetQRCode(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
 	var merchant models.Merchant
-	if err := database.DB.Select("id", "name").First(&merchant, merchantID).Error; err != nil {
+	if err := database.DB.Select("id", "name").First(&merchant, utils.DefaultMerchantID).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
 		return
 	}
 
-	qrCode, err := utils.GenerateMerchantStoreQRCode(merchantID, 280)
+	qrCode, err := utils.GenerateMerchantStoreQRCode(280)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "生成微信小程序码失败: "+err.Error())
 		return
@@ -275,11 +270,9 @@ func GetQRCode(c *gin.Context) {
 }
 
 func GetDeliverySettings(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
 	var settings models.MerchantDeliverySettings
-	if err := database.DB.Where("merchant_id = ?", merchantID).First(&settings).Error; err != nil {
-		settings = models.MerchantDeliverySettings{MerchantID: merchantID}
+	if err := database.DB.First(&settings).Error; err != nil {
+		settings = models.MerchantDeliverySettings{}
 	}
 
 	response.Success(c, gin.H{
@@ -359,8 +352,6 @@ func normalizeDeliverySettingsRules(req DeliverySettingsRequest) ([]normalizedDi
 }
 
 func UpdateDeliverySettings(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
-
 	var req DeliverySettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
@@ -374,8 +365,8 @@ func UpdateDeliverySettings(c *gin.Context) {
 	}
 
 	var settings models.MerchantDeliverySettings
-	if err := database.DB.Where("merchant_id = ?", merchantID).First(&settings).Error; err != nil {
-		settings = models.MerchantDeliverySettings{MerchantID: merchantID}
+	if err := database.DB.First(&settings).Error; err != nil {
+		settings = models.MerchantDeliverySettings{}
 	}
 
 	settings.Enabled = req.Enabled

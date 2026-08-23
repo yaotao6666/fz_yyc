@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	nethttp "net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -24,17 +25,16 @@ import (
 
 	wxpay "github.com/wechatpay-apiv3/wechatpay-go/core"
 	"github.com/wechatpay-apiv3/wechatpay-go/core/auth/verifiers"
-	"github.com/wechatpay-apiv3/wechatpay-go/core/downloader"
 	"github.com/wechatpay-apiv3/wechatpay-go/core/notify"
 	"github.com/wechatpay-apiv3/wechatpay-go/core/option"
 	"github.com/wechatpay-apiv3/wechatpay-go/services/partnerpayments/jsapi"
+	"github.com/wechatpay-apiv3/wechatpay-go/services/profitsharing"
 	"github.com/wechatpay-apiv3/wechatpay-go/services/refunddomestic"
 )
 
 type JSAPIPayRequest struct {
 	AppID       string
 	OpenID      string
-	AppMode     string
 	SubMchID    string
 	OrderNo     string
 	Description string
@@ -80,9 +80,33 @@ type ServiceProviderClient struct {
 	certSerialNo   string
 	privateKey     *rsa.PrivateKey
 	wechatPubKey   string
+	pubKeyID       string
 	callbackURL    string
 	client         *wxpay.Client
 	notifyHandler  *notify.Handler
+}
+
+// SPMchID 返回服务商商户号（跨包访问）
+func (c *ServiceProviderClient) SPMchID() string {
+	return c.spMchID
+}
+
+// resolveKeyFileOrRaw 兼容两种配置方式：
+// - 配置值为已存在的文件路径 → 读取文件内容作为密钥材料
+// - 否则视为内联 PEM / Base64 原文
+func resolveKeyFileOrRaw(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", nil
+	}
+	if info, err := os.Stat(trimmed); err == nil && !info.IsDir() {
+		content, readErr := os.ReadFile(trimmed)
+		if readErr != nil {
+			return "", fmt.Errorf("读取密钥文件失败 %s: %w", trimmed, readErr)
+		}
+		return strings.TrimSpace(string(content)), nil
+	}
+	return trimmed, nil
 }
 
 func loadRSAPrivateKey(pemStr string) (*rsa.PrivateKey, error) {
@@ -116,29 +140,6 @@ func loadRSAPrivateKey(pemStr string) (*rsa.PrivateKey, error) {
 	return rsaKey, nil
 }
 
-func loadX509Cert(pemOrBase64 string) (*x509.Certificate, error) {
-	pemStr := strings.TrimSpace(pemOrBase64)
-	var raw []byte
-	if strings.Contains(pemStr, "-----BEGIN") {
-		block, _ := pem.Decode([]byte(pemStr))
-		if block == nil {
-			return nil, errors.New("证书PEM解析失败")
-		}
-		raw = block.Bytes
-	} else {
-		b, err := base64.StdEncoding.DecodeString(pemStr)
-		if err != nil {
-			return nil, fmt.Errorf("证书Base64解码失败: %w", err)
-		}
-		raw = b
-	}
-	cert, err := x509.ParseCertificate(raw)
-	if err != nil {
-		return nil, fmt.Errorf("解析X509证书失败: %w", err)
-	}
-	return cert, nil
-}
-
 func NewServiceProviderClient() (*ServiceProviderClient, error) {
 	if config.Config == nil {
 		return nil, fmt.Errorf("应用配置未初始化")
@@ -148,7 +149,10 @@ func NewServiceProviderClient() (*ServiceProviderClient, error) {
 	spMchID := strings.TrimSpace(wc.SPMchID)
 	apiv3Key := strings.TrimSpace(wc.APIV3Key)
 	certSerialNo := strings.TrimSpace(wc.CertSerialNo)
-	privateKeyStr := strings.TrimSpace(wc.PrivateKey)
+	privateKeyStr, err := resolveKeyFileOrRaw(wc.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
 	callbackURL := strings.TrimSpace(wc.CallbackURL)
 
 	if spMchID == "" || apiv3Key == "" || certSerialNo == "" || privateKeyStr == "" {
@@ -160,14 +164,35 @@ func NewServiceProviderClient() (*ServiceProviderClient, error) {
 		return nil, fmt.Errorf("解析支付私钥失败: %w", err)
 	}
 
+	publicKeyStr, err := resolveKeyFileOrRaw(wc.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	// 解析微信支付公钥（用于响应验签 + 敏感字段加密）
+	var pubKey *rsa.PublicKey
+	if publicKeyStr != "" {
+		if k, kErr := loadPublicKey(publicKeyStr); kErr == nil {
+			pubKey = k
+		}
+	}
+	pubKeyID := strings.TrimSpace(wc.PublicKeyID)
+
 	httpClient := &nethttp.Client{Timeout: 15 * time.Second}
 
-	wxClient, err := wxpay.NewClient(
-		context.Background(),
-		option.WithMerchantCredential(spMchID, certSerialNo, privKey),
-		option.WithHTTPClient(httpClient),
-		option.WithoutValidator(),
-	)
+	var clientOpts []wxpay.ClientOption
+	clientOpts = append(clientOpts, option.WithHTTPClient(httpClient))
+	if pubKey != nil && pubKeyID != "" {
+		// 微信支付公钥模式：负责签名、响应验签、敏感字段加密（自动携带 Wechatpay-Serial）
+		clientOpts = append(clientOpts,
+			option.WithWechatPayPublicKeyAuthCipher(spMchID, certSerialNo, privKey, pubKeyID, pubKey))
+	} else {
+		// 兜底：仅配置签名，不做响应验签
+		clientOpts = append(clientOpts,
+			option.WithMerchantCredential(spMchID, certSerialNo, privKey),
+			option.WithoutValidator(),
+		)
+	}
+	wxClient, err := wxpay.NewClient(context.Background(), clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("初始化微信支付客户端失败: %w", err)
 	}
@@ -177,7 +202,8 @@ func NewServiceProviderClient() (*ServiceProviderClient, error) {
 		apiv3Key:     apiv3Key,
 		certSerialNo: certSerialNo,
 		privateKey:   privKey,
-		wechatPubKey: strings.TrimSpace(wc.PublicKey),
+		wechatPubKey: publicKeyStr,
+		pubKeyID:     pubKeyID,
 		callbackURL:  callbackURL,
 		client:       wxClient,
 	}
@@ -190,27 +216,24 @@ func NewServiceProviderClient() (*ServiceProviderClient, error) {
 }
 
 func (c *ServiceProviderClient) initNotifyHandler() error {
-	var v wxpay.CertificateGetter
-	if c.wechatPubKey != "" {
-		cert, err := loadX509Cert(c.wechatPubKey)
-		if err == nil {
-			v = newStaticCertGetter(cert)
-		}
+	// 本项目使用微信支付公钥模式验签回调：公钥与公钥ID必须成对配置，不再回退下载平台证书
+	if c.wechatPubKey != "" && c.pubKeyID == "" {
+		return fmt.Errorf("微信支付通知验签配置不完整：已配置公钥 WECHAT_PAY_SP_PUBLIC_KEY，但缺少公钥ID WECHAT_PAY_SP_PUBLIC_KEY_ID")
 	}
-	if v == nil {
-		d, err := downloader.NewCertificateDownloader(
-			context.Background(),
-			c.spMchID,
-			c.privateKey,
-			c.certSerialNo,
-			c.apiv3Key,
-		)
-		if err != nil {
-			return fmt.Errorf("初始化微信平台证书下载器失败: %w", err)
-		}
-		v = d
+	if c.pubKeyID != "" && c.wechatPubKey == "" {
+		return fmt.Errorf("微信支付通知验签配置不完整：已配置公钥ID WECHAT_PAY_SP_PUBLIC_KEY_ID，但缺少公钥 WECHAT_PAY_SP_PUBLIC_KEY")
 	}
-	handler, err := notify.NewRSANotifyHandler(c.apiv3Key, verifiers.NewSHA256WithRSAVerifier(v))
+	if c.wechatPubKey == "" {
+		return fmt.Errorf("微信支付通知验签未配置：请在配置中提供 WECHAT_PAY_SP_PUBLIC_KEY(微信支付V3公钥) 与 WECHAT_PAY_SP_PUBLIC_KEY_ID(公钥ID)")
+	}
+	pubKey, err := loadPublicKey(c.wechatPubKey)
+	if err != nil {
+		return fmt.Errorf("微信支付V3公钥解析失败: %w", err)
+	}
+	handler, err := notify.NewRSANotifyHandler(
+		c.apiv3Key,
+		verifiers.NewSHA256WithRSAPubkeyVerifier(c.pubKeyID, *pubKey),
+	)
 	if err != nil {
 		return fmt.Errorf("初始化通知处理器失败: %w", err)
 	}
@@ -218,33 +241,34 @@ func (c *ServiceProviderClient) initNotifyHandler() error {
 	return nil
 }
 
-type staticCertGetter struct {
-	cert *x509.Certificate
-}
-
-func newStaticCertGetter(cert *x509.Certificate) *staticCertGetter { return &staticCertGetter{cert: cert} }
-
-func (g *staticCertGetter) Get(_ context.Context, serialNumber string) (*x509.Certificate, bool) {
-	_ = serialNumber
-	if g.cert == nil {
-		return nil, false
+// loadPublicKey 解析微信支付公钥（PEM 或 Base64 原文，PKCS1/PKCS8）
+func loadPublicKey(pemOrBase64 string) (*rsa.PublicKey, error) {
+	trimmed := strings.TrimSpace(pemOrBase64)
+	var raw []byte
+	if strings.Contains(trimmed, "-----BEGIN") {
+		block, _ := pem.Decode([]byte(trimmed))
+		if block == nil {
+			return nil, errors.New("公钥PEM解析失败")
+		}
+		raw = block.Bytes
+	} else {
+		decoded, err := base64.StdEncoding.DecodeString(trimmed)
+		if err != nil {
+			return nil, fmt.Errorf("公钥Base64解码失败: %w", err)
+		}
+		raw = decoded
 	}
-	return g.cert, true
-}
-
-func (g *staticCertGetter) GetAll(_ context.Context) map[string]*x509.Certificate {
-	if g.cert == nil {
-		return map[string]*x509.Certificate{}
+	if pkixKey, err := x509.ParsePKIXPublicKey(raw); err == nil {
+		if rsaKey, ok := pkixKey.(*rsa.PublicKey); ok {
+			return rsaKey, nil
+		}
+		return nil, errors.New("公钥不是RSA类型")
 	}
-	serial := strings.ToUpper(fmt.Sprintf("%X", g.cert.SerialNumber.Bytes()))
-	return map[string]*x509.Certificate{serial: g.cert}
-}
-
-func (g *staticCertGetter) GetNewestSerial(_ context.Context) string {
-	if g.cert == nil {
-		return ""
+	rsaKey, err2 := x509.ParsePKCS1PublicKey(raw)
+	if err2 != nil {
+		return nil, fmt.Errorf("解析RSA公钥失败: %w", err2)
 	}
-	return strings.ToUpper(fmt.Sprintf("%X", g.cert.SerialNumber.Bytes()))
+	return rsaKey, nil
 }
 
 func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(
@@ -261,23 +285,20 @@ func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(
 
 	svc := jsapi.JsapiApiService{Client: c.client}
 
+	// 固定 sub_app 模式：sp_appid 取服务商 appid，sub_appid 取特约商户主体小程序 appid
 	spAppid := strings.TrimSpace(config.Config.Wechat.AppID)
 	if spAppid == "" {
 		spAppid = req.AppID
 	}
-	var subAppid *string
-	if strings.EqualFold(req.AppMode, AppModeSubApp) {
-		sub := strings.TrimSpace(config.Config.Wechat.SubAppID)
-		if sub == "" {
-			sub = req.AppID
-		}
-		subAppid = wxpay.String(sub)
+	subAppid := strings.TrimSpace(config.Config.Wechat.SubAppID)
+	if subAppid == "" {
+		subAppid = req.AppID
 	}
 
 	r := jsapi.PrepayRequest{
 		SpAppid:     wxpay.String(spAppid),
 		SpMchid:     wxpay.String(c.spMchID),
-		SubAppid:    subAppid,
+		SubAppid:    wxpay.String(subAppid),
 		SubMchid:    wxpay.String(req.SubMchID),
 		Description: wxpay.String(req.Description),
 		OutTradeNo:  wxpay.String(req.OrderNo),
@@ -287,8 +308,8 @@ func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(
 			Currency: wxpay.String("CNY"),
 		},
 		Payer: &jsapi.Payer{
-			SpOpenid:  wxpay.String(req.OpenID),
-			SubOpenid: subAppidPayerOpenID(req.AppMode, req.OpenID),
+			SpOpenid:  nil,
+			SubOpenid: wxpay.String(req.OpenID),
 		},
 	}
 	expireAt := time.Now().Add(30 * time.Minute)
@@ -305,8 +326,8 @@ func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(
 	pkg := "prepay_id=" + prepayID
 
 	appID := spAppid
-	if strings.EqualFold(req.AppMode, AppModeSubApp) && subAppid != nil {
-		appID = *subAppid
+	if subAppid != "" {
+		appID = subAppid
 	}
 
 	message := appID + "\n" + timestamp + "\n" + nonce + "\n" + pkg + "\n"
@@ -324,13 +345,6 @@ func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(
 		PaySign:   signature,
 		PrepayID:  prepayID,
 	}, nil
-}
-
-func subAppidPayerOpenID(mode, openID string) *string {
-	if strings.EqualFold(mode, AppModeSubApp) {
-		return wxpay.String(openID)
-	}
-	return nil
 }
 
 func (c *ServiceProviderClient) resolveNotifyURL(raw string) string {
@@ -403,6 +417,285 @@ func (c *ServiceProviderClient) QueryPartnerRefundByRefundNo(
 		RefundID:    derefString(resp.RefundId),
 		SuccessTime: formatTimePtr(resp.SuccessTime),
 	}, nil
+}
+
+// ============================================
+// 分账 (Profit Sharing)
+// ============================================
+
+// ProfitSharingReceiverItem 一次分账指令中单个接收方的信息
+type ProfitSharingReceiverItem struct {
+	Type        string // 类型: MERCHANT_ID 商户号 / PERSONAL_OPENID 个人openid
+	Account     string // 商户号 或 个人openid
+	Name        string // 个人类型时的真实姓名(选传, 传则校实名)
+	Amount      int64  // 分账金额(单位:分)
+	Description string // 分账原因描述
+}
+
+// ProfitSharingRequest 创建分账单请求
+type ProfitSharingRequest struct {
+	SubMchID      string // 特约商户号(分账出资方)
+	AppID         string // 特约商户主体小程序appid
+	TransactionID string // 微信支付交易单号
+	OutOrderNo    string // 商户分账单号
+	Receivers     []ProfitSharingReceiverItem
+}
+
+// ProfitSharingReceiverResult 分账单内单方结果
+type ProfitSharingReceiverResult struct {
+	Type        string     // MERCHANT_ID / PERSONAL_OPENID
+	Account     string     // 接收方账号
+	Amount      int64      // 分账金额(分)
+	Result      string     // PENDING/SUCCESS/CLOSED
+	DetailID    string     // 微信分账明细单号
+	FailReason  string     // 失败原因
+	CreateTime  time.Time  // 分账创建时间
+	FinishTime  *time.Time // 分账完成时间
+}
+
+// ProfitSharingResult 分账单查询/创建结果
+type ProfitSharingResult struct {
+	OutOrderNo string
+	OrderID    string // 微信分账单号
+	Status     string // PROCESSING/FINISHED
+	Receivers  []ProfitSharingReceiverResult
+}
+
+// AddProfitSharingReceiverRequest 添加分账接收方请求
+type AddProfitSharingReceiverRequest struct {
+	SubMchID       string // 特约商户号(分账出资方)
+	AppID          string // 特约商户主体小程序appid
+	Type           string // MERCHANT_ID / PERSONAL_OPENID
+	Account        string // 商户号 或 个人openid
+	Name           string // 商户全称或开户人姓名(MERCHANT_ID必传) / 个人姓名(PERSONAL_OPENID选传)
+	RelationType   string // 与特约商户关系, 如 SERVICE_PROVIDER
+}
+
+// CreateProfitSharingOrder 创建分账单（将一笔已支付订单按各方金额分给多个接收方）
+func (c *ServiceProviderClient) CreateProfitSharingOrder(
+	ctx context.Context,
+	req ProfitSharingRequest,
+) (*ProfitSharingResult, error) {
+	if c.client == nil {
+		return nil, fmt.Errorf("微信支付客户端未初始化")
+	}
+	if len(req.Receivers) == 0 {
+		return nil, fmt.Errorf("分账接收方列表为空")
+	}
+	svc := profitsharing.OrdersApiService{Client: c.client}
+	receivers := make([]profitsharing.CreateOrderReceiver, 0, len(req.Receivers))
+	for _, r := range req.Receivers {
+		item := profitsharing.CreateOrderReceiver{
+			Type:        wxpay.String(r.Type),
+			Account:     wxpay.String(r.Account),
+			Amount:      wxpay.Int64(r.Amount),
+			Description: wxpay.String(r.Description),
+		}
+		if r.Name != "" {
+			item.Name = wxpay.String(r.Name)
+		}
+		receivers = append(receivers, item)
+	}
+	unfreezeUnsplit := false
+	resp, _, err := svc.CreateOrder(ctx, profitsharing.CreateOrderRequest{
+		Appid:            wxpay.String(req.AppID),
+		OutOrderNo:       wxpay.String(req.OutOrderNo),
+		SubMchid:         wxpay.String(req.SubMchID),
+		TransactionId:    wxpay.String(req.TransactionID),
+		Receivers:        receivers,
+		UnfreezeUnsplit:  &unfreezeUnsplit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("微信分账下单失败: %w", err)
+	}
+	return mapProfitSharingOrderEntity(resp), nil
+}
+
+// QueryProfitSharingOrder 查询分账结果
+func (c *ServiceProviderClient) QueryProfitSharingOrder(
+	ctx context.Context,
+	subMchID, transactionID, outOrderNo string,
+) (*ProfitSharingResult, error) {
+	if c.client == nil {
+		return nil, fmt.Errorf("微信支付客户端未初始化")
+	}
+	svc := profitsharing.OrdersApiService{Client: c.client}
+	resp, _, err := svc.QueryOrder(ctx, profitsharing.QueryOrderRequest{
+		SubMchid:      wxpay.String(subMchID),
+		TransactionId: wxpay.String(transactionID),
+		OutOrderNo:    wxpay.String(outOrderNo),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("微信分账结果查询失败: %w", err)
+	}
+	return mapProfitSharingOrderEntity(resp), nil
+}
+
+// QueryProfitSharingMerchantRatio 查询特约商户允许父商户分账的最大比例（单位: 万分比）
+func (c *ServiceProviderClient) QueryProfitSharingMerchantRatio(ctx context.Context, subMchID string) (int64, error) {
+	if c.client == nil {
+		return 0, fmt.Errorf("微信支付客户端未初始化")
+	}
+	if subMchID == "" {
+		return 0, fmt.Errorf("缺少子商户号")
+	}
+	svc := profitsharing.MerchantsApiService{Client: c.client}
+	resp, _, err := svc.QueryMerchantRatio(ctx, profitsharing.QueryMerchantRatioRequest{
+		SubMchid: wxpay.String(subMchID),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("微信分账比例查询失败: %w", err)
+	}
+	if resp == nil || resp.MaxRatio == nil {
+		return 0, fmt.Errorf("微信未返回允许分账比例")
+	}
+	return *resp.MaxRatio, nil
+}
+
+// AddProfitSharingReceiver 建立分账接收方关系
+func (c *ServiceProviderClient) AddProfitSharingReceiver(
+	ctx context.Context,
+	req AddProfitSharingReceiverRequest,
+) error {
+	if c.client == nil {
+		return fmt.Errorf("微信支付客户端未初始化")
+	}
+	if req.SubMchID == "" || req.AppID == "" || req.Type == "" || req.Account == "" || req.RelationType == "" {
+		return fmt.Errorf("缺少分账接收方信息(sub_mchid/appid/type/account/relation_type)")
+	}
+	svc := profitsharing.ReceiversApiService{Client: c.client}
+	recvType := profitsharing.ReceiverType(req.Type)
+	recvRelation := profitsharing.ReceiverRelationType(req.RelationType)
+	body := profitsharing.AddReceiverRequest{
+		Appid:        wxpay.String(req.AppID),
+		SubMchid:     wxpay.String(req.SubMchID),
+		Type:         &recvType,
+		Account:      wxpay.String(req.Account),
+		RelationType: &recvRelation,
+	}
+	if req.Name != "" {
+		body.Name = wxpay.String(req.Name)
+	}
+	_, _, err := svc.AddReceiver(ctx, body)
+	if err != nil {
+		// 已存在的接收方关系视为成功，避免重复建关系报错
+		if IsProfitSharingReceiverAlreadyExists(err) {
+			return nil
+		}
+		return fmt.Errorf("微信建立分账接收方关系失败: %w", err)
+	}
+	return nil
+}
+
+// DeleteProfitSharingReceiver 解除分账接收方关系
+func (c *ServiceProviderClient) DeleteProfitSharingReceiver(
+	ctx context.Context,
+	req AddProfitSharingReceiverRequest,
+) error {
+	if c.client == nil {
+		return fmt.Errorf("微信支付客户端未初始化")
+	}
+	if req.SubMchID == "" || req.AppID == "" || req.Type == "" || req.Account == "" {
+		return fmt.Errorf("缺少分账接收方信息(sub_mchid/appid/type/account)")
+	}
+	svc := profitsharing.ReceiversApiService{Client: c.client}
+	delType := profitsharing.ReceiverType(req.Type)
+	_, _, err := svc.DeleteReceiver(ctx, profitsharing.DeleteReceiverRequest{
+		Appid:    wxpay.String(req.AppID),
+		SubMchid: wxpay.String(req.SubMchID),
+		Type:     &delType,
+		Account:  wxpay.String(req.Account),
+	})
+	if err != nil {
+		return fmt.Errorf("微信解除分账接收方关系失败: %w", err)
+	}
+	return nil
+}
+
+// mapProfitSharingOrderEntity 将微信分账单实体映射为内部结果结构
+func mapProfitSharingOrderEntity(resp *profitsharing.OrdersEntity) *ProfitSharingResult {
+	if resp == nil {
+		return &ProfitSharingResult{}
+	}
+	result := &ProfitSharingResult{
+		OutOrderNo: derefString(resp.OutOrderNo),
+		OrderID:    derefString(resp.OrderId),
+		Status:     "",
+		Receivers:  []ProfitSharingReceiverResult{},
+	}
+	if resp.State != nil {
+		result.Status = string(*resp.State)
+	}
+	for _, r := range resp.Receivers {
+		item := ProfitSharingReceiverResult{
+			Type:       derefReceiverType(r.Type),
+			Account:    derefString(r.Account),
+			Amount:     derefInt64(r.Amount),
+			Result:     derefDetailStatus(r.Result),
+			DetailID:   derefString(r.DetailId),
+			FailReason: derefDetailFailReason(r.FailReason),
+		}
+		if r.CreateTime != nil {
+			item.CreateTime = *r.CreateTime
+		}
+		if r.FinishTime != nil {
+			item.FinishTime = r.FinishTime
+		}
+		result.Receivers = append(result.Receivers, item)
+	}
+	return result
+}
+
+func derefReceiverType(t *profitsharing.ReceiverType) string {
+	if t == nil {
+		return ""
+	}
+	return string(*t)
+}
+
+func derefDetailStatus(s *profitsharing.DetailStatus) string {
+	if s == nil {
+		return ""
+	}
+	return string(*s)
+}
+
+func derefDetailFailReason(r *profitsharing.DetailFailReason) string {
+	if r == nil {
+		return ""
+	}
+	return string(*r)
+}
+
+func derefInt64(v *int64) int64 {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+// IsProfitSharingReceiverAlreadyExists 判断是否为「分账接收方已存在」错误
+func IsProfitSharingReceiverAlreadyExists(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr *wxpay.APIError
+	if errors.As(err, &apiErr) && strings.Contains(apiErr.Message, "已存在") {
+		return true
+	}
+	return strings.Contains(err.Error(), "已存在")
+}
+
+// IsProfitSharingReceiverRelationNotExist 判断是否为「分账接收方关系不存在」错误
+func IsProfitSharingReceiverRelationNotExist(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr *wxpay.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == "PARAM_ERROR" && strings.Contains(apiErr.Message, "关系不存在") {
+		return true
+	}
+	return strings.Contains(err.Error(), "关系不存在")
 }
 
 // ============================================

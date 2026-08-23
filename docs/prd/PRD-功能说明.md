@@ -12,7 +12,7 @@
 
 ## 2. 产品角色
 
-系统采用单商家模式，不存在服务商实体与多商家管理能力。微信支付服务商凭证为系统级配置，单商户通过回填 `sub_mch_id` 接入支付。
+系统采用单商家模式。微信支付商户凭证为系统级配置，单商户通过回填 `sub_mch_id` 接入支付。
 
 ### 2.1 客户端小程序
 
@@ -30,12 +30,13 @@
 
 - 独立 Web 后台入口，单商户统一经营管理。
 - 核心职责：
-  - 商品与分类管理
+  - 商品与分类管理（商品管理为一级目录，下含商品管理、分类管理二级菜单）
   - 订单查看、核销、退款处理
   - 满减营销、打印机、公告管理
   - 服务人员管理（添加与审核）
   - 商户经营数据分析
   - 商户资料与设置
+  - **系统管理（RBAC）**：菜单管理、角色管理、部门管理、员工管理（多角色 + owner 超管直通，三层精准权限控制）
 
 ### 2.3 服务人员端
 
@@ -68,10 +69,20 @@ tabBar 页面（商城主导航）：
 - `pages/store/order-detail`：订单详情（租赁订单展示租赁时长、押金状态、归还/退还信息）
 - `pages/store/address-list`：收货地址列表
 - `pages/store/address-edit`：编辑地址
+- `pages/store/my-health`：我的健康首页（健康档案查看、自助评估入口、适配建议入口、照护计划入口、康复随访/健康宣教/体征记录入口）
+- `pages/store/health-record-edit`：健康档案编辑（建档/更新）
+- `pages/store/health-assessment`：自助健康评估（选量表答题，提交后回显总分/等级/结论）
+- `pages/store/my-fitting`：我的适配建议（列表/详情/确认，推荐商品"去选购"跳商品详情页复用现有下单链路）
+- `pages/store/my-care-plans`：我的照护计划（列表/详情，查看计划内容与历史照护记录）
+- `pages/store/care-plan-detail`：照护计划详情（计划信息 + 照护记录列表）
+- `pages/store/my-follow-ups`：我的康复随访（本人随访任务列表/详情，查看状态与随访结果）
+- `pages/store/health-education`：健康宣教列表（已发布文章，按本人慢病标签匹配度排序，支持分类筛选）
+- `pages/store/education-detail`：健康宣教文章详情（浏览量 +1）
+- `pages/store/my-monitoring`：我的体征记录（列表按类型筛选 + 自助录入）
 
 入口参数与下单方式说明：
 
-- `pages/home/index`、`pages/store/product`、`pages/store/confirm`：统一支持从 `merchant_id` 或 `scene` 解析商家入口参数
+- `pages/home/index`、`pages/store/product`、`pages/store/confirm`：统一解析店铺入口参数（单商户模式，入口固定单店）
 - `pages/store/confirm` 根据 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 动态展示可选下单方式，未开启的方式不展示
 - `pages/store/confirm` 展示商户当前启用的满减规则、已命中优惠和下一档提示，下单金额以服务端返回的 `discount_amount`、`pay_amount` 为准
 - `pages/store/confirm` 支持 `buy_now=1` 参数走"立即购买"流程，使用 `buyNowItem` 而非购物车商品展示与下单
@@ -100,6 +111,14 @@ tabBar 页面（商城主导航）：
 - 服务人员管理页：服务人员账号添加、注册申请审核、启停
 - `web-admin/src/views/analytics/MerchantStatsView.vue`：商户经营数据分析
 - `web-admin/src/views/settings/SpSettingsView.vue`：商户设置（商户资料、支付配置、配送设置、营业状态）
+- `web-admin/src/views/health/HealthRecordsView.vue`：健康档案管理（列表/详情/编辑，路由 `/health/records`）
+- `web-admin/src/views/health/HealthAssessmentFormsView.vue`：评估量表管理（新增/编辑/删除/启停，路由 `/health/assessment-forms`）
+- `web-admin/src/views/health/HealthAssessmentsView.vue`：评估记录（列表与按关键字/量表筛选，路由 `/health/assessments`）
+- `web-admin/src/views/health/FittingRecommendationsView.vue`：适配建议管理（搜索/列表/详情抽屉/编辑弹窗(推荐商品远程搜索)/删除/分页，路由 `/health/fitting`）
+- `web-admin/src/views/health/CarePlansView.vue`：照护计划管理（搜索/列表/详情抽屉(含照护记录表)/新增编辑弹窗(居民远程搜索+护理项动态行+指派服务人员)/删除/分页，路由 `/health/care-plans`）
+- `web-admin/src/views/health/FollowUpTasksView.vue`：随访任务管理（按用户关键字/状态/任务类型搜索、列表分页、手动登记、详情、执行弹窗(随访方式/内容/宣教文章多选/满意度)、管理员代执行，路由 `/health/follow-ups`）
+- `web-admin/src/views/health/HealthMonitoringView.vue`：生命体征监测（只读查询，按用户关键字/监测类型筛选、分页，路由 `/health/monitoring`）
+- `web-admin/src/views/health/EducationArticlesView.vue`：健康宣教管理（列表/新增编辑(标题/分类/封面/正文/定向慢病标签/状态/发布时间)/删除/分页，路由 `/health/education`）
 
 ### 3.3 服务人员接单小程序页面
 
@@ -108,7 +127,16 @@ tabBar 页面（商城主导航）：
 - `pages/orders/pending`：待接订单列表
 - `pages/orders/accepted`：已接订单列表
 - `pages/orders/detail`：订单详情
-- `pages/profile/index`：个人中心与接单统计
+- `pages/profile/index`：个人中心与接单统计（含"我的照护计划"、"随访任务"入口，随访任务入口含待执行角标）
+- `pages/health/resident`：居民健康档案查看（客户健康档案、评估记录与适配建议、生命体征，数据权限校验，含"生成适配建议"按钮）
+- `pages/health/assess`：健康评估（为客户上门登记评估）
+- `pages/health/fitting-form`：生成适配建议（症状/需求描述、适配结论、推荐商品多选+理由）
+- `pages/health/care-plans`：我的照护计划（列表，仅展示指派给我的计划）
+- `pages/health/care-plan-detail`：照护计划详情（计划内容 + 历史照护记录）
+- `pages/health/care-visit-form`：录入上门照护记录（护理项勾选/生命体征/照片/备注/下次随访建议）
+- `pages/health/follow-ups`：我的随访任务（列表，状态筛选，可见指派给我或待认领的任务）
+- `pages/health/follow-up-detail`：随访执行（随访方式/内容/宣教文章多选/满意度/跳过，待认领任务执行时自动认领）
+- 工单详情页新增"客户健康档案"入口，进入客户档案/评估页面；签退成功后提示"录入照护记录"（携带 orderId 进入 `pages/health/care-visit-form`）
 
 ## 4. 核心功能说明
 
@@ -165,8 +193,8 @@ tabBar 页面（商城主导航）：
   - `sub_mch_id`
 - 已进件商户只需要回填子商户号即可拉起支付，本轮联调样例为 `1112649854`。
 - `sub_mch_id` 已配置时，支付配置状态视为完成。
-- 微信支付服务商凭证（`mch_id`、`api_key`、`api_v3_key`、证书序列号、私钥、公钥、回调地址）作为系统级配置管理，不存在服务商管理实体。
-- 支付回调、退款沿用服务商支付链路，由系统级凭证统一承载。
+- 微信支付商户凭证（`mch_id`、`api_key`、`api_v3_key`、证书序列号、私钥、公钥、回调地址）作为系统级配置管理。
+- 支付回调、退款沿用系统支付链路，由系统级凭证统一承载。
 
 ### 4.3 商品与分类管理
 
@@ -190,7 +218,7 @@ tabBar 页面（商城主导航）：
   - `max_rental_duration` 最大租赁时长（0=不限；>0 时 C 端时长选择器限制在该范围内）
 - 一口价商品沿用原下单流程；租赁商品下单时必须传入 `rental_duration`，金额按 `rental_price × rental_duration × quantity + deposit × quantity` 计算。
 - 租赁订单的 `total_deposit > 0`，订单状态流转与一口价一致，但 `paid` 在业务上等同"租赁中"，需等待用户归还商品。
-- 归还由商家在 PC 后台订单详情触发：填写扣除金额（可选）与验机备注，调用 `POST /api/v1/sp/merchants/{merchant_id}/orders/{order_id}/return`，系统原路退还押金。
+- 归还由商家在 PC 后台订单详情触发：填写扣除金额（可选）与验机备注，调用 `POST /api/v1/merchant/orders/{order_id}/return`，系统原路退还押金。
 - 归还后订单主状态仍为 `paid`，需商家手动核销为 `completed`。
 
 ### 4.3.1 满减营销
@@ -295,6 +323,68 @@ tabBar 页面（商城主导航）：
 - 已接订单与历史：服务人员可在 `pages/orders/accepted` 查看已接订单列表，在 `pages/orders/detail` 查看订单详情，在 `pages/profile/index` 查看接单统计。
 - 服务人员不执行核销。
 
+### 4.10 系统管理（RBAC 权限体系）
+
+- **数据模型**：`sys_menus`（菜单/按钮）、`sys_roles`（角色）、`sys_role_menus`（角色-菜单关联）、`sys_departments`（部门，树形）、`merchant_staff_roles`（员工-角色关联）；`merchant_staffs` 新增 `department_id`。
+- **角色**：预置「超级管理员」（code=admin，绑定全部菜单）作模板；`role=owner`（店铺负责人）为超管直通，不依赖角色绑定。
+- **三层精准控制**：
+  1. 接口级：后端 RBAC 中间件，按权限码校验，无权限返回 403；
+  2. 页面级：前端路由 `meta.permission` + 路由守卫，无权限重定向工作台；
+  3. 按钮级：前端 `v-permission` 指令，无权限自动移除按钮。
+- **动态菜单**：登录响应返回 `menus`（当前员工可见菜单树）与 `permissions`（权限码数组）；侧边栏按菜单树动态渲染，支持一级目录 + 二级子菜单，目录在存在可见子菜单时显示；「商品管理」为一级目录，真实商品管理 `/products` 与分类管理 `/categories` 为其二级菜单。
+- **员工管理**：支持姓名/手机号/用户名/密码、所属部门、关联角色（多选）、启用/禁用、重置密码；「至少保留一个店铺负责人」校验。
+- **菜单管理**：树形维护菜单/按钮（名称、路径、图标、排序、权限标识、状态、显示），删除受限（存在子菜单或被角色引用时拒绝）。
+- **角色管理**：列表 + 分配权限（菜单树多选回显，覆盖式保存）；删除受限（被员工绑定拒绝）。
+- **部门管理**：树形维护部门（名称、负责人、电话、排序、状态）；删除受限（存在子部门或关联员工拒绝）。
+- **权限变更生效**：角色/菜单/员工变更时后端清空 RBAC 缓存（约 60s 缓存窗口），员工重登或调用 `GET /api/v1/merchant/rbac/permissions` 刷新即时生效。
+- **不含数据权限**：员工可见全量业务数据，仅控制功能权限（菜单/按钮）。
+
+### 4.11 基层健康服务闭环（阶段一：居民健康档案与人群健康评估）
+
+- **阶段范围**：阶段一落地「居民健康档案 + 人群健康评估」，覆盖三端：web-admin 档案/量表管理、服务人员上门评估、C 端查看与自助评估。
+- **居民健康档案（health_records）**：C 端用户可建档/更新个人健康档案（真实姓名、性别、出生日期、身份证号、联系电话、紧急联系人、常住地址、身高体重、血型、既往病史/过敏史/家族病史/手术史/长期用药/慢病标签、吸烟饮酒、评估等级等）；web-admin 可查看列表（按关键字/评估等级筛选）、详情（含评估记录）与编辑档案。
+- **评估量表（health_assessment_forms）**：web-admin 配置量表（名称、评估维度、题目与选项分值、评分规则、草稿/启用状态）；C 端与服务人员端仅展示启用中的量表。
+- **评估记录（health_assessments）**：C 端自助评估（`assessor_type=1`）与服务人员上门评估（`assessor_type=2`）均保存评估快照（量表名、答案、总分、等级、结论、建议、症状描述），并将等级回写档案 `assessment_level`。
+- **数据权限**：服务人员仅能查看/评估自己接单服务过的客户（按 `orders.assigned_staff_id` 关联校验），否则返回 403；web-admin 按 RBAC 权限码控制（`health:view` / `health:update` / `assessment:view` / `assessment:create/update/delete`）。
+- **计分规则**：总分 = 各题选中 option 的 `score` 之和；等级取 `score_rule` 中第一条命中 `min <= 总分 <= max` 的 `level` / `conclusion`。
+- **量表维度**：`adl` 日常生活能力 / `barthel` 巴氏指数 / `fall` 跌倒风险 / `nutrition` 营养评估 / `cognition` 认知评估 / `pressure` 压疮风险 / `weak` 衰弱筛查 / `geriatric` 老年综合 / `self` 通用自评。
+- **慢病标签常见值**：高血压、糖尿病、冠心病、脑卒中、慢阻肺、骨质疏松、帕金森、阿尔茨海默、关节炎、其他。
+
+### 4.11.1 基层健康服务闭环（阶段二：康复辅具适配）
+
+- **阶段范围**：阶段二落地「康复辅具适配」，在阶段一健康档案与评估基础上形成「评估→适配→销售/租赁」闭环，覆盖三端：web-admin 适配建议管理、服务人员上门生成适配建议、C 端查看/确认与选购。
+- **适配建议（fitting_recommendations）**：服务人员端基于评估为客户生成适配建议，保存症状/需求描述、适配结论、推荐商品快照与生成服务人员；`status` 0 草稿 / 1 已确认 / 2 已下单。
+- **状态流转**：服务人员端生成即草稿（`status=0`）→ C 端用户确认后 `status=1`（已确认）→ 关联订单后 `status=2`（已下单）。
+- **推荐商品快照**：推荐商品保存快照 `{product_id, name, reason, sale_type}`（商品名/销售类型生成时固化，不受后续商品改价改名影响），生成/编辑时逐一校验商品存在且上架（`status=1`），不满足返回"推荐商品不可用"。
+- **三端职责**：
+  - **web-admin**：`/health/fitting` 适配建议管理页，支持按用户昵称/手机号与状态搜索、列表分页、详情抽屉、编辑弹窗（结论/推荐商品远程搜索/状态/关联订单）、删除；按 RBAC 权限码 `fitting:view` / `fitting:update` 控制。
+  - **服务人员端**：`pages/health/resident` 客户档案页新增"适配建议"区块与"生成适配建议"按钮；`pages/health/fitting-form` 填写症状/结论并多选推荐商品（含理由）提交，数据权限校验仅限服务过的客户。
+  - **C 端**：`pages/store/my-fitting` 我的适配建议列表/详情/确认，推荐商品每件提供"去选购"入口，跳转商品详情页复用现有下单链路（支持一口价/租赁）；`pages/store/my-health` 入口网格新增"适配建议"。
+
+### 4.11.2 基层健康服务闭环（阶段三：居家康养照护）
+
+- **阶段范围**：阶段三落地「居家康养照护」，在阶段一、阶段二基础上由 web-admin 制定照护计划并指派服务人员，服务人员上门服务后录入照护记录，形成「评估→适配→照护」闭环，覆盖三端：web-admin 照护计划管理、服务人员端我的照护计划与录入照护记录、C 端查看我的照护计划。
+- **照护计划（care_plans）**：web-admin 创建照护计划（居民、计划类型 1生活照料/2基础护理/3康复训练/4综合康养、起止日期、频次、目标、护理项配置、指派服务人员、关联订单、状态 0草稿/1执行中/2已暂停/3已完成）；服务人员端与 C 端仅可见自己的计划。
+- **上门照护记录（care_visits）**：服务人员上门服务后录入照护记录（护理项完成情况、生命体征、照片、备注、下次随访建议），关联照护计划或工单至少其一，且须属于当前服务人员负责范围。
+- **三端职责**：
+  - **web-admin**：`/health/care-plans` 照护计划管理页，支持按用户关键字/计划类型/状态搜索、列表分页（含照护次数）、详情抽屉（含照护记录表）、新增/编辑弹窗（居民远程搜索、护理项动态行、指派服务人员）、删除；按 RBAC 权限码 `care:view` / `care:create` 控制。
+  - **服务人员端**：`pages/health/care-plans` 我的照护计划、`care-plan-detail` 详情与历史照护记录、`care-visit-form` 录入照护记录（护理项勾选/生命体征/照片/备注/下次随访建议）；profile 页"我的照护计划"入口；工单详情签退成功后提示"录入照护记录"（携带 orderId）。
+  - **C 端**：`pages/store/my-care-plans` 我的照护计划列表、`care-plan-detail` 详情与照护记录；`pages/store/my-health` 入口网格新增"照护计划"。
+- **业务规则**：照护记录 `plan_id` / `order_id` 至少提供一个且均须属于当前服务人员负责范围（数据权限），`user_id` 取 plan/order 对应且一致；存在照护记录的计划不可删除（保留历史溯源）。
+
+### 4.11.3 基层健康服务闭环（阶段四：持续康复随访与健康宣教）
+
+- **阶段范围**：阶段四落地「持续康复随访 + 生命体征监测 + 健康宣教」，在阶段一至阶段三基础上形成「评估→适配→照护→随访→监测→宣教」四阶段完整闭环，覆盖三端：web-admin 随访任务/体征/宣教管理、服务人员执行随访与上门体征录入、C 端查看随访与体征、阅读健康宣教。
+- **随访任务（follow_up_tasks）**：`task_type` 1康复随访/2租后回访/3慢病随访/4评估回访，`source_type` 1服务完成/2租赁归还/3评估完成/4手动，`status` 0待执行/1已完成/2已跳过，`contact_method` 1电话/2上门/3微信；`staff_id` 为空表示待认领。
+- **自动生成**：服务工单签退完成（租赁订单→租后回访、其他服务订单→康复随访，执行人=当前服务人员）、租赁归还完成（租后回访）、健康评估完成（评估回访，自助与服务人员评估均触发）三处自动生成随访任务，计划随访时间=完成/评估时点+72 小时，由 `server/internal/services/followup` 包 `CreateFollowUpTask` 统一实现，失败仅记录日志、不影响业务主流程。
+- **生命体征监测（health_monitoring）**：`record_type` 1血压/2血糖/3心率/4血氧/5体重，录入支持用户自助（`recorded_by=0`）与服务人员上门（`recorded_by=服务人员ID`），记录时间 `recorded_at` 用 RFC3339 带时区。
+- **健康宣教（health_education_articles）**：管理端维护文章（标题/分类/封面/正文/定向慢病标签/状态/发布时间），仅已发布对 C 端与服务人员端可见；C 端按本人档案慢病标签与文章 `tags` 匹配度排序，详情浏览计浏览量（异步 +1）。
+- **三端职责**：
+  - **web-admin**：`/health/follow-ups` 随访任务管理（搜索/列表/登记/详情/执行弹窗(随访方式/内容/宣教文章多选/满意度)/分页）、`/health/monitoring` 生命体征监测（只读查询）、`/health/education` 健康宣教管理（列表/新增编辑/删除）；按 RBAC 权限码 `followup:view` / `followup:update` / `monitor:view` / `monitor:create` / `education:view` / `education:create` 控制。
+  - **服务人员端**：`pages/health/follow-ups` 我的随访任务（状态筛选，profile 页"随访任务"入口含待执行角标）、`follow-up-detail` 随访执行（方式/内容/宣教文章多选/满意度/跳过，待认领任务自动认领）；`resident` 客户档案页新增"生命体征"区块与上门录入。
+  - **C 端**：`pages/store/my-follow-ups` 我的康复随访、`health-education` 健康宣教列表、`education-detail` 文章详情、`my-monitoring` 体征记录列表+录入；`my-health` 入口网格新增"康复随访/健康宣教/体征记录"。
+- **业务规则**：待认领任务服务人员可执行并自动认领，本人无权操作他人任务（403）；服务人员仅能随访/录入本人服务过的客户（数据权限，否则 403）；宣教文章仅已发布对 C 端/服务人员端可见；慢病标签维护在健康档案 `health_records.chronic_tags`，供宣教定向与随访选用。
+
 ## 5. 完整业务链路摘要
 
 ### 5.1 商户经营主链路
@@ -337,11 +427,42 @@ tabBar 页面（商城主导航）：
 7. 系统通过微信支付原路退还押金（扣除损坏赔偿后），订单 `deposit_status` 置为已退还/已扣除
 8. 商户管理员确认无误后对订单执行核销，订单流转为 `completed`
 
+### 5.5 基层健康服务闭环链路
+
+1. 用户在 C 端「我的健康」进入，未建档时先填写档案完成建档，已建档则直接查看/更新
+2. 用户在 C 端选择启用中的量表自助完成评估，或服务人员上门为客户登记评估
+3. 系统按量表评分规则计算总分/等级/结论，生成评估记录，并将等级回写档案 `assessment_level`
+4. 服务人员在工单详情进入「客户健康档案」，查看客户档案与评估记录（数据权限校验）
+5. web-admin 在「健康服务」菜单下管理健康档案（`health:view` / `health:update`）、评估量表（`assessment:view` / `assessment:create/update/delete`）与评估记录（`assessment:view` / `assessment:create`）
+
+**阶段二（康复辅具适配）扩展步骤：**
+
+6. 服务人员在 `pages/health/resident` 客户档案页点击"生成适配建议"，进入 `pages/health/fitting-form` 填写症状/适配结论并多选推荐商品（含理由），提交后生成适配建议（`status=0` 草稿，推荐商品校验在售并保存快照）
+7. C 端用户在 `pages/store/my-fitting` 查看适配建议，确认后 `status=1`（已确认）；对推荐商品点击"去选购"进入商品详情页，复用现有下单链路完成购买/租赁
+8. 适配建议关联订单后 `status=2`（已下单），web-admin 在 `/health/fitting` 适配建议页编辑结论/推荐商品/状态/关联订单或删除（`fitting:view` / `fitting:update`）
+
+**阶段三（居家康养照护）扩展步骤：**
+
+9. web-admin 在 `/health/care-plans` 为居民制定照护计划（选择居民、计划类型、起止日期、频次、目标、护理项、指派服务人员），计划状态默认草稿，可置为执行中
+10. 服务人员在「我的照护计划」查看被指派的计划与护理项，按计划上门服务
+11. 服务人员完成上门服务后在 `pages/health/care-visit-form` 录入照护记录（护理项完成情况、生命体征、照片、备注、下次随访建议），可关联计划或工单（至少其一，且须属于本人负责范围，`user_id` 取 plan/order 对应且一致）
+12. C 端用户在 `pages/store/my-care-plans` 查看自己的照护计划与历史照护记录；web-admin 可查看照护记录（`care:view`），存在照护记录的计划不可删除
+
+**阶段四（持续康复随访与健康宣教）扩展步骤：**
+
+13. 服务工单签退完成后系统自动生成随访任务（租赁订单→租后回访、其他服务订单→康复随访，执行人=当前服务人员）；租赁归还（PC 后台归还退押金）完成后自动生成租后回访；健康评估完成后自动生成评估回访；计划随访时间=完成/评估时点+72 小时（`server/internal/services/followup` 包 `CreateFollowUpTask` 统一实现）
+14. 服务人员在「我的随访任务」（profile 页入口，含待执行角标）查看指派给自己或待认领的任务并按状态筛选；进入 `pages/health/follow-up-detail` 执行随访：选择随访方式（电话/上门/微信）、填写随访内容、多选健康宣教文章、评分满意度，或跳过任务；待认领任务执行时自动认领
+15. 服务人员上门随访时在客户档案页「生命体征」区块查看历史记录并录入当前体征（`recorded_by=当前服务人员`）；C 端用户在 `pages/store/my-monitoring` 自助录入体征（`recorded_by=0`）并查看本人记录
+16. web-admin 在 `/health/education` 维护健康宣教文章（定向慢病标签，仅已发布对外可见）；服务人员随访执行时可选用已发布的宣教文章；C 端用户在 `pages/store/health-education` 按本人慢病标签匹配度阅读宣教内容，详情浏览计浏览量
+
+至此，「评估→适配→照护→随访→监测→宣教」基层健康服务四阶段闭环已完整落地。
+
 ## 6. 与根 PRD 的对应关系
 
 - 项目概述、角色与三端定位：对应 `PRD.md` 第 1 章（1.2 产品定位与三端架构、1.3 客户端小程序、1.5 商户 PC 后台、1.6 服务人员接单小程序）
 - 商户接入与支付配置：对应 `PRD.md` 第 1.8 节
-- 微信支付服务商模式：对应 `PRD.md` 第 1.9 节
+- 微信支付商户模式：对应 `PRD.md` 第 1.9 节
 - 功能模块：对应 `PRD.md` 第 2 章
 - 业务流程与状态约定：对应 `PRD.md` 第 1.8 节及相关业务章节
+- 基层健康服务闭环：对应 `PRD.md` 第 2.11 节（功能模块）与 3.11 节（API 接口）
 - 若功能实现有变化，必须同步更新本文件与根 `PRD.md` 索引摘要

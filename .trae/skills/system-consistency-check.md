@@ -58,12 +58,10 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
    - 约束条件是否一致（NOT NULL、DEFAULT、UNIQUE、外键）
 5. 对于 PRD 未定义但数据库中存在的表/字段，标记为"PRD未定义"，提示确认
 
-**PRD 中定义的数据表清单**（共 23 张）：
+**PRD 中定义的数据表清单**（共 21 张）：
 
 | 表名 | 说明 |
 |------|------|
-| service_providers | 服务商 |
-| service_provider_admins | 服务商管理员 |
 | merchants | 商家 |
 | merchant_delivery_settings | 商家配送设置 |
 | merchant_staffs | 商家员工 |
@@ -120,7 +118,6 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
 2. 逐个读取 `server/internal/handlers/` 下各子目录的 handler 文件：
    - `admin/` — 管理员登录、支付回调
    - `merchant/` — 商家端所有业务（商品、订单、分类、员工、分析、配送、打印等）
-   - `sp/` — 服务商端所有业务（仪表盘、商家管理、公告、活动、设置等）
    - `user/` — C端用户业务（店铺、订单、地址等）
    - `upload/` — 文件上传
    - `ws/` — WebSocket
@@ -128,7 +125,7 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
    - 请求结构体（binding 标签）的字段是否与 models.go 中对应模型的字段一致
    - 响应数据是否正确映射模型字段
    - 数据库查询是否使用了正确的模型关联和预加载
-   - 中间件认证是否正确（merchant/sp/user 角色区分）
+   - 中间件认证是否正确（merchant/user 角色区分）
 4. 验证路由与 handler 的映射完整性：
    - main.go 注册的路由是否有对应 handler 实现
    - handler 中导出的函数是否都在 main.go 中注册了路由
@@ -142,7 +139,6 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
 | C端店铺 | /api/v1/store/:merchant_id | 无 | user |
 | C端用户 | /api/v1/user | JWT | user |
 | 商家管理 | /api/v1/merchant | JWT | merchant |
-| 服务商 | /api/v1/sp | JWT | sp |
 | WebSocket | /api/v1/ws | JWT | ws |
 | 支付回调 | /api/v1/notify | 无 | admin |
 
@@ -172,7 +168,7 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
 
 ### 任务3：小程序页面接口接入一致性检测
 
-**目标**：全面扫描三种身份（商家、用户、服务商）的所有页面，验证是否正确接入接口。
+**目标**：全面扫描两种身份（商家、用户）的所有页面，验证是否正确接入接口。
 
 **执行步骤**：
 
@@ -187,7 +183,6 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
 | 身份 | 页面目录 | 页面数 | 关键页面 |
 |------|----------|--------|----------|
 | 商家端 | pages/merchant/ | 11 | 工作台、商品列表/编辑、订单列表/详情、分类管理、数据分析、设置、员工、配送、通知 |
-| 服务商端 | pages/sp/ | 9 | 登录、仪表盘、商家列表/详情/编辑、统计、公告列表/编辑、设置 |
 | 用户端 | pages/store/ | 7 | 店铺首页、商品详情、购物车、确认订单、我的订单、声音测试 |
 | 认证页 | pages/auth/ | 1 | 商家登录 |
 
@@ -199,7 +194,7 @@ docker exec fz_yyc_mysql mysql -uroot -pfz_yyc_2024 fz_yyc_api -e "SHOW TABLES;"
 | HTTP方法 | GET/POST/PUT/DELETE 是否一致 |
 | 请求参数 | 参数名、类型、是否必填是否匹配 |
 | 响应解析 | 前端是否正确解析后端返回的数据结构 |
-| 认证方式 | 商家端/用户端/服务商端是否使用正确的 token |
+| 认证方式 | 商家端/用户端是否使用正确的 token |
 | 错误处理 | 前端是否处理了后端可能返回的错误码 |
 
 **差异清单输出格式**：
@@ -314,8 +309,7 @@ COMMIT;
 
 | 数据类型 | 说明 | 示例 |
 |----------|------|------|
-| 服务商账号 | 默认服务商和管理员 | admin / 密码见测试文档 |
-| 系统配置 | 服务商基础配置 | 商户号、API密钥占位 |
+| 系统配置 | 系统基础配置 | 商户号、API密钥占位 |
 | 基础分类 | 通用商品分类模板 | 可选，按需创建 |
 | 系统参数 | 全局配置项 | 配送费默认值、通知开关等 |
 
@@ -377,10 +371,6 @@ fz_yyc/
 │   │   │   │   ├── analytics.go              # 数据分析
 │   │   │   │   ├── staff.go                  # 员工管理
 │   │   │   │   └── invite.go                 # 邀请
-│   │   │   ├── sp/                           # 服务商handler
-│   │   │   │   ├── handler.go                # 登录、设置
-│   │   │   │   ├── announcement.go           # 公告管理
-│   │   │   │   └── payment.go                # 支付
 │   │   │   ├── user/                         # C端用户handler
 │   │   │   │   └── handler.go                # 店铺、订单、地址
 │   │   │   ├── upload/upload.go              # 文件上传
@@ -412,16 +402,6 @@ fz_yyc/
         │   │   ├── orders/list.vue           # 订单列表
         │   │   ├── orders/detail.vue         # 订单详情
         │   │   └── analytics/index.vue       # 数据分析
-        │   ├── sp/                           # 服务商端（9页面）
-        │   │   ├── login.vue                 # 登录
-        │   │   ├── home.vue                  # 仪表盘
-        │   │   ├── settings.vue              # 设置
-        │   │   ├── merchants/list.vue        # 商家列表
-        │   │   ├── merchants/detail.vue      # 商家详情
-        │   │   ├── merchants/edit.vue        # 商家编辑
-        │   │   ├── analytics/merchant-stats.vue  # 商家统计
-        │   │   ├── announcements/index.vue   # 公告列表
-        │   │   └── announcements/edit.vue    # 公告编辑
         │   └── store/                        # 用户端（7页面）
         │       ├── home.vue                  # 店铺首页
         │       ├── product.vue               # 商品详情
@@ -432,8 +412,7 @@ fz_yyc/
         │       └── test-entry.vue            # 测试入口
         └── stores/                           # Pinia状态管理
             ├── auth.ts                       # 认证状态
-            ├── merchant.ts                   # 商家状态
-            └── sp.ts                         # 服务商状态
+            └── merchant.ts                   # 商家状态
 ```
 
 ## 注意事项
@@ -444,4 +423,4 @@ fz_yyc/
 4. **数据备份**：重大变更前执行 `docker exec fz_yyc_mysql mysqldump -uroot -pfz_yyc_2024 fz_yyc_api > backup.sql`
 5. **文档同步**：修改产品功能或后端接口或数据表后，必须同步修改 PRD 文档
 6. **以PRD为准**：当实现与PRD不一致时，以PRD文档需求为准，如不满足需给出建议方案
-7. **三端隔离**：商家端、用户端、服务商端的认证和权限完全隔离，检测时需分别验证
+7. **两端隔离**：商家端与用户端的认证和权限完全隔离，检测时需分别验证

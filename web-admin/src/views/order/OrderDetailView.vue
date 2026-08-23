@@ -35,6 +35,10 @@ const statusSummary = computed(() => {
 
 const isRentalOrder = computed(() => Number(order.value?.total_deposit || 0) > 0)
 
+function profitSharingStatusText(s: number | undefined) {
+  return ({ 1: '分账中', 2: '分账成功', 3: '分账失败', 4: '已跳过' } as const)[Number(s || 0)] || '未分账'
+}
+
 const isServiceOrder = computed(() => {
   const t = Number(order.value?.order_type || 0)
   return t === 3 || t === 4 || t === 6
@@ -234,6 +238,13 @@ onMounted(loadOrderDetail)
             <div class="info-row"><span>配送费</span><span>¥{{ formatAmount(order.delivery_fee) }}</span></div>
             <div class="info-row"><span>优惠金额</span><span>-¥{{ formatAmount(order.discount_amount) }}</span></div>
             <div class="info-row total-row"><span>实付金额</span><span>¥{{ formatAmount(order.pay_amount) }}</span></div>
+            <template v-if="Number(order.profit_sharing_status ?? 0) > 0">
+              <div class="info-row"><span>分账状态</span><span>{{ profitSharingStatusText(order.profit_sharing_status) }}</span></div>
+              <div v-if="Number(order.profit_sharing_amount || 0) > 0" class="info-row"><span>分账总额</span><span>¥{{ formatAmount(order.profit_sharing_amount) }}</span></div>
+              <div v-if="order.profit_sharing_at" class="info-row"><span>分账时间</span><span>{{ formatDateTime(order.profit_sharing_at) }}</span></div>
+              <div v-if="order.profit_sharing_order_no" class="info-row"><span>分账单号</span><span>{{ order.profit_sharing_order_no }}</span></div>
+              <div v-if="order.profit_sharing_error" class="info-row error-row"><span>失败原因</span><span>{{ order.profit_sharing_error }}</span></div>
+            </template>
             <template v-if="isRentalOrder">
               <div class="info-row"><span>押金状态</span><span>{{ getDepositStatusText(order.deposit_status) }}</span></div>
               <div v-if="Number(order.deposit_deduct_amount || 0) > 0" class="info-row"><span>押金扣除</span><span>¥{{ formatAmount(order.deposit_deduct_amount) }}</span></div>
@@ -374,6 +385,10 @@ onMounted(loadOrderDetail)
 .total-row {
   font-weight: 700;
   color: #111827;
+}
+
+.error-row span:last-child {
+  color: #f56c6c;
 }
 
 .item-list {

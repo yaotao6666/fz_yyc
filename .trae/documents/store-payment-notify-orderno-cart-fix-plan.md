@@ -27,7 +27,7 @@
   - `yyyyMMddHHmmss` 14 位时间戳
   - `now.UnixNano()%10000` 4 位随机尾数
 - 当前订单模型 `server/internal/models/models.go` 中 `orders.order_no` 长度为 `size:32`、唯一索引。
-- 现有规则没有包含 `merchant_id`，并且随机段只有 4 位，在高并发或同秒多商家下存在碰撞概率。
+- 现有规则没有包含 `merchant_id`，并且随机段只有 4 位，在高并发或同秒下存在碰撞概率。
 
 ### 3. 提交订单后支付页显示 0 元
 - 确认页逻辑在 `miniprogram/src/pages/store/confirm.vue`。

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"fz_yyc_api/internal/config"
+	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -14,15 +15,17 @@ import (
 // Claims JWT Claims
 type Claims struct {
 	UserID   uint64 `json:"user_id"`
-	UserType string `json:"user_type"` // sp, merchant, user
+	StaffID  uint64 `json:"staff_id,omitempty"` // 商家后台员工ID（merchant类型token）
+	UserType string `json:"user_type"`          // sp, merchant, user
 	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
 
 // GenerateToken 生成Token
-func GenerateToken(userID uint64, userType, username string) (string, error) {
+func GenerateToken(userID, staffID uint64, userType, username string) (string, error) {
 	claims := &Claims{
 		UserID:   userID,
+		StaffID:  staffID,
 		UserType: userType,
 		Username: username,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -81,6 +84,7 @@ func JWTAuth() gin.HandlerFunc {
 
 		// 将用户信息存储到Context
 		c.Set("user_id", claims.UserID)
+		c.Set("staff_id", claims.StaffID)
 		c.Set("user_type", claims.UserType)
 		c.Set("username", claims.Username)
 
@@ -160,8 +164,21 @@ func GetUserType(c *gin.Context) string {
 }
 
 // GetMerchantID 获取当前商家ID
+// 系统为单商户模式，固定返回全局单例商家ID，不再依赖 token 中的 user_id
 func GetMerchantID(c *gin.Context) uint64 {
-	return GetUserID(c)
+	return utils.DefaultMerchantID
+}
+
+// GetStaffID 获取当前登录的员工ID（merchant类型token）
+func GetStaffID(c *gin.Context) uint64 {
+	staffID, exists := c.Get("staff_id")
+	if !exists || staffID == nil {
+		return 0
+	}
+	if id, ok := staffID.(uint64); ok {
+		return id
+	}
+	return 0
 }
 
 // GetUsername 获取当前登录用户名

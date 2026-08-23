@@ -34,6 +34,72 @@
       }
     },
     {
+      "path": "pages/health/resident",
+      "style": {
+        "navigationBarTitleText": "居民健康档案",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/health/assess",
+      "style": {
+        "navigationBarTitleText": "健康评估",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/health/fitting-form",
+      "style": {
+        "navigationBarTitleText": "生成适配建议",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/health/care-plans",
+      "style": {
+        "navigationBarTitleText": "我的照护计划",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/health/care-plan-detail",
+      "style": {
+        "navigationBarTitleText": "照护计划详情",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/health/care-visit-form",
+      "style": {
+        "navigationBarTitleText": "录入照护记录",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/health/follow-ups",
+      "style": {
+        "navigationBarTitleText": "我的随访任务",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/health/follow-up-detail",
+      "style": {
+        "navigationBarTitleText": "随访任务详情",
+        "navigationBarBackgroundColor": "#517528",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
       "path": "pages/schedule/index",
       "style": {
         "navigationBarTitleText": "排班",

@@ -7,6 +7,7 @@ import (
 	"fz_yyc_api/internal/config"
 	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/internal/models"
+	categorypkg "fz_yyc_api/internal/services/category"
 	"fz_yyc_api/internal/services/orderquery"
 	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/internal/utils"
@@ -41,7 +42,6 @@ type StoreProductSpecResponse struct {
 
 type StoreProductResponse struct {
 	ID                uint64                     `json:"id"`
-	MerchantID        uint64                     `json:"merchant_id"`
 	CategoryID        uint64                     `json:"category_id"`
 	Name              string                     `json:"name"`
 	Description       string                     `json:"description"`
@@ -90,7 +90,7 @@ func getOrCreateStoreUser(openID string, now time.Time) (*models.User, bool, err
 	return &user, false, nil
 }
 
-func recordUserBehaviorEvent(merchantID uint64, userID uint64, openID string, eventType string, page string, productID *uint64, orderID *uint64, source string, payload map[string]interface{}) {
+func recordUserBehaviorEvent(userID uint64, openID string, eventType string, page string, productID *uint64, orderID *uint64, source string, payload map[string]interface{}) {
 	var payloadJSON models.JSON
 	if len(payload) > 0 {
 		if raw, err := json.Marshal(payload); err == nil {
@@ -99,15 +99,14 @@ func recordUserBehaviorEvent(merchantID uint64, userID uint64, openID string, ev
 	}
 
 	event := models.UserBehaviorEvent{
-		MerchantID: merchantID,
-		UserID:     userID,
-		OpenID:     openID,
-		EventType:  eventType,
-		Page:       page,
-		ProductID:  productID,
-		OrderID:    orderID,
-		Source:     source,
-		Payload:    payloadJSON,
+		UserID:    userID,
+		OpenID:    openID,
+		EventType: eventType,
+		Page:      page,
+		ProductID: productID,
+		OrderID:   orderID,
+		Source:    source,
+		Payload:   payloadJSON,
 	}
 	database.DB.Create(&event)
 }
@@ -242,11 +241,6 @@ func buildAccessibleOrderItemImage(image string) string {
 }
 
 func buildAccessibleOrder(order models.Order) models.Order {
-	if order.Merchant != nil {
-		order.Merchant.Logo = buildAccessibleOrderItemImage(order.Merchant.Logo)
-		order.Merchant.CoverImage = buildAccessibleOrderItemImage(order.Merchant.CoverImage)
-	}
-
 	for index := range order.Items {
 		order.Items[index].Image = buildAccessibleOrderItemImage(order.Items[index].Image)
 	}
@@ -271,7 +265,6 @@ func buildStoreProductResponse(product models.Product) StoreProductResponse {
 
 	return StoreProductResponse{
 		ID:                product.ID,
-		MerchantID:        product.MerchantID,
 		CategoryID:        categoryID,
 		Name:              product.Name,
 		Description:       product.Description,
@@ -344,7 +337,7 @@ func WechatLogin(c *gin.Context) {
 	}
 	database.DB.Model(&user).Updates(updates)
 
-	token, _ := utils.GenerateToken(user.ID, "user", user.Nickname)
+	token, _ := utils.GenerateToken(user.ID, 0, "user", user.Nickname)
 	appIdentity, err := wechatpay.GetActiveAppIdentity()
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, err.Error())
@@ -400,11 +393,8 @@ func getWechatOpenID(code string) (string, string, error) {
 }
 
 func GetStoreHome(c *gin.Context) {
-	merchantID := c.Param("merchant_id")
-	id, _ := strconv.ParseUint(merchantID, 10, 64)
-
 	var merchant models.Merchant
-	if err := database.DB.First(&merchant, id).Error; err != nil {
+	if err := database.DB.First(&merchant, utils.DefaultMerchantID).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商家不存在")
 		return
 	}
@@ -416,30 +406,42 @@ func GetStoreHome(c *gin.Context) {
 	}
 
 	var categories []models.Category
-	database.DB.Where("merchant_id = ? AND status = 1", id).Order("sort ASC").Find(&categories)
+	database.DB.Where("status = 1").Order("sort ASC, id ASC").Find(&categories)
 
 	var hotProducts []models.Product
-	database.DB.Where("merchant_id = ? AND status = 1", id).Order("sales DESC").Limit(10).Find(&hotProducts)
+	database.DB.Where("status = 1").Order("sales DESC").Limit(10).Find(&hotProducts)
 
 	var deliverySettings models.MerchantDeliverySettings
-	database.DB.Where("merchant_id = ?", id).First(&deliverySettings)
+	database.DB.First(&deliverySettings)
 
 	hotProductResponses := make([]StoreProductResponse, 0, len(hotProducts))
 	for _, product := range hotProducts {
 		hotProductResponses = append(hotProductResponses, buildStoreProductResponse(product))
 	}
 
+	// C端平铺返回启用分类，product_count 为该分类自身+全部子孙分类直接挂载的商品数
+	categoryResponses := make([]map[string]interface{}, 0, len(categories))
+	for _, cat := range categories {
+		count, _ := categorypkg.SubtreeProductCount(database.DB, cat.ID)
+		categoryResponses = append(categoryResponses, map[string]interface{}{
+			"id":            cat.ID,
+			"name":          cat.Name,
+			"parent_id":     cat.ParentID,
+			"level":         cat.Level,
+			"sort":          cat.Sort,
+			"product_count": count,
+		})
+	}
+
 	response.Success(c, gin.H{
 		"merchant":          merchant,
-		"categories":        categories,
+		"categories":        categoryResponses,
 		"hot_products":      hotProductResponses,
 		"delivery_settings": deliverySettings,
 	})
 }
 
 func GetProducts(c *gin.Context) {
-	merchantID := c.Param("merchant_id")
-	id, _ := strconv.ParseUint(merchantID, 10, 64)
 	categoryID := c.Query("category_id")
 	keyword := c.Query("keyword")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -452,11 +454,17 @@ func GetProducts(c *gin.Context) {
 		pageSize = 20
 	}
 
-	query := database.DB.Model(&models.Product{}).Where("merchant_id = ? AND status = 1", id)
+	query := database.DB.Model(&models.Product{}).Where("status = 1")
 
 	if categoryID != "" {
 		catID, _ := strconv.ParseUint(categoryID, 10, 64)
-		query = query.Where("category_id = ?", catID)
+		// 查询该分类及其全部子孙分类下的商品（商品可挂任意层）
+		categoryIDs, err := categorypkg.CollectSubtreeIDs(database.DB, catID)
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取商品列表失败")
+			return
+		}
+		query = query.Where("category_id IN ?", categoryIDs)
 	}
 	if keyword != "" {
 		query = query.Where("name LIKE ?", "%"+keyword+"%")
@@ -488,13 +496,11 @@ func GetProducts(c *gin.Context) {
 }
 
 func GetProductDetail(c *gin.Context) {
-	merchantID := c.Param("merchant_id")
 	productID := c.Param("product_id")
-	mid, _ := strconv.ParseUint(merchantID, 10, 64)
 	pid, _ := strconv.ParseUint(productID, 10, 64)
 
 	var product models.Product
-	if err := database.DB.Preload("Category").Preload("Specs").Where("id = ? AND merchant_id = ? AND status = 1", pid, mid).First(&product).Error; err != nil {
+	if err := database.DB.Preload("Category").Preload("Specs").Where("id = ? AND status = 1", pid).First(&product).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeProductNotFound, "商品不存在或已下架")
 		return
 	}
@@ -503,9 +509,6 @@ func GetProductDetail(c *gin.Context) {
 }
 
 func RecordUserVisit(c *gin.Context) {
-	merchantID := c.Param("merchant_id")
-	mid, _ := strconv.ParseUint(merchantID, 10, 64)
-
 	var req struct {
 		OpenID string `json:"openid"`
 		Source string `json:"source"`
@@ -551,18 +554,17 @@ func RecordUserVisit(c *gin.Context) {
 	database.DB.Model(&user).Updates(updates)
 
 	visit := models.UserVisit{
-		UserID:     user.ID,
-		MerchantID: mid,
-		OpenID:     user.OpenID,
-		VisitTime:  now,
-		Source:     req.Source,
+		UserID:    user.ID,
+		OpenID:    user.OpenID,
+		VisitTime: now,
+		Source:    req.Source,
 	}
 	database.DB.Create(&visit)
 
-	recordUserBehaviorEvent(mid, user.ID, user.OpenID, "store_visit", "store_home", nil, nil, req.Source, map[string]interface{}{
+	recordUserBehaviorEvent(user.ID, user.OpenID, "store_visit", "store_home", nil, nil, req.Source, map[string]interface{}{
 		"source": req.Source,
 	})
-	wsHandler.BroadcastStoreVisitNotify(mid, user.OpenID, req.Source)
+	wsHandler.BroadcastStoreVisitNotify(user.OpenID, req.Source)
 
 	response.Success(c, gin.H{
 		"user_id":     user.ID,
@@ -571,9 +573,6 @@ func RecordUserVisit(c *gin.Context) {
 }
 
 func RecordBehaviorEvent(c *gin.Context) {
-	merchantID := c.Param("merchant_id")
-	mid, _ := strconv.ParseUint(merchantID, 10, 64)
-
 	var req struct {
 		OpenID    string                 `json:"openid"`
 		EventType string                 `json:"event_type" binding:"required"`
@@ -618,12 +617,11 @@ func RecordBehaviorEvent(c *gin.Context) {
 		return
 	}
 
-	recordUserBehaviorEvent(mid, user.ID, user.OpenID, req.EventType, req.Page, req.ProductID, req.OrderID, req.Source, req.Payload)
+	recordUserBehaviorEvent(user.ID, user.OpenID, req.EventType, req.Page, req.ProductID, req.OrderID, req.Source, req.Payload)
 	response.Success(c, gin.H{"message": "记录成功"})
 }
 
 type CreateOrderRequest struct {
-	MerchantID      uint64  `json:"merchant_id"`
 	OrderType       uint8   `json:"order_type"`
 	BizStatus       uint8   `json:"biz_status"`
 	ScheduledAt     string  `json:"scheduled_at"`
@@ -642,16 +640,11 @@ type CreateOrderRequest struct {
 }
 
 func CreateOrder(c *gin.Context) {
-	merchantID := c.Param("merchant_id")
-	pathMerchantID, _ := strconv.ParseUint(merchantID, 10, 64)
-
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
 	}
-
-	req.MerchantID = pathMerchantID
 
 	userID := utils.GetUserID(c)
 	if userID == 0 {
@@ -663,7 +656,7 @@ func CreateOrder(c *gin.Context) {
 	_ = database.DB.First(&currentUser, userID).Error
 
 	var merchant models.Merchant
-	if err := database.DB.First(&merchant, req.MerchantID).Error; err != nil {
+	if err := database.DB.First(&merchant, utils.DefaultMerchantID).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeMerchantNotFound, "商家不存在")
 		return
 	}
@@ -700,11 +693,6 @@ func CreateOrder(c *gin.Context) {
 
 		if product.ProductType > maxProductType {
 			maxProductType = product.ProductType
-		}
-
-		if product.MerchantID != req.MerchantID {
-			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "商品不属于该商家")
-			return
 		}
 
 		if product.Status != 1 {
@@ -746,7 +734,6 @@ func CreateOrder(c *gin.Context) {
 			totalDeposit += itemDeposit
 
 			orderItems = append(orderItems, models.OrderItem{
-				MerchantID:      req.MerchantID,
 				ProductID:       item.ProductID,
 				ProductName:     product.Name,
 				Image:           image,
@@ -772,7 +759,6 @@ func CreateOrder(c *gin.Context) {
 			totalAmount += subtotal
 
 			orderItems = append(orderItems, models.OrderItem{
-				MerchantID:  req.MerchantID,
 				ProductID:   item.ProductID,
 				ProductName: product.Name,
 				Image:       image,
@@ -794,7 +780,7 @@ func CreateOrder(c *gin.Context) {
 		payAmount = 0
 	}
 
-	orderNo := utils.GenerateOrderNo(req.MerchantID)
+	orderNo := utils.GenerateOrderNo(utils.DefaultMerchantID)
 
 	// 根据 product_type 推断 order_type 和 biz_status
 	orderType := req.OrderType
@@ -823,7 +809,6 @@ func CreateOrder(c *gin.Context) {
 	order := models.Order{
 		OrderNo:         orderNo,
 		UserID:          userID,
-		MerchantID:      req.MerchantID,
 		OrderType:       orderType,
 		BizStatus:       bizStatus,
 		ScheduledAt:     scheduledAt,
@@ -892,7 +877,7 @@ func CreateOrder(c *gin.Context) {
 		"total_spent":  gorm.Expr("total_spent + ?", payAmount),
 	})
 
-	recordUserBehaviorEvent(req.MerchantID, userID, "", "submit_order", "store_confirm", nil, &order.ID, "store", map[string]interface{}{
+	recordUserBehaviorEvent(userID, "", "submit_order", "store_confirm", nil, &order.ID, "store", map[string]interface{}{
 		"order_type": orderType,
 		"pay_amount": payAmount,
 	})
@@ -909,7 +894,7 @@ func CreateOrder(c *gin.Context) {
 	var payHint string
 	if payAmount > 0 {
 		var merchant models.Merchant
-		if err := database.DB.First(&merchant, order.MerchantID).Error; err == nil {
+		if err := database.DB.First(&merchant, utils.DefaultMerchantID).Error; err == nil {
 			client, clientErr := wechatpay.NewServiceProviderClient()
 			merchantReady := merchant.SubMchID != "" && merchant.PaymentConfigStatus == 1
 			if clientErr != nil || !merchantReady {
@@ -989,7 +974,6 @@ func createWechatPayOrder(
 	return client.CreatePartnerJSAPIPayOrder(ctx, wechatpay.JSAPIPayRequest{
 		AppID:       appIdentity.AppID,
 		OpenID:      openID,
-		AppMode:     appIdentity.Mode,
 		SubMchID:    merchant.SubMchID,
 		OrderNo:     order.OrderNo,
 		Description: fmt.Sprintf("%s订单支付", merchant.Name),
@@ -1003,7 +987,6 @@ func GetOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	status := c.Query("status")
-	merchantID := c.Query("merchant_id")
 
 	if page < 1 {
 		page = 1
@@ -1019,16 +1002,12 @@ func GetOrders(c *gin.Context) {
 		query = query.Where("status = ?", statusInt)
 	}
 
-	if merchantID != "" {
-		query = query.Where("merchant_id = ?", merchantID)
-	}
-
 	var total int64
 	query.Count(&total)
 
 	var orders []models.Order
 	offset := (page - 1) * pageSize
-	if err := query.Preload("Merchant").Preload("Items").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&orders).Error; err != nil {
+	if err := query.Preload("Items").Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&orders).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取订单列表失败")
 		return
 	}
@@ -1054,7 +1033,7 @@ func GetOrderDetail(c *gin.Context) {
 	id, _ := strconv.ParseUint(orderID, 10, 64)
 
 	var order models.Order
-	if err := database.DB.Preload("Merchant").Preload("Items").Where("id = ? AND user_id = ?", id, userID).First(&order).Error; err != nil {
+	if err := database.DB.Preload("Items").Where("id = ? AND user_id = ?", id, userID).First(&order).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
 		return
 	}
@@ -1158,7 +1137,7 @@ func ApplyRefund(c *gin.Context) {
 	// 同步调用微信退款接口（仅当订单已完成支付回调、商家已配置子商户号时）
 	if strings.TrimSpace(order.TransactionID) != "" && order.PayAmount > 0 {
 		var merchant models.Merchant
-		if err := database.DB.First(&merchant, order.MerchantID).Error; err == nil && merchant.SubMchID != "" {
+		if err := database.DB.First(&merchant, utils.DefaultMerchantID).Error; err == nil && merchant.SubMchID != "" {
 			notifyURL := config.Config.WechatPay.CallbackURL
 			client, cliErr := wechatpay.NewServiceProviderClient()
 			if cliErr == nil && notifyURL != "" {

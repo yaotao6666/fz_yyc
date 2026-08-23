@@ -175,7 +175,6 @@ function normalizeProduct(product: ProductApiResponse | null | undefined): Produ
   return {
     ...product,
     id: normalizeRequiredNumber(product?.id),
-    merchant_id: normalizeNumberValue(product?.merchant_id),
     category_id: normalizeRequiredNumber(product?.category_id),
     price: normalizeRequiredNumber(product?.price),
     original_price: normalizeNumberValue(product?.original_price),
@@ -319,8 +318,8 @@ export async function uploadImage(filePath: string): Promise<{ url: string; key:
 /**
  * 获取店铺首页信息
  */
-export function getStoreHome(merchantId: number) {
-  return get<StoreHomeInfo>(`/api/v1/store/${merchantId}/home`).then(data => {
+export function getStoreHome() {
+  return get<StoreHomeInfo>('/api/v1/store/home').then(data => {
     if (data?.hot_products) {
       data.hot_products = data.hot_products.map((p: any) => {
         const normalized = normalizeProduct(p)
@@ -347,8 +346,8 @@ export function getStoreHome(merchantId: number) {
 /**
  * 获取店铺商品列表
  */
-export function getStoreProducts(merchantId: number, params?: { category_id?: number }) {
-  return get<ProductListResponse>(`/api/v1/store/${merchantId}/products`, params).then(res => {
+export function getStoreProducts(params?: { category_id?: number }) {
+  return get<ProductListResponse>('/api/v1/store/products', params).then(res => {
     const normalized = normalizeListField(res)
     return { ...normalized, list: normalized.list.map(normalizeProduct) }
   })
@@ -357,15 +356,15 @@ export function getStoreProducts(merchantId: number, params?: { category_id?: nu
 /**
  * 获取店铺商品详情
  */
-export function getStoreProduct(merchantId: number, productId: number) {
-  return get<Product>(`/api/v1/store/${merchantId}/products/${productId}`).then(normalizeProduct)
+export function getStoreProduct(productId: number) {
+  return get<Product>(`/api/v1/store/products/${productId}`).then(normalizeProduct)
 }
 
 /**
  * 获取配送费规则
  */
-export function getStoreDeliveryRules(merchantId: number) {
-  return get<StoreDeliveryRules>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeStoreDeliveryRules)
+export function getStoreDeliveryRules() {
+  return get<StoreDeliveryRules>('/api/v1/store/delivery-rules').then(normalizeStoreDeliveryRules)
 }
 
 // ============ C端订单相关 ============
@@ -373,15 +372,15 @@ export function getStoreDeliveryRules(merchantId: number) {
 /**
  * 创建订单
  */
-export function createOrder(merchantId: number, data: CreateOrderRequest) {
-  return post<CreateOrderResponse>(`/api/v1/store/${merchantId}/orders`, data)
+export function createOrder(data: CreateOrderRequest) {
+  return post<CreateOrderResponse>('/api/v1/store/orders', data)
 }
 
 /**
  * 上报店铺行为事件
  */
-export function trackStoreBehaviorEvent(merchantId: number, data: MerchantBehaviorEventRequest) {
-  return post<{ message: string }>(`/api/v1/store/${merchantId}/event`, data, { loading: false, showErrorToast: false })
+export function trackStoreBehaviorEvent(data: MerchantBehaviorEventRequest) {
+  return post<{ message: string }>('/api/v1/store/event', data, { loading: false, showErrorToast: false })
 }
 
 /**
@@ -389,13 +388,11 @@ export function trackStoreBehaviorEvent(merchantId: number, data: MerchantBehavi
  * @param params.page 页码
  * @param params.page_size 每页数量
  * @param params.status 订单状态
- * @param params.merchant_id 商家ID（可选，用于筛选特定商家的订单）
  */
 export function getMyOrders(params?: {
   page?: number
   page_size?: number
   status?: number
-  merchant_id?: number
 }) {
   return get<OrderListResponse>('/api/v1/user/orders', params).then((response) => {
     const normalized = normalizeListField(response)

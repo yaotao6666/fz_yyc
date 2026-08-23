@@ -93,13 +93,23 @@
       </view>
 
       <view class="quick-entry-bar">
-        <view class="quick-entry-card" @click="goMyOrders">
-          <view class="quick-entry-icon">📋</view>
-          <view class="quick-entry-content">
-            <view class="quick-entry-title">我的订单</view>
-            <view class="quick-entry-desc">查看当前店铺订单与退款进度</view>
+        <view class="quick-entry-row">
+          <view class="quick-entry-card" @click="goMyOrders">
+            <view class="quick-entry-icon">📋</view>
+            <view class="quick-entry-content">
+              <view class="quick-entry-title">我的订单</view>
+              <view class="quick-entry-desc">查看订单与退款进度</view>
+            </view>
+            <view class="quick-entry-arrow">›</view>
           </view>
-          <view class="quick-entry-arrow">›</view>
+          <view class="quick-entry-card" @click="goMyHealth">
+            <view class="quick-entry-icon health">🩺</view>
+            <view class="quick-entry-content">
+              <view class="quick-entry-title">我的健康</view>
+              <view class="quick-entry-desc">健康档案与自助评估</view>
+            </view>
+            <view class="quick-entry-arrow">›</view>
+          </view>
         </view>
       </view>
 
@@ -474,7 +484,6 @@ const { trackVisit, trackPageView } = useAnalytics()
 const instance = getCurrentInstance()
 
 const storeInfo = ref<StoreHomeInfo | null>(null)
-const currentMerchantId = ref(1)
 const currentCategoryIndex = ref(0)
 const loadingProducts = ref(false)
 const merchantLogo = ref('')
@@ -606,20 +615,12 @@ watch(currentCategoryIndex, () => {
 })
 
 function parseEntryOptions(options?: Record<string, any>) {
-  return parseStoreEntryOptions(options, currentMerchantId.value)
+  return parseStoreEntryOptions(options)
 }
 
 function applyEntryOptions(options?: Record<string, any>) {
-  const { merchantId, source } = parseEntryOptions(options)
-  const merchantChanged = currentMerchantId.value !== merchantId
-
-  currentMerchantId.value = merchantId
+  const { source } = parseEntryOptions(options)
   entrySource.value = source
-
-  if (merchantChanged) {
-    _loadRetryCount = 0
-    resetStoreHomeState()
-  }
 }
 
 onLoad((options) => {
@@ -637,37 +638,35 @@ onShow(() => {
     const pages = getCurrentPages()
     const currentPage = pages[pages.length - 1] as any
     applyEntryOptions(currentPage?.options)
-    const merchantId = currentMerchantId.value
     const source = entrySource.value
 
-    const guideKey = `storeHomeGuideShown:${merchantId}`
-    showGuide.value = !uni.getStorageSync(guideKey)
+    showGuide.value = !uni.getStorageSync('storeHomeGuideShown')
 
-    const loaded = await loadStoreHome(merchantId)
+    const loaded = await loadStoreHome()
     if (loaded) {
-      void trackVisit({ merchant_id: merchantId, source })
-      void trackPageView('store_home', merchantId, source)
+      void trackVisit({ source })
+      void trackPageView('store_home', source)
     }
   })().finally(() => {
     showPromise = null
   })
 })
 
-async function loadStoreHome(merchantId: number, silent = false) {
+async function loadStoreHome(silent = false) {
   if (!silent && !storeInfo.value) {
     isInitialLoading.value = true
   }
   pageErrorMessage.value = ''
 
   try {
-    const res = await getStoreHome(merchantId)
+    const res = await getStoreHome()
     _loadRetryCount = 0
     storeInfo.value = res
 
     cacheMerchantImages(res)
 
     if (res.categories?.length) {
-      await loadAllCategoryProducts(merchantId, res.categories, silent)
+      await loadAllCategoryProducts(res.categories, silent)
       await nextTick()
       measureProductSections()
     }
@@ -679,7 +678,7 @@ async function loadStoreHome(merchantId: number, silent = false) {
         _loadRetryCount++
         console.log(`加载店铺信息重试 (${_loadRetryCount}/2)`)
         await new Promise(resolve => setTimeout(resolve, 600))
-        return loadStoreHome(merchantId, silent)
+        return loadStoreHome(silent)
       }
       pageErrorMessage.value = error instanceof Error ? error.message || '请重新进入后重试' : '请重新进入后重试'
       uni.showToast({ title: '加载失败，请重新进入', icon: 'none' })
@@ -691,8 +690,7 @@ async function loadStoreHome(merchantId: number, silent = false) {
 }
 
 async function refreshStoreHome() {
-  const merchantId = currentMerchantId.value
-  const loaded = await loadStoreHome(merchantId, true)
+  const loaded = await loadStoreHome(true)
   uni.stopPullDownRefresh()
   if (!loaded) {
     uni.showToast({ title: '刷新失败，请稍后重试', icon: 'none' })
@@ -700,7 +698,7 @@ async function refreshStoreHome() {
 }
 
 function retryLoadStoreHome() {
-  void loadStoreHome(currentMerchantId.value)
+  void loadStoreHome()
 }
 
 function toggleNotice() {
@@ -712,7 +710,6 @@ function toggleNotice() {
 }
 
 async function loadAllCategoryProducts(
-  merchantId: number,
   categories: Array<{ id: number; name: string; sort: number; product_count: number }>,
   silent = false
 ) {
@@ -726,7 +723,7 @@ async function loadAllCategoryProducts(
 
   try {
     const results = await Promise.allSettled(categories.map(async (category) => {
-      const res = await getStoreProducts(merchantId, { category_id: category.id })
+      const res = await getStoreProducts({ category_id: category.id })
       return { categoryId: category.id, list: res.list || [] }
     }))
 
@@ -884,9 +881,8 @@ function getProductImage(product: any) {
 }
 
 function goProductDetail(productId: number) {
-  const merchantId = storeInfo.value?.merchant?.id || 1
   uni.navigateTo({
-    url: `/pages/store/product?merchant_id=${merchantId}&product_id=${productId}`
+    url: `/pages/store/product?product_id=${productId}`
   })
 }
 
@@ -918,9 +914,6 @@ function getWellnessPackagePreview(product: Product): string {
 }
 
 async function addToCart(product: any) {
-  const merchantId = storeInfo.value?.merchant?.id || currentMerchantId.value
-  currentMerchantId.value = merchantId
-
   showAddDialog.value = true
   addDialogLoading.value = true
   addDialogProduct.value = null
@@ -930,7 +923,7 @@ async function addToCart(product: any) {
   })
 
   try {
-    const detail = await getStoreProduct(merchantId, product.id)
+    const detail = await getStoreProduct(product.id)
     addDialogProduct.value = detail
 
     if (detail.specs?.length) {
@@ -1018,11 +1011,9 @@ function confirmAddDialog() {
     return uni.showToast({ title: '库存不足', icon: 'none' })
   }
 
-  const merchantId = storeInfo.value?.merchant?.id || currentMerchantId.value
   const merchantName = storeInfo.value?.merchant?.name || ''
 
   cartStore.addItem({
-    merchant_id: merchantId,
     merchant_name: merchantName,
     product_id: addDialogProduct.value.id,
     product_name: addDialogProduct.value.name,
@@ -1061,9 +1052,8 @@ function goCart() {
     return
   }
 
-  const merchantId = storeInfo.value?.merchant?.id || 1
   uni.navigateTo({
-    url: `/pages/store/cart?merchant_id=${merchantId}`
+    url: `/pages/store/cart`
   })
 }
 
@@ -1078,23 +1068,26 @@ function handlePrimaryAction() {
     return
   }
 
-  const merchantId = storeInfo.value?.merchant?.id || 1
   uni.navigateTo({
-    url: `/pages/store/confirm?merchant_id=${merchantId}`
+    url: `/pages/store/confirm`
   })
 }
 
 function closeGuide() {
   showGuide.value = false
 
-  const guideKey = `storeHomeGuideShown:${currentMerchantId.value}`
-  uni.setStorageSync(guideKey, true)
+  uni.setStorageSync('storeHomeGuideShown', true)
 }
 
 function goMyOrders() {
-  const merchantId = storeInfo.value?.merchant?.id || 1
   uni.navigateTo({
-    url: `/pages/store/my-orders?merchant_id=${merchantId}`
+    url: `/pages/store/my-orders`
+  })
+}
+
+function goMyHealth() {
+  uni.navigateTo({
+    url: `/pages/store/my-health`
   })
 }
 </script>
@@ -1416,7 +1409,14 @@ function goMyOrders() {
   background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
 }
 
+.quick-entry-row {
+  display: flex;
+  gap: 20rpx;
+}
+
 .quick-entry-card {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   padding: 24rpx;
@@ -1435,6 +1435,11 @@ function goMyOrders() {
   justify-content: center;
   font-size: 34rpx;
   margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.quick-entry-icon.health {
+  background: rgba(22, 163, 74, 0.1);
 }
 
 .quick-entry-content {

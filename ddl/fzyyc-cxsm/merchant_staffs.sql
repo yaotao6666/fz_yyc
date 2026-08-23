@@ -2,7 +2,6 @@ create table merchant_staffs
 (
     id                    bigint unsigned auto_increment
         primary key,
-    merchant_id           bigint unsigned                            not null,
     username              varchar(64)                                not null,
     password              varchar(128)                               not null,
     name                  varchar(64)                                null,
@@ -18,11 +17,8 @@ create table merchant_staffs
     last_wechat_login_at  datetime                                   null,
     created_at            datetime         default CURRENT_TIMESTAMP not null,
     updated_at            datetime         default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
-    constraint uk_merchant_staffs_merchant_username
-        unique (merchant_id, username),
-    constraint fk_merchant_staffs_merchant
-        foreign key (merchant_id) references merchants (id)
-            on delete cascade
+    constraint uk_merchant_staffs_username
+        unique (username)
 )
     comment '商家员工表' collate = utf8mb4_unicode_ci;
 

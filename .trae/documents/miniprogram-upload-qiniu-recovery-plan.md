@@ -6,7 +6,7 @@
 
   * 商家端商品编辑页上传商品图片：`miniprogram/src/pages/merchant/products/edit.vue`
 
-  * 服务商端商家详情页上传商家 Logo / 背景图：`miniprogram/src/pages/sp/merchants/detail.vue`
+  * 商家详情页上传商家 Logo / 背景图：`miniprogram/src/pages/sp/merchants/detail.vue`
 
 * 修复策略：继续沿用现有 `/api/v1/upload/token + 七牛直传` 方案，不新增本地上传兜底。
 
@@ -55,8 +55,6 @@
     * `sp` -> `uploads/sp`
 
   * <br />
-
-  * 服务商 `admin -> sp` 改造后，这里的角色前缀逻辑已经切到 `sp`。
 
 * 实测接口结果
 
@@ -244,7 +242,7 @@
 
 ### 1. 后端接口验证
 
-* 使用服务商账号登录后请求 `/api/v1/upload/token`：
+* 使用商家账号登录后请求 `/api/v1/upload/token`：
 
   * 返回 `code=0`
 
@@ -301,8 +299,6 @@
   * `server/pkg/qiniu/qiniu.go`
 
 ### 5. 回归重点
-
-* 不影响此前已修复的服务商 `sp` 鉴权。
 
 * 不影响商品图片、商家 Logo、商家背景图的显示 URL 归一化。
 

@@ -19,14 +19,11 @@ type prdSpecResponse struct {
 }
 
 func GetProductSpecs(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	productID, _ := strconv.ParseUint(c.Param("product_id"), 10, 64)
 
 	var product models.Product
-	if err := database.DB.Select("id").Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", productID, merchantID).First(&product).Error; err != nil {
+	if err := database.DB.Select("id").Where("id = ? AND deleted_at IS NULL", productID).First(&product).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
 	}
@@ -69,10 +66,7 @@ type prdUpdateProductSpecsRequest struct {
 }
 
 func UpdateProductSpecs(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	productID, _ := strconv.ParseUint(c.Param("product_id"), 10, 64)
 
 	var req prdUpdateProductSpecsRequest
@@ -82,7 +76,7 @@ func UpdateProductSpecs(c *gin.Context) {
 	}
 
 	var product models.Product
-	if err := database.DB.Select("id").Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", productID, merchantID).First(&product).Error; err != nil {
+	if err := database.DB.Select("id").Where("id = ? AND deleted_at IS NULL", productID).First(&product).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
 	}
@@ -128,10 +122,7 @@ type prdDeleteProductSpecsRequest struct {
 }
 
 func DeleteProductSpecs(c *gin.Context) {
-	merchantID, ok := resolveTargetMerchantID(c)
-	if !ok {
-		return
-	}
+	_, _ = resolveTargetMerchantID(c)
 	productID, _ := strconv.ParseUint(c.Param("product_id"), 10, 64)
 
 	var req prdDeleteProductSpecsRequest
@@ -145,7 +136,7 @@ func DeleteProductSpecs(c *gin.Context) {
 	}
 
 	var product models.Product
-	if err := database.DB.Select("id").Where("id = ? AND merchant_id = ? AND deleted_at IS NULL", productID, merchantID).First(&product).Error; err != nil {
+	if err := database.DB.Select("id").Where("id = ? AND deleted_at IS NULL", productID).First(&product).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "商品不存在")
 		return
 	}

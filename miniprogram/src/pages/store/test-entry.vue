@@ -7,71 +7,28 @@
 
     <view class="content">
       <view class="input-section">
-        <text class="label">请输入商家ID：</text>
-        <input
-          v-model="merchantId"
-          class="input"
-          type="number"
-          placeholder="例如：1"
-          @confirm="enterStore"
-        />
-        <text class="hint">当前测试商家ID：1</text>
+        <button class="btn-primary" @click="enterStore">进入商家店铺</button>
       </view>
-
-      <button class="btn-primary" @click="enterStore">进入商家店铺</button>
 
       <view class="info-section">
         <text class="info-title">📝 使用说明</text>
         <text class="info-text">
-          1. 在上方输入框中输入商家ID（默认：1）\n
-          2. 点击"进入商家店铺"按钮\n
-          3. 将进入该商家的店铺首页\n
-          4. 可以浏览商品、加入购物车、下单支付\n
+          1. 点击"进入商家店铺"按钮\n
+          2. 将进入店铺首页\n
+          3. 可以浏览商品、加入购物车、下单支付\n
           \n\n⚠️ 注意事项：\n
           • 支付功能需要在微信开发者工具中开启\n
           • 或使用模拟支付进行测试
         </text>
-      </view>
-
-      <view class="merchant-list">
-        <text class="list-title">📋 可用商家列表</text>
-        <view
-          v-for="merchant in merchants"
-          :key="merchant.id"
-          class="merchant-item"
-          @click="selectMerchant(merchant.id)"
-        >
-          <text class="merchant-name">{{ merchant.name }}</text>
-          <text class="merchant-id">ID: {{ merchant.id }}</text>
-        </view>
       </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-
-const merchantId = ref('1')
-
-const merchants = ref([
-  { id: 1, name: '美味餐厅' },
-  { id: 2, name: '示例商家B' },
-  { id: 3, name: '示例商家C' }
-])
-
-function selectMerchant(id: number) {
-  merchantId.value = String(id)
-}
-
 function enterStore() {
-  if (!merchantId.value) {
-    uni.showToast({ title: '请输入商家ID', icon: 'none' })
-    return
-  }
-
   uni.navigateTo({
-    url: `/pages/store/home?merchant_id=${merchantId.value}`
+    url: `/pages/store/home`
   })
 }
 </script>
@@ -113,29 +70,6 @@ function enterStore() {
   margin-bottom: 40rpx;
 }
 
-.label {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 500;
-  color: #1a1a1a;
-  margin-bottom: 16rpx;
-}
-
-.input {
-  height: 88rpx;
-  background: #f8f9fa;
-  border-radius: 16rpx;
-  padding: 0 24rpx;
-  font-size: 32rpx;
-  margin-bottom: 12rpx;
-}
-
-.hint {
-  display: block;
-  font-size: 24rpx;
-  color: #999999;
-}
-
 .btn-primary {
   width: 100%;
   height: 88rpx;
@@ -154,7 +88,6 @@ function enterStore() {
   background: #f0f5ff;
   border-radius: 16rpx;
   padding: 32rpx;
-  margin-bottom: 40rpx;
 }
 
 .info-title {
@@ -171,39 +104,5 @@ function enterStore() {
   color: #666666;
   line-height: 1.8;
   white-space: pre-line;
-}
-
-.merchant-list {
-  border-top: 1rpx solid #f0f0f0;
-  padding-top: 40rpx;
-}
-
-.list-title {
-  display: block;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 24rpx;
-}
-
-.merchant-item {
-  background: #f8f9fa;
-  border-radius: 12rpx;
-  padding: 24rpx;
-  margin-bottom: 16rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.merchant-name {
-  font-size: 28rpx;
-  color: #1a1a1a;
-  font-weight: 500;
-}
-
-.merchant-id {
-  font-size: 24rpx;
-  color: #999999;
 }
 </style>

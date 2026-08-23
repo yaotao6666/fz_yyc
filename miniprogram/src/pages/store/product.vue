@@ -216,7 +216,6 @@ const product = ref<Product | null>(null)
 const quantity = ref(1)
 const rentalDuration = ref(1)
 const selectedSpecs = reactive<Record<string, string>>({})
-const merchantId = ref(1)
 const productId = ref(1)
 const entrySource = ref('scan')
 
@@ -288,12 +287,10 @@ const selectedStock = computed(() => {
 })
 
 function applyEntryOptions(options?: Record<string, any>) {
-  const { merchantId: nextMerchantId, productId: nextProductId, source } = parseStoreProductEntryOptions(
+  const { productId: nextProductId, source } = parseStoreProductEntryOptions(
     options,
-    merchantId.value,
     productId.value
   )
-  merchantId.value = nextMerchantId
   productId.value = nextProductId
   entrySource.value = source
 }
@@ -311,8 +308,8 @@ onShow(() => {
 
 async function loadProduct() {
   try {
-    product.value = await getStoreProduct(merchantId.value, productId.value)
-    await trackProductView(merchantId.value, productId.value)
+    product.value = await getStoreProduct(productId.value)
+    await trackProductView(productId.value)
     
     // 默认选中第一个规格
     if (product.value.specs?.length) {
@@ -369,7 +366,6 @@ function addToCart() {
   }
 
   cartStore.addItem({
-    merchant_id: merchantId.value,
     merchant_name: cartStore.merchantName || '',
     product_id: product.value.id,
     product_name: product.value.name,
@@ -401,7 +397,6 @@ function buyNow() {
   }
 
   const item = {
-    merchant_id: merchantId.value,
     merchant_name: cartStore.merchantName || '',
     product_id: product.value.id,
     product_name: product.value.name,
@@ -420,17 +415,17 @@ function buyNow() {
   cartStore.setBuyNowItem(item)
 
   uni.navigateTo({
-    url: `/pages/store/confirm?merchant_id=${merchantId.value}&buy_now=1`
+    url: `/pages/store/confirm?buy_now=1`
   })
 }
 
 function goHome() {
-  uni.redirectTo({ url: `/pages/store/home?merchant_id=${merchantId.value}` })
+  uni.redirectTo({ url: `/pages/store/home` })
 }
 
 function goCart() {
   uni.navigateTo({
-    url: `/pages/store/cart?merchant_id=${merchantId.value}`
+    url: `/pages/store/cart`
   })
 }
 </script>

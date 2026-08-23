@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
@@ -15,7 +14,6 @@ import (
 
 // GetServiceStaffList 服务人员列表（PC 后台管理）
 func GetServiceStaffList(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
 	status := c.Query("status")
 	keyword := c.Query("keyword")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -27,7 +25,7 @@ func GetServiceStaffList(c *gin.Context) {
 		pageSize = 20
 	}
 
-	query := database.DB.Model(&models.ServiceStaff{}).Where("merchant_id = ?", merchantID)
+	query := database.DB.Model(&models.ServiceStaff{})
 	if status != "" {
 		if s, err := strconv.Atoi(status); err == nil {
 			query = query.Where("status = ?", s)
@@ -60,7 +58,6 @@ type UpdateServiceStaffStatusRequest struct {
 
 // UpdateServiceStaffStatus 审核通过(0→1) / 启用(2→1) / 禁用(1→2)
 func UpdateServiceStaffStatus(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "服务人员ID错误")
@@ -79,7 +76,7 @@ func UpdateServiceStaffStatus(c *gin.Context) {
 	}
 
 	result := database.DB.Model(&models.ServiceStaff{}).
-		Where("id = ? AND merchant_id = ?", id, merchantID).
+		Where("id = ?", id).
 		Update("status", req.Status)
 	if result.Error != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新失败")
@@ -100,7 +97,6 @@ type ResetServiceStaffPasswordRequest struct {
 
 // ResetServiceStaffPassword 商家重置服务人员密码
 func ResetServiceStaffPassword(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "服务人员ID错误")
@@ -120,7 +116,7 @@ func ResetServiceStaffPassword(c *gin.Context) {
 	}
 
 	result := database.DB.Model(&models.ServiceStaff{}).
-		Where("id = ? AND merchant_id = ?", id, merchantID).
+		Where("id = ?", id).
 		Update("password", string(hashedPassword))
 	if result.RowsAffected == 0 {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "服务人员不存在")
@@ -132,14 +128,13 @@ func ResetServiceStaffPassword(c *gin.Context) {
 
 // DeleteServiceStaff 删除服务人员
 func DeleteServiceStaff(c *gin.Context) {
-	merchantID := middleware.GetMerchantID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "服务人员ID错误")
 		return
 	}
 
-	result := database.DB.Where("id = ? AND merchant_id = ?", id, merchantID).Delete(&models.ServiceStaff{})
+	result := database.DB.Where("id = ?", id).Delete(&models.ServiceStaff{})
 	if result.RowsAffected == 0 {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "服务人员不存在")
 		return

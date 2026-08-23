@@ -2,12 +2,7 @@
   <view class="container">
       <view class="card">
       <view class="title">商家 WebSocket 联调测试</view>
-      <view class="subtitle">输入目标商家 ID，手动下发进店与订单通知，验证商家端 WebSocket 是否已连通</view>
-
-      <view class="field">
-        <view class="label">商家ID</view>
-        <input v-model="merchantId" class="input" type="number" placeholder="请输入 merchant_id" />
-      </view>
+      <view class="subtitle">手动下发进店与订单通知，验证商家端 WebSocket 是否已连通</view>
 
       <view class="field">
         <view class="label">订单号</view>
@@ -35,7 +30,6 @@
       <view v-if="lastResult" class="result-card" :class="{ success: lastResult.delivered > 0, warning: lastResult.delivered === 0 }">
         <view class="result-title">最近发送结果</view>
         <view class="result-row">类型：{{ lastResult.label }}</view>
-        <view class="result-row">目标商家：{{ lastResult.merchantId }}</view>
         <view class="result-row">在线连接数：{{ lastResult.delivered }}</view>
         <view class="result-row">发送时间：{{ lastResult.sentAt }}</view>
         <view class="result-hint">
@@ -65,28 +59,16 @@ interface NotifyResponse {
 
 interface SendResult {
   label: string
-  merchantId: number
   delivered: number
   sentAt: string
 }
 
-const merchantId = ref('1')
 const orderNo = ref('TEST-ORDER')
 const visitorOpenId = ref('')
 const visitSource = ref('dev')
 const submitting = ref(false)
 const currentAction = ref<NotifyAction | ''>('')
 const lastResult = ref<SendResult | null>(null)
-
-function getMerchantId(): number | null {
-  const id = Number(merchantId.value)
-  if (!id) {
-    uni.showToast({ title: '请输入商家ID', icon: 'none' })
-    return null
-  }
-
-  return id
-}
 
 function formatCurrentTime(): string {
   const now = new Date()
@@ -95,29 +77,22 @@ function formatCurrentTime(): string {
   return `${datePart} ${timePart}`
 }
 
-function updateLastResult(label: string, id: number, delivered: number) {
+function updateLastResult(label: string, delivered: number) {
   lastResult.value = {
     label,
-    merchantId: id,
     delivered,
     sentAt: formatCurrentTime()
   }
 }
 
 async function sendOrderNotify() {
-  const id = getMerchantId()
-  if (!id) {
-    return
-  }
-
   currentAction.value = 'order'
   submitting.value = true
   try {
     const result = await post<NotifyResponse>('/api/v1/dev/order-notify', {
-      merchant_id: id,
       order_no: orderNo.value.trim()
     })
-    updateLastResult('订单成功提醒', id, result.delivered)
+    updateLastResult('订单成功提醒', result.delivered)
     uni.showToast({ title: result.delivered > 0 ? '发送成功' : '已发送但无在线连接', icon: 'none' })
   } catch (e: any) {
     uni.showToast({ title: e?.message || '发送失败', icon: 'none' })
@@ -128,20 +103,14 @@ async function sendOrderNotify() {
 }
 
 async function sendVisitNotify() {
-  const id = getMerchantId()
-  if (!id) {
-    return
-  }
-
   currentAction.value = 'visit'
   submitting.value = true
   try {
     const result = await post<NotifyResponse>('/api/v1/dev/store-visit-notify', {
-      merchant_id: id,
       visitor_openid: visitorOpenId.value.trim(),
       source: visitSource.value.trim()
     })
-    updateLastResult('顾客进店提醒', id, result.delivered)
+    updateLastResult('顾客进店提醒', result.delivered)
     uni.showToast({ title: result.delivered > 0 ? '发送成功' : '已发送但无在线连接', icon: 'none' })
   } catch (e: any) {
     uni.showToast({ title: e?.message || '发送失败', icon: 'none' })

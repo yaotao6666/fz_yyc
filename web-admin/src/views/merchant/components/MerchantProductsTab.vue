@@ -219,14 +219,14 @@ onMounted(loadData)
     <div class="toolbar">
       <el-form inline>
         <el-form-item label="分类">
-          <el-select v-model="filters.category_id" clearable placeholder="全部分类" style="width: 160px;">
-            <el-option
-              v-for="category in categories"
-              :key="category.id"
-              :label="category.name"
-              :value="category.id"
-            />
-          </el-select>
+          <el-cascader
+            v-model="filters.category_id"
+            :options="categories"
+            :props="{ value: 'id', label: 'name', children: 'children', checkStrictly: true, emitPath: false }"
+            clearable
+            placeholder="全部分类"
+            style="width: 200px;"
+          />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="filters.status" clearable placeholder="全部状态" style="width: 140px;">

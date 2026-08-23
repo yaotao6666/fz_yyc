@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/profitsharing"
 	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/pkg/database"
 
@@ -62,6 +63,9 @@ func WechatPayPayCallback(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": "FAIL", "message": "process error"})
 		return
 	}
+
+	// 支付成功后后台自动分账（不阻塞回调响应）
+	profitsharing.AutoProfitShareForPaidOrder(tx.OutTradeNo, tx.TransactionID)
 
 	c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "ok"})
 }

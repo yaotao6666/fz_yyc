@@ -32,27 +32,29 @@ $result = Test-API "服务商登录" {
     @{Name="服务商登录"; Status=($resp.code -eq 0); Detail=$resp.message}
 }
 
-# 测试2: 商家管理员登录 (验证merchant_id修复)
-$result = Test-API "商家管理员登录 (验证merchant_id)" {
+# 测试2: 商家管理员登录 (验证RBAC登录态)
+$result = Test-API "商家管理员登录 (验证RBAC登录态)" {
     $body = @{username="merchant1"; password="123456"} | ConvertTo-Json
     $resp = Invoke-RestMethod -Uri "$BASE_URL/auth/merchant/login" -Method Post -Body $body -ContentType "application/json"
     Write-Host "状态码: 200"
     Write-Host "响应: $($resp | ConvertTo-Json -Depth 10)"
 
-    $merchantId = $resp.data.merchant_id
+    $token = $resp.data.token
+    $menus = $resp.data.menus
+    $permissions = $resp.data.permissions
     Write-Host ""
-    Write-Host ">>> merchant_id 值: $merchantId" -ForegroundColor Yellow
+    Write-Host ">>> token 长度: $($token.Length), 菜单数: $($menus.Count), 权限码数: $($permissions.Count)" -ForegroundColor Yellow
 
-    if ($merchantId -and $merchantId -gt 0) {
-        Write-Host "✅ 修复成功: merchant_id 不再是 0" -ForegroundColor Green
+    if ($token -and $menus -is [array] -and $permissions -is [array]) {
+        Write-Host "✅ 登录响应包含 token/menus/permissions" -ForegroundColor Green
         $passed = $true
     } else {
-        Write-Host "❌ 修复失败: merchant_id 仍然是 0 或无效" -ForegroundColor Red
+        Write-Host "❌ 登录响应缺少 token/menus/permissions" -ForegroundColor Red
         $passed = $false
     }
 
     $script:merchantToken = $resp.data.token
-    @{Name="商家登录merchant_id"; Status=$passed; Detail="merchant_id=$merchantId"}
+    @{Name="商家登录RBAC"; Status=$passed; Detail="menus=$($menus.Count), perms=$($permissions.Count)"}
 }
 
 # 测试3: 获取商家信息
@@ -165,14 +167,13 @@ $result = Test-API "C端用户登录" {
 if ($userToken -and $productId) {
     $result = Test-API "创建订单 (验证库存扣减和销量更新)" {
         # 先获取商品当前库存和销量
-        $productResp = Invoke-RestMethod -Uri "$BASE_URL/store/1/products/$productId" -Method Get
+        $productResp = Invoke-RestMethod -Uri "$BASE_URL/store/products/$productId" -Method Get
         $beforeStock = $productResp.data.stock
         $beforeSales = $productResp.data.sales
         Write-Host ">>> 创建订单前 - stock: $beforeStock, sales: $beforeSales" -ForegroundColor Yellow
 
-        # 创建订单
+        # 创建订单（单商户模式，无 merchant_id）
         $body = @{
-            merchant_id=1
             delivery_type=1
             contact_name="测试用户"
             contact_phone="13800138000"
@@ -181,13 +182,13 @@ if ($userToken -and $productId) {
         } | ConvertTo-Json -Depth 10
 
         $headers = @{Authorization="Bearer $userToken"; "Content-Type"="application/json"}
-        $orderResp = Invoke-RestMethod -Uri "$BASE_URL/user/orders" -Method Post -Headers $headers -Body $body
+        $orderResp = Invoke-RestMethod -Uri "$BASE_URL/store/orders" -Method Post -Headers $headers -Body $body
         Write-Host "创建订单响应: $($orderResp | ConvertTo-Json -Depth 10)"
 
         if ($orderResp.code -eq 0) {
             # 再次获取商品信息
             Start-Sleep -Milliseconds 500
-            $productResp2 = Invoke-RestMethod -Uri "$BASE_URL/store/1/products/$productId" -Method Get
+            $productResp2 = Invoke-RestMethod -Uri "$BASE_URL/store/products/$productId" -Method Get
             $afterStock = $productResp2.data.stock
             $afterSales = $productResp2.data.sales
             Write-Host ">>> 创建订单后 - stock: $afterStock, sales: $afterSales" -ForegroundColor Yellow

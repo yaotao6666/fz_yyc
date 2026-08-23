@@ -1,5 +1,4 @@
 export interface StoreEntryOptions {
-  merchantId: number
   source: string
 }
 
@@ -19,28 +18,24 @@ export function parseStoreSceneParams(scene: string) {
 }
 
 export function parseStoreEntryOptions(
-  options?: Record<string, any>,
-  fallbackMerchantId = 1
+  options?: Record<string, any>
 ): StoreEntryOptions {
   const normalizedOptions = options || {}
   const scene = typeof normalizedOptions.scene === 'string'
     ? decodeURIComponent(normalizedOptions.scene)
     : ''
   const sceneParams = parseStoreSceneParams(scene)
-  const rawMerchantId = normalizedOptions.merchant_id || sceneParams.merchant_id || fallbackMerchantId || 1
-  const merchantId = Number(rawMerchantId) || 1
   const source = String(normalizedOptions.source || sceneParams.source || (scene ? 'scene' : 'scan'))
 
-  return { merchantId, source }
+  return { source }
 }
 
 export function parseStoreProductEntryOptions(
   options?: Record<string, any>,
-  fallbackMerchantId = 1,
   fallbackProductId = 1
 ): StoreProductEntryOptions {
   const normalizedOptions = options || {}
-  const { merchantId, source } = parseStoreEntryOptions(normalizedOptions, fallbackMerchantId)
+  const { source } = parseStoreEntryOptions(normalizedOptions)
   const scene = typeof normalizedOptions.scene === 'string'
     ? decodeURIComponent(normalizedOptions.scene)
     : ''
@@ -48,5 +43,5 @@ export function parseStoreProductEntryOptions(
   const rawProductId = normalizedOptions.product_id || sceneParams.product_id || fallbackProductId || 1
   const productId = Number(rawProductId) || 1
 
-  return { merchantId, productId, source }
+  return { productId, source }
 }

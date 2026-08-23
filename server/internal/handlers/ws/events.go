@@ -7,7 +7,7 @@ type merchantEvent struct {
 	Payload interface{} `json:"payload"`
 }
 
-func broadcastMerchantEvent(merchantID uint64, eventType string, payload interface{}) int {
+func broadcastMerchantEvent(eventType string, payload interface{}) int {
 	message, err := json.Marshal(merchantEvent{
 		Type:    eventType,
 		Payload: payload,
@@ -16,19 +16,17 @@ func broadcastMerchantEvent(merchantID uint64, eventType string, payload interfa
 		return 0
 	}
 
-	return BroadcastToMerchant(merchantID, message)
+	return BroadcastToMerchant(message)
 }
 
-func BroadcastOrderNotify(merchantID uint64, orderNo string) int {
-	return broadcastMerchantEvent(merchantID, "order_notify", map[string]interface{}{
-		"merchant_id": merchantID,
-		"order_no":    orderNo,
+func BroadcastOrderNotify(orderNo string) int {
+	return broadcastMerchantEvent("order_notify", map[string]interface{}{
+		"order_no": orderNo,
 	})
 }
 
-func BroadcastStoreVisitNotify(merchantID uint64, visitorOpenID string, source string) int {
-	return broadcastMerchantEvent(merchantID, "store_visit_notify", map[string]interface{}{
-		"merchant_id":    merchantID,
+func BroadcastStoreVisitNotify(visitorOpenID string, source string) int {
+	return broadcastMerchantEvent("store_visit_notify", map[string]interface{}{
 		"visitor_openid": visitorOpenID,
 		"source":         source,
 	})

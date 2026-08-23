@@ -1,7 +1,6 @@
 package merchant
 
 import (
-	"strconv"
 	"time"
 
 	"fz_yyc_api/internal/models"
@@ -24,9 +23,6 @@ type UserStats struct {
 }
 
 func GetUserStats(c *gin.Context) {
-	merchantID := c.Query("merchant_id")
-	mid, _ := strconv.ParseUint(merchantID, 10, 64)
-
 	var stats UserStats
 
 	today := time.Now().Format("2006-01-02")
@@ -37,7 +33,6 @@ func GetUserStats(c *gin.Context) {
 	// 总用户数（按openid去重，有订单的用户）
 	var distinctUsers []uint64
 	database.DB.Model(&models.Order{}).
-		Where("merchant_id = ?", mid).
 		Distinct("user_id").
 		Pluck("user_id", &distinctUsers)
 	stats.TotalUsers = int64(len(distinctUsers))
@@ -75,7 +70,6 @@ func GetUserStats(c *gin.Context) {
 
 	// 总访问次数
 	database.DB.Model(&models.UserVisit{}).
-		Where("merchant_id = ?", mid).
 		Count(&stats.TotalVisitCount)
 
 	// 人均访问次数
@@ -86,7 +80,7 @@ func GetUserStats(c *gin.Context) {
 	// 活跃用户（7天内有访问）
 	var activeUsers int64
 	database.DB.Model(&models.UserVisit{}).
-		Where("merchant_id = ? AND visit_time >= ?", mid, dayAgo).
+		Where("visit_time >= ?", dayAgo).
 		Distinct("user_id").
 		Count(&activeUsers)
 	stats.ActiveUsers = activeUsers
@@ -95,7 +89,6 @@ func GetUserStats(c *gin.Context) {
 }
 
 type MerchantOverview struct {
-	MerchantID   uint64  `json:"merchant_id"`
 	MerchantName string  `json:"merchant_name"`
 	TotalUsers   int64   `json:"total_users"`
 	TotalOrders  int64   `json:"total_orders"`
@@ -115,7 +108,6 @@ func GetMerchantsOverview(c *gin.Context) {
 	for _, merchant := range merchants {
 		var distinctUsers []uint64
 		database.DB.Model(&models.Order{}).
-			Where("merchant_id = ?", merchant.ID).
 			Distinct("user_id").
 			Pluck("user_id", &distinctUsers)
 
@@ -123,25 +115,24 @@ func GetMerchantsOverview(c *gin.Context) {
 		var totalSales, todaySales float64
 
 		database.DB.Model(&models.Order{}).
-			Where("merchant_id = ? AND status IN (2, 3)", merchant.ID).
+			Where("status IN (2, 3)").
 			Count(&totalOrders)
 
 		database.DB.Model(&models.Order{}).
-			Where("merchant_id = ? AND status IN (2, 3)", merchant.ID).
+			Where("status IN (2, 3)").
 			Select("COALESCE(SUM(pay_amount), 0)").
 			Scan(&totalSales)
 
 		database.DB.Model(&models.Order{}).
-			Where("merchant_id = ? AND status IN (2, 3) AND DATE(created_at) = ?", merchant.ID, today).
+			Where("status IN (2, 3) AND DATE(created_at) = ?", today).
 			Count(&todayOrders)
 
 		database.DB.Model(&models.Order{}).
-			Where("merchant_id = ? AND status IN (2, 3) AND DATE(created_at) = ?", merchant.ID, today).
+			Where("status IN (2, 3) AND DATE(created_at) = ?", today).
 			Select("COALESCE(SUM(pay_amount), 0)").
 			Scan(&todaySales)
 
 		overviews = append(overviews, MerchantOverview{
-			MerchantID:   merchant.ID,
 			MerchantName: merchant.Name,
 			TotalUsers:   int64(len(distinctUsers)),
 			TotalOrders:  totalOrders,

@@ -151,7 +151,6 @@ function normalizeProduct(product: ProductApiResponse | null | undefined): Produ
   return {
     ...product,
     id: normalizeRequiredNumber(product?.id),
-    merchant_id: normalizeNumberValue(product?.merchant_id),
     category_id: normalizeRequiredNumber(product?.category_id),
     price: normalizeRequiredNumber(product?.price),
     original_price: normalizeNumberValue(product?.original_price),
@@ -179,8 +178,8 @@ function normalizeListField<T, R extends { list?: T[] | null }>(response: R): R 
   }
 }
 
-export function getStoreHome(merchantId: number) {
-  return get<StoreHomeInfo>(`/api/v1/store/${merchantId}/home`).then(data => {
+export function getStoreHome() {
+  return get<StoreHomeInfo>(`/api/v1/store/home`).then(data => {
     if (data?.hot_products) {
       data.hot_products = data.hot_products.map((item: any) => {
         const normalized = normalizeProduct(item)
@@ -209,27 +208,27 @@ export function getStoreHome(merchantId: number) {
   })
 }
 
-export function getStoreProducts(merchantId: number, params?: { category_id?: number }) {
-  return get<ProductListResponse>(`/api/v1/store/${merchantId}/products`, params).then(response => {
+export function getStoreProducts(params?: { category_id?: number }) {
+  return get<ProductListResponse>(`/api/v1/store/products`, params).then(response => {
     const normalized = normalizeListField(response)
     return { ...normalized, list: normalized.list.map(normalizeProduct) }
   })
 }
 
-export function getStoreProduct(merchantId: number, productId: number) {
-  return get<Product>(`/api/v1/store/${merchantId}/products/${productId}`).then(normalizeProduct)
+export function getStoreProduct(productId: number) {
+  return get<Product>(`/api/v1/store/products/${productId}`).then(normalizeProduct)
 }
 
-export function getStoreDeliveryRules(merchantId: number) {
-  return get<StoreDeliveryRules>(`/api/v1/store/${merchantId}/delivery-rules`).then(normalizeStoreDeliveryRules)
+export function getStoreDeliveryRules() {
+  return get<StoreDeliveryRules>(`/api/v1/store/delivery-rules`).then(normalizeStoreDeliveryRules)
 }
 
-export function createOrder(merchantId: number, data: CreateOrderRequest) {
-  return post<CreateOrderResponse>(`/api/v1/store/${merchantId}/orders`, data)
+export function createOrder(data: CreateOrderRequest) {
+  return post<CreateOrderResponse>(`/api/v1/store/orders`, data)
 }
 
-export function trackStoreBehaviorEvent(merchantId: number, data: MerchantBehaviorEventRequest) {
-  return post<{ message: string }>(`/api/v1/store/${merchantId}/event`, data, {
+export function trackStoreBehaviorEvent(data: MerchantBehaviorEventRequest) {
+  return post<{ message: string }>(`/api/v1/store/event`, data, {
     loading: false,
     showErrorToast: false
   })

@@ -29,9 +29,9 @@ def test_api():
         print("无法获取token，跳过后续测试")
         return results
 
-    # 2. 测试商家管理员登录 - 验证merchant_id是否正确
+    # 2. 测试商家管理员登录 - 验证RBAC登录态（token/menus/permissions）
     print("\n" + "=" * 60)
-    print("测试2: 商家管理员登录 (验证merchant_id修复)")
+    print("测试2: 商家管理员登录 (验证RBAC登录态)")
     print("=" * 60)
     try:
         resp = requests.post(f"{BASE_URL}/auth/merchant/login", json={
@@ -42,19 +42,20 @@ def test_api():
         print(f"状态码: {resp.status_code}")
         print(f"响应: {json.dumps(data, ensure_ascii=False, indent=2)}")
 
-        # 验证merchant_id
-        merchant_id = data.get("data", {}).get("merchant_id")
-        print(f"\n>>> merchant_id 值: {merchant_id}")
-        if merchant_id and merchant_id > 0:
-            print("✅ 修复成功: merchant_id 不再是 0")
-        else:
-            print("❌ 修复失败: merchant_id 仍然是 0 或无效")
-
+        # 验证 RBAC 登录态：token / menus / permissions
         merchant_token = data.get("data", {}).get("token", "")
-        results.append(("商家登录merchant_id", True, merchant_id > 0 if merchant_id else False))
+        menus = data.get("data", {}).get("menus", [])
+        permissions = data.get("data", {}).get("permissions", [])
+        print(f"\n>>> token 长度: {len(merchant_token)}, 菜单数: {len(menus)}, 权限码数: {len(permissions)}")
+        if merchant_token and isinstance(menus, list) and isinstance(permissions, list):
+            print("✅ 修复成功: 登录响应包含 token/menus/permissions")
+            results.append(("商家登录RBAC", True, True))
+        else:
+            print("❌ 修复失败: 登录响应缺少 token/menus/permissions")
+            results.append(("商家登录RBAC", True, False))
     except Exception as e:
         print(f"请求失败: {e}")
-        results.append(("商家登录merchant_id", False, False))
+        results.append(("商家登录RBAC", False, False))
         merchant_token = ""
 
     # 3. 测试获取商家信息
@@ -213,17 +214,16 @@ def test_api():
 
         # 先获取商品当前库存和销量
         try:
-            resp = requests.get(f"{BASE_URL}/store/1/products/{product_id}")
+            resp = requests.get(f"{BASE_URL}/store/products/{product_id}")
             before_data = resp.json()
             before_stock = before_data.get("data", {}).get("stock", 0)
             before_sales = before_data.get("data", {}).get("sales", 0)
             print(f">>> 创建订单前 - stock: {before_stock}, sales: {before_sales}")
 
-            # 创建订单
-            resp = requests.post(f"{BASE_URL}/user/orders", headers={
+            # 创建订单（单商户模式，无 merchant_id）
+            resp = requests.post(f"{BASE_URL}/store/orders", headers={
                 "Authorization": f"Bearer {user_token}"
             }, json={
-                "merchant_id": 1,
                 "delivery_type": 1,
                 "contact_name": "测试用户",
                 "contact_phone": "13800138000",
@@ -237,7 +237,7 @@ def test_api():
 
             if order_data.get("code") == 0:
                 # 再次获取商品信息
-                resp = requests.get(f"{BASE_URL}/store/1/products/{product_id}")
+                resp = requests.get(f"{BASE_URL}/store/products/{product_id}")
                 after_data = resp.json()
                 after_stock = after_data.get("data", {}).get("stock", 0)
                 after_sales = after_data.get("data", {}).get("sales", 0)

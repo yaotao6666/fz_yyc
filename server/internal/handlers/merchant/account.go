@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"fz_yyc_api/internal/handlers/rbac"
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/services/wechatpay"
@@ -33,16 +34,7 @@ type WechatQuickLoginRequest struct {
 }
 
 func getCurrentMerchantStaff(c *gin.Context) (*models.MerchantStaff, error) {
-	merchantID := middleware.GetMerchantID(c)
-	usernameValue, _ := c.Get("username")
-	username, _ := usernameValue.(string)
-
-	var staff models.MerchantStaff
-	if err := database.DB.Where("merchant_id = ? AND username = ?", merchantID, username).First(&staff).Error; err != nil {
-		return nil, err
-	}
-
-	return &staff, nil
+	return middleware.GetCurrentStaff(c)
 }
 
 func buildMerchantOpenID(code string) string {
@@ -235,7 +227,7 @@ func WechatQuickLogin(c *gin.Context) {
 	}
 
 	var staff models.MerchantStaff
-	if err := database.DB.Preload("Merchant").Where("openid = ?", wechatIdentity.OpenID).First(&staff).Error; err != nil {
+	if err := database.DB.Where("openid = ?", wechatIdentity.OpenID).First(&staff).Error; err != nil {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "您还不是商家，请注册后使用")
 		return
 	}
@@ -260,10 +252,17 @@ func WechatQuickLogin(c *gin.Context) {
 	staff.LastLoginAt = &now
 	staff.LastWechatLoginAt = &now
 
-	token, _ := utils.GenerateToken(staff.MerchantID, "merchant", staff.Username)
+	token, _ := utils.GenerateToken(staff.ID, staff.ID, "merchant", staff.Username)
+	menus, permissions, rbacErr := rbac.BuildStaffMenusAndPermissions(&staff)
+	if rbacErr != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "加载权限失败")
+		return
+	}
 	response.Success(c, gin.H{
 		"token":       token,
-		"merchant_id": staff.MerchantID,
+		"merchant_id": utils.DefaultMerchantID,
 		"staff":       staff,
+		"menus":       menus,
+		"permissions": permissions,
 	})
 }

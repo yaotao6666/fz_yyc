@@ -70,16 +70,16 @@
   - `user_login_app_id`：对应 `data.app_id`
 - **鉴权使用**：
   - `Authorization: Bearer {user_token}` 用于 `GET/POST /api/v1/user/*`
-  - `Authorization: Bearer {user_token}` 用于 `POST /api/v1/store/:merchant_id/orders`（下单）
-  - `/api/v1/store/:merchant_id/home`、`/products`、`/products/:product_id`、`/delivery-rules` 为公开接口，不要求登录
-  - `pages/home/index`、`pages/store/product`、`pages/store/confirm` 统一支持从 `merchant_id` 或 `scene` 解析商户入口参数
-  - `GET /api/v1/store/:merchant_id/home` 与 `GET /api/v1/store/:merchant_id/delivery-rules` 进入页面后可直接发起，不等待登录完成
+  - `Authorization: Bearer {user_token}` 用于 `POST /api/v1/store/orders`（下单）
+  - `/api/v1/store/home`、`/products`、`/products/:product_id`、`/delivery-rules` 为公开接口，不要求登录
+  - `pages/home/index`、`pages/store/product`、`pages/store/confirm` 统一解析店铺入口参数（单商户模式，入口固定单店）
+  - `GET /api/v1/store/home` 与 `/api/v1/store/delivery-rules` 进入页面后可直接发起，不等待登录完成
 
 #### C 端访问与埋点
 
-- **访问埋点**：`POST /api/v1/store/:merchant_id/visit`
+- **访问埋点**：`POST /api/v1/store/visit`
   - 请求：`{ openid: string, source?: string }`
-- **行为埋点**：`POST /api/v1/store/:merchant_id/event`
+- **行为埋点**：`POST /api/v1/store/event`
   - 请求：
     - `openid: string`
     - `event_type: page_view | product_view | submit_order | pay_success`
@@ -150,14 +150,14 @@
 
 - 商户资料更新需支持 `logo` 与背景图字段。
 - `GET /api/v1/merchant/settings` 需返回 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled`，`PUT /api/v1/merchant/settings` 需支持更新这三个开关。
-- `GET /api/v1/store/:merchant_id/delivery-rules` 除配送费结构外，还需返回 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 供确认页动态展示下单方式。
+- `GET /api/v1/store/delivery-rules` 除配送费结构外，还需返回 `takeout_enabled`、`dine_in_enabled`、`pickup_enabled` 供确认页动态展示下单方式。
 - `GET /api/v1/merchant/full-reduction-rules` 返回 `rules` 与 `active_rules`，单档规则至少包含 `threshold_amount`、`discount_amount`、`status`、`sort`。
 - `PUT /api/v1/merchant/full-reduction-rules` 最多支持 5 档规则，`discount_amount` 必须小于 `threshold_amount`。
-- `GET /api/v1/store/:merchant_id/full-reduction-rules` 为公开接口，仅返回当前商户启用中的满减规则。
+- `GET /api/v1/store/full-reduction-rules` 为公开接口，仅返回当前商户启用中的满减规则。
 - `delivery_settings.enabled` 只表示配送费规则是否生效，确认页是否展示“配送”必须以后端返回的 `takeout_enabled` 为准。
 - `GET /api/v1/merchant/printers` 返回打印机列表时，需返回 `type`、`status`、`auto_print`、`is_default`、`print_count`、`last_print_at`、`has_api_key`、`has_feie_ukey`。
 - 飞鹅打印机请求字段至少包含 `feie_user`、`feie_ukey`、`feie_sn`。
-- `GET /api/v1/merchant/qrcode` 必须固定生成指向 `pages/home/index` 的小程序码，且 `scene` 需使用 `merchant_id={当前商户ID}` 以兼容现有商城入口解析逻辑。
+- `GET /api/v1/merchant/qrcode` 必须固定生成指向 `pages/home/index` 的小程序码，且 `scene` 固定为店铺标识（单商户模式，不包含 `merchant_id`）。
 - 服务人员管理接口用于维护接单小程序的账号、姓名、手机号、状态等，注册申请审核通过后服务人员方可登录接单。
 - 订单核销由商户管理员在 PC 后台执行，无需重复输入核销码。
 
@@ -188,7 +188,7 @@
 - 快速核销：`POST /api/v1/merchant/orders/quick-complete`
 - 商户退款
 - 订单统计
-- **归还租赁商品（退押金）**：`POST /api/v1/sp/merchants/{merchant_id}/orders/{order_id}/return`
+- **归还租赁商品（退押金）**：`POST /api/v1/merchant/orders/{order_id}/return`
 - C 端订单列表 / 详情 / 取消 / 申请退款
 
 当前重点约束：
@@ -254,7 +254,7 @@
 
 - 下单时必须按商户维度读取 `sub_mch_id`。
 - 已进件商户通过 PC 后台回填 `sub_mch_id` 完成支付配置。
-- 微信支付服务商凭证为系统级配置，由系统统一维护，不在商户维度暴露。
+- 微信支付商户凭证为系统级配置，由系统统一维护，不在商户维度暴露。
 - `WECHAT_PAY_APP_MODE` 仅切换登录与下单支付时使用的小程序身份，不改变支付回调与退款实现。
 
 ### 2.7 数据分析接口
@@ -323,6 +323,213 @@
 - 待接订单列表与已接订单列表均需保证空数组兜底。
 - 接单为原子操作，避免多服务人员重复接单。
 
+### 2.11 健康服务接口（基层健康服务闭环）
+
+基层健康服务闭环分四期落地：阶段一覆盖居民健康档案与人群健康评估，阶段二覆盖康复辅具适配，阶段三覆盖居家康养照护（照护计划制定与上门照护记录），阶段四覆盖持续康复随访、生命体征监测与健康宣教。接口按端分为三组，C 端与服务人员端需登录，管理端在商户 RBAC 基础上按权限码校验。
+
+### 2.12 RBAC 权限码维护规范（接口 ↔ 按钮 ↔ 菜单节点三方一致）
+
+> **硬性约束**：所有商户管理端接口必须接入 RBAC 鉴权，且保证 **前端按钮权限码 = 后端接口鉴权码 = `sys_menus.permission` 节点** 三方完全一致。新增接口时必须同步生成对应的菜单权限节点，禁止出现"前端有按钮但接口无鉴权码"或"接口用聚合码但前端用细分码"的分叉。
+
+#### 2.12.1 权限码命名约定
+
+- **页面级权限码**：仅读取能力，格式 `模块:view`（如 `health:view`、`assessment:view`、`care:view`），挂载于菜单目录（`menu_type=1`）节点，同时用作前端路由守卫。
+- **按钮级权限码**：写操作，格式 `模块:create | update | delete`（可含 `status` / `config` 等动作语义），挂载于按钮节点（`menu_type=2`），用于 `v-permission` 按钮级控制。
+- **禁止聚合混合**：同一个模块不得既用细分的 `assessment:create/update/delete` 又用聚合的 `assessment:config`，二者只选其一，且全局统一。
+
+#### 2.12.2 新增接口的 RBAC 落地流程（自动插入到对应节点）
+
+新增/修改商户管理端接口时，必须依次完成以下四步（缺一不可）：
+
+1. **后端接入**：在 `server/cmd/server/main.go` 的路由注册处为接口添加 `middleware.RBAC("模块:动作")`；改动权限码时同步更新 `internal/utils/constants.go` 及 `internal/middleware/rbac.go`（如需）。
+2. **前端按钮**：在对应页面按钮上使用 `v-permission="'模块:动作'"`，与后端接口鉴权码完全一致。
+3. **数据库菜单节点**：编写幂等迁移脚本（`server/migrations/*.sql`），用 `INSERT IGNORE INTO sys_menus ...` 在对应父节点（`parent_id`）下新增/更新按钮节点，`permission` 与上两步一致；**再 `INSERT IGNORE INTO sys_role_menus (role_id, menu_id) SELECT 1, id FROM sys_menus WHERE id IN (...)` 绑定超管角色**，确保既有账号不影响。
+4. **文档同步**：同步更新本文件各阶段"管理端接口-权限码"表、`PRD-功能说明.md` 的 RBAC 描述，以及执行迁移脚本。
+
+> **检查点**：交接或合并前，用 SQL 核对 `sys_menus` 中没有一个 `permission` 值被接口使用却未在节点中登记（`SELECT permission FROM sys_menus WHERE permission<>''` 与后端全部 RBAC 权限码做差集校验）。
+
+#### 2.12.3 健康服务权限码现状（细粒度，前/后端/DB 一致）
+
+| 子模块 | 页面级 | 按钮级（create/update/delete 或动作） |
+| --- | --- | --- |
+| 健康档案 | `health:view`（id=81） | 编辑 `health:update`（id=811） |
+| 评估量表 | `assessment:view`（id=82） | 新增 `assessment:create`（id=821）· 编辑/启停 `assessment:update`（id=822）· 删除 `assessment:delete`（id=823） |
+| 评估记录 | `assessment:view`（id=83） | 手动登记 `assessment:create`（id=831） |
+| 适配建议 | `fitting:view`（id=84） | 编辑/确认 `fitting:update`（id=841） |
+| 照护计划 | `care:view`（id=85） | 新增 `care:create`（id=851）· 编辑 `care:update`（id=852）· 删除 `care:delete`（id=853） |
+| 随访任务 | `followup:view`（id=86） | 执行/登记 `followup:update`（id=861） |
+| 生命体征 | `monitor:view`（id=87） | 录入 `monitor:create`（id=871） |
+| 健康宣教 | `education:view`（id=88） | 新增/编辑 `education:create`（id=881） |
+
+#### 阶段一：居民健康档案与人群健康评估
+
+##### C 端（前缀 /api/v1/user，需用户登录）
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /health-record` | 我的健康档案，未建档返回 `data=null` |
+| `PUT /health-record` | 有则更新、无则创建我的健康档案 |
+| `GET /assessment-forms` | 仅返回已启用的评估量表列表 |
+| `GET /assessments` | 我的评估记录（分页倒序） |
+| `POST /assessments` | 自助评估提交 `{form_id, answers:{key:label}, symptom_desc}`，后端计分并返回 `total_score` / `level` / `conclusion` |
+
+##### 服务人员端（前缀 /api/v1/service-staff，需服务人员登录）
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /assessment-forms` | 仅返回已启用的评估量表列表 |
+| `GET /residents/:user_id/health-record` | 查看客户健康档案（数据权限校验） |
+| `GET /residents/:user_id/assessments` | 客户评估记录（分页，数据权限校验） |
+| `POST /residents/:user_id/assessments` | 上门评估登记，`assessor_type=2`（数据权限校验） |
+
+##### 管理端（前缀 /api/v1/merchant + RBAC）
+
+| 接口 | 权限码 | 说明 |
+| --- | --- | --- |
+| `GET /health-records` | `health:view` | 健康档案列表，`keyword` / `assessment_level` 筛选，分页，含用户信息 |
+| `GET /health-records/:id` | `health:view` | 健康档案详情，含该用户全部评估记录 |
+| `PUT /health-records/:id` | `health:update` | 编辑健康档案 |
+| `GET /assessment-forms` | `assessment:view` | 评估量表列表（含草稿） |
+| `POST /assessment-forms` | `assessment:create` | 新增评估量表 |
+| `PUT /assessment-forms/:id` | `assessment:update` | 编辑评估量表 |
+| `PATCH /assessment-forms/:id/status` | `assessment:update` | 启用/停用评估量表（仅更新 status，1 启用 / 0 草稿） |
+| `DELETE /assessment-forms/:id` | `assessment:delete` | 删除评估量表 |
+| `GET /health-assessments` | `assessment:view` | 评估记录列表，`keyword` / `form_id` 筛选，分页 |
+
+##### 公共约束
+
+- **数据权限**：服务人员仅能查看/评估自己接单服务过的客户（按 `orders.assigned_staff_id` 关联校验），无服务关系返回 403。
+- **计分逻辑**：总分 = 各题选中 option 的 `score` 之和；等级取 `score_rule` 中第一条命中 `min <= total <= max` 的 `level` / `conclusion`。
+- **等级回写**：评估保存后，将 `level` 回写 `health_records.assessment_level`（仅档案已存在时生效）。
+- **量表维度**：`adl` 日常生活能力 / `barthel` 巴氏指数 / `fall` 跌倒风险 / `nutrition` 营养评估 / `cognition` 认知评估 / `pressure` 压疮风险 / `weak` 衰弱筛查 / `geriatric` 老年综合 / `self` 通用自评。
+
+#### 阶段二：康复辅具适配
+
+阶段二在健康档案与评估基础上，由服务人员端基于评估结果为居民生成康复辅具适配建议，用户确认后进入选购/租赁下单，形成「评估→适配→销售/租赁」闭环。推荐商品保存快照，接口共 9 个，按端分为三组。
+
+##### C 端（前缀 /api/v1/user，需用户登录）
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /fitting-recommendations` | 我的适配建议（分页倒序） |
+| `GET /fitting-recommendations/:id` | 我的适配建议详情（仅本人，他人返回 403） |
+| `POST /fitting-recommendations/:id/confirm` | 确认适配建议（仅草稿可确认，确认后 `status=1`） |
+
+##### 服务人员端（前缀 /api/v1/service-staff，需服务人员登录）
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /residents/:user_id/fitting-recommendations` | 客户适配建议（分页倒序，数据权限校验） |
+| `POST /residents/:user_id/fitting-recommendations` | 为客户生成适配建议，请求 `{assessment_id?, symptom_desc, fitting_result, recommended_products:[{product_id, reason}]}`，推荐商品逐一校验并快照 name/sale_type，落库 `status=0`（数据权限校验） |
+
+##### 管理端（前缀 /api/v1/merchant + RBAC）
+
+| 接口 | 权限码 | 说明 |
+| --- | --- | --- |
+| `GET /fitting-recommendations` | `fitting:view` | 适配建议列表，`keyword`（用户昵称/手机号）/ `status` 筛选，分页，含用户信息 |
+| `GET /fitting-recommendations/:id` | `fitting:view` | 适配建议详情，含用户信息 |
+| `PUT /fitting-recommendations/:id` | `fitting:update` | 编辑适配建议（结论/推荐商品/状态/order_id，仅更新传入字段，推荐商品重新校验并快照） |
+| `DELETE /fitting-recommendations/:id` | `fitting:update` | 删除适配建议 |
+
+##### 阶段二业务规则
+
+- **状态流转**：`status`：0 草稿 / 1 已确认 / 2 已下单；服务人员端生成即草稿，C 端确认后置 1，关联订单后置 2。
+- **快照规则**：推荐商品保存快照 `{product_id, name, reason, sale_type}`，生成/编辑时逐一校验商品存在且上架（`status=1`），不满足返回"推荐商品不可用"。
+- **数据权限**：服务人员仅能查看/生成自己服务过客户的适配建议（按 `orders.assigned_staff_id` 关联校验），无服务关系返回 403；C 端仅能查看/操作本人建议；管理端按 RBAC 权限码 `fitting:view` / `fitting:update` 控制。
+- **RBAC 菜单**：健康服务菜单（id=8）下新增子菜单「适配建议」`/health/fitting`（id=84，`fitting:view`）+ 按钮「编辑/确认」（id=841，`fitting:update`），迁移脚本自动绑定角色 1。
+
+#### 阶段三：居家康养照护
+
+阶段三在阶段一、阶段二基础上，由 web-admin 为居民制定照护计划并指派服务人员，服务人员上门服务后录入照护记录（护理项完成情况、生命体征、照片、下次随访建议），形成「评估→适配→照护」基层健康服务闭环。接口共 11 个（C 端 2 个、服务人员端 3 个、管理端 6 个），按端分为三组。
+
+##### C 端（前缀 /api/v1/user，需用户登录）
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /care-plans` | 我的照护计划（分页，仅本人） |
+| `GET /care-plans/:id` | 我的照护计划详情，含该计划全部上门照护记录（仅本人，他人返回 403） |
+
+##### 服务人员端（前缀 /api/v1/service-staff，需服务人员登录）
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /care-plans` | 我的照护计划（仅 `assigned_staff_id` 为当前服务人员，分页） |
+| `GET /care-plans/:id` | 我的照护计划详情，含照护记录（数据权限校验，非本人指派返回 403） |
+| `POST /care-visits` | 录入上门照护记录，请求 `{plan_id?, order_id?, visit_at, nursing_items:[{name,done,remark}], vitals:{blood_pressure,blood_glucose,heart_rate,oxygen,weight}, photos:[], remark, follow_up_advice}`（数据权限校验） |
+
+##### 管理端（前缀 /api/v1/merchant + RBAC）
+
+| 接口 | 权限码 | 说明 |
+| --- | --- | --- |
+| `GET /care-plans` | `care:view` | 照护计划列表，`keyword` / `plan_type` / `status` 筛选，分页，含用户信息与 `visit_count` |
+| `GET /care-plans/:id` | `care:view` | 照护计划详情，含用户信息与该计划全部照护记录 |
+| `POST /care-plans` | `care:create` | 新增照护计划（居民、计划类型、起止日期、频次、目标、护理项、指派服务人员、关联订单、状态） |
+| `PUT /care-plans/:id` | `care:update` | 编辑照护计划（仅更新传入字段） |
+| `DELETE /care-plans/:id` | `care:delete` | 删除照护计划，存在照护记录时拒绝删除（保留历史溯源） |
+| `GET /care-visits` | `care:view` | 上门照护记录列表，`plan_id` / `user_id` 筛选，分页，含用户信息与录入人员姓名 |
+
+##### 阶段三业务规则
+
+- **数据权限**：服务人员端仅能查看 `assigned_staff_id` 为当前的照护计划；录入照护记录时 `plan_id` / `order_id` 至少提供一个，且均须属于当前服务人员负责范围（按 `care_plans.assigned_staff_id` / `orders.assigned_staff_id` 校验），`user_id` 取 plan/order 对应用户且保持一致，无服务关系返回 403。
+- **删除保护**：存在照护记录（care_visits）的照护计划不可删除，保留历史溯源。
+- **RBAC 菜单**：健康服务菜单（id=8）下新增子菜单「照护计划」`/health/care-plans`（id=85，`care:view`）+ 操作按钮 `care:create`（id=851，新增）`care:update`（id=852，编辑）`care:delete`（id=853，删除），迁移脚本自动绑定角色 1。
+- **数据表**：新增 `care_plans` 照护计划表、`care_visits` 上门照护记录表，迁移脚本 `server/migrations/20260818120000_care_plans_visits.sql`，字段详见 `PRD.md` 4.27 / 4.28。
+
+#### 阶段四：持续康复随访与健康宣教
+
+阶段四在阶段一至阶段三基础上，打通「服务/租赁/评估完成后 → 随访任务 → 生命体征监测 → 健康宣教触达」的持续康复闭环：服务完成、租赁归还、评估完成自动生成随访任务，服务人员执行随访并选用宣教文章推送，C 端可查看随访、体征记录与健康宣教。接口共 21 个（C 端 5 个、服务人员端 7 个、管理端 9 个），按端分为三组。
+
+##### C 端（前缀 /api/v1/user，需用户登录）
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /follow-ups` | 我的随访任务（分页倒序，可按 `status` 筛选，仅本人） |
+| `GET /health-education` | 已发布宣教文章，按本人档案慢病标签与文章 `tags` 匹配度排序（交集多者优先，相同按发布时间倒序），支持 `category` 筛选 |
+| `GET /health-education/:id` | 宣教文章详情（仅已发布可见，浏览量异步 +1） |
+| `GET /monitoring` | 我的生命体征记录（分页倒序，可按 `record_type` 筛选） |
+| `POST /monitoring` | 自助录入体征 `{record_type, value, unit, extra, recorded_at?, remark}`，`recorded_by=0` 表示本人 |
+
+##### 服务人员端（前缀 /api/v1/service-staff，需服务人员登录）
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /follow-up-tasks` | 随访任务列表（`staff_id` 为当前 或 待认领，分页倒序，可按 `status` 筛选） |
+| `GET /follow-up-tasks/:id` | 随访任务详情（须属于当前服务人员或待认领，否则 403） |
+| `POST /follow-up-tasks/:id/complete` | 执行随访，请求 `{result:{contact_method, content, education_article_ids, satisfaction, remark}}`；待认领任务自动认领为当前服务人员，`status`→已完成、`completed_at`=now、`contact_method` 回写列、`result` 存 JSON |
+| `POST /follow-up-tasks/:id/skip` | 跳过随访（权限校验同上，`status`→已跳过，待认领任务同样自动认领） |
+| `GET /health-education` | 已发布宣教文章（供随访执行时选用，按发布时间倒序） |
+| `GET /residents/:user_id/monitoring` | 客户生命体征记录（分页倒序，数据权限校验） |
+| `POST /residents/:user_id/monitoring` | 为客户录入体征（数据权限校验，`recorded_by`=当前服务人员） |
+
+##### 管理端（前缀 /api/v1/merchant + RBAC）
+
+| 接口 | 权限码 | 说明 |
+| --- | --- | --- |
+| `GET /follow-up-tasks` | `followup:view` | 随访任务列表，`keyword`（用户昵称/手机号）/ `status` / `task_type` 筛选，分页，含用户与服务人员信息 |
+| `GET /follow-up-tasks/:id` | `followup:view` | 随访任务详情（含用户与服务人员信息） |
+| `POST /follow-up-tasks` | `followup:update` | 手动登记随访任务（`source_type` 固定为手动），`plan_follow_time` 缺省为当前+72小时 |
+| `POST /follow-up-tasks/:id/complete` | `followup:update` | 管理员代执行随访（请求结构同服务人员端，不做认领） |
+| `GET /monitoring` | `monitor:view` | 生命体征记录列表，`keyword`（用户昵称/手机号）/ `record_type` 筛选，分页，含用户信息 |
+| `GET /health-education` | `education:view` | 宣教文章列表（含草稿），`keyword` / `category` / `status` 筛选，分页倒序 |
+| `POST /health-education` | `education:create` | 新增宣教文章（标题/分类/封面/正文/定向慢病标签/状态/发布时间） |
+| `PUT /health-education/:id` | `education:create` | 编辑宣教文章（仅更新传入字段） |
+| `DELETE /health-education/:id` | `education:create` | 删除宣教文章 |
+
+##### 阶段四业务规则
+
+- **随访任务自动生成（三处触发）**：
+  - 服务工单签退（服务人员端 CheckOut）完成后：租赁订单生成「租后回访」、其他服务订单生成「康复随访」，执行人=当前服务人员；
+  - 租赁归还（PC 后台归还退押金）完成后：生成「租后回访」；
+  - 健康评估完成（自助 `assessor_type=1` 与服务人员 `assessor_type=2` 均触发）后：生成「评估回访」。
+  - 统一经 `server/internal/services/followup` 包 `CreateFollowUpTask` 生成，计划随访时间=完成/评估时点+72 小时，生成失败仅记录日志、不影响业务主流程。
+- **任务状态**：`task_type`：1 康复随访 / 2 租后回访 / 3 慢病随访 / 4 评估回访；`source_type`：1 服务完成 / 2 租赁归还 / 3 评估完成 / 4 手动；`status`：0 待执行 / 1 已完成 / 2 已跳过；`contact_method`：1 电话 / 2 上门 / 3 微信。
+- **待认领与自动认领**：`staff_id` 为空表示待认领，服务人员端可见并可执行，执行/跳过时自动认领为当前服务人员；C 端与管理端按各自可见范围操作。
+- **宣教定向**：慢病标签维护在健康档案 `health_records.chronic_tags`；C 端宣教列表按本人慢病标签与文章 `tags` 匹配度排序，仅已发布文章对 C 端/服务人员端可见，草稿仅管理端可见。
+- **生命体征**：`record_type`：1 血压 / 2 血糖 / 3 心率 / 4 血氧 / 5 体重；录入支持用户自助（`recorded_by=0`）与服务人员上门（`recorded_by=服务人员ID`），记录时间 `recorded_at` 用 RFC3339 带时区。
+- **数据权限**：服务人员仅能随访（执行本人或待认领任务）与查看/录入本人服务过客户的体征（按 `orders.assigned_staff_id` 关联校验），无服务关系返回 403。
+- **RBAC 菜单**：健康服务菜单（id=8）下新增子菜单「随访任务」`/health/follow-ups`（id=86，`followup:view`）+ 按钮「执行/登记」（id=861，`followup:update`）；「生命体征」`/health/monitoring`（id=87，`monitor:view`）+ 按钮「录入」（id=871，`monitor:create`）；「健康宣教」`/health/education`（id=88，`education:view`）+ 按钮「新增/编辑」（id=881，`education:create`），迁移脚本自动绑定角色 1。
+- **数据表**：新增 `follow_up_tasks` 随访任务表、`health_monitoring` 生命体征监测表、`health_education_articles` 健康宣教内容表，迁移脚本 `server/migrations/20260818130000_followup_monitoring_education.sql`，字段详见 `PRD.md` 4.29 / 4.30 / 4.31。
+
 ## 3. 返回结构与空值约定
 
 ### 3.1 列表返回
@@ -366,3 +573,4 @@
 - C 端接口：对应 `PRD.md` `3.8`
 - 微信支付接口：对应 `PRD.md` `3.9`
 - 服务人员接口：对应 `PRD.md` 新增章节
+- 健康服务接口：对应 `PRD.md` 新增 `3.11` 章节

@@ -2,7 +2,7 @@
 
 ## Summary
 
-修复 web-admin 商品编辑页销量输入框不显示的 bug，使服务商可在 PC 端商品编辑页修改商品销量。后端、API、类型定义、表单数据流均已就绪，仅需修复前端 `isServiceProvider` 未定义问题。
+修复 web-admin 商品编辑页销量输入框不显示的 bug，使商家可在 PC 端商品编辑页修改商品销量。后端、API、类型定义、表单数据流均已就绪，仅需修复前端 `isServiceProvider` 未定义问题。
 
 ## Current State Analysis
 
@@ -11,7 +11,7 @@
 1. **后端 `server/internal/handlers/merchant/product.go`**
    - `ProductRequest.Sales` 字段已存在（指针类型 `*uint`，第 440 行）
    - `UpdateProduct` 已处理 sales：`if req.Sales != nil { updates["sales"] = *req.Sales }`（第 546-548 行）
-   - 鉴权通过 `MerchantOrSpAuth` 中间件 + `resolveTargetMerchantID`，服务商可通过 `merchant_id` 指定目标商家
+   - 鉴权通过 `MerchantOrSpAuth` 中间件 + `resolveTargetMerchantID`，商家可通过 `merchant_id` 指定目标商家
 
 2. **前端 API `web-admin/src/api/sp.ts`**
    - `updateMerchantProduct` 已发送 sales 字段（第 115-119 行）
@@ -35,7 +35,7 @@
 
 ### 上下文
 
-web-admin 本身就是**服务商专属后台**（登录者必为服务商），不存在商家/服务商角色切换，因此 `isServiceProvider` 在该后台内恒为 `true`。
+web-admin 本身就是**商家后台**（登录者必为商家），不存在商家/商家角色切换，因此 `isServiceProvider` 在该后台内恒为 `true`。
 
 ## Proposed Changes
 
@@ -45,7 +45,7 @@ web-admin 本身就是**服务商专属后台**（登录者必为服务商），
 - **改动位置**：`<script setup>` 块内，建议放在 `productId` 计算属性之后（第 32 行后）
 - **改动内容**：新增一行
   ```ts
-  // web-admin 为服务商专属后台，登录者必为服务商，故恒为 true
+  // web-admin 为商家后台，登录者必为商家，故恒为 true
   const isServiceProvider = true
   ```
 - **理由**：
@@ -53,7 +53,7 @@ web-admin 本身就是**服务商专属后台**（登录者必为服务商），
   - 与项目最小改动原则一致，避免引入 auth store 不必要的 getter
   - 现有第 241 行 `v-if="isServiceProvider"` 逻辑可保持不变，向后兼容
 - **后续行为**：
-  - 服务商进入商品编辑页时，销量输入框正常显示
+  - 商家进入商品编辑页时，销量输入框正常显示
   - 用户可修改销量值为任意非负整数（`el-input-number` 已设 `:min="0"`）
   - 保存时通过现有 `updateMerchantProduct` 提交，后端 `UpdateProduct` 更新 `sales` 字段
   - 返回列表页（`MerchantProductsTab.vue` 第 201-205 行）可看到销量已更新
@@ -73,7 +73,7 @@ web-admin 本身就是**服务商专属后台**（登录者必为服务商），
    - 确认 `MerchantProductEditView.vue` 第 241 行 `v-if="isServiceProvider"` 不再报 lint 警告。
 
 2. **运行时验证**
-   - 服务商登录 web-admin，进入某个商家详情页 → 商品 Tab → 点击某商品"编辑"。
+   - 商家登录 web-admin，进入某个商家详情页 → 商品 Tab → 点击某商品"编辑"。
    - 确认商品编辑页"商品基础信息"卡片中"排序值"下方出现"销量"输入框。
    - 修改销量值（例如从 0 改为 100），点击"保存商品"。
    - 返回商品列表，确认该商品"销量"列显示为 100。
@@ -89,7 +89,7 @@ web-admin 本身就是**服务商专属后台**（登录者必为服务商），
 1. **修改 `web-admin/src/views/merchant/MerchantProductEditView.vue`**
    - 在 `<script setup>` 第 32 行（`isEditMode` 计算属性）之后插入：
      ```ts
-     // web-admin 为服务商专属后台，登录者必为服务商
+     // web-admin 为商家后台，登录者必为商家
      const isServiceProvider = true
      ```
 

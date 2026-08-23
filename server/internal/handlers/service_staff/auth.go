@@ -59,20 +59,12 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// 默认关联第一个商家（单商户模式）
-	var merchant models.Merchant
-	if err := database.DB.First(&merchant).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "商家不存在")
-		return
-	}
-
 	staff := models.ServiceStaff{
-		MerchantID: merchant.ID,
-		Username:   req.Username,
-		Password:   string(hashedPassword),
-		Name:       req.Name,
-		Phone:      req.Phone,
-		Status:     0, // 待审核
+		Username: req.Username,
+		Password: string(hashedPassword),
+		Name:     req.Name,
+		Phone:    req.Phone,
+		Status:   0, // 待审核
 	}
 
 	if err := database.DB.Create(&staff).Error; err != nil {
@@ -117,7 +109,7 @@ func Login(c *gin.Context) {
 	now := time.Now()
 	database.DB.Model(&models.ServiceStaff{}).Where("id = ?", staff.ID).Update("last_login_at", now)
 
-	token, _ := utils.GenerateToken(staff.ID, "service_staff", staff.Username)
+	token, _ := utils.GenerateToken(staff.ID, 0, "service_staff", staff.Username)
 	response.Success(c, gin.H{
 		"token": token,
 		"staff": staff,
@@ -156,7 +148,7 @@ func WechatLogin(c *gin.Context) {
 	now := time.Now()
 	database.DB.Model(&models.ServiceStaff{}).Where("id = ?", staff.ID).Update("last_login_at", now)
 
-	token, _ := utils.GenerateToken(staff.ID, "service_staff", staff.Username)
+	token, _ := utils.GenerateToken(staff.ID, 0, "service_staff", staff.Username)
 	response.Success(c, gin.H{
 		"token": token,
 		"staff": staff,

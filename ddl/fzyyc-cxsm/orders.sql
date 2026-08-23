@@ -4,7 +4,6 @@ create table orders
         primary key,
     order_no                varchar(32)                   not null comment '订单编号',
     user_id                 bigint unsigned               not null comment '下单用户ID',
-    merchant_id             bigint unsigned               not null comment '商家ID',
     total_amount            decimal(10, 2)   default 0.00 not null comment '商品总金额(元)',
     delivery_fee            decimal(10, 2)   default 0.00 not null comment '配送费(元)',
     discount_amount         decimal(10, 2)   default 0.00 not null comment '优惠减免金额(元)',
@@ -37,8 +36,6 @@ create table orders
         unique (order_no),
     constraint uk_orders_order_no
         unique (order_no),
-    constraint fk_orders_merchant
-        foreign key (merchant_id) references merchants (id),
     constraint fk_orders_user
         foreign key (user_id) references users (id)
 )
@@ -46,9 +43,6 @@ create table orders
 
 create index idx_orders_created_at
     on orders (created_at);
-
-create index idx_orders_merchant_id
-    on orders (merchant_id);
 
 create index idx_orders_paid_at
     on orders (paid_at);

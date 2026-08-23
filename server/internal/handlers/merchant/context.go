@@ -1,20 +1,12 @@
 package merchant
 
 import (
-	"net/http"
-
-	"fz_yyc_api/internal/middleware"
-	"fz_yyc_api/pkg/response"
+	"fz_yyc_api/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
+// resolveTargetMerchantID 单商户模式下固定返回全局单例商家ID
 func resolveTargetMerchantID(c *gin.Context) (uint64, bool) {
-	userType := middleware.GetUserType(c)
-	if userType == "merchant" {
-		return middleware.GetMerchantID(c), true
-	}
-
-	response.Fail(c, http.StatusForbidden, response.CodeForbidden, "需要商家权限")
-	return 0, false
+	return utils.DefaultMerchantID, true
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createMerchantCategory,
@@ -20,12 +20,31 @@ const categories = ref<MerchantCategory[]>([])
 
 const form = reactive<MerchantCategoryPayload>({
   name: '',
+  parent_id: undefined,
   sort: 0,
   status: 1
 })
 
+// 可作父分类的候选（level<=2，即还有资格挂子级的分类），扁平化后供下拉选择
+const parentOptions = computed<{ id: number; name: string; level: number }[]>(() => {
+  const result: { id: number; name: string; level: number }[] = []
+  const walk = (list: MerchantCategory[], prefix: string) => {
+    for (const node of list) {
+      if (Number(node.level || 1) <= 2) {
+        result.push({ id: node.id, name: `${prefix}${node.name}`, level: Number(node.level || 1) })
+      }
+      if (node.children?.length) {
+        walk(node.children, `${prefix}${node.name} / `)
+      }
+    }
+  }
+  walk(categories.value, '')
+  return result
+})
+
 function resetForm() {
   form.name = ''
+  form.parent_id = undefined
   form.sort = 0
   form.status = 1
 }
@@ -39,6 +58,7 @@ function openCreate() {
 function openEdit(category: MerchantCategory) {
   editingCategory.value = category
   form.name = category.name
+  form.parent_id = category.parent_id || undefined
   form.sort = category.sort
   form.status = category.status
   dialogVisible.value = true
@@ -56,6 +76,7 @@ async function loadData() {
 function buildPayload(status?: number): MerchantCategoryPayload {
   return {
     name: form.name.trim(),
+    parent_id: form.parent_id && form.parent_id > 0 ? form.parent_id : undefined,
     sort: Number(form.sort || 0),
     status: Number(status ?? form.status ?? 1)
   }
@@ -106,6 +127,7 @@ async function toggleStatus(category: MerchantCategory) {
   const nextStatus = Number(category.status || 0) === 1 ? 0 : 1
   await updateMerchantCategory(category.id, {
     name: category.name,
+    parent_id: category.parent_id || undefined,
     sort: category.sort,
     status: nextStatus
   })
@@ -118,7 +140,8 @@ async function saveSort() {
 
   savingSort.value = true
   try {
-    await sortMerchantCategories(categories.value.map((item) => ({
+    const items = flattenCategories(categories.value)
+    await sortMerchantCategories(items.map((item) => ({
       id: item.id,
       sort: Number(item.sort || 0)
     })))
@@ -127,6 +150,20 @@ async function saveSort() {
   } finally {
     savingSort.value = false
   }
+}
+
+function flattenCategories(list: MerchantCategory[]): MerchantCategory[] {
+  const result: MerchantCategory[] = []
+  const walk = (nodes: MerchantCategory[]) => {
+    for (const node of nodes) {
+      result.push(node)
+      if (node.children?.length) {
+        walk(node.children)
+      }
+    }
+  }
+  walk(list)
+  return result
 }
 
 onMounted(loadData)
@@ -142,8 +179,20 @@ onMounted(loadData)
     </div>
 
     <el-card class="page-card" shadow="never">
-      <el-table :data="categories" v-loading="loading" style="width: 100%;">
+      <el-table
+        :data="categories"
+        v-loading="loading"
+        row-key="id"
+        :tree-props="{ children: 'children' }"
+        default-expand-all
+        style="width: 100%;"
+      >
         <el-table-column prop="name" label="分类名称" min-width="180" />
+        <el-table-column label="层级" width="90">
+          <template #default="{ row }">
+            {{ Number(row.level || 1) }} 级
+          </template>
+        </el-table-column>
         <el-table-column label="商品数" width="100">
           <template #default="{ row }">
             {{ row.product_count || 0 }}
@@ -185,6 +234,27 @@ onMounted(loadData)
         <el-form-item label="分类名称" required>
           <el-input v-model="form.name" maxlength="30" show-word-limit placeholder="请输入分类名称" />
         </el-form-item>
+        <el-form-item label="父分类">
+          <el-select
+            v-model="form.parent_id"
+            clearable
+            placeholder="不选择则为一级分类"
+            style="width: 100%;"
+          >
+            <el-option
+              v-for="opt in parentOptions"
+              :key="opt.id"
+              :label="opt.name"
+              :value="opt.id"
+            >
+              <span>{{ opt.name }}</span>
+              <el-tag size="small" :type="opt.level === 1 ? 'success' : 'warning'" style="margin-left: 8px;">
+                {{ opt.level }}级
+              </el-tag>
+            </el-option>
+          </el-select>
+          <div class="form-tip">最多支持三级分类；选择父类后本分类将自动成为其下级。</div>
+        </el-form-item>
         <el-form-item label="排序">
           <el-input-number v-model="form.sort" :min="0" :precision="0" :step="1" style="width: 100%;" />
         </el-form-item>
@@ -215,5 +285,12 @@ onMounted(loadData)
 .toolbar {
   display: flex;
   justify-content: flex-end;
+}
+
+.form-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
 }
 </style>

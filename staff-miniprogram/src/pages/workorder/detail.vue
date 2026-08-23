@@ -38,6 +38,10 @@ const canAccept = computed(() => detail.value?.biz_status === 1)
 const canCheckIn = computed(() => detail.value?.biz_status === 2)
 // 是否可签退
 const canCheckOut = computed(() => detail.value?.biz_status === 3)
+// 是否可录入照护记录（服务中/待支付/已完成且关联客户）
+const canRecordVisit = computed(() =>
+  !!detail.value?.user_id && [3, 4, 5].includes(detail.value?.biz_status)
+)
 
 async function loadDetail() {
   if (!orderId.value) return
@@ -123,6 +127,14 @@ async function confirmCheckOut() {
     if (result.code === 0) {
       uni.showToast({ title: '签退成功', icon: 'success' })
       loadDetail()
+      // 签退成功后询问是否录入本次上门照护记录
+      uni.showModal({
+        title: '录入照护记录',
+        content: '是否录入本次上门照护记录？',
+        success: (res) => {
+          if (res.confirm) goRecordVisit()
+        }
+      })
     } else {
       uni.showToast({ title: result.message || '签退失败', icon: 'none' })
     }
@@ -134,6 +146,18 @@ async function confirmCheckOut() {
 function callPhone(phone: string) {
   if (!phone) return
   uni.makePhoneCall({ phoneNumber: phone })
+}
+
+// 跳转录入照护记录（携带订单ID，无计划时走自由输入护理项）
+function goRecordVisit() {
+  if (!orderId.value) return
+  uni.navigateTo({ url: `/pages/health/care-visit-form?orderId=${orderId.value}` })
+}
+
+// 跳转客户健康档案（居民健康档案/健康评估）
+function goResident() {
+  if (!detail.value?.user_id) return
+  uni.navigateTo({ url: `/pages/health/resident?userId=${detail.value.user_id}` })
 }
 
 onLoad((options: any) => {
@@ -183,6 +207,17 @@ onShow(() => {
       <view class="info-row" v-if="detail.scheduled_at">
         <text class="info-label">预约时间</text>
         <text class="info-value">{{ formatDate(detail.scheduled_at) }}</text>
+      </view>
+    </view>
+
+    <!-- 客户健康档案入口 -->
+    <view class="card section" v-if="detail.user_id">
+      <view class="record-entry" @tap="goResident">
+        <view class="record-entry-info">
+          <text class="record-entry-title">客户健康档案</text>
+          <text class="record-entry-desc">查看健康档案与评估记录，可为客户开展健康评估</text>
+        </view>
+        <text class="record-entry-arrow">›</text>
       </view>
     </view>
 
@@ -292,10 +327,11 @@ onShow(() => {
     </view>
 
     <!-- 底部操作栏 -->
-    <view class="footer-bar" v-if="canAccept || canCheckIn || canCheckOut">
+    <view class="footer-bar" v-if="canAccept || canCheckIn || canCheckOut || canRecordVisit">
       <button v-if="canAccept" class="action-btn primary" @tap="handleAccept">立即接单</button>
       <button v-if="canCheckIn" class="action-btn primary" @tap="handleCheckIn">签到开始服务</button>
       <button v-if="canCheckOut" class="action-btn warn" @tap="openCheckoutModal">签退结束服务</button>
+      <button v-if="canRecordVisit" class="action-btn outline" @tap="goRecordVisit">录入照护记录</button>
     </view>
 
     <!-- 签退备注弹窗 -->
@@ -376,6 +412,30 @@ onShow(() => {
   border: 2rpx solid var(--primary-color);
   border-radius: 8rpx;
 }
+.record-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 0;
+}
+.record-entry-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+.record-entry-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+.record-entry-desc {
+  font-size: 24rpx;
+  color: #999;
+}
+.record-entry-arrow {
+  font-size: 36rpx;
+  color: #ccc;
+}
 .discount { color: #ff4d4f; }
 .total-row { padding-top: 20rpx; border-top: 2rpx solid var(--border-color); margin-top: 8rpx; }
 .total-amount { font-size: 34rpx; font-weight: 600; color: #ff4d4f; }
@@ -446,6 +506,11 @@ onShow(() => {
   &::after { border: none; }
   &.primary { background: var(--primary-color); }
   &.warn { background: var(--warning-color); }
+  &.outline {
+    background: #fff;
+    color: var(--primary-color);
+    border: 2rpx solid var(--primary-color);
+  }
 }
 
 .modal-mask {

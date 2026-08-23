@@ -8,7 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, '')
   const proxyTarget = env.VITE_API_PROXY_TARGET
-  const appBase = '/sp/'
+  const appBase = '/sm/'
 
   return {
     plugins: [vue()],
@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      outDir: 'sp'
+      outDir: 'sm'
     },
     server: proxyTarget
       ? {

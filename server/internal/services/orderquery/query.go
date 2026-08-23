@@ -14,7 +14,6 @@ import (
 )
 
 type ListOptions struct {
-	MerchantID      uint64
 	Status          *int
 	OrderType       *int
 	BizStatus       *int
@@ -28,7 +27,6 @@ type ListOptions struct {
 }
 
 type DetailOptions struct {
-	MerchantID      uint64
 	IncludeMerchant bool
 }
 
@@ -39,8 +37,8 @@ type ListResult struct {
 	PageSize int
 }
 
-func LoadMerchantOrderByID(merchantID, orderID uint64) (*models.Order, error) {
-	return GetOrderDetail(orderID, DetailOptions{MerchantID: merchantID})
+func LoadMerchantOrderByID(orderID uint64) (*models.Order, error) {
+	return GetOrderDetail(orderID, DetailOptions{})
 }
 
 func GetOrderList(ctx context.Context, options ListOptions) (*ListResult, error) {
@@ -166,9 +164,6 @@ func normalizePagination(page, pageSize int) (int, int) {
 
 func applyOrderScopes(query *gorm.DB, options ListOptions) *gorm.DB {
 	scopedQuery := query
-	if options.MerchantID > 0 {
-		scopedQuery = scopedQuery.Where("orders.merchant_id = ?", options.MerchantID)
-	}
 	if options.Status != nil {
 		scopedQuery = scopedQuery.Where("orders.status = ?", *options.Status)
 	}
@@ -196,19 +191,11 @@ func applyOrderScopes(query *gorm.DB, options ListOptions) *gorm.DB {
 }
 
 func applyDetailScopes(query *gorm.DB, options DetailOptions) *gorm.DB {
-	scopedQuery := query
-	if options.MerchantID > 0 {
-		scopedQuery = scopedQuery.Where("orders.merchant_id = ?", options.MerchantID)
-	}
-	return scopedQuery
+	return query
 }
 
 func preloadOrderAssociations(query *gorm.DB, includeMerchant bool) *gorm.DB {
-	scopedQuery := query.Preload("User").Preload("Items")
-	if includeMerchant {
-		scopedQuery = scopedQuery.Preload("Merchant")
-	}
-	return scopedQuery
+	return query.Preload("User").Preload("Items")
 }
 
 func refreshOrderListRefundStatus(ctx context.Context, options ListOptions, orders []models.Order) {
@@ -218,7 +205,6 @@ func refreshOrderListRefundStatus(ctx context.Context, options ListOptions, orde
 	}
 	for index := range orders {
 		refreshSingleOrderRefundStatus(ctx, client, &orders[index], DetailOptions{
-			MerchantID:      options.MerchantID,
 			IncludeMerchant: options.IncludeMerchant,
 		})
 	}

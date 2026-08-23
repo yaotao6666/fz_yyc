@@ -135,14 +135,16 @@ func CalculateDeliveryFee(totalAmount, baseFee, freeDeliveryAmount float64, dist
 
 type TokenClaims struct {
 	UserID   uint64 `json:"user_id"`
+	StaffID  uint64 `json:"staff_id,omitempty"` // 商家后台员工ID（merchant类型token）
 	UserType string `json:"user_type"`
 	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID uint64, userType, username string) (string, error) {
+func GenerateToken(userID, staffID uint64, userType, username string) (string, error) {
 	claims := &TokenClaims{
 		UserID:   userID,
+		StaffID:  staffID,
 		UserType: userType,
 		Username: username,
 		RegisteredClaims: jwt.RegisteredClaims{

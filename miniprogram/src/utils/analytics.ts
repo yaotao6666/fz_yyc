@@ -8,13 +8,11 @@ import { post } from './request'
 import { useAuth } from './useAuth'
 
 interface VisitParams {
-  merchant_id: number
   source?: string
 }
 
 interface TrackEventParams {
   event: 'page_view' | 'product_view' | 'submit_order' | 'pay_success'
-  merchant_id: number
   page?: string
   product_id?: number
   order_id?: number
@@ -44,7 +42,7 @@ export function useAnalytics() {
       }
 
       const res = await post<{ user_id: number; visit_count: number }>(
-        `/api/v1/store/${params.merchant_id}/visit`,
+        `/api/v1/store/visit`,
         {
           openid: getOpenid(),
           source: params.source || 'scan'
@@ -66,7 +64,7 @@ export function useAnalytics() {
         return false
       }
 
-      await trackStoreBehaviorEvent(params.merchant_id, {
+      await trackStoreBehaviorEvent({
         openid: getOpenid(),
         event_type: params.event,
         page: params.page,
@@ -82,39 +80,35 @@ export function useAnalytics() {
     }
   }
 
-  const trackPageView = async (page: string, merchantId: number, source = 'store') => {
+  const trackPageView = async (page: string, source = 'store') => {
     return await trackEvent({
       event: 'page_view',
-      merchant_id: merchantId,
       page,
       source,
       data: { page }
     })
   }
 
-  const trackProductView = async (merchantId: number, productId: number) => {
+  const trackProductView = async (productId: number) => {
     return await trackEvent({
       event: 'product_view',
-      merchant_id: merchantId,
       product_id: productId,
       page: 'store_product',
       data: { product_id: productId }
     })
   }
 
-  const trackCheckout = async (merchantId: number, amount: number) => {
+  const trackCheckout = async (amount: number) => {
     return await trackEvent({
       event: 'submit_order',
-      merchant_id: merchantId,
       page: 'store_confirm',
       data: { amount }
     })
   }
 
-  const trackPayment = async (merchantId: number, orderId: number, amount: number) => {
+  const trackPayment = async (orderId: number, amount: number) => {
     return await trackEvent({
       event: 'pay_success',
-      merchant_id: merchantId,
       order_id: orderId,
       page: 'store_payment_result',
       data: { order_id: orderId, amount }

@@ -13,12 +13,12 @@
 - [x] Task 3: 编写接口与模型一致性检测流程
   - [x] SubTask 3.1: 定义检测步骤（扫描handlers → 提取请求/响应结构体 → 对比models.go → 验证路由映射 → 检查中间件）
   - [x] SubTask 3.2: 定义差异清单输出格式（请求结构体不一致、响应结构体不一致、路由映射问题、参数验证问题）
-  - [x] SubTask 3.3: 列出需检测的handler目录（admin/、merchant/、sp/、user/、upload/、ws/）
+  - [x] SubTask 3.3: 列出需检测的handler目录（admin/、merchant/、user/、upload/、ws/）
 
 - [x] Task 4: 编写前端页面接口接入检测流程
   - [x] SubTask 4.1: 定义检测步骤（扫描pages → 提取API调用 → 对比后端路由 → 验证参数 → 检查认证方式）
   - [x] SubTask 4.2: 定义差异清单输出格式（接口路径错误、请求参数不一致、响应解析问题、认证方式问题）
-  - [x] SubTask 4.3: 列出需检测的页面目录（merchant/、store/、sp/、auth/）和API封装文件（api/index.ts）
+  - [x] SubTask 4.3: 列出需检测的页面目录（merchant/、store/、auth/）和API封装文件（api/index.ts）
 
 - [x] Task 5: 编写自测与脚本生成流程
   - [x] SubTask 5.1: 定义自测验证步骤（curl测试核心接口、验证响应结构）

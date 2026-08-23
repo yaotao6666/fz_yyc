@@ -34,23 +34,23 @@ $result = Test-API "Service Provider Login" {
     @{Name="Service Provider Login"; Status=($resp.code -eq 0); Detail=$resp.message}
 }
 
-# Test 2: Merchant Login (verify merchant_id fix)
-$result = Test-API "Merchant Login (merchant_id fix)" {
+# Test 2: Merchant Login (verify RBAC login state)
+$result = Test-API "Merchant Login (RBAC)" {
     $body = @{username="merchant1"; password="123456"} | ConvertTo-Json
     $resp = Invoke-RestMethod -Uri "$BASE_URL/auth/merchant/login" -Method Post -Body $body -ContentType "application/json"
     Write-Host "Response: $($resp | ConvertTo-Json -Depth 10)"
-    $merchantId = $resp.data.merchant_id
-    Write-Host ""
-    Write-Host ">>> merchant_id value: $merchantId"
-    if ($merchantId -and $merchantId -gt 0) {
-        Write-Host "PASS: merchant_id is not 0 anymore"
-        $passed = $true
+    $token = $resp.data.token
+    $menus = $resp.data.menus
+    $permissions = $resp.data.permissions
+    Write-Host ">>> token length: $($token.Length), menus: $($menus.Count), perms: $($permissions.Count)"
+    $passed = $token -and $menus -is [array] -and $permissions -is [array]
+    if ($passed) {
+        Write-Host "PASS: Login response includes token/menus/permissions"
     } else {
-        Write-Host "FAIL: merchant_id is still 0 or invalid"
-        $passed = $false
+        Write-Host "FAIL: Login response missing token/menus/permissions"
     }
     $script:merchantToken = $resp.data.token
-    @{Name="Merchant Login merchant_id"; Status=$passed; Detail="merchant_id=$merchantId"}
+    @{Name="Merchant Login RBAC"; Status=$passed; Detail="menus=$($menus.Count), perms=$($permissions.Count)"}
 }
 
 # Test 3: Get Merchant Profile
@@ -156,13 +156,12 @@ $result = Test-API "C-end User Login" {
 # Test 8: Create Order (stock deduction and sales update)
 if ($userToken -and $productId) {
     $result = Test-API "Create Order (stock & sales)" {
-        $productResp = Invoke-RestMethod -Uri "$BASE_URL/store/1/products/$productId" -Method Get
+        $productResp = Invoke-RestMethod -Uri "$BASE_URL/store/products/$productId" -Method Get
         $beforeStock = $productResp.data.stock
         $beforeSales = $productResp.data.sales
         Write-Host ">>> Before order - stock: $beforeStock, sales: $beforeSales"
 
         $body = @{
-            merchant_id=1
             delivery_type=1
             contact_name="Test User"
             contact_phone="13800138000"
@@ -170,12 +169,12 @@ if ($userToken -and $productId) {
             items=@(@{product_id=$productId; quantity=2})
         } | ConvertTo-Json -Depth 10
         $headers = @{Authorization="Bearer $userToken"; "Content-Type"="application/json"}
-        $orderResp = Invoke-RestMethod -Uri "$BASE_URL/user/orders" -Method Post -Headers $headers -Body $body
+        $orderResp = Invoke-RestMethod -Uri "$BASE_URL/store/orders" -Method Post -Headers $headers -Body $body
         Write-Host "Order Response: $($orderResp | ConvertTo-Json -Depth 10)"
 
         if ($orderResp.code -eq 0) {
             Start-Sleep -Milliseconds 500
-            $productResp2 = Invoke-RestMethod -Uri "$BASE_URL/store/1/products/$productId" -Method Get
+            $productResp2 = Invoke-RestMethod -Uri "$BASE_URL/store/products/$productId" -Method Get
             $afterStock = $productResp2.data.stock
             $afterSales = $productResp2.data.sales
             Write-Host ">>> After order - stock: $afterStock, sales: $afterSales"

@@ -140,7 +140,6 @@ const cartStore = useCartStore()
 const { trackPageView, trackPayment } = useAnalytics()
 
 const remark = ref('')
-const merchantId = ref(1)
 const entrySource = ref('scan')
 const submitting = ref(false)
 const finalOrder = ref<Order | null>(null)
@@ -173,8 +172,7 @@ const hasRentalItems = computed(() => displayItems.value.some(item => Number(ite
 const totalDeposit = computed(() => displayItems.value.reduce((sum, item) => sum + getItemDeposit(item), 0))
 
 function applyEntryOptions(options?: Record<string, any>) {
-  const { merchantId: nextMerchantId, source } = parseStoreEntryOptions(options, merchantId.value)
-  merchantId.value = nextMerchantId
+  const { source } = parseStoreEntryOptions(options)
   entrySource.value = source
   isBuyNow.value = !!(options && Number(options.buy_now) === 1)
 }
@@ -196,12 +194,12 @@ onShow(async () => {
   if (authed) {
     await loadAddresses(readSelectedAddressId())
   }
-  void trackPageView('store_confirm', merchantId.value, entrySource.value)
+  void trackPageView('store_confirm', entrySource.value)
 })
 
 async function loadDeliveryRules() {
   try {
-    const rules = await getStoreDeliveryRules(merchantId.value)
+    const rules = await getStoreDeliveryRules()
     deliveryConfig.value = rules
     deliveryRules.value = (rules.distance_rules || []).map((item) => ({
       distance: item.max_distance,
@@ -423,7 +421,7 @@ async function submitOrder() {
     submitting.value = true
     uni.showLoading({ title: '创建订单中...' })
 
-    const res = await createOrder(merchantId.value, orderData)
+    const res = await createOrder(orderData)
     applyFinalOrderAmount(res.order)
 
     if (res.pay_params) {
@@ -438,11 +436,11 @@ async function submitOrder() {
           uni.hideLoading()
           clearOrderCartAfterSuccess()
           uni.showToast({ title: '支付成功', icon: 'success' })
-          await trackPayment(merchantId.value, res.order.id, res.order.pay_amount)
+          await trackPayment(res.order.id, res.order.pay_amount)
 
           setTimeout(() => {
             uni.redirectTo({
-              url: `/pages/store/my-orders?merchant_id=${merchantId.value}&status=2`
+              url: `/pages/store/my-orders?status=2`
             })
           }, 1500)
         },
@@ -453,11 +451,16 @@ async function submitOrder() {
 
             setTimeout(() => {
               uni.redirectTo({
-                url: `/pages/store/my-orders?merchant_id=${merchantId.value}&status=1`
+                url: `/pages/store/my-orders?status=1`
               })
             }, 1500)
           } else {
             uni.showToast({ title: '支付失败', icon: 'none' })
+            setTimeout(() => {
+              uni.redirectTo({
+                url: `/pages/store/my-orders?status=1`
+              })
+            }, 1500)
           }
         },
         complete: () => {
@@ -467,14 +470,33 @@ async function submitOrder() {
     } else {
       uni.hideLoading()
       clearOrderCartAfterSuccess()
-      uni.showToast({ title: '订单创建成功', icon: 'success' })
-      await trackPayment(merchantId.value, res.order.id, res.order.pay_amount)
+      await trackPayment(res.order.id, res.order.pay_amount)
 
-      setTimeout(() => {
-        uni.redirectTo({
-          url: `/pages/store/my-orders?merchant_id=${merchantId.value}`
+      if ((res.order.pay_amount ?? 0) > 0) {
+        // 需要支付，但当前没有可用支付参数（凭证未配置或商家未完成支付设置）
+        const hint = res.pay_hint || '商家支付配置未完成，请稍后在「待付款」中重新发起支付，或联系商家确认'
+        uni.showModal({
+          title: '订单已创建，请稍后支付',
+          content: hint,
+          showCancel: false,
+          confirmText: '查看订单',
+          confirmColor: '#2B5CE3',
+          success: () => {
+            setTimeout(() => {
+              uni.redirectTo({
+                url: `/pages/store/my-orders?status=1`
+              })
+            }, 300)
+          }
         })
-      }, 1500)
+      } else {
+        uni.showToast({ title: '订单创建成功', icon: 'success' })
+        setTimeout(() => {
+          uni.redirectTo({
+            url: `/pages/store/my-orders`
+          })
+        }, 1500)
+      }
       submitting.value = false
     }
   } catch (error: any) {

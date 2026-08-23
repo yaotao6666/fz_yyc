@@ -2,15 +2,15 @@
 
 ## Summary
 
-- 目标：在当前“微信支付服务商 + 服务商企业主体小程序”实现上，新增 1 个 `.env` 配置项，用于全局切换当前部署版本的小程序支付身份。
+- 目标：在当前“微信支付服务商 + 商户主体小程序”实现上，新增 1 个 `.env` 配置项，用于全局切换当前部署版本的小程序支付身份。
 - 两种模式定义：
-  - `sp_app`：1 个微信支付服务商 + 该服务商企业主体的小程序，支付时使用 `sp_appid + sp_openid`
-  - `sub_app`：1 个微信支付服务商 + 1 个非服务商主体的小程序，支付时仍走服务商支付体系，但使用 `sub_appid + sub_openid`
+  - `sp_app`：1 个微信支付服务商 + 该商户主体的小程序，支付时使用 `sp_appid + sp_openid`
+  - `sub_app`：1 个微信支付服务商 + 1 个关联主体的小程序，支付时仍走系统支付体系，但使用 `sub_appid + sub_openid`
 - 已确认决策：
   - 系统始终只有 1 个全局小程序身份，不存在每个商户一个不同小程序
-  - 支付、退款、回调都继续走服务商支付体系，不改成直连商户模式
+  - 支付、退款、回调都继续走系统支付体系，不改成直连商户模式
   - 仅通过一个全局 `.env` 模式开关控制当前部署版本运行在哪种小程序支付身份下
-  - 切到 `sub_app` 后，用户登录也要切到该全局非服务商主体小程序，拿到 `sub_openid`
+  - 切到 `sub_app` 后，用户登录也要切到该全局关联主体小程序，拿到 `sub_openid`
 
 ## Current State Analysis
 
@@ -18,10 +18,10 @@
 
 - `server/internal/config/config.go`
   - 当前只有一套全局小程序配置：`WECHAT_APP_ID`、`WECHAT_APP_SECRET`
-  - 当前只有一套全局服务商支付配置：`WECHAT_PAY_SP_MCH_ID`、`WECHAT_PAY_SP_API_V3_KEY`、`WECHAT_PAY_SP_CERT_SERIAL_NO`、`WECHAT_PAY_SP_PRIVATE_KEY`、`WECHAT_PAY_SP_PUBLIC_KEY`、`WECHAT_PAY_SP_CALLBACK_URL`
+  - 当前只有一套全局系统支付配置：`WECHAT_PAY_SP_MCH_ID`、`WECHAT_PAY_SP_API_V3_KEY`、`WECHAT_PAY_SP_CERT_SERIAL_NO`、`WECHAT_PAY_SP_PRIVATE_KEY`、`WECHAT_PAY_SP_PUBLIC_KEY`、`WECHAT_PAY_SP_CALLBACK_URL`
   - 没有“当前运行模式”字段，也没有第二套小程序配置
 - `server/.env.example`
-  - 仅说明了服务商小程序和服务商支付配置，没有模式切换说明，也没有非服务商主体小程序配置
+  - 仅说明了商户小程序和系统支付配置，没有模式切换说明，也没有关联主体小程序配置
 
 ### 2. 用户登录现状
 
@@ -51,17 +51,17 @@
     - `sub_appid`
     - `payer.sub_openid`
 - 结论：
-  - 当前只支持“服务商小程序身份发起 partner JSAPI 支付”
+  - 当前只支持“商户小程序身份发起 partner JSAPI 支付”
 
 ### 4. 回调 / 退款 现状
 
 - `server/internal/handlers/sp/payment.go`
   - 支付回调和退款回调都通过 `wechatpay.NewServiceProviderClient()` 解析和处理
 - `server/internal/handlers/merchant/order.go`
-  - 退款继续调用服务商支付客户端
+  - 退款继续调用支付客户端
 - 结论：
-  - 这几条链路都建立在“服务商支付体系”之上
-  - 只要新模式仍然走 partner JSAPI，并继续使用服务商证书与服务商 API v3 Key，这些链路原则上无需改协议层
+  - 这几条链路都建立在“系统支付体系”之上
+  - 只要新模式仍然走 partner JSAPI，并继续使用支付证书与API v3 Key，这些链路原则上无需改协议层
 
 ### 5. 商户数据现状
 
@@ -80,17 +80,17 @@
 - 修改内容：
   - 为配置新增支付模式字段，例如：
     - `WechatPay.AppMode string`
-  - 保留现有服务商主体小程序配置：
+  - 保留现有商户主体小程序配置：
     - `WECHAT_APP_ID`
     - `WECHAT_APP_SECRET`
-  - 新增非服务商主体小程序配置：
+  - 新增关联主体小程序配置：
     - `WECHAT_SUB_APP_ID`
     - `WECHAT_SUB_APP_SECRET`
   - 新增模式变量：
     - `WECHAT_PAY_APP_MODE=sp_app|sub_app`
 - 模式语义：
   - `sp_app`：当前默认逻辑
-  - `sub_app`：登录与下单使用非服务商主体小程序身份，但支付、退款、回调仍走服务商体系
+  - `sub_app`：登录与下单使用关联主体小程序身份，但支付、退款、回调仍走系统支付体系
 - 同步文件：
   - `server/.env.example`
   - `server/.env.production.example`
@@ -128,15 +128,15 @@
 - 实际行为：
   - `sp_app`：
     - 继续用 `WECHAT_APP_ID/WECHAT_APP_SECRET` 调 `jscode2session`
-    - 返回服务商主体小程序下的 `openid`
+    - 返回商户主体小程序下的 `openid`
   - `sub_app`：
     - 改用 `WECHAT_SUB_APP_ID/WECHAT_SUB_APP_SECRET`
-    - 返回非服务商主体小程序下的 `openid`
+    - 返回关联主体小程序下的 `openid`
 - 数据影响：
   - 本轮不引入商户级 `openid` 隔离
   - 仍以“当前部署实例只有 1 个全局小程序身份”为前提，沿用现有 `users.openid` 结构
 
-### 4. 扩展服务商支付下单请求，支持 `sub_appid/sub_openid`
+### 4. 扩展系统支付下单请求，支持 `sub_appid/sub_openid`
 
 - 修改文件：`server/internal/services/wechatpay/service_provider.go`
 - 修改内容：
@@ -155,7 +155,7 @@
   - 统一继续调用 `/v3/pay/partner/transactions/jsapi`
 - 说明：
   - 这一步是本次方案的核心改动点
-  - 本质上是“服务商 partner JSAPI 下的小程序身份切换”，不是支付模式整体改成直连商户
+  - 本质上是“partner JSAPI 下的小程序身份切换”，不是支付模式整体改成直连商户
 
 ### 5. 调整下单支付入口，按全局模式选择支付参数
 
@@ -174,7 +174,7 @@
   - 任一模式下都仍要求：
     - `WECHAT_PAY_SP_MCH_ID`
     - 商户 `sub_mch_id`
-    - 服务商证书/私钥/API V3 Key/回调地址
+    - 支付证书/私钥/API V3 Key/回调地址
 
 ### 6. 前端用户态增加“模式切换后强制重登”的兼容策略
 
@@ -193,18 +193,18 @@
     - 重新执行登录
 - 这样可以避免从 `sp_app` 切到 `sub_app` 后继续错误复用旧 `openid`
 
-### 7. 回调、退款保持服务商链路不变
+### 7. 回调、退款保持支付链路不变
 
 - 主要涉及文件：
   - `server/internal/handlers/sp/payment.go`
   - `server/internal/handlers/merchant/order.go`
   - `server/internal/services/orderquery/query.go`
 - 本轮策略：
-  - 不改服务商支付客户端初始化
+  - 不改支付客户端初始化
   - 不改回调解密配置来源
   - 不改退款调用链路
 - 前提：
-  - `sub_app` 仍是服务商模式下的 partner JSAPI，只是变更小程序身份字段
+  - `sub_app` 仍是商户模式下的 partner JSAPI，只是变更小程序身份字段
 
 ### 8. 文档同步
 
@@ -225,12 +225,12 @@
 - 决策：新增模式值建议仅支持：
   - `sp_app`
   - `sub_app`
-- 决策：`sub_app` 不是直连商户支付，而是服务商 partner JSAPI 下切换为 `sub_appid/sub_openid`
-- 决策：服务商支付证书、回调解密、退款继续沿用现有配置
+- 决策：`sub_app` 不是直连商户支付，而是partner JSAPI 下切换为 `sub_appid/sub_openid`
+- 决策：支付证书、回调解密、退款继续沿用现有配置
 - 决策：本轮不新增数据库字段、不新增迁移、不改商户管理数据模型
 - 决策：前端只做“模式变化后清理旧登录态并重登”，不做多身份并存
 - 假设：当前部署实例只会服务于 1 个小程序版本，不会在同一实例内同时混跑 `sp_app` 和 `sub_app`
-- 假设：非服务商主体小程序已在微信支付侧完成与服务商体系所需的关联配置
+- 假设：关联主体小程序已在微信支付侧完成与系统支付体系所需的关联配置
 
 ## Verification Steps
 

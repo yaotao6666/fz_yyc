@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/followup"
+	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
 
@@ -14,8 +16,7 @@ import (
 
 // PendingOrders 待接订单列表（已支付 + biz_status=1 待接单 + 未被接单）
 func PendingOrders(c *gin.Context) {
-	staff, err := GetCurrentStaff(c)
-	if err != nil {
+	if _, err := GetCurrentStaff(c); err != nil {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "获取信息失败")
 		return
 	}
@@ -31,8 +32,8 @@ func PendingOrders(c *gin.Context) {
 
 	var orders []models.Order
 	query := database.DB.
-		Where("merchant_id = ? AND status = ? AND biz_status = ? AND assigned_staff_id IS NULL",
-			staff.MerchantID, 2, 1). // status=2已支付, biz_status=1待接单
+		Where("status = ? AND biz_status = ? AND assigned_staff_id IS NULL",
+			2, 1). // status=2已支付, biz_status=1待接单
 		Order("paid_at DESC").
 		Offset((page - 1) * pageSize).
 		Limit(pageSize)
@@ -44,8 +45,8 @@ func PendingOrders(c *gin.Context) {
 
 	var total int64
 	database.DB.Model(&models.Order{}).
-		Where("merchant_id = ? AND status = ? AND biz_status = ? AND assigned_staff_id IS NULL",
-			staff.MerchantID, 2, 1).Count(&total)
+		Where("status = ? AND biz_status = ? AND assigned_staff_id IS NULL",
+			2, 1).Count(&total)
 
 	response.Success(c, gin.H{
 		"list":  orders,
@@ -71,8 +72,8 @@ func AcceptOrder(c *gin.Context) {
 	// 原子接单：只有 biz_status=1 且 assigned_staff_id IS NULL 时才能接单
 	now := time.Now()
 	result := database.DB.Model(&models.Order{}).
-		Where("id = ? AND merchant_id = ? AND status = ? AND biz_status = ? AND assigned_staff_id IS NULL",
-			orderID, staff.MerchantID, 2, 1).
+		Where("id = ? AND status = ? AND biz_status = ? AND assigned_staff_id IS NULL",
+			orderID, 2, 1).
 		Updates(map[string]interface{}{
 			"assigned_staff_id": staff.ID,
 			"biz_status":        2, // 已接单
@@ -118,7 +119,7 @@ func AcceptedOrders(c *gin.Context) {
 	}
 
 	query := database.DB.
-		Where("assigned_staff_id = ? AND merchant_id = ?", staff.ID, staff.MerchantID).
+		Where("assigned_staff_id = ?", staff.ID).
 		Order("updated_at DESC").
 		Offset((page - 1) * pageSize).
 		Limit(pageSize)
@@ -137,7 +138,7 @@ func AcceptedOrders(c *gin.Context) {
 
 	var total int64
 	countQuery := database.DB.Model(&models.Order{}).
-		Where("assigned_staff_id = ? AND merchant_id = ?", staff.ID, staff.MerchantID)
+		Where("assigned_staff_id = ?", staff.ID)
 	if bizStatus != "" {
 		if bs, err := strconv.Atoi(bizStatus); err == nil {
 			countQuery = countQuery.Where("biz_status = ?", bs)
@@ -174,10 +175,6 @@ func OrderDetail(c *gin.Context) {
 
 	// 只能查看自己接的或待接的订单
 	if order.AssignedStaffID != nil && *order.AssignedStaffID != staff.ID {
-		response.Fail(c, http.StatusForbidden, response.CodeForbidden, "无权查看此订单")
-		return
-	}
-	if order.MerchantID != staff.MerchantID {
 		response.Fail(c, http.StatusForbidden, response.CodeForbidden, "无权查看此订单")
 		return
 	}
@@ -277,6 +274,15 @@ func CheckOut(c *gin.Context) {
 	database.DB.First(&order, orderID)
 	if order.OrderType == 2 {
 		database.DB.Model(&order).Update("rental_returned_at", now)
+	}
+
+	// 服务完成自动生成随访任务（失败仅记录，不影响签退主流程）
+	if order.OrderType == 2 {
+		// 租赁服务：租后回访
+		_ = followup.CreateFollowUpTask(order.UserID, utils.FollowUpTypeReturnVisit, utils.FollowUpSourceRentalReturn, order.ID, staff.ID)
+	} else {
+		// 普通服务：康复随访
+		_ = followup.CreateFollowUpTask(order.UserID, utils.FollowUpTypeRehab, utils.FollowUpSourceService, order.ID, staff.ID)
 	}
 
 	response.SuccessWithMessage(c, "签退成功", gin.H{

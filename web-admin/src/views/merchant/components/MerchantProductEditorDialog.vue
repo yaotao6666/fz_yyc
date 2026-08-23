@@ -372,14 +372,15 @@ watch(
         </el-form-item>
 
         <el-form-item label="商品分类">
-          <el-select v-model="form.category_id" clearable placeholder="请选择商品分类" style="width: 100%;">
-            <el-option
-              v-for="category in categories"
-              :key="category.id"
-              :label="category.name"
-              :value="category.id"
-            />
-          </el-select>
+          <el-cascader
+            v-model="form.category_id"
+            :options="categories"
+            :props="{ value: 'id', label: 'name', children: 'children', checkStrictly: true, emitPath: false }"
+            clearable
+            placeholder="请选择商品分类（可任意层级）"
+            style="width: 100%;"
+          />
+          <div class="form-tip">支持最多三级分类，商品可挂到任意层级。</div>
         </el-form-item>
 
         <el-form-item label="商品描述">
@@ -575,5 +576,12 @@ watch(
 
 .empty-spec {
   color: #6b7280;
+}
+
+.form-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
 }
 </style>
