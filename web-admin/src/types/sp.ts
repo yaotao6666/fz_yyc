@@ -886,3 +886,31 @@ export interface ProfitSharingConfig {
   max_ratio_pct: string
   max_ratio_raw?: string
 }
+
+// ---------- 小程序轮播图 ----------
+
+export interface MiniProgramBanner {
+  id: number
+  merchant_id: number
+  title: string
+  image: string
+  link_type: 'none' | 'product' | 'category' | 'url'
+  link_value: string
+  sort: number
+  status: number // 1=启用 0=禁用
+  created_at: string
+  updated_at: string
+}
+
+export interface MiniProgramBannerListResponse {
+  list: MiniProgramBanner[]
+}
+
+export interface MiniProgramBannerPayload {
+  title?: string
+  image: string
+  link_type: 'none' | 'product' | 'category' | 'url'
+  link_value?: string
+  sort?: number
+  status?: number
+}

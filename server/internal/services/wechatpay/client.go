@@ -285,14 +285,16 @@ func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(
 
 	svc := jsapi.JsapiApiService{Client: c.client}
 
-	// 固定 sub_app 模式：sp_appid 取服务商 appid，sub_appid 取特约商户主体小程序 appid
-	spAppid := strings.TrimSpace(config.Config.Wechat.AppID)
-	if spAppid == "" {
-		spAppid = req.AppID
-	}
-	subAppid := strings.TrimSpace(config.Config.Wechat.SubAppID)
+	// 服务商收款：sp_appid 须与服务商商户号(SPMchID)绑定（WECHAT_PAY_SP_APP_ID），
+	// sub_appid 用特约商户主体小程序（WECHAT_APP_ID，与 sub_mchid 绑定），支付人取 sub_openid。
+	// 二者不可混用，否则微信返回 APPID_MCHID_NOT_MATCH。
+	subAppid := strings.TrimSpace(config.Config.Wechat.AppID)
 	if subAppid == "" {
 		subAppid = req.AppID
+	}
+	spAppid := strings.TrimSpace(config.Config.WechatPay.SPAppID)
+	if spAppid == "" {
+		spAppid = req.AppID
 	}
 
 	r := jsapi.PrepayRequest{
@@ -325,19 +327,15 @@ func (c *ServiceProviderClient) CreatePartnerJSAPIPayOrder(
 	nonce := randomString(32)
 	pkg := "prepay_id=" + prepayID
 
-	appID := spAppid
-	if subAppid != "" {
-		appID = subAppid
-	}
-
-	message := appID + "\n" + timestamp + "\n" + nonce + "\n" + pkg + "\n"
+	// 调起支付签名与返回给前端的 appId 必须是用户 openid 所属小程序（sub_appid）
+	message := subAppid + "\n" + timestamp + "\n" + nonce + "\n" + pkg + "\n"
 	signature, err := signRSA(message, c.privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("生成支付参数签名失败: %w", err)
 	}
 
 	return &JSAPIPayResponse{
-		AppID:     appID,
+		AppID:     subAppid,
 		TimeStamp: timestamp,
 		NonceStr:  nonce,
 		Package:   pkg,
@@ -435,7 +433,7 @@ type ProfitSharingReceiverItem struct {
 // ProfitSharingRequest 创建分账单请求
 type ProfitSharingRequest struct {
 	SubMchID      string // 特约商户号(分账出资方)
-	AppID         string // 特约商户主体小程序appid
+	AppID         string // 小程序appid（WECHAT_APP_ID）
 	TransactionID string // 微信支付交易单号
 	OutOrderNo    string // 商户分账单号
 	Receivers     []ProfitSharingReceiverItem
@@ -464,7 +462,7 @@ type ProfitSharingResult struct {
 // AddProfitSharingReceiverRequest 添加分账接收方请求
 type AddProfitSharingReceiverRequest struct {
 	SubMchID       string // 特约商户号(分账出资方)
-	AppID          string // 特约商户主体小程序appid
+	AppID          string // 小程序appid（WECHAT_APP_ID）
 	Type           string // MERCHANT_ID / PERSONAL_OPENID
 	Account        string // 商户号 或 个人openid
 	Name           string // 商户全称或开户人姓名(MERCHANT_ID必传) / 个人姓名(PERSONAL_OPENID选传)

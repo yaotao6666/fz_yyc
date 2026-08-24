@@ -198,6 +198,8 @@
 - **租赁到期提醒**：`GET /api/v1/merchant/orders/rental-due`（`orderrental:view`，`due_range`=soon/overdue，返回未归还租赁订单与剩余天数）
 - **续租**：`POST /api/v1/merchant/orders/{order_id}/renew`（`order:renew`，生成 `parent_order_id=原单`、`renew_flag=1` 的新待支付订单，可选 `duration`）
 - C 端订单列表 / 详情 / 取消 / 申请退款
+- **C 端续租**：`POST /api/v1/user/orders/{order_id}/renew`（需登录，校验本人已支付租赁订单，生成 `parent_order_id=原单`、`renew_flag=1` 的新待支付订单并返回 `pay_params` 供微信支付；已存在该单待支付续租单则拒绝）
+- C 端订单详情返回值含 `assigned_staff_name`（指派服务人员姓名）、`biz_status`、`rental_end_at`、`parent_order_id`、`renew_flag`，供订单运营对齐展示。
 
 当前重点约束：
 
@@ -249,9 +251,7 @@
 ### 2.6 支付接口
 
 - C 端下单支付由商户主体统一拉起。
-- 全局配置 `WECHAT_PAY_APP_MODE` 控制当前部署版本的小程序支付身份：
-  - `sp_app`：请求微信支付时使用 `sp_appid + payer.sp_openid`
-  - `sub_app`：请求微信支付时使用 `sub_appid + payer.sub_openid`
+- 小程序登录身份统一取 `WECHAT_APP_ID`/`WECHAT_APP_SECRET`。支付下单时：`sp_appid` 取 `WECHAT_PAY_SP_APP_ID`（与服务商商户号绑定的小程序），`sub_appid` 取 `WECHAT_APP_ID`（与 `sub_mchid` 绑定的特约商户主体小程序），支付人取 `payer.sub_openid`；二者不可混用，否则微信返回 `APPID_MCHID_NOT_MATCH`。
 - 商户支付配置字段：
   - `sub_mch_id`
   - `payment_config_status`
@@ -265,7 +265,7 @@
 - 下单时必须按商户维度读取 `sub_mch_id`。
 - 已进件商户通过 PC 后台回填 `sub_mch_id` 完成支付配置。
 - 微信支付商户凭证为系统级配置，由系统统一维护，不在商户维度暴露。
-- `WECHAT_PAY_APP_MODE` 仅切换登录与下单支付时使用的小程序身份，不改变支付回调与退款实现。
+- 登录使用 `WECHAT_APP_ID` 对应小程序；支付下单 `sp_appid` 使用 `WECHAT_PAY_SP_APP_ID`、`sub_appid` 使用 `WECHAT_APP_ID`，不改变支付回调与退款实现。
 
 ### 2.7 数据分析接口
 

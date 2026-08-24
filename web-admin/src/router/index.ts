@@ -21,6 +21,7 @@ import HealthAssessmentFormsView from '@/views/health/HealthAssessmentFormsView.
 import HealthAssessmentsView from '@/views/health/HealthAssessmentsView.vue'
 import FittingRecommendationsView from '@/views/health/FittingRecommendationsView.vue'
 import CarePlansView from '@/views/health/CarePlansView.vue'
+import MiniProgramBannersView from '@/views/miniprogram/MiniProgramBannersView.vue'
 import { setupRouterGuards } from './guards'
 
 const routes = [
@@ -95,6 +96,13 @@ const routes = [
         name: 'analytics',
         component: MerchantStatsView,
         meta: { title: '数据分析', requiresAuth: true, permission: 'analytics:view' }
+      },
+      // 小程序配置
+      {
+        path: '/miniprogram-banners',
+        name: 'miniprogram-banners',
+        component: MiniProgramBannersView,
+        meta: { title: '小程序轮播图', requiresAuth: true, permission: 'banners:view' }
       },
       // 系统管理（RBAC）
       {

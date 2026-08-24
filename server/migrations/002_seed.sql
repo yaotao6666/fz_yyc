@@ -45,29 +45,17 @@ CREATE TABLE `merchants` (
   `business_category` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '经营类目',
   `business_hours` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '营业时间描述',
   `announcement` text COLLATE utf8mb4_unicode_ci COMMENT '商家公告',
-  `min_order_amount` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '最低起送金额',
-  `takeout_enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否开启配送: true=开启 false=关闭',
-  `dine_in_enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否开启堂食: true=开启 false=关闭',
   `sub_mch_id` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '微信支付子商户号(线下进件后回填)',
-  `sub_mch_status` tinyint unsigned NOT NULL DEFAULT '0',
-  `applyment_status` tinyint unsigned NOT NULL DEFAULT '0',
-  `audit_status` tinyint unsigned NOT NULL DEFAULT '0',
-  `audit_remark` varchar(256) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `status` tinyint unsigned NOT NULL DEFAULT '1' COMMENT '营业状态: 1=营业中 0=休息中',
   `rating` decimal(2,1) NOT NULL DEFAULT '5.0' COMMENT '商家评分(1.0-5.0)',
   `sales_count` bigint unsigned NOT NULL DEFAULT '0' COMMENT '累计销量',
-  `qrcode_url` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime(3) DEFAULT NULL COMMENT '创建时间',
   `updated_at` datetime(3) DEFAULT NULL COMMENT '更新时间',
   `cover_image` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商家背景/封面图地址(七牛私有路径)',
   `payment_config_status` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '支付配置状态: 0=未完成配置 1=已完成配置(已回填sub_mch_id)',
   `profit_sharing_enabled` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否开启自动分账',
-  `qr_code_url` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商家小程序码图片地址',
-  `pickup_enabled_2` tinyint(1) NOT NULL DEFAULT '1',
-  `pickup_enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否开启自提: true=开启 false=关闭',
   PRIMARY KEY (`id`),
   KEY `idx_merchants_sub_mch_id` (`sub_mch_id`),
-  KEY `idx_merchants_audit_status` (`audit_status`),
   KEY `idx_merchants_status` (`status`),
   KEY `idx_merchants_location` (`lat`,`lng`)
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家表';
@@ -79,7 +67,7 @@ CREATE TABLE `merchants` (
 
 LOCK TABLES `merchants` WRITE;
 /*!40000 ALTER TABLE `merchants` DISABLE KEYS */;
-INSERT INTO `merchants` VALUES (1,'乐享辅具（云南财旭商贸）','https://lexiang-oss.jxxme.cn/uploads/merchant/1/1778940798537.jpg','李四','13539565631','lisi@example.com','北京市朝阳区建国路88号',39.908823,116.407470,'二类医疗器械/康复辅具 与 共享租赁','08:00-21:00','全品类二类医疗辅具，支持零售与共享租赁低价套餐，专业适老康复服务。',0.00,1,1,'1112979963',2,2,1,'资质审核通过',1,5.0,0,'https://example.com/qrcode/merchant_1.png','2026-05-11 00:38:11.000','2026-08-23 09:53:51.908','https://lexiang-oss.jxxme.cn/uploads/merchant/1/1778940807903.png',1,1,NULL,1,1);
+INSERT INTO `merchants` VALUES (1,'乐享辅具（云南财旭商贸）','https://lexiang-oss.jxxme.cn/uploads/merchant/1/1778940798537.jpg','李四','13539565631','lisi@example.com','北京市朝阳区建国路88号',39.908823,116.407470,'二类医疗器械/康复辅具 与 共享租赁','08:00-21:00','全品类二类医疗辅具，支持零售与共享租赁低价套餐，专业适老康复服务。','1112979963',1,5.0,0,'2026-05-11 00:38:11.000','2026-08-23 09:53:51.908','https://lexiang-oss.jxxme.cn/uploads/merchant/1/1778940807903.png',1,1);
 /*!40000 ALTER TABLE `merchants` ENABLE KEYS */;
 UNLOCK TABLES;
 

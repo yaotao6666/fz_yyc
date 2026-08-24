@@ -97,9 +97,7 @@
 - 商户下单时能拉起对应的 `sub_mch_id`
 - 未完成支付配置的商户会被下单拦截
 - 使用 `1112649854` 的商户样例可正常拉起支付
-- `WECHAT_PAY_APP_MODE=sp_app` 时，下单请求使用 `sp_appid + payer.sp_openid`
-- `WECHAT_PAY_APP_MODE=sub_app` 时，下单请求使用 `sub_appid + payer.sub_openid`
-- 小程序支付身份切换后，前端会清理旧登录态并重新登录
+- 下单请求 `sp_appid` 使用 `WECHAT_PAY_SP_APP_ID`、`sub_appid` 使用 `WECHAT_APP_ID`，支付人取 `payer.sub_openid`，不出现 `APPID_MCHID_NOT_MATCH`
 - 支付回调后订单支付状态正确
 
 ## 4. 推荐测试链路

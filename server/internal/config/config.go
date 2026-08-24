@@ -63,6 +63,7 @@ type JWT struct {
 // WechatPay 微信支付配置
 type WechatPay struct {
 	SPMchID            string
+	SPAppID            string // 服务商下单 sp_appid：须与服务商商户号 SPMchID 绑定的小程序 appid（WECHAT_PAY_SP_APP_ID）
 	APIV3Key           string
 	CertSerialNo       string
 	PrivateKey         string
@@ -82,10 +83,8 @@ type Qiniu struct {
 
 // Wechat 微信小程序配置
 type Wechat struct {
-	AppID        string // 服务商主体小程序AppID
-	AppSecret    string // 服务商主体小程序AppSecret
-	SubAppID     string // 非服务商主体小程序AppID
-	SubAppSecret string // 非服务商主体小程序AppSecret
+	AppID     string // 小程序AppID（WECHAT_APP_ID）
+	AppSecret string // 小程序AppSecret（WECHAT_APP_SECRET）
 }
 
 // InitConfig 初始化配置
@@ -188,15 +187,12 @@ func mergeConfig() {
 	if viper.IsSet("WECHAT_APP_SECRET") {
 		Config.Wechat.AppSecret = viper.GetString("WECHAT_APP_SECRET")
 	}
-	if viper.IsSet("WECHAT_SUB_APP_ID") {
-		Config.Wechat.SubAppID = viper.GetString("WECHAT_SUB_APP_ID")
-	}
-	if viper.IsSet("WECHAT_SUB_APP_SECRET") {
-		Config.Wechat.SubAppSecret = viper.GetString("WECHAT_SUB_APP_SECRET")
-	}
 
 	if viper.IsSet("WECHAT_PAY_SP_MCH_ID") {
 		Config.WechatPay.SPMchID = viper.GetString("WECHAT_PAY_SP_MCH_ID")
+	}
+	if viper.IsSet("WECHAT_PAY_SP_APP_ID") {
+		Config.WechatPay.SPAppID = viper.GetString("WECHAT_PAY_SP_APP_ID")
 	}
 
 	if viper.IsSet("WECHAT_PAY_SP_API_V3_KEY") {
@@ -332,15 +328,12 @@ func mergeEnvConfig() {
 	if env := os.Getenv("WECHAT_APP_SECRET"); env != "" {
 		Config.Wechat.AppSecret = env
 	}
-	if env := os.Getenv("WECHAT_SUB_APP_ID"); env != "" {
-		Config.Wechat.SubAppID = env
-	}
-	if env := os.Getenv("WECHAT_SUB_APP_SECRET"); env != "" {
-		Config.Wechat.SubAppSecret = env
-	}
 
 	if env := os.Getenv("WECHAT_PAY_SP_MCH_ID"); env != "" {
 		Config.WechatPay.SPMchID = env
+	}
+	if env := os.Getenv("WECHAT_PAY_SP_APP_ID"); env != "" {
+		Config.WechatPay.SPAppID = env
 	}
 	if env := os.Getenv("WECHAT_PAY_SP_API_V3_KEY"); env != "" {
 		Config.WechatPay.APIV3Key = env
@@ -418,10 +411,8 @@ func getDefaultConfig() *AppConfig {
 			Expire: 720,
 		},
 		Wechat: Wechat{
-			AppID:        "",
-			AppSecret:    "",
-			SubAppID:     "",
-			SubAppSecret: "",
+			AppID:     "",
+			AppSecret: "",
 		},
 		WechatPay: WechatPay{
 			SPMchID:            "",

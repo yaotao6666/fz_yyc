@@ -346,10 +346,14 @@ export function getStoreHome() {
 /**
  * 获取店铺商品列表
  */
-export function getStoreProducts(params?: { category_id?: number }) {
+export function getStoreProducts(params?: { category_id?: number; keyword?: string; page?: number; page_size?: number }) {
   return get<ProductListResponse>('/api/v1/store/products', params).then(res => {
     const normalized = normalizeListField(res)
-    return { ...normalized, list: normalized.list.map(normalizeProduct) }
+    return {
+      ...normalized,
+      list: normalized.list.map(normalizeProduct),
+      pagination: (normalized as any).pagination
+    } as ProductListResponse
   })
 }
 
@@ -417,6 +421,14 @@ export function applyRefund(orderId: number, data: { reason: string }) {
   return post<any>(`/api/v1/user/orders/${orderId}/refund`, data)
 }
 
+/**
+ * 续租：基于原租赁订单生成关联新订单并返回支付参数
+ */
+export function renewOrder(orderId: number, data?: { duration?: number }) {
+  return post<{ order: Order; pay_params?: WechatPayParams; pay_hint?: string }>(
+    `/api/v1/user/orders/${orderId}/renew`, data || {})
+}
+
 // ============ C端订单详情 ============
 
 export function getMyOrderDetail(orderId: number) {
@@ -457,6 +469,7 @@ export default {
   getMyOrders,
   cancelMyOrder,
   applyRefund,
+  renewOrder,
   // C端订单详情
   getMyOrderDetail,
   // C端地址管理

@@ -245,6 +245,14 @@ func buildAccessibleOrder(order models.Order) models.Order {
 		order.Items[index].Image = buildAccessibleOrderItemImage(order.Items[index].Image)
 	}
 
+	// 指派服务人员姓名（gorm:"-" 瞬时字段，非查询返回）
+	if order.AssignedStaffID != nil {
+		var staff models.ServiceStaff
+		if err := database.DB.Select("name").First(&staff, *order.AssignedStaffID).Error; err == nil {
+			order.AssignedStaffName = staff.Name
+		}
+	}
+
 	return order
 }
 
@@ -301,7 +309,13 @@ func WechatLogin(c *gin.Context) {
 		return
 	}
 
-	openID, unionID, err := getWechatOpenID(req.Code)
+	appIdentity, err := wechatpay.GetActiveAppIdentity()
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "微信小程序配置缺失")
+		return
+	}
+
+	openID, unionID, err := getWechatOpenID(req.Code, appIdentity)
 	if err != nil {
 		log.Printf("获取微信openid失败: %v", err)
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "微信登录失败")
@@ -338,15 +352,10 @@ func WechatLogin(c *gin.Context) {
 	database.DB.Model(&user).Updates(updates)
 
 	token, _ := utils.GenerateToken(user.ID, 0, "user", user.Nickname)
-	appIdentity, err := wechatpay.GetActiveAppIdentity()
-	if err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, err.Error())
-		return
-	}
 
 	response.Success(c, gin.H{
 		"token":    token,
-		"app_mode": appIdentity.Mode,
+		"app_mode": "app",
 		"app_id":   appIdentity.AppID,
 		"user": gin.H{
 			"id":       user.ID,
@@ -356,10 +365,16 @@ func WechatLogin(c *gin.Context) {
 	})
 }
 
-func getWechatOpenID(code string) (string, string, error) {
-	appIdentity, err := wechatpay.GetActiveAppIdentity()
-	if err != nil {
-		return "", "", err
+func getWechatOpenID(code string, appIdentity *wechatpay.AppIdentity) (string, string, error) {
+	// 开发环境 / H5 调试：客户端会传入 "dev_" 前缀的模拟 code，
+	// 此时直接用 code 本身作为伪 openid，避免请求微信 jscode2session 失败无法登录。
+	if strings.HasPrefix(code, "dev_") {
+		pseudoOpenID := "o_" + code[4:]
+		return pseudoOpenID, "", nil
+	}
+
+	if appIdentity == nil {
+		return "", "", fmt.Errorf("应用身份配置缺失")
 	}
 
 	url := fmt.Sprintf(
@@ -367,7 +382,14 @@ func getWechatOpenID(code string) (string, string, error) {
 		appIdentity.AppID, appIdentity.AppSecret, code,
 	)
 
-	resp, err := http.Get(url)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", "", fmt.Errorf("构造微信请求失败: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return "", "", fmt.Errorf("请求微信API失败: %w", err)
 	}
@@ -414,6 +436,27 @@ func GetStoreHome(c *gin.Context) {
 	var deliverySettings models.MerchantDeliverySettings
 	database.DB.First(&deliverySettings)
 
+	// C 端小程序首页启用的轮播图
+	var banners []models.MiniProgramBanner
+	database.DB.
+		Where("merchant_id = ? AND status = 1", utils.DefaultMerchantID).
+		Order("sort ASC, id DESC").
+		Find(&banners)
+
+	bannerResponses := make([]map[string]interface{}, 0, len(banners))
+	for _, banner := range banners {
+		image := banner.Image
+		if qiniuService != nil {
+			image = qiniuService.BuildPrivateURL(image)
+		}
+		bannerResponses = append(bannerResponses, map[string]interface{}{
+			"id":         banner.ID,
+			"image":      image,
+			"link_type":  banner.LinkType,
+			"link_value": banner.LinkValue,
+		})
+	}
+
 	hotProductResponses := make([]StoreProductResponse, 0, len(hotProducts))
 	for _, product := range hotProducts {
 		hotProductResponses = append(hotProductResponses, buildStoreProductResponse(product))
@@ -438,7 +481,29 @@ func GetStoreHome(c *gin.Context) {
 		"categories":        categoryResponses,
 		"hot_products":      hotProductResponses,
 		"delivery_settings": deliverySettings,
+		"banners":           bannerResponses,
 	})
+}
+
+// GetStoreDeliveryRules 返回商家配送费规则（C端确认订单页使用）
+func GetStoreDeliveryRules(c *gin.Context) {
+	var deliverySettings models.MerchantDeliverySettings
+	if err := database.DB.First(&deliverySettings).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// 未配置时返回默认规则，避免 C 端下单流程被 404 阻断
+			response.Success(c, gin.H{
+				"enabled":              false,
+				"base_fee":             0,
+				"free_delivery_amount": 0,
+				"max_distance":         10,
+				"distance_rules":       []interface{}{},
+			})
+			return
+		}
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取配送规则失败")
+		return
+	}
+	response.Success(c, deliverySettings)
 }
 
 func GetProducts(c *gin.Context) {
@@ -1067,6 +1132,194 @@ func CancelOrder(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"message": "订单已取消"})
+}
+
+// RenewOrderRequest 用户端续租请求
+type RenewOrderRequest struct {
+	Duration uint `json:"duration"` // 可选：续租时长（默认取原单最长租赁时长）
+}
+
+// RenewOrder 用户端续租：基于本人已支付的租赁订单生成关联新订单（parent_order_id=原ID, renew_flag=1, 待支付），并创建支付参数
+func RenewOrder(c *gin.Context) {
+	userID := utils.GetUserID(c)
+	orderIDStr := c.Param("order_id")
+	orderID, err := strconv.ParseUint(orderIDStr, 10, 64)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单ID错误")
+		return
+	}
+
+	var req RenewOrderRequest
+	_ = c.ShouldBindJSON(&req)
+
+	var src models.Order
+	if err := database.DB.Preload("Items").Where("id = ? AND user_id = ?", orderID, userID).First(&src).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeOrderNotFound, "订单不存在")
+		return
+	}
+	if src.OrderType != 2 || len(src.Items) == 0 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "仅租赁订单可续租")
+		return
+	}
+	if src.Status == 1 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "原订单尚未支付，无法续租")
+		return
+	}
+
+	// 存在待支付的续租单时避免重复生成
+	var pendingRenew int64
+	database.DB.Model(&models.Order{}).
+		Where("parent_order_id = ? AND status = 1", orderID).Count(&pendingRenew)
+	if pendingRenew > 0 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "该订单已存在待支付的续租单")
+		return
+	}
+
+	duration := req.Duration
+	if duration == 0 {
+		for _, it := range src.Items {
+			if it.SaleType == 2 && it.RentalDuration > duration {
+				duration = it.RentalDuration
+			}
+		}
+	}
+	if duration == 0 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "续租时长无效")
+		return
+	}
+
+	// 复制订单费用：按续租时长重算租金，押金不变
+	var newTotalAmount float64
+	var newItems []models.OrderItem
+	for _, it := range src.Items {
+		renewalUnits := duration
+		switch it.RentalUnit {
+		case 2: // 周
+			renewalUnits = duration * 7
+		case 3: // 月
+			renewalUnits = duration * 30
+		}
+		subtotal := it.UnitRentalPrice * float64(renewalUnits) * float64(it.Quantity)
+		newTotalAmount += subtotal
+		newItems = append(newItems, models.OrderItem{
+			ProductID:       it.ProductID,
+			ProductName:     it.ProductName,
+			Image:           it.Image,
+			Price:           it.UnitRentalPrice,
+			Quantity:        it.Quantity,
+			SpecInfo:        it.SpecInfo,
+			Subtotal:        subtotal,
+			SaleType:        2,
+			RentalUnit:      it.RentalUnit,
+			RentalDuration:  duration,
+			UnitRentalPrice: it.UnitRentalPrice,
+			RentalSubtotal:  subtotal,
+			Deposit:         it.Deposit,
+		})
+	}
+
+	payAmount := newTotalAmount + src.DeliveryFee - src.DiscountAmount + src.TotalDeposit
+	if payAmount < 0 {
+		payAmount = 0
+	}
+
+	orderNo := utils.GenerateOrderNo(utils.DefaultMerchantID)
+
+	tx := database.DB.Begin()
+	newOrder := models.Order{
+		OrderNo:         orderNo,
+		UserID:          userID,
+		OrderType:       2, // 租赁
+		BizStatus:       0,
+		AssignedStaffID: src.AssignedStaffID,
+		TotalAmount:     newTotalAmount,
+		DeliveryFee:     src.DeliveryFee,
+		DiscountAmount:  src.DiscountAmount,
+		PayAmount:       payAmount,
+		TotalDeposit:    src.TotalDeposit,
+		DeliveryAddress: src.DeliveryAddress,
+		ContactName:     src.ContactName,
+		ContactPhone:    src.ContactPhone,
+		Remark:          src.Remark,
+		Status:          1,
+		ParentOrderID:   &src.ID,
+		RenewFlag:       1,
+		ScheduledAt:     src.ScheduledAt,
+	}
+	if newOrder.TotalDeposit > 0 {
+		newOrder.DepositStatus = 1
+	}
+	if err := tx.Create(&newOrder).Error; err != nil {
+		tx.Rollback()
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建续租订单失败")
+		return
+	}
+	for i := range newItems {
+		newItems[i].OrderID = newOrder.ID
+		if err := tx.Create(&newItems[i]).Error; err != nil {
+			tx.Rollback()
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建续租商品失败")
+			return
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建续租订单失败")
+		return
+	}
+
+	database.DB.Preload("Items").First(&newOrder, newOrder.ID)
+
+	// 创建微信支付参数（沿用下单逻辑）
+	var payParams gin.H
+	var payHint string
+	if payAmount > 0 {
+		var merchant models.Merchant
+		var currentUser models.User
+		if err := database.DB.First(&currentUser, userID).Error; err == nil {
+			if err := database.DB.First(&merchant, utils.DefaultMerchantID).Error; err == nil {
+				client, clientErr := wechatpay.NewServiceProviderClient()
+				merchantReady := merchant.SubMchID != "" && merchant.PaymentConfigStatus == 1
+				if clientErr != nil || !merchantReady {
+					var reasons []string
+					if clientErr != nil {
+						reasons = append(reasons, fmt.Sprintf("服务商支付凭证未配置: %s", clientErr.Error()))
+					}
+					if merchant.SubMchID == "" {
+						reasons = append(reasons, "商家尚未绑定收款商户号")
+					}
+					if merchant.PaymentConfigStatus != 1 {
+						reasons = append(reasons, "商家支付配置未完成")
+					}
+					payHint = strings.Join(reasons, "；")
+				} else {
+					payResponse, payErr := createWechatPayOrder(context.Background(), client, &merchant, newOrder, int64(payAmount*100), currentUser.OpenID)
+					if payErr != nil {
+						payHint = fmt.Sprintf("创建支付单失败: %s", payErr.Error())
+					} else {
+						payParams = gin.H{
+							"appId":     payResponse.AppID,
+							"timeStamp": payResponse.TimeStamp,
+							"nonceStr":  payResponse.NonceStr,
+							"package":   payResponse.Package,
+							"signType":  payResponse.SignType,
+							"paySign":   payResponse.PaySign,
+							"prepay_id": payResponse.PrepayID,
+						}
+					}
+				}
+			}
+		}
+	}
+
+	respBody := gin.H{
+		"order":      buildAccessibleOrder(newOrder),
+		"pay_params": payParams,
+	}
+	if payHint != "" {
+		respBody["pay_hint"] = payHint
+	}
+	response.SuccessWithMessage(c, "续租订单已生成", respBody)
 }
 
 type ApplyRefundRequest struct {

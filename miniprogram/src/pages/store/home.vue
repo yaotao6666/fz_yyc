@@ -92,6 +92,37 @@
         </view>
       </view>
 
+      <!-- 金刚区：轮播图 + icon 分类宫格 整合卡片 -->
+      <view class="kingkong-card">
+        <!-- 轮播图 -->
+        <swiper
+          v-if="bannerImages.length > 0"
+          class="banner-swiper"
+          :indicator-dots="true"
+          :autoplay="true"
+          :interval="3500"
+          :circular="true"
+          indicator-active-color="#007AFF"
+        >
+          <swiper-item v-for="(img, index) in bannerImages" :key="index">
+            <image class="banner-image" :src="img" mode="aspectFill" @click="onBannerTap(index)" />
+          </swiper-item>
+        </swiper>
+
+        <!-- icon 分类宫格 -->
+        <view class="icon-grid">
+          <view
+            v-for="type in PRODUCT_TYPE_SECTIONS"
+            :key="type.key"
+            class="icon-grid-item"
+            @click="goTypeSection(type.key)"
+          >
+            <view class="icon-grid-icon" :class="'pt-' + type.key">{{ type.icon }}</view>
+            <view class="icon-grid-text">{{ type.title }}</view>
+          </view>
+        </view>
+      </view>
+
       <view class="quick-entry-bar">
         <view class="quick-entry-row">
           <view class="quick-entry-card" @click="goMyOrders">
@@ -197,6 +228,7 @@
             <view
               v-for="section in productTypeSections"
               :key="section.key"
+              :id="'type-section-' + section.key"
               class="type-section"
             >
               <view class="type-section-header">
@@ -319,7 +351,8 @@
         </scroll-view>
       </view>
 
-      <view class="cart-bar">
+      <!-- 购物车栏（暂隐藏，移除多余占位以修复tabBar上方空白） -->
+      <!-- <view class="cart-bar">
         <view class="cart-area" :class="{ disabled: isCartEmpty }" @click="goCart">
           <view :class="isCartEmpty ? 'cart-icon-empty' : 'cart-icon'">
             <text>🛒</text>
@@ -342,14 +375,11 @@
         >
           {{ primaryActionText }}
         </view>
-      </view>
+      </view> -->
 
       <view v-if="showAddSuccessTip" class="add-success-tip">
         {{ addSuccessText }}
       </view>
-
-      <!-- 底部占位 -->
-      <view class="bottom-placeholder"></view>
     </template>
 
     <view v-if="showAddDialog" class="add-dialog-mask" @click="closeAddDialog">
@@ -460,7 +490,7 @@ import { parseStoreEntryOptions } from '@utils/storeEntry'
 import type { StoreHomeInfo, Product, SpecOption, StoreProductGroup, ProductType } from '@types'
 import { BrandAsset } from '../../utils/constants'
 
-// 商品类型分区配置
+// 商品类型分区配置（首页 icon 宫格只展示 4 大业务分类）
 const PRODUCT_TYPE_SECTIONS: Array<{
   key: ProductType
   title: string
@@ -471,8 +501,7 @@ const PRODUCT_TYPE_SECTIONS: Array<{
   { key: 1, title: '辅具零售', icon: '🛍️', tagClass: 'pt-retail-tag', tagText: '一口价' },
   { key: 2, title: '辅具租赁', icon: '🔑', tagClass: 'pt-rental-tag', tagText: '租赁' },
   { key: 3, title: '康养套餐', icon: '🌿', tagClass: 'pt-wellness-tag', tagText: '套餐' },
-  { key: 4, title: '陪诊服务', icon: '🏥', tagClass: 'pt-escort-tag', tagText: '陪诊' },
-  { key: 5, title: '科普资讯', icon: '📚', tagClass: 'pt-info-tag', tagText: '资讯' }
+  { key: 4, title: '陪诊服务', icon: '🏥', tagClass: 'pt-escort-tag', tagText: '陪诊' }
 ]
 
 function getProductTypeSection(productType: ProductType | number) {
@@ -536,6 +565,15 @@ const productTypeSections = computed(() => {
   })).filter(section => section.products.length > 0)
 })
 const hasProductTypeSections = computed(() => productTypeSections.value.length > 0)
+// 首页轮播图：优先使用接口 banners，为空时回退商家封面占位
+const bannerImages = computed<string[]>(() => {
+  const banners = storeInfo.value?.banners
+  if (Array.isArray(banners) && banners.length) {
+    return banners.map((banner) => banner.image).filter(Boolean)
+  }
+  const cover = storeInfo.value?.merchant?.cover_image || ''
+  return cover ? [cover] : []
+})
 const hasLoadedAnyProducts = computed(() => productSections.value.some(section => section.products.length > 0))
 const showProductEmpty = computed(() => !loadingProducts.value && !hasLoadedAnyProducts.value && !showHotProducts.value)
 const showPageError = computed(() => !!pageErrorMessage.value && !storeInfo.value)
@@ -821,6 +859,31 @@ function scrollToCategory(categoryId: number) {
   })
 }
 
+function onBannerTap(index: number) {
+  const banner = storeInfo.value?.banners?.[index]
+  if (!banner) return
+  if (banner.link_type === 'product' && banner.link_value) {
+    goProductDetail(Number(banner.link_value))
+    return
+  }
+  if (banner.link_type === 'category') {
+    uni.switchTab({ url: `/pages/store/category` })
+  }
+}
+
+// 点击 icon 分类宫格：滚动到对应商品类型分区
+function goTypeSection(productType: number) {
+  if (!hasProductTypeSections.value) {
+    uni.switchTab({ url: `/pages/store/category` })
+    return
+  }
+  setManualCategoryScrollLock()
+  productScrollIntoView.value = ''
+  nextTick(() => {
+    productScrollIntoView.value = `type-section-${productType}`
+  })
+}
+
 function selectCategory(index: number) {
   const category = storeInfo.value?.categories?.[index]
   if (!category) {
@@ -1052,7 +1115,7 @@ function goCart() {
     return
   }
 
-  uni.navigateTo({
+  uni.switchTab({
     url: `/pages/store/cart`
   })
 }
@@ -1258,6 +1321,79 @@ function goMyHealth() {
 
 .quick-entry-bar {
   padding: 20rpx 24rpx 0;
+}
+
+/* 首页轮播图 */
+.kingkong-card {
+  margin: 24rpx 24rpx 0;
+  background: #ffffff;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.banner-swiper {
+  height: 300rpx;
+  width: 100%;
+}
+
+.banner-image {
+  width: 100%;
+  height: 300rpx;
+  background: #e8eaf0;
+}
+
+/* icon 分类宫格 */
+.icon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 28rpx 8rpx 16rpx;
+}
+
+.icon-grid-item {
+  flex: 1;
+  min-width: 25%;
+  max-width: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.icon-grid-icon {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42rpx;
+  margin-bottom: 12rpx;
+}
+
+.icon-grid-icon.pt-1 {
+  background: rgba(0, 122, 255, 0.1);
+}
+
+.icon-grid-icon.pt-2 {
+  background: rgba(255, 149, 0, 0.12);
+}
+
+.icon-grid-icon.pt-3 {
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.icon-grid-icon.pt-4 {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.icon-grid-icon.pt-5 {
+  background: rgba(100, 116, 139, 0.14);
+}
+
+.icon-grid-text {
+  font-size: 24rpx;
+  color: #333333;
+  text-align: center;
 }
 
 .sticky-mini-bar {
@@ -1466,7 +1602,9 @@ function goMyHealth() {
 
 .main-content {
   display: flex;
-  height: calc(100vh - 400rpx - 120rpx - 116rpx);
+  /* header(400rpx) + margin-top(24rpx) 正好填满 tabBar 之上可视区，
+     商品列表在内部 scroll-view 滚动，页面本身不滚动，避免 tabBar 上方出现空白 */
+  height: calc(100vh - 424rpx);
   background: #ffffff;
   margin-top: 24rpx;
 }
@@ -1933,7 +2071,7 @@ function goMyHealth() {
 
 .cart-bar {
   position: fixed;
-  bottom: 0;
+  bottom: calc(100rpx + env(safe-area-inset-bottom));
   left: 0;
   right: 0;
   height: 120rpx;
@@ -1946,6 +2084,11 @@ function goMyHealth() {
   z-index: 100;
 }
 
+.cart-bar-placeholder {
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
 .cart-area {
   display: flex;
   align-items: center;
@@ -2327,9 +2470,5 @@ function goMyHealth() {
   font-size: 32rpx;
   font-weight: 500;
   text-align: center;
-}
-
-.bottom-placeholder {
-  height: 160rpx;
 }
 </style>

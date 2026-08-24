@@ -301,6 +301,7 @@ type Order struct {
 	RentalEndAt          *time.Time  `gorm:"index;comment:租赁到期时间(支付时=paid_at+租赁时长)" json:"rental_end_at"`
 	ParentOrderID        *uint64     `gorm:"index;comment:续租关联原订单ID(0/空=普通订单)" json:"parent_order_id,omitempty"`
 	RenewFlag            uint8       `gorm:"not null;default:0;comment:是否续租单: 1=续租 0=非" json:"renew_flag"`
+	AssignedStaffName    string      `gorm:"-" json:"assigned_staff_name"`
 	DeliveryAddress      string      `gorm:"size:256;comment:收货地址(配送时填写)" json:"delivery_address"`
 	ContactName          string      `gorm:"size:64;comment:联系人姓名(配送时填写)" json:"contact_name"`
 	ContactPhone         string      `gorm:"size:20;comment:联系电话(配送时填写)" json:"contact_phone"`
@@ -401,6 +402,27 @@ type Activity struct {
 
 func (Activity) TableName() string {
 	return "activities"
+}
+
+// ============================================
+// 小程序轮播图表 (mini_program_banners)
+// 用途：商家配置 C 端小程序首页金刚区轮播图
+// ============================================
+type MiniProgramBanner struct {
+	ID        uint64    `gorm:"primaryKey;autoIncrement;comment:轮播图ID" json:"id"`
+	MerchantID uint64   `gorm:"not null;index;comment:所属商家ID" json:"merchant_id"`
+	Title     string    `gorm:"size:128;comment:轮播图标题(仅后台识别)" json:"title"`
+	Image     string    `gorm:"size:512;not null;comment:轮播图图片URL(七牛私有路径)" json:"image"`
+	LinkType  string    `gorm:"size:16;not null;default:'none';comment:跳转类型: none=无跳转 product=商品详情 category=分类页 url=外部链接" json:"link_type"`
+	LinkValue string    `gorm:"size:256;comment:跳转目标值: product=product_id category=空(跳分类tab) url=链接" json:"link_value"`
+	Sort      uint      `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
+	Status    uint8     `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
+	CreatedAt time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+}
+
+func (MiniProgramBanner) TableName() string {
+	return "mini_program_banners"
 }
 
 // ============================================

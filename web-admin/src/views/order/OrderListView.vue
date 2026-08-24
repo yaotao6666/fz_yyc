@@ -2,20 +2,63 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getOrders } from '@/api/sp'
+import { getOrders, dispatchOrder, getDispatchableStaffList, renewOrder } from '@/api/sp'
 import type { SpOrder } from '@/types/sp'
 import { SpOrderStatusText, OrderTypeText, BizStatusText } from '@/types/sp'
 import { formatAmount, formatDateTime } from '@/utils/format'
+import { ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const loading = ref(false)
 const orders = ref<SpOrder[]>([])
 
-// 派单选择弹窗（列表页简化：仅详情页提供派单；此处续租入口复用）
-import { renewOrder } from '@/api/sp'
-import { ElMessageBox } from 'element-plus'
-
 const renewingId = ref<number | null>(null)
+// 派单
+const dispatchingId = ref<number | null>(null)
+const dispatchDialogVisible = ref(false)
+const staffLoading = ref(false)
+const staffOptions = ref<{ id: number; name: string; phone?: string }[]>([])
+const selectedStaffId = ref<number | null>(null)
+
+async function openDispatchDialog(row: SpOrder) {
+  dispatchTarget.value = row
+  selectedStaffId.value = row.assigned_staff_id || null
+  dispatchDialogVisible.value = true
+  staffLoading.value = true
+  try {
+    staffOptions.value = await getDispatchableStaffList()
+  } catch (error: any) {
+    ElMessage.error(error?.message || '获取服务人员失败')
+  } finally {
+    staffLoading.value = false
+  }
+}
+
+async function confirmDispatch() {
+  const target = dispatchTarget.value
+  if (!target || !target.id || !selectedStaffId.value) {
+    ElMessage.warning('请选择服务人员')
+    return
+  }
+  dispatchingId.value = target.id
+  try {
+    await dispatchOrder(target.id, selectedStaffId.value)
+    ElMessage.success('派单成功')
+    dispatchDialogVisible.value = false
+    loadOrders()
+  } catch (error: any) {
+    ElMessage.error(error?.message || '派单失败')
+  } finally {
+    dispatchingId.value = null
+  }
+}
+
+function canDispatchOrder(row: SpOrder) {
+  return row.status === 2 && Number(row.order_type) !== 1 && Number(row.order_type) !== 5
+}
+
+// 派单目标订单（用于弹窗确认）
+const dispatchTarget = ref<SpOrder | null>(null)
 async function handleRenewFromList(row: SpOrder) {
   if (!row.id) return
   try {
@@ -266,6 +309,13 @@ onMounted(loadOrders)
             <span v-else>-</span>
           </template>
         </el-table-column>
+        <el-table-column label="服务人员" width="130">
+          <template #default="scope">
+            <span v-if="scope.row.assigned_staff?.name">{{ scope.row.assigned_staff.name }}</span>
+            <span v-else-if="scope.row.assigned_staff_id">服务人员#{{ scope.row.assigned_staff_id }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="下单时间" min-width="170">
           <template #default="scope">
             {{ formatDateTime(scope.row.created_at) }}
@@ -274,6 +324,7 @@ onMounted(loadOrders)
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="goDetail(scope.row.id)">查看详情</el-button>
+            <el-button v-if="canDispatchOrder(scope.row)" link type="primary" v-permission="'order:dispatch'" :loading="dispatchingId === scope.row.id" @click="openDispatchDialog(scope.row)">派单</el-button>
             <el-button v-if="Number(scope.row.order_type) === 2 && scope.row.status !== 1" link type="warning" v-permission="'order:renew'" :loading="renewingId === scope.row.id" @click="handleRenewFromList(scope.row)">续租</el-button>
           </template>
         </el-table-column>
@@ -292,6 +343,17 @@ onMounted(loadOrders)
         />
       </div>
     </el-card>
+
+    <el-dialog v-model="dispatchDialogVisible" title="派单给服务人员" width="440px">
+      <p v-if="dispatchTarget" class="dispatch-tip">订单号：{{ dispatchTarget.order_no }}，请选择已审核的服务人员。</p>
+      <el-select v-model="selectedStaffId" v-loading="staffLoading" placeholder="选择已审核服务人员" style="width: 100%;" filterable>
+        <el-option v-for="s in staffOptions" :key="s.id" :label="`${s.name} (${s.phone || '无手机号'})`" :value="s.id" />
+      </el-select>
+      <template #footer>
+        <el-button @click="dispatchDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="dispatchingId !== null" @click="confirmDispatch">确认派单</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -300,5 +362,11 @@ onMounted(loadOrders)
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+.dispatch-tip {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #6b7280;
 }
 </style>

@@ -18,8 +18,6 @@ const menuGroups = computed(() => [
     title: '服务',
     items: [
       { icon: '📋', label: '全部工单', path: '/pages/workorder/index' },
-      { icon: '📊', label: '接单统计', path: '' },
-      { icon: '🧰', label: '验机归还', path: '' },
       { icon: '🩺', label: '我的照护计划', path: '/pages/health/care-plans' },
       { icon: '📞', label: '随访任务', path: '/pages/health/follow-ups', badge: pendingFollowUps.value }
     ]
@@ -28,10 +26,7 @@ const menuGroups = computed(() => [
     title: '账户',
     items: [
       { icon: '📝', label: '资料变更（需审核）', path: '/pages/profile/edit' },
-      { icon: '📋', label: '我的审核记录', path: '/pages/profile/my-audits' },
-      { icon: '🔔', label: '消息通知', path: '' },
-      { icon: '⚙️', label: '设置', path: '' },
-      { icon: '❓', label: '帮助与反馈', path: '' }
+      { icon: '📋', label: '我的审核记录', path: '/pages/profile/my-audits' }
     ]
   }
 ])
@@ -76,7 +71,7 @@ function onTapItem(item: any) {
     return
   }
   // tab 页用 switchTab，非 tab 页用 navigateTo
-  const tabPaths = ['/pages/todo/index', '/pages/workorder/index', '/pages/schedule/index', '/pages/profile/index']
+  const tabPaths = ['/pages/todo/index', '/pages/workorder/index', '/pages/profile/index']
   if (tabPaths.includes(item.path)) {
     uni.switchTab({ url: item.path })
   } else {

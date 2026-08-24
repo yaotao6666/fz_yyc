@@ -420,11 +420,11 @@ function buyNow() {
 }
 
 function goHome() {
-  uni.redirectTo({ url: `/pages/store/home` })
+  uni.switchTab({ url: `/pages/store/home` })
 }
 
 function goCart() {
-  uni.navigateTo({
+  uni.switchTab({
     url: `/pages/store/cart`
   })
 }

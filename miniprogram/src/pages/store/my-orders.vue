@@ -246,7 +246,7 @@ function goDetail(orderId: number) {
 }
 
 function goShopping() {
-  uni.navigateTo({ url: `/pages/store/home` })
+  uni.switchTab({ url: `/pages/store/home` })
 }
 
 function cancelOrder(order: Order) {

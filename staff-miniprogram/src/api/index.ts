@@ -172,13 +172,6 @@ export const staffProfileApi = {
     request({ url: '/api/v1/service-staff/statistics' })
 }
 
-/* ============ 排班接口（暂为占位，后端尚未实现） ============ */
-
-export const staffScheduleApi = {
-  getScheduleList: (_month: string) =>
-    Promise.resolve({ code: 0, data: [] } as any)
-}
-
 /* ============ 健康档案/评估接口 ============ */
 
 // 后端 JSON 列可能返回字符串或数组，统一规范化为字符串数组

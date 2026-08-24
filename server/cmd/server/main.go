@@ -118,6 +118,7 @@ func setupRoutes(r *gin.Engine) {
 		storeGroup.Use(middleware.OptionalJWTAuth())
 		{
 			storeGroup.GET("/home", user.GetStoreHome)
+			storeGroup.GET("/delivery-rules", user.GetStoreDeliveryRules)
 			storeGroup.GET("/products", user.GetProducts)
 			storeGroup.GET("/products/:product_id", user.GetProductDetail)
 			storeGroup.POST("/visit", user.RecordUserVisit)
@@ -138,6 +139,7 @@ func setupRoutes(r *gin.Engine) {
 			userGroup.GET("/orders/:order_id", user.GetOrderDetail)
 			userGroup.POST("/orders/:order_id/cancel", user.CancelOrder)
 			userGroup.POST("/orders/:order_id/refund", user.ApplyRefund)
+			userGroup.POST("/orders/:order_id/renew", user.RenewOrder)
 			userGroup.GET("/addresses", user.GetAddresses)
 			userGroup.POST("/addresses", user.CreateAddress)
 			userGroup.PUT("/addresses/:id", user.UpdateAddress)
@@ -250,6 +252,14 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.GET("/products/:product_id/specs", middleware.RBAC("products:specs"), merchant.GetProductSpecs)
 				merchantOnlyGroup.PUT("/products/:product_id/specs", middleware.RBAC("products:specs"), merchant.UpdateProductSpecs)
 				merchantOnlyGroup.DELETE("/products/:product_id/specs", middleware.RBAC("products:specs"), merchant.DeleteProductSpecs)
+
+				// 小程序轮播图配置
+				merchantOnlyGroup.GET("/miniprogram-banners", middleware.RBAC("banners:view"), merchant.GetBanners)
+				merchantOnlyGroup.GET("/miniprogram-banners/:id", middleware.RBAC("banners:view"), merchant.GetBanner)
+				merchantOnlyGroup.POST("/miniprogram-banners", middleware.RBAC("banners:create"), merchant.CreateBanner)
+				merchantOnlyGroup.PUT("/miniprogram-banners/:id", middleware.RBAC("banners:update"), merchant.UpdateBanner)
+				merchantOnlyGroup.PATCH("/miniprogram-banners/:id/status", middleware.RBAC("banners:status"), merchant.UpdateBannerStatus)
+				merchantOnlyGroup.DELETE("/miniprogram-banners/:id", middleware.RBAC("banners:delete"), merchant.DeleteBanner)
 
 				// RBAC 系统管理
 				merchantOnlyGroup.GET("/rbac/permissions", rbacHandler.GetMyMenus)

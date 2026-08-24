@@ -208,10 +208,14 @@ export function getStoreHome() {
   })
 }
 
-export function getStoreProducts(params?: { category_id?: number }) {
+export function getStoreProducts(params?: { category_id?: number; keyword?: string; page?: number; page_size?: number }) {
   return get<ProductListResponse>(`/api/v1/store/products`, params).then(response => {
     const normalized = normalizeListField(response)
-    return { ...normalized, list: normalized.list.map(normalizeProduct) }
+    return {
+      ...normalized,
+      list: normalized.list.map(normalizeProduct),
+      pagination: (normalized as any).pagination
+    } as ProductListResponse
   })
 }
 

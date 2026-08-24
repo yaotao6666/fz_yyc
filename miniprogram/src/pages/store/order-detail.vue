@@ -22,6 +22,14 @@
       </view>
     </view>
 
+    <view class="section" v-if="order.assigned_staff_name">
+      <view class="section-title">服务人员</view>
+      <view class="info-row">
+        <text class="label">指派服务人员</text>
+        <text class="value">{{ order.assigned_staff_name }}</text>
+      </view>
+    </view>
+
     <view class="section">
       <view class="section-title">配送信息</view>
       <view v-if="deliveryAddressText" class="info-row">
@@ -58,6 +66,16 @@
       <view class="info-row" v-if="order.completed_at">
         <text class="label">完成时间</text>
         <text class="value">{{ formatDateTime(order.completed_at) }}</text>
+      </view>
+      <view class="info-row" v-if="isRentalOrder && order.rental_end_at">
+        <text class="label">租赁到期</text>
+        <text class="value" :class="{ overdue: isRentalOverdue }">
+          {{ formatDateTime(order.rental_end_at) }}（{{ rentalDueText }}）
+        </text>
+      </view>
+      <view class="info-row" v-if="isServiceBizOrder && order.biz_status">
+        <text class="label">服务状态</text>
+        <text class="value">{{ bizStatusText }}</text>
       </view>
       <view class="info-row" v-if="order.refunded_at">
         <text class="label">退款时间</text>
@@ -154,6 +172,9 @@
       <button v-if="canRefund" class="btn warning" :disabled="submitting" @click="contactMerchantForRefund">
         联系商家退款
       </button>
+      <button v-if="canRenew" class="btn primary" :disabled="submitting" @click="renewOrderNow">
+        续租
+      </button>
     </view>
 
   </view>
@@ -162,7 +183,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { cancelMyOrder, getMyOrderDetail } from '@api'
+import { cancelMyOrder, getMyOrderDetail, renewOrder } from '@api'
 import { OrderStatus, OrderStatusText } from '@types'
 import type { Order } from '@types'
 import { BrandAsset } from '../../utils/constants'
@@ -176,6 +197,31 @@ const canRefund = computed(() => {
   return order.value?.status === OrderStatus.PAID
 })
 const isRentalOrder = computed(() => Number(order.value?.total_deposit || 0) > 0)
+const isServiceBizOrder = computed(() => Number(order.value?.biz_status || 0) > 0)
+// 租赁订单：已支付且未归还时可续租
+const canRenew = computed(() => {
+  if (!order.value) return false
+  if (!isRentalOrder.value) return false
+  if (order.value.status !== OrderStatus.PAID) return false
+  return !order.value.rental_returned_at
+})
+const isRentalOverdue = computed(() => {
+  const end = order.value?.rental_end_at
+  if (!end) return false
+  return new Date(end).getTime() < Date.now()
+})
+const rentalDueText = computed(() => {
+  const end = order.value?.rental_end_at
+  if (!end) return ''
+  const remain = new Date(end).getTime() - Date.now()
+  if (remain <= 0) return '已逾期'
+  const days = Math.ceil(remain / 86400000)
+  if (days <= 1) return '今日到期'
+  return `剩余${days}天`
+})
+const bizStatusText = computed(() => {
+  return { 1: '待接单', 2: '已指派/待出发', 3: '服务中', 4: '待支付尾款', 5: '已完成', 6: '已取消' }[Number(order.value?.biz_status)] || ''
+})
 
 function getRentalUnitText(unit?: number): string {
   return { 1: '天', 2: '周', 3: '月' }[Number(unit || 0)] || ''
@@ -288,6 +334,74 @@ async function cancelOrder() {
         uni.showToast({ title: '订单已取消', icon: 'success' })
       } catch (error: any) {
         uni.showToast({ title: error.message || '取消失败', icon: 'none' })
+      } finally {
+        submitting.value = false
+      }
+    }
+  })
+}
+
+async function renewOrderNow() {
+  if (!order.value) return
+  uni.showModal({
+    title: '确认续租',
+    content: '将按原租赁时长生成续租订单并跳转支付，是否继续？',
+    success: async (res) => {
+      if (!res.confirm || !order.value) return
+      submitting.value = true
+      uni.showLoading({ title: '生成续租订单...' })
+      try {
+        const renewRes = await renewOrder(order.value.id)
+        const payParams = renewRes.pay_params
+        if (payParams) {
+          uni.requestPayment({
+            provider: 'wxpay',
+            timeStamp: payParams.timeStamp,
+            nonceStr: payParams.nonceStr,
+            package: payParams.package,
+            signType: payParams.signType,
+            paySign: payParams.paySign,
+            success: () => {
+              uni.hideLoading()
+              uni.showToast({ title: '续租支付成功', icon: 'success' })
+              setTimeout(() => {
+                uni.redirectTo({ url: '/pages/store/my-orders?status=2' })
+              }, 1500)
+            },
+            fail: (err) => {
+              uni.hideLoading()
+              if (err.errMsg?.includes('cancel')) {
+                uni.showToast({ title: '支付已取消', icon: 'none' })
+                setTimeout(() => {
+                  uni.redirectTo({ url: '/pages/store/my-orders?status=1' })
+                }, 1200)
+              } else {
+                uni.showToast({ title: '支付失败', icon: 'none' })
+              }
+            }
+          })
+        } else {
+          uni.hideLoading()
+          if (Number(renewRes.order?.pay_amount || 0) > 0) {
+            uni.showModal({
+              title: '续租订单已生成',
+              content: renewRes.pay_hint || '商家支付配置未完成，请稍后在「待付款」中支付',
+              showCancel: false,
+              confirmText: '知道了',
+              success: () => {
+                uni.redirectTo({ url: '/pages/store/my-orders?status=1' })
+              }
+            })
+          } else {
+            uni.showToast({ title: '续租订单已生成', icon: 'success' })
+            setTimeout(() => {
+              uni.redirectTo({ url: '/pages/store/my-orders' })
+            }, 1200)
+          }
+        }
+      } catch (error: any) {
+        uni.hideLoading()
+        uni.showToast({ title: error.message || '续租失败', icon: 'none' })
       } finally {
         submitting.value = false
       }
@@ -523,6 +637,10 @@ function contactMerchantForRefund() {
 
 .deposit-value {
   color: #ff9500;
+}
+
+.overdue {
+  color: #f53f3f;
 }
 
 .rental-deposit-block {

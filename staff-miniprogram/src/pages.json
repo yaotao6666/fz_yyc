@@ -100,14 +100,6 @@
       }
     },
     {
-      "path": "pages/schedule/index",
-      "style": {
-        "navigationBarTitleText": "排班",
-        "navigationBarBackgroundColor": "#517528",
-        "navigationBarTextStyle": "white"
-      }
-    },
-    {
       "path": "pages/profile/index",
       "style": {
         "navigationBarTitleText": "我的",
@@ -157,12 +149,6 @@
         "selectedIconPath": "static/tabbar/workorder-active.png"
       },
       {
-        "pagePath": "pages/schedule/index",
-        "text": "排班",
-        "iconPath": "static/tabbar/schedule.png",
-        "selectedIconPath": "static/tabbar/schedule-active.png"
-      },
-      {
         "pagePath": "pages/profile/index",
         "text": "我的",
         "iconPath": "static/tabbar/profile.png",
@@ -180,10 +166,6 @@
       {
         "name": "工单页",
         "path": "pages/workorder/index"
-      },
-      {
-        "name": "排班页",
-        "path": "pages/schedule/index"
       },
       {
         "name": "我的页",

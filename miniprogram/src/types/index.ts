@@ -254,6 +254,13 @@ export interface Order {
   delivery_info?: DeliveryInfo
   status: number
   status_text?: string
+  // 订单运营对齐（派单/租赁）
+  biz_status?: number
+  assigned_staff_id?: number
+  assigned_staff_name?: string
+  rental_end_at?: string
+  parent_order_id?: number
+  renew_flag?: number
   remark?: string
   transaction_id?: string
   created_at: string
@@ -363,8 +370,15 @@ export interface StoreHomeInfo {
     name: string
     parent_id?: number
     level?: number
+    icon?: string
     sort: number
     product_count: number
+  }[]
+  banners?: {
+    id: number
+    image: string
+    link_type?: string
+    link_value?: string
   }[]
   hot_products: {
     id: number

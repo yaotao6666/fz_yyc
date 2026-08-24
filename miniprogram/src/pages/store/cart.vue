@@ -169,7 +169,7 @@ function removeItem(item: CartItem) {
 }
 
 function goShopping() {
-  uni.navigateTo({
+  uni.switchTab({
     url: `/pages/store/home`
   })
 }
@@ -189,7 +189,9 @@ function goCheckout() {
 .cart-container {
   min-height: 100vh;
   background: #f5f5f5;
-  padding-bottom: 140rpx;
+  /* 为底部固定的全选结算栏（100rpx）预留空间；tabBar 页面无需额外叠加安全区 */
+  padding-bottom: calc(100rpx + 32rpx);
+  box-sizing: border-box;
 }
 
 .store-info {
@@ -386,6 +388,8 @@ function goCheckout() {
 
 .bottom-bar {
   position: fixed;
+  /* 购物车是 tabBar 页面：fixed 定位参照的视口底部就是 tabBar 顶部，
+     bottom: 0 即贴住 tabBar 上方；再叠加偏移反而会悬空漂浮 */
   bottom: 0;
   left: 0;
   right: 0;
@@ -394,8 +398,8 @@ function goCheckout() {
   display: flex;
   align-items: center;
   padding: 0 32rpx;
-  padding-bottom: env(safe-area-inset-bottom);
   box-shadow: 0 -2rpx 10rpx rgba(0, 0, 0, 0.05);
+  z-index: 99;
 }
 
 .select-all {

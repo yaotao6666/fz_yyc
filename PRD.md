@@ -145,7 +145,7 @@
 **店铺二维码**：
 
 - 商户拥有店铺二维码用于 C 端用户扫码访问
-- 二维码携带商户 ID 参数，指向 `pages/home/index`
+- 二维码携带商户 ID 参数，指向 `pages/store/home`
 
 ### 1.4 客户端小程序详细说明
 
@@ -157,17 +157,17 @@
 
 **页面结构与 tabBar**：
 
-- **首页**（`pages/home/index`）：商城首页，展示轮播图、商品活动、服务分类图标宫格、热销推荐
-- **分类**（`pages/category/index`）：全部分类列表，支持分类下商品浏览
-- **购物车**（`pages/cart/index`）：购物车商品管理，支持数量修改与批量结算
-- **我的**（`pages/my/index`）：用户信息、我的订单入口、收货地址管理、联系商户
+- **首页**（`pages/store/home`）：商城首页，展示轮播图（PC 未配置时商家封面/占位承载）、服务分类图标宫格、热销推荐、按商品类型分区的商品流
+- **分类**（`pages/store/category`）：全部分类列表，支持分类下商品浏览
+- **购物车**（`pages/store/cart`）：购物车商品管理，支持数量修改与批量结算
+- **我的**（`pages/store/me`）：用户信息、我的订单入口、我的健康入口、收货地址管理、联系商户
 
 非 tabBar 页面保留在 `pages/store/` 下：
 
-- `pages/store/product`：商品详情
+- `pages/store/product`：商品详情（含科普资讯 product_type=5 正文展示）
 - `pages/store/confirm`：确认订单
-- `pages/store/my-orders`：我的订单
-- `pages/store/order-detail`：订单详情
+- `pages/store/my-orders`：我的订单（状态筛选，展示服务/租赁订单状态）
+- `pages/store/order-detail`：订单详情（展示指派服务人员、租赁到期时间与剩余天数、续租入口）
 - `pages/store/address-list`：收货地址列表
 - `pages/store/address-edit`：编辑地址
 - `pages/store/my-health`：我的健康首页（健康档案、自助评估入口）
@@ -176,10 +176,15 @@
 
 **首页模块说明**：
 
-- **轮播图**：商户在 PC 后台配置的 banner 图片，自动轮播，可配置点击跳转（商品/分类）
+- **轮播图**：展示轮播图（`banners`）。当前 PC 后台暂无轮播图配置入口，前端响应为空时以商家封面/占位图承载；后续 PC 提供配置后再由商户上传 banner。可配置点击跳转（商品/分类）
 - **商品活动区域**：展示当前生效的满减规则与优惠活动摘要
-- **服务分类图标宫格**：商品分类以 icon 图标形式展示，点击跳转分类页对应分类
+- **服务分类图标宫格**：按商品类型（零售/租赁/套餐/陪诊/资讯）以 icon 图标形式展示，点击滚动到首页对应类型分区
 - **热销推荐**：热门商品列表，支持点击进入商品详情与加购
+
+**订单运营对齐（PC → C 端）**：
+
+- 订单详情展示指派服务人员姓名、租赁订单到期时间与剩余天数/逾期状态、服务类订单业务状态（待接单/已指派/服务中）
+- 已支付未归还的租赁订单支持「续租」：调用用户端续租接口生成关联新订单（`parent_order_id=原单`、`renew_flag=1`）并发起微信支付
 
 **用户订单记录**：
 
@@ -3029,7 +3034,7 @@ GET /api/v1/store/home
 
 **说明：**
 
-- `banners` 为商户在 PC 后台配置的轮播图列表，`link_type` 可选值：`product`（商品）、`category`（分类）、`none`（无跳转）。
+- `banners` 为商户在 PC 后台配置的轮播图列表，`link_type` 可选值：`product`（商品）、`category`（分类）、`none`（无跳转）。当前 PC 后台暂未提供轮播图配置入口，后端暂不返回 `banners` 时，C 端首页以商家封面/占位图承载；后续 PC 提供配置后再接入该字段。
 - `activities` 为当前生效的活动信息数组，`type` 当前支持 `full_reduction`（满减规则摘要）。
 - `categories` 每项包含 `icon` 字段，为分类图标 URL，用于首页分类图标宫格展示。
 - `hot_products` 当前返回商品结构化对象，图片字段为 `images` 数组。
@@ -3420,6 +3425,43 @@ Authorization: Bearer {token}
 }
 ```
 
+#### 3.9.11 用户端续租
+
+```
+POST /api/v1/user/orders/{order_id}/renew
+Authorization: Bearer {token}
+```
+
+> **说明**：已支付且未归还的租赁订单发起续租，生成关联新订单（`parent_order_id=原订单ID`、`renew_flag=1`、待支付），并返回微信支付参数。若已存在该订单的待支付续租单则拒绝重复生成。续租时长默认取原单最长租赁时长，可按需传 `duration`（租赁计费周期）。
+
+**请求参数：**
+
+```json
+{
+  "duration": 1
+}
+```
+
+**响应：**
+
+```json
+{
+  "code": 0,
+  "data": {
+    "order": {
+      "id": 1001,
+      "order_no": "...",
+      "parent_order_id": 998,
+      "renew_flag": 1,
+      "status": 1,
+      "pay_amount": 199.00
+    },
+    "pay_params": { "appId": "", "timeStamp": "", "nonceStr": "", "package": "", "signType": "", "paySign": "" },
+    "pay_hint": ""
+  }
+}
+```
+
 ### 3.10 微信支付接口
 
 #### 3.10.1 创建支付订单
@@ -3487,7 +3529,7 @@ POST /api/v1/store/orders
 
 - 微信支付商户凭证（`mch_id`、`api_key`、`api_v3_key`、证书序列号、私钥、公钥、回调地址）为系统级配置，不在商户维度暴露。
 - 单商户通过回填 `sub_mch_id` 接入支付，支付资金结算到商户子商户账户。
-- 全局配置 `WECHAT_PAY_APP_MODE` 控制小程序支付身份：`sp_app` 使用 `sp_appid + payer.sp_openid`；`sub_app` 使用 `sub_appid + payer.sub_openid`。
+- 小程序登录身份统一取 `WECHAT_APP_ID`/`WECHAT_APP_SECRET`（登录、二维码生成共用）。支付下单时：`sp_appid` 取 `WECHAT_PAY_SP_APP_ID`（与服务商商户号 `sp_mchid` 绑定的小程序），`sub_appid` 取 `WECHAT_APP_ID`（与 `sub_mchid` 绑定的特约商户主体小程序），支付人取 `payer.sub_openid`；二者不可混用，否则微信返回 `APPID_MCHID_NOT_MATCH`。
 
 #### 3.10.2 支付回调通知
 

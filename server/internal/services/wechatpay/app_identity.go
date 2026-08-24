@@ -7,29 +7,24 @@ import (
 	"fz_yyc_api/internal/config"
 )
 
-// AppIdentity 当前小程序应用身份。
-// 本项目固定使用特约商户主体小程序（sub_app 模式），不再支持 sp_app/sub_app 切换。
+// AppIdentity 当前小程序应用身份（统一使用 WECHAT_APP_ID/WECHAT_APP_SECRET）。
 type AppIdentity struct {
-	Mode            string
-	AppID           string
-	AppSecret       string
-	OpenIDFieldName string
+	AppID     string
+	AppSecret string
 }
 
-// GetActiveAppIdentity 返回当前生效的应用身份（固定 sub_app，即特约商户主体小程序）。
+// GetActiveAppIdentity 返回当前生效的小程序应用身份（WECHAT_APP_ID/WECHAT_APP_SECRET）。
 func GetActiveAppIdentity() (*AppIdentity, error) {
 	if config.Config == nil {
 		return nil, fmt.Errorf("应用配置未初始化")
 	}
-	appID := strings.TrimSpace(config.Config.Wechat.SubAppID)
-	appSecret := strings.TrimSpace(config.Config.Wechat.SubAppSecret)
+	appID := strings.TrimSpace(config.Config.Wechat.AppID)
+	appSecret := strings.TrimSpace(config.Config.Wechat.AppSecret)
 	if appID == "" || appSecret == "" {
-		return nil, fmt.Errorf("特约商户主体小程序配置不完整（缺少 SubAppID/SubAppSecret）")
+		return nil, fmt.Errorf("微信小程序配置不完整（缺少 WECHAT_APP_ID/WECHAT_APP_SECRET）")
 	}
 	return &AppIdentity{
-		Mode:            "sub_app",
-		AppID:           appID,
-		AppSecret:       appSecret,
-		OpenIDFieldName: "sub_openid",
+		AppID:     appID,
+		AppSecret: appSecret,
 	}, nil
 }

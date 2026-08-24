@@ -53,6 +53,9 @@ import type {
   SysMenu,
   SysRole,
   UpdateSpMerchantFormData,
+  MiniProgramBanner,
+  MiniProgramBannerListResponse,
+  MiniProgramBannerPayload,
   UploadTokenResponse,
 } from '@/types/sp'
 
@@ -891,4 +894,42 @@ export function retryProfitSharingRecord(id: number) {
   return request
     .post(`/api/v1/merchant/profit-sharing/records/${id}/retry`)
     .then(unwrapApiResponse<ProfitSharingRecord>)
+}
+
+/* ============ 小程序轮播图配置 ============ */
+
+export function getMiniProgramBanners() {
+  return request
+    .get('/api/v1/merchant/miniprogram-banners')
+    .then(unwrapApiResponse<MiniProgramBannerListResponse>)
+}
+
+export function getMiniProgramBanner(id: number) {
+  return request
+    .get(`/api/v1/merchant/miniprogram-banners/${id}`)
+    .then(unwrapApiResponse<MiniProgramBanner>)
+}
+
+export function createMiniProgramBanner(data: MiniProgramBannerPayload) {
+  return request
+    .post('/api/v1/merchant/miniprogram-banners', data)
+    .then(unwrapApiResponse<MiniProgramBanner>)
+}
+
+export function updateMiniProgramBanner(id: number, data: Partial<MiniProgramBannerPayload>) {
+  return request
+    .put(`/api/v1/merchant/miniprogram-banners/${id}`, data)
+    .then(unwrapApiResponse<MiniProgramBanner>)
+}
+
+export function updateMiniProgramBannerStatus(id: number, status: number) {
+  return request
+    .patch(`/api/v1/merchant/miniprogram-banners/${id}/status`, { status })
+    .then(unwrapApiResponse<{ message?: string }>)
+}
+
+export function deleteMiniProgramBanner(id: number) {
+  return request
+    .delete(`/api/v1/merchant/miniprogram-banners/${id}`)
+    .then(unwrapApiResponse<{ message: string }>)
 }
