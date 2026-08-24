@@ -20,10 +20,10 @@ import (
 
 // RegisterRequest 注册申请请求
 type RegisterRequest struct {
-	Username       string `json:"username" binding:"required,min=2,max=64"`
-	Password       string `json:"password" binding:"required,min=6"`
-	Name           string `json:"name" binding:"required"`
-	Phone          string `json:"phone" binding:"required"`
+	Username       string              `json:"username" binding:"required,min=2,max=64"`
+	Password       string              `json:"password" binding:"required,min=6"`
+	Name           string              `json:"name" binding:"required"`
+	Phone          string              `json:"phone" binding:"required"`
 	Qualifications []QualificationItem `json:"qualifications"`
 }
 
@@ -202,9 +202,9 @@ func resolveWechatOpenID(code string) (string, error) {
 		return "staff_wx_" + trimmedCode, nil
 	}
 
-	appIdentity, err := wechatpay.GetActiveAppIdentity()
+	appIdentity, err := wechatpay.GetStaffAppIdentity()
 	if err != nil {
-		return "", fmt.Errorf("微信小程序配置缺失")
+		return "", fmt.Errorf("服务人员端小程序配置缺失")
 	}
 
 	query := url.Values{}

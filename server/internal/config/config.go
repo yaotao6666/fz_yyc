@@ -62,14 +62,15 @@ type JWT struct {
 
 // WechatPay 微信支付配置
 type WechatPay struct {
-	SPMchID            string
-	SPAppID            string // 服务商下单 sp_appid：须与服务商商户号 SPMchID 绑定的小程序 appid（WECHAT_PAY_SP_APP_ID）
-	APIV3Key           string
-	CertSerialNo       string
-	PrivateKey         string
-	PublicKey          string
-	PublicKeyID        string // 微信支付公钥ID（新验签模式，对应响应头 Wechatpay-Serial）
-	CallbackURL        string
+	SPMchID           string
+	SPAppID           string // 服务商下单 sp_appid：须与服务商商户号 SPMchID 绑定的小程序 appid（WECHAT_PAY_SP_APP_ID）
+	APIV3Key          string
+	CertSerialNo      string
+	PrivateKey        string
+	PublicKey         string
+	PublicKeyID       string // 微信支付公钥ID（新验签模式，对应响应头 Wechatpay-Serial）
+	CallbackURL       string // 支付成功回调
+	RefundCallbackURL string // 退款结果回调
 }
 
 // Qiniu 七牛云配置
@@ -83,8 +84,10 @@ type Qiniu struct {
 
 // Wechat 微信小程序配置
 type Wechat struct {
-	AppID     string // 小程序AppID（WECHAT_APP_ID）
-	AppSecret string // 小程序AppSecret（WECHAT_APP_SECRET）
+	AppID          string // 用户端(C端)小程序AppID（WECHAT_APP_ID）
+	AppSecret      string // 用户端(C端)小程序AppSecret（WECHAT_APP_SECRET）
+	StaffAppID     string // 服务人员端小程序AppID（WECHAT_STAFF_APP_ID）
+	StaffAppSecret string // 服务人员端小程序AppSecret（WECHAT_STAFF_APP_SECRET）
 }
 
 // InitConfig 初始化配置
@@ -187,6 +190,12 @@ func mergeConfig() {
 	if viper.IsSet("WECHAT_APP_SECRET") {
 		Config.Wechat.AppSecret = viper.GetString("WECHAT_APP_SECRET")
 	}
+	if viper.IsSet("WECHAT_STAFF_APP_ID") {
+		Config.Wechat.StaffAppID = viper.GetString("WECHAT_STAFF_APP_ID")
+	}
+	if viper.IsSet("WECHAT_STAFF_APP_SECRET") {
+		Config.Wechat.StaffAppSecret = viper.GetString("WECHAT_STAFF_APP_SECRET")
+	}
 
 	if viper.IsSet("WECHAT_PAY_SP_MCH_ID") {
 		Config.WechatPay.SPMchID = viper.GetString("WECHAT_PAY_SP_MCH_ID")
@@ -224,6 +233,9 @@ func mergeConfig() {
 	}
 	if viper.IsSet("WECHAT_PAY_SP_CALLBACK_URL") {
 		Config.WechatPay.CallbackURL = viper.GetString("WECHAT_PAY_SP_CALLBACK_URL")
+	}
+	if viper.IsSet("WECHAT_PAY_SP_REFUND_CALLBACK_URL") {
+		Config.WechatPay.RefundCallbackURL = viper.GetString("WECHAT_PAY_SP_REFUND_CALLBACK_URL")
 	}
 
 	if viper.IsSet("QINIU_ACCESS_KEY") {
@@ -328,6 +340,12 @@ func mergeEnvConfig() {
 	if env := os.Getenv("WECHAT_APP_SECRET"); env != "" {
 		Config.Wechat.AppSecret = env
 	}
+	if env := os.Getenv("WECHAT_STAFF_APP_ID"); env != "" {
+		Config.Wechat.StaffAppID = env
+	}
+	if env := os.Getenv("WECHAT_STAFF_APP_SECRET"); env != "" {
+		Config.Wechat.StaffAppSecret = env
+	}
 
 	if env := os.Getenv("WECHAT_PAY_SP_MCH_ID"); env != "" {
 		Config.WechatPay.SPMchID = env
@@ -360,6 +378,9 @@ func mergeEnvConfig() {
 	}
 	if env := os.Getenv("WECHAT_PAY_SP_CALLBACK_URL"); env != "" {
 		Config.WechatPay.CallbackURL = env
+	}
+	if env := os.Getenv("WECHAT_PAY_SP_REFUND_CALLBACK_URL"); env != "" {
+		Config.WechatPay.RefundCallbackURL = env
 	}
 
 	if env := os.Getenv("QINIU_ACCESS_KEY"); env != "" {
@@ -411,16 +432,19 @@ func getDefaultConfig() *AppConfig {
 			Expire: 720,
 		},
 		Wechat: Wechat{
-			AppID:     "",
-			AppSecret: "",
+			AppID:          "",
+			AppSecret:      "",
+			StaffAppID:     "",
+			StaffAppSecret: "",
 		},
 		WechatPay: WechatPay{
-			SPMchID:            "",
-			APIV3Key:           "",
-			CertSerialNo:       "",
-			PrivateKey:         "",
-			PublicKey:          "",
-			CallbackURL:        "",
+			SPMchID:           "",
+			APIV3Key:          "",
+			CertSerialNo:      "",
+			PrivateKey:        "",
+			PublicKey:         "",
+			CallbackURL:       "",
+			RefundCallbackURL: "",
 		},
 		Qiniu: Qiniu{
 			AccessKey: "",

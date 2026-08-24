@@ -60,6 +60,7 @@
                   </template>
                 </view>
               </view>
+              <view class="add-btn" @click.stop="onProductQuickAdd(product)">+</view>
             </view>
           </template>
 
@@ -68,15 +69,87 @@
         </scroll-view>
       </view>
     </template>
+
+    <view v-if="showAddDialog" class="add-dialog-mask" @click="closeAddDialog">
+      <view class="add-dialog" @click.stop>
+        <view class="add-dialog-header">
+          <view class="add-dialog-title">{{ addDialogProduct?.name || '选择规格' }}</view>
+          <view class="add-dialog-close" @click="closeAddDialog">×</view>
+        </view>
+
+        <view v-if="addDialogLoading" class="add-dialog-loading">加载中...</view>
+
+        <template v-else>
+          <view class="add-dialog-price">
+            <text class="price-label">价格</text>
+            <text class="price-value">¥{{ addDialogSelectedPrice.toFixed(2) }}</text>
+          </view>
+
+          <view class="add-dialog-specs" v-if="addDialogProduct?.specs?.length">
+            <view
+              v-for="spec in addDialogProduct.specs"
+              :key="spec.name"
+              class="add-spec-group"
+            >
+              <view class="add-spec-name">{{ spec.name }}</view>
+              <view class="add-spec-options">
+                <view
+                  v-for="option in spec.options"
+                  :key="option.name"
+                  class="add-spec-option"
+                  :class="{
+                    selected: addDialogSelectedSpecs[spec.name] === option.name,
+                    disabled: option.stock === 0
+                  }"
+                  @click="selectAddDialogSpec(spec.name, option)"
+                >
+                  <text class="option-name">{{ option.name }}</text>
+                  <text v-if="option.price > 0" class="option-price">+¥{{ option.price.toFixed(2) }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <view class="add-dialog-quantity">
+            <view class="quantity-title">数量</view>
+            <view class="quantity-control">
+              <view
+                class="quantity-btn"
+                :class="{ disabled: addDialogQuantity <= 1 }"
+                @click="decreaseAddDialogQuantity"
+              >-</view>
+              <text class="quantity-value">{{ addDialogQuantity }}</text>
+              <view
+                class="quantity-btn"
+                :class="{ disabled: addDialogQuantity >= addDialogSelectedStock }"
+                @click="increaseAddDialogQuantity"
+              >+</view>
+            </view>
+            <view class="stock-tip">库存：{{ addDialogSelectedStock }}</view>
+          </view>
+
+          <view class="add-dialog-footer">
+            <view class="add-dialog-confirm" @click="confirmAddDialog">加入购物车</view>
+          </view>
+        </template>
+      </view>
+    </view>
+
+    <view v-if="showAddSuccessTip" class="add-success-tip">
+      {{ addSuccessText }}
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, ref, reactive, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getStoreHome, getStoreProducts } from '../../api/store'
-import type { Product } from '../../types'
+import { getStoreHome, getStoreProducts, getStoreProduct } from '../../api/store'
+import { useCartStore } from '../../stores/cart'
+import type { Product, SpecOption } from '../../types'
 import { BrandAsset } from '../../utils/constants'
+
+const cartStore = useCartStore()
 
 const categories = ref<Array<{ id: number; name: string; product_count?: number }>>([])
 type ProductSection = {

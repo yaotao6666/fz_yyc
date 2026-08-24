@@ -266,9 +266,9 @@ func RefundOrder(c *gin.Context) {
 		}
 	}
 
-	notifyURL := config.Config.WechatPay.CallbackURL
+	notifyURL := config.Config.WechatPay.RefundCallbackURL
 	if notifyURL == "" {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "服务商支付回调地址未配置")
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "服务商退款回调地址未配置")
 		return
 	}
 

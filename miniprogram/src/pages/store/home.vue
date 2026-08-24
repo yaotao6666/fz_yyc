@@ -42,9 +42,6 @@
           </view>
         </view>
       </view>
-      <view class="store-status" :class="{ closed: storeInfo?.merchant?.status !== 1 }">
-        {{ storeInfo?.merchant?.status === 1 ? '营业中' : '休息中' }}
-      </view>
     </view>
 
     <view v-if="storeInfo?.merchant?.status !== 1" class="rest-tip">
@@ -79,10 +76,6 @@
           <view class="sticky-mini-info">
             <view class="sticky-mini-name">{{ storeInfo.merchant.name }}</view>
             <view class="sticky-mini-meta">
-              <text class="sticky-mini-status" :class="{ closed: storeInfo.merchant.status !== 1 }">
-                {{ storeInfo.merchant.status === 1 ? '营业中' : '休息中' }}
-              </text>
-              <text class="sticky-mini-divider">·</text>
               <text class="sticky-mini-category">{{ currentCategory?.name || '商品列表' }}</text>
             </view>
           </view>
@@ -119,27 +112,6 @@
           >
             <view class="icon-grid-icon" :class="'pt-' + type.key">{{ type.icon }}</view>
             <view class="icon-grid-text">{{ type.title }}</view>
-          </view>
-        </view>
-      </view>
-
-      <view class="quick-entry-bar">
-        <view class="quick-entry-row">
-          <view class="quick-entry-card" @click="goMyOrders">
-            <view class="quick-entry-icon">📋</view>
-            <view class="quick-entry-content">
-              <view class="quick-entry-title">我的订单</view>
-              <view class="quick-entry-desc">查看订单与退款进度</view>
-            </view>
-            <view class="quick-entry-arrow">›</view>
-          </view>
-          <view class="quick-entry-card" @click="goMyHealth">
-            <view class="quick-entry-icon health">🩺</view>
-            <view class="quick-entry-content">
-              <view class="quick-entry-title">我的健康</view>
-              <view class="quick-entry-desc">健康档案与自助评估</view>
-            </view>
-            <view class="quick-entry-arrow">›</view>
           </view>
         </view>
       </view>

@@ -1,12 +1,12 @@
 {
   "name": "财旭商贸-服务人员端",
-  "appid": "wx71a54b66552dc9e8",
+  "appid": "wx78c58ff857fb6ce6",
   "description": "财旭商贸服务人员端 - 处理康养上门、陪诊、辅具租赁归还、科普活动等服务工单",
   "versionName": "0.1.0",
   "versionCode": "1",
   "transformPx": false,
   "mp-weixin": {
-    "appid": "wx71a54b66552dc9e8",
+    "appid": "wx78c58ff857fb6ce6",
     "setting": {
       "urlCheck": false,
       "es6": true,
