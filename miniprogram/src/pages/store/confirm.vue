@@ -36,6 +36,33 @@
       </view>
     </view>
 
+    <!-- 服务对象（服务订单必选健康档案） -->
+    <view v-if="hasServiceItems" class="section record-section">
+      <view class="section-title-row">
+        <view class="section-title">服务对象</view>
+        <text v-if="healthRecordList.length > 1" class="section-meta">共 {{ healthRecordList.length }} 份档案</text>
+      </view>
+      <view class="record-card" :class="{ empty: !healthRecord }" @click="goHealthRecord">
+        <template v-if="healthRecord">
+          <view class="record-main">
+            <view class="record-top">
+              <text class="record-name">{{ healthRecord.real_name || '未命名' }}</text>
+              <text class="record-rel-tag">{{ relationText(healthRecord.relation) }}</text>
+              <text class="record-tag">服务档案</text>
+            </view>
+            <view class="record-detail">
+              {{ recordSummaryText }}
+            </view>
+          </view>
+          <text class="address-arrow">></text>
+        </template>
+        <view v-else class="record-empty">
+          <text class="record-empty-title">{{ loadingRecord ? '档案加载中...' : '请先创建健康档案' }}</text>
+          <text class="record-empty-desc">服务订单需指定服务对象，点击前往建档</text>
+        </view>
+      </view>
+    </view>
+
     <!-- 商品信息 -->
     <view class="section goods-section">
       <view class="section-title">商品信息</view>
@@ -57,7 +84,6 @@
               <text v-if="Number(item.product_type) === 2 || Number(item.sale_type) === 2" class="goods-rental-tag">租赁</text>
               <text v-else-if="Number(item.product_type) === 3" class="goods-wellness-tag">套餐</text>
               <text v-else-if="Number(item.product_type) === 4" class="goods-escort-tag">陪诊</text>
-              <text v-else-if="Number(item.product_type) === 5" class="goods-info-tag">资讯</text>
             </view>
             <view class="goods-spec" v-if="item.specs">{{ item.specs }}</view>
             <view class="goods-rental-info" v-if="Number(item.sale_type) === 2">
@@ -90,9 +116,63 @@
         <text class="amount-label">{{ hasFinalPricing ? '配送费' : '预估配送费' }}</text>
         <text class="amount-value">¥{{ displayDeliveryFee.toFixed(2) }}</text>
       </view>
+      <view class="amount-row coupon" @click="openCouponPopup">
+        <text class="amount-label">优惠券</text>
+        <text class="amount-value" :class="{ 'coupon-active': couponSummaryText.startsWith('-') }">
+          {{ couponSummaryText }} <text class="coupon-arrow">›</text>
+        </text>
+      </view>
+      <view v-if="displayDiscountAmount > 0" class="amount-row discount">
+        <text class="amount-label">券抵扣</text>
+        <text class="amount-value">-¥{{ displayDiscountAmount.toFixed(2) }}</text>
+      </view>
       <view class="amount-row total">
         <text class="amount-label">{{ hasFinalPricing ? '合计' : '预估合计' }}</text>
         <text class="amount-value">¥{{ displayTotalAmount.toFixed(2) }}</text>
+      </view>
+    </view>
+
+    <!-- 优惠券选择弹窗 -->
+    <view v-if="couponPopupVisible" class="coupon-selector-mask" @click="couponPopupVisible = false">
+      <view class="coupon-selector-panel" @click.stop>
+        <view class="coupon-selector-header">
+          <text class="coupon-selector-title">选择优惠券</text>
+          <text class="coupon-selector-close" @click="couponPopupVisible = false">×</text>
+        </view>
+        <scroll-view class="coupon-selector-list" scroll-y>
+          <view v-if="usableCoupons.length === 0" class="coupon-empty">
+            <text class="coupon-empty-icon">🎟️</text>
+            <text class="coupon-empty-text">暂无可用优惠券</text>
+          </view>
+          <view
+            v-for="coupon in usableCoupons"
+            :key="coupon.user_coupon_id"
+            class="coupon-option"
+            :class="{ selected: selectedCoupon?.user_coupon_id === coupon.user_coupon_id }"
+            @click="selectCoupon(coupon)"
+          >
+            <view class="coupon-option-left">
+              <text class="coupon-option-value">¥{{ Number(coupon.discount).toFixed(2) }}</text>
+              <text class="coupon-option-threshold">
+                {{ Number(coupon.threshold_amount) > 0 ? `满${Number(coupon.threshold_amount).toFixed(0)}可用` : '无门槛' }}
+              </text>
+            </view>
+            <view class="coupon-option-right">
+              <text class="coupon-option-name">{{ coupon.name }}</text>
+              <text class="coupon-option-validity">有效期至 {{ String(coupon.expired_at || '').replace('T', ' ').slice(0, 10) }}</text>
+            </view>
+            <view class="coupon-option-check" :class="{ checked: selectedCoupon?.user_coupon_id === coupon.user_coupon_id }"></view>
+          </view>
+          <view
+            v-if="usableCoupons.length > 0"
+            class="coupon-option none"
+            :class="{ selected: !selectedCoupon }"
+            @click="selectCoupon(null)"
+          >
+            <text class="coupon-option-name">不使用优惠券</text>
+            <view class="coupon-option-check" :class="{ checked: !selectedCoupon }"></view>
+          </view>
+        </scroll-view>
       </view>
     </view>
 
@@ -111,6 +191,37 @@
     <view v-if="hasRentalItems" class="rental-notice">
       租赁订单：押金将在归还商品并由商家验机后原路退还，若有损坏将扣除相应费用
     </view>
+
+    <!-- 服务对象：多档案选择弹层 -->
+    <view v-if="recordPickerVisible" class="picker-mask" @click="recordPickerVisible = false">
+      <view class="picker-panel" @click.stop>
+        <view class="picker-header">
+          <text class="picker-title">选择服务对象</text>
+          <text class="picker-close" @click="recordPickerVisible = false">×</text>
+        </view>
+        <scroll-view scroll-y class="picker-body">
+          <view
+            v-for="r in healthRecordList"
+            :key="r.id"
+            class="picker-item"
+            :class="{ active: healthRecord?.id === r.id }"
+            @tap="selectRecordFromList(r)"
+          >
+            <view class="picker-item-main">
+              <view class="picker-item-top">
+                <text class="picker-item-name">{{ r.real_name || '未命名档案' }}</text>
+                <text class="picker-item-rel">{{ relationText(r.relation) }}</text>
+              </view>
+              <view class="picker-item-sub">{{ buildRecordSummary(r) }}</view>
+            </view>
+            <text v-if="healthRecord?.id === r.id" class="picker-item-check">✓</text>
+          </view>
+          <view class="picker-create" @tap="goCreateRecordFromPicker">
+            ＋ 新增健康档案
+          </view>
+        </scroll-view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -119,12 +230,15 @@ import { ref, computed, watch } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { createOrder, getStoreDeliveryRules } from '../../api/store'
 import { createUserAddress, getUserAddresses } from '../../api'
+import { getUserHealthRecord, listUserHealthRecords } from '../../api/health'
+import { getOrderUsableCoupons } from '../../api/coupon'
+import type { OrderUsableCoupon } from '../../types/coupon'
 import { useCartStore, getItemPayAmount, getItemDeposit, getRentalUnitText } from '../../stores/cart'
 import type { CartItem } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
 import { useAuth } from '../../utils/useAuth'
 import { parseStoreEntryOptions } from '@utils/storeEntry'
-import type { CreateOrderRequest, Order, StoreDeliveryRules, UserAddress } from '@types'
+import type { CreateOrderRequest, HealthRecord, Order, StoreDeliveryRules, UserAddress } from '@types'
 import { BrandAsset } from '../../utils/constants'
 import {
   STORE_SELECTED_ADDRESS_ID_KEY,
@@ -160,6 +274,66 @@ const deliveryRules = ref<{ distance: number; fee: number; label: string }[]>([]
 const deliveryDistance = ref(0)
 const deliveryDistanceIndex = ref(0)
 
+/* ============ 优惠券（PRD V2.0 阶段二） ============ */
+const usableCoupons = ref<OrderUsableCoupon[]>([])
+const selectedCoupon = ref<OrderUsableCoupon | null>(null)
+const couponPopupVisible = ref(false)
+const couponsLoaded = ref(false)
+
+const couponDiscount = computed(() => Number(selectedCoupon.value?.discount || 0))
+
+const couponSummaryText = computed(() => {
+  if (finalOrder.value) {
+    return Number(finalOrder.value.discount_amount) > 0 ? `-¥${Number(finalOrder.value.discount_amount).toFixed(2)}` : '未使用'
+  }
+  if (selectedCoupon.value) {
+    return `-¥${couponDiscount.value.toFixed(2)}`
+  }
+  if (usableCoupons.value.length > 0) {
+    return `${usableCoupons.value.length} 张可用`
+  }
+  return couponsLoaded.value ? '暂无可用' : '暂无可用'
+})
+
+const productIds = computed(() => displayItems.value.map(item => Number(item.product_id)).filter(id => id > 0))
+
+async function loadUsableCoupons() {
+  if (goodsAmount.value <= 0 || productIds.value.length === 0) {
+    usableCoupons.value = []
+    couponsLoaded.value = true
+    return
+  }
+  try {
+    const res = await getOrderUsableCoupons(Number(goodsAmount.value.toFixed(2)), productIds.value)
+    usableCoupons.value = res.list || []
+    // 已选中的券失效时自动清除
+    if (selectedCoupon.value) {
+      const matched = usableCoupons.value.find(c => c.user_coupon_id === selectedCoupon.value?.user_coupon_id)
+      selectedCoupon.value = matched || null
+    }
+  } catch (_e) {
+    usableCoupons.value = []
+  } finally {
+    couponsLoaded.value = true
+  }
+}
+
+function openCouponPopup() {
+  if (finalOrder.value) {
+    uni.showToast({ title: '订单已创建，无法修改优惠券', icon: 'none' })
+    return
+  }
+  couponPopupVisible.value = true
+}
+
+function selectCoupon(coupon: OrderUsableCoupon | null) {
+  if (coupon && Number(coupon.discount) <= 0) {
+    return
+  }
+  selectedCoupon.value = coupon
+  couponPopupVisible.value = false
+}
+
 const displayItems = computed<CartItem[]>(() => {
   if (isBuyNow.value && cartStore.buyNowItem) {
     return [cartStore.buyNowItem]
@@ -168,6 +342,91 @@ const displayItems = computed<CartItem[]>(() => {
 })
 
 const hasRentalItems = computed(() => displayItems.value.some(item => Number(item.sale_type) === 2))
+
+// 服务订单（康养套餐/陪诊服务）：必须绑定服务对象（健康档案）
+const hasServiceItems = computed(() => displayItems.value.some(item => [3, 4].includes(Number(item.product_type))))
+
+const healthRecord = ref<HealthRecord | null>(null)
+const loadingRecord = ref(false)
+// 多档案列表支持（账号下的全部健康档案）
+const healthRecordList = ref<HealthRecord[]>([])
+const recordPickerVisible = ref(false)
+
+const recordSummaryText = computed(() => {
+  const record = healthRecord.value
+  if (!record) return ''
+  const gender = Number(record.gender) === 2 ? '女' : '男'
+  const birth = record.birth_date ? String(record.birth_date).slice(0, 10) : ''
+  const age = birth ? `${new Date().getFullYear() - Number(birth.slice(0, 4))}岁` : '年龄未知'
+  const tags = (record.chronic_tags || []).slice(0, 2).join('、')
+  return [gender, age, tags].filter(Boolean).join(' · ')
+})
+
+function relationText(relation?: number) {
+  const map: Record<number, string> = { 1: '本人', 2: '父母', 3: '其他亲属' }
+  return relation == null ? '未设置' : (map[relation] || '其他亲属')
+}
+
+function buildRecordSummary(record: HealthRecord) {
+  const gender = Number(record.gender) === 2 ? '女' : '男'
+  const birth = record.birth_date ? String(record.birth_date).slice(0, 10) : ''
+  const age = birth ? `${new Date().getFullYear() - Number(birth.slice(0, 4))}岁` : '年龄未知'
+  const tags = (record.chronic_tags || []).slice(0, 2).join('、')
+  return [gender, age, tags].filter(Boolean).join(' · ')
+}
+
+async function loadHealthRecord() {
+  try {
+    loadingRecord.value = true
+    // 优先拉取账号下的档案列表（多档案），失败或为空时再退回单档案接口
+    try {
+      const list = await listUserHealthRecords()
+      healthRecordList.value = Array.isArray(list) ? list : []
+      // 默认选中：当前 healthRecord（若在列表中）、否则取列表第 1 条
+      const currentId = healthRecord.value?.id
+      const matched = healthRecordList.value.find(r => r.id === currentId)
+      if (matched) {
+        healthRecord.value = matched
+      } else if (healthRecordList.value.length > 0) {
+        healthRecord.value = healthRecordList.value[0]
+      } else {
+        healthRecord.value = null
+      }
+      return
+    } catch (err) {
+      console.warn('[Confirm] listUserHealthRecords failed, fallback to single record', err)
+    }
+    healthRecord.value = await getUserHealthRecord()
+    if (healthRecord.value) {
+      healthRecordList.value = [healthRecord.value]
+    }
+  } catch (error) {
+    console.error('获取健康档案失败:', error)
+    healthRecord.value = null
+    healthRecordList.value = []
+  } finally {
+    loadingRecord.value = false
+  }
+}
+
+function goHealthRecord() {
+  // 若已有多档案，展示选择弹层；否则直接跳档案页
+  if (healthRecordList.value.length > 0) {
+    recordPickerVisible.value = true
+  } else {
+    uni.navigateTo({ url: '/pages/store/my-health' })
+  }
+}
+
+function selectRecordFromList(record: HealthRecord) {
+  healthRecord.value = record
+  recordPickerVisible.value = false
+}
+
+function goCreateRecordFromPicker() {
+  recordPickerVisible.value = false
+  uni.navigateTo({ url: '/pages/store/health-record-edit' })
+}
 
 const totalDeposit = computed(() => displayItems.value.reduce((sum, item) => sum + getItemDeposit(item), 0))
 
@@ -193,6 +452,10 @@ onShow(async () => {
   const authed = await ensureAuth()
   if (authed) {
     await loadAddresses(readSelectedAddressId())
+    if (hasServiceItems.value) {
+      await loadHealthRecord()
+    }
+    void loadUsableCoupons()
   }
   void trackPageView('store_confirm', entrySource.value)
 })
@@ -311,7 +574,8 @@ const hasFinalPricing = computed(() => !!finalOrder.value)
 const displayGoodsAmount = computed(() => finalOrder.value?.total_amount ?? goodsAmount.value)
 const displayDeliveryFee = computed(() => finalOrder.value?.delivery_fee ?? deliveryFee.value)
 const displayDepositAmount = computed(() => finalOrder.value?.total_deposit ?? totalDeposit.value)
-const displayTotalAmount = computed(() => displayGoodsAmount.value + displayDepositAmount.value + displayDeliveryFee.value)
+const displayDiscountAmount = computed(() => Number(finalOrder.value?.discount_amount ?? couponDiscount.value) || 0)
+const displayTotalAmount = computed(() => Math.max(0, displayGoodsAmount.value + displayDepositAmount.value + displayDeliveryFee.value - displayDiscountAmount.value))
 const displayPayAmount = computed(() => finalOrder.value?.pay_amount ?? payableAmount.value)
 
 const amountCaption = computed(() => {
@@ -340,7 +604,14 @@ const totalAmount = computed(() => {
   return goodsAmount.value + totalDeposit.value + deliveryFee.value
 })
 
-const payableAmount = computed(() => totalAmount.value)
+const payableAmount = computed(() => Math.max(0, totalAmount.value - couponDiscount.value))
+
+// 商品金额变化时刷新可用券（订单创建前）
+watch(goodsAmount, () => {
+  if (!finalOrder.value) {
+    void loadUsableCoupons()
+  }
+})
 
 watch(
   [
@@ -403,6 +674,27 @@ async function submitOrder() {
     return uni.showToast({ title: '商品列表为空', icon: 'none' })
   }
 
+  // 服务订单硬性规则：必须指定服务对象（健康档案）
+  if (hasServiceItems.value) {
+    if (loadingRecord.value) {
+      return uni.showToast({ title: '健康档案加载中，请稍后', icon: 'none' })
+    }
+    if (!healthRecord.value) {
+      uni.showModal({
+        title: '请先创建健康档案',
+        content: '服务订单需指定服务对象，是否前往创建健康档案？',
+        confirmText: '去建档',
+        confirmColor: '#2B5CE3',
+        success: (res) => {
+          if (res.confirm) {
+            uni.navigateTo({ url: '/pages/store/my-health' })
+          }
+        }
+      })
+      return
+    }
+  }
+
   const orderData: CreateOrderRequest = {
     items: displayItems.value.map(item => ({
       product_id: item.product_id,
@@ -411,6 +703,9 @@ async function submitOrder() {
       rental_duration: Number(item.sale_type) === 2 ? Number(item.rental_duration || 0) : undefined
     })),
     delivery_distance: deliveryDistance.value,
+    user_coupon_id: selectedCoupon.value?.user_coupon_id || undefined,
+    record_id: hasServiceItems.value && healthRecord.value ? healthRecord.value.id : undefined,
+    address_id: selectedAddress.value?.id,
     delivery_address: selectedAddressText.value,
     contact_name: selectedAddress.value?.name || '',
     contact_phone: selectedAddress.value?.phone || '',
@@ -536,6 +831,21 @@ function clearOrderCartAfterSuccess() {
   margin-bottom: 24rpx;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.section-title-row .section-title {
+  margin-bottom: 0;
+}
+.section-meta {
+  font-size: 24rpx;
+  color: #64748b;
+}
+
 .delivery-type-selector {
   display: flex;
   gap: 24rpx;
@@ -654,6 +964,81 @@ function clearOrderCartAfterSuccess() {
   font-size: 28rpx;
   color: #c0c4cc;
   flex-shrink: 0;
+}
+
+.record-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  background: #f8f9fa;
+  border-radius: 16rpx;
+}
+
+.record-card.empty {
+  border: 2rpx dashed #d9e7ff;
+  background: #f7fbff;
+}
+
+.record-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-top {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 10rpx;
+}
+
+.record-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.record-tag {
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: #e6f9f0;
+  color: #0bab5e;
+  font-size: 22rpx;
+}
+
+.record-rel-tag {
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 22rpx;
+}
+
+.record-detail {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #333333;
+  word-break: break-all;
+}
+
+.record-empty {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-empty-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8rpx;
+}
+
+.record-empty-desc {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  line-height: 1.5;
 }
 
 .address-actions {
@@ -1144,6 +1529,178 @@ function clearOrderCartAfterSuccess() {
   color: #ff9500;
 }
 
+.amount-row.coupon .amount-value {
+  color: #ff4d4f;
+}
+
+.amount-row.coupon .coupon-active {
+  color: #ff4d4f;
+  font-weight: 600;
+}
+
+.coupon-arrow {
+  color: #c0c4cc;
+  margin-left: 4rpx;
+}
+
+.coupon-selector-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.coupon-selector-panel {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 24rpx;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.coupon-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.coupon-selector-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.coupon-selector-close {
+  font-size: 44rpx;
+  color: #999999;
+  line-height: 1;
+  padding: 8rpx 12rpx;
+}
+
+.coupon-selector-list {
+  max-height: 58vh;
+}
+
+.coupon-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0;
+}
+
+.coupon-empty-icon {
+  font-size: 72rpx;
+}
+
+.coupon-empty-text {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #999999;
+}
+
+.coupon-option {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  background: #f8f9fb;
+  margin-bottom: 16rpx;
+  border: 2rpx solid transparent;
+}
+
+.coupon-option.selected {
+  background: #e6f0ff;
+  border-color: #007AFF;
+}
+
+.coupon-option.none {
+  justify-content: space-between;
+  padding: 20rpx 24rpx;
+}
+
+.coupon-option-left {
+  width: 160rpx;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 0;
+  border-right: 2rpx dashed #e0e0e0;
+}
+
+.coupon-option-value {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #ff3b30;
+  line-height: 1.2;
+}
+
+.coupon-option-threshold {
+  font-size: 20rpx;
+  color: #ff7a45;
+  margin-top: 4rpx;
+}
+
+.coupon-option-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.coupon-option-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coupon-option-validity {
+  font-size: 22rpx;
+  color: #999999;
+}
+
+.coupon-option-check {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  border: 2rpx solid #d9d9d9;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.coupon-option-check.checked {
+  border: none;
+  background: #007AFF;
+  position: relative;
+}
+
+.coupon-option-check.checked::after {
+  content: '';
+  position: absolute;
+  left: 12rpx;
+  top: 6rpx;
+  width: 8rpx;
+  height: 16rpx;
+  border: solid #ffffff;
+  border-width: 0 4rpx 4rpx 0;
+  transform: rotate(45deg);
+}
+
 .amount-row.deposit .amount-value {
   color: #ff9500;
 }
@@ -1224,5 +1781,100 @@ function clearOrderCartAfterSuccess() {
   font-size: 24rpx;
   border-radius: 12rpx;
   line-height: 1.5;
+}
+
+/* 服务对象多档案选择弹层 */
+.picker-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.picker-panel {
+  width: 100%;
+  max-height: 75vh;
+  background: #fff;
+  border-radius: 24rpx 24rpx 0 0;
+  display: flex;
+  flex-direction: column;
+}
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 2rpx solid #f1f5f9;
+}
+.picker-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.picker-close {
+  font-size: 44rpx;
+  color: #94a3b8;
+  line-height: 1;
+  padding: 0 16rpx;
+}
+.picker-body {
+  flex: 1;
+  min-height: 0;
+  padding: 16rpx 24rpx 40rpx;
+}
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  border: 2rpx solid #e2e8f0;
+  margin-bottom: 16rpx;
+  background: #fff;
+}
+.picker-item.active {
+  border-color: #2b5ce3;
+  background: rgba(43, 92, 227, 0.05);
+}
+.picker-item-main { flex: 1; min-width: 0; }
+.picker-item-top {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 8rpx;
+}
+.picker-item-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.picker-item-rel {
+  font-size: 22rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+.picker-item-sub {
+  font-size: 26rpx;
+  color: #475569;
+  line-height: 1.4;
+}
+.picker-item-check {
+  color: #2b5ce3;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+.picker-create {
+  margin-top: 8rpx;
+  padding: 24rpx;
+  text-align: center;
+  border-radius: 16rpx;
+  border: 2rpx dashed #2b5ce3;
+  color: #2b5ce3;
+  font-size: 28rpx;
+  background: rgba(43, 92, 227, 0.04);
 }
 </style>

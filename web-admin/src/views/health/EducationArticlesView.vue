@@ -1,13 +1,40 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getEducationArticles, createEducationArticle, updateEducationArticle, deleteEducationArticle } from '@/api/sp'
-import type { EducationArticle } from '@/types/sp'
+import { getEducationArticles, createEducationArticle, updateEducationArticle, deleteEducationArticle, getHealthEducationCategories } from '@/api/sp'
+import type { EducationArticle, HealthEducationCategory } from '@/types/sp'
 import { ChronicTagOptions } from '@/types/sp'
 import { formatDateTime } from '@/utils/format'
 
 const loading = ref(false)
 const list = ref<EducationArticle[]>([])
+
+// 宣教分类列表（两级，parent_id=0 为一级）
+const categoryList = ref<HealthEducationCategory[]>([])
+const categoryLoading = ref(false)
+
+// 构造成一级+二级的级联选项
+const categoryOptions = computed(() => {
+  const tops = categoryList.value.filter((c) => c.parent_id === 0 && c.status === 1)
+  return tops.map((top) => ({
+    value: top.id,
+    label: top.name,
+    children: categoryList.value
+      .filter((c) => c.parent_id === top.id && c.status === 1)
+      .map((c) => ({ value: c.id, label: c.name }))
+  }))
+})
+
+async function loadCategories() {
+  categoryLoading.value = true
+  try {
+    categoryList.value = await getHealthEducationCategories()
+  } catch (_e) {
+    // 已由拦截器提示
+  } finally {
+    categoryLoading.value = false
+  }
+}
 
 const pagination = reactive({
   page: 1,
@@ -83,7 +110,7 @@ const saving = ref(false)
 
 const editForm = reactive({
   title: '',
-  category: '',
+  category_id: undefined as number | undefined,
   cover: '',
   content: '',
   tags: [] as string[],
@@ -96,7 +123,7 @@ function openCreate() {
   dialogMode.value = 'create'
   Object.assign(editForm, {
     title: '',
-    category: '',
+    category_id: undefined,
     cover: '',
     content: '',
     tags: [],
@@ -111,7 +138,7 @@ function openEdit(row: EducationArticle) {
   dialogMode.value = 'update'
   Object.assign(editForm, {
     title: row.title || '',
-    category: row.category || '',
+    category_id: row.category_id && row.category_id > 0 ? row.category_id : undefined,
     cover: row.cover || '',
     content: row.content || '',
     tags: row.tags || [],
@@ -126,9 +153,19 @@ async function handleSave() {
     ElMessage.warning('请填写文章标题')
     return
   }
+  // 前端与后端保持一致：正文必填（后端 content binding:required）
+  if (!editForm.content.trim()) {
+    ElMessage.warning('请填写文章正文')
+    return
+  }
+  // 发布（status=1）必须选择分类
+  if (editForm.status === 1 && !editForm.category_id) {
+    ElMessage.warning('发布前必须选择宣教分类')
+    return
+  }
   const payload = {
     title: editForm.title.trim(),
-    category: editForm.category.trim() || undefined,
+    category_id: editForm.category_id || 0,
     cover: editForm.cover.trim() || undefined,
     content: editForm.content,
     tags: editForm.tags,
@@ -165,7 +202,19 @@ async function handleDelete(row: EducationArticle) {
   }
 }
 
-onMounted(loadData)
+// 根据 category_id 或旧 category 字段获取分类展示名
+function displayCategory(row: EducationArticle): string {
+  if (row.category_id && row.category_id > 0) {
+    const cat = categoryList.value.find((c) => c.id === row.category_id)
+    if (cat) return cat.name
+  }
+  return row.category || '未分类'
+}
+
+onMounted(async () => {
+  loadCategories()
+  loadData()
+})
 </script>
 
 <template>
@@ -208,7 +257,7 @@ onMounted(loadData)
       </el-table-column>
       <el-table-column label="分类" width="110">
         <template #default="{ row }">
-          <el-tag size="small" type="primary" effect="plain">{{ row.category || '未分类' }}</el-tag>
+          <el-tag size="small" type="primary" effect="plain">{{ displayCategory(row) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="定向标签" min-width="200">
@@ -264,16 +313,24 @@ onMounted(loadData)
     >
       <el-form label-width="100px">
         <el-form-item label="标题" required>
-          <el-input v-model="editForm.title" placeholder="文章标题" />
+          <el-input v-model="editForm.title" placeholder="文章标题" maxlength="128" show-word-limit />
         </el-form-item>
         <el-form-item label="分类">
-          <el-input v-model="editForm.category" placeholder="如：高血压防治（可空）" />
+          <el-cascader
+            v-model="editForm.category_id"
+            :options="categoryOptions"
+            :props="{ checkStrictly: true, emitPath: false, value: 'value', label: 'label', children: 'children' }"
+            placeholder="请选择宣教分类"
+            style="width: 100%"
+            clearable
+            :loading="categoryLoading"
+          />
         </el-form-item>
         <el-form-item label="封面 URL">
           <el-input v-model="editForm.cover" placeholder="封面图片地址（可空）" />
         </el-form-item>
-        <el-form-item label="正文">
-          <el-input v-model="editForm.content" type="textarea" :rows="6" placeholder="文章正文内容（可空）" />
+        <el-form-item label="正文" required>
+          <el-input v-model="editForm.content" type="textarea" :rows="6" placeholder="文章正文内容（必填）" />
         </el-form-item>
         <el-form-item label="定向慢病标签">
           <el-select

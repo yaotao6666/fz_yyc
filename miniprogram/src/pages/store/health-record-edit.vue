@@ -4,6 +4,26 @@
     <view class="form-card">
       <view class="card-title">基本信息</view>
       <view class="form-item">
+        <view class="form-label">与本人关系</view>
+        <view class="radio-group">
+          <view
+            class="radio-chip"
+            :class="{ active: form.relation === 1 }"
+            @click="form.relation = 1"
+          >本人</view>
+          <view
+            class="radio-chip"
+            :class="{ active: form.relation === 2 }"
+            @click="form.relation = 2"
+          >父母</view>
+          <view
+            class="radio-chip"
+            :class="{ active: form.relation === 3 }"
+            @click="form.relation = 3"
+          >其他亲属</view>
+        </view>
+      </view>
+      <view class="form-item">
         <view class="form-label">姓名</view>
         <input v-model="form.real_name" class="form-input" placeholder="请输入真实姓名" maxlength="30" />
       </view>
@@ -191,11 +211,12 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getUserHealthRecord, saveUserHealthRecord } from '../../api/health'
+import { listUserHealthRecords, createUserHealthRecord, updateUserHealthRecord } from '../../api/health'
 import type { HealthRecord } from '../../types'
 import { useAuth } from '../../utils/useAuth'
 
 interface HealthRecordForm {
+  relation: number
   real_name: string
   gender: number | null
   birth_date: string
@@ -236,6 +257,7 @@ const smokeOptions = ['不吸烟', '偶尔吸烟', '经常吸烟', '已戒烟']
 const drinkOptions = ['不饮酒', '偶尔饮酒', '经常饮酒', '已戒酒']
 
 const form = reactive<HealthRecordForm>({
+  relation: 1,
   real_name: '',
   gender: null,
   birth_date: '',
@@ -299,7 +321,9 @@ function splitStringArray(value: string): string[] {
     .filter(Boolean)
 }
 
-onLoad(async () => {
+let editId: number | null = null
+
+onLoad(async (options: any) => {
   const { ensureAuth } = useAuth()
   const authed = await ensureAuth()
   if (!authed) {
@@ -307,10 +331,21 @@ onLoad(async () => {
     return
   }
 
+  // 关系：新建时可由下单页通过 relation 参数预选（默认本人）
+  const relation = Number(options?.relation)
+  if (relation === 2 || relation === 3) {
+    form.relation = relation
+  }
+
+  const id = Number(options?.id)
+  if (!id) return
+
   try {
-    const record = await getUserHealthRecord()
-    if (record) {
-      fillForm(record)
+    const records = await listUserHealthRecords()
+    const target = records.find(item => item.id === id)
+    if (target) {
+      editId = id
+      fillForm(target)
     }
   } catch (error) {
     console.error('加载健康档案失败:', error)
@@ -318,6 +353,7 @@ onLoad(async () => {
 })
 
 function fillForm(record: HealthRecord) {
+  form.relation = record.relation === 2 || record.relation === 3 ? record.relation : 1
   form.real_name = record.real_name || ''
   form.gender = record.gender || null
   form.birth_date = record.birth_date || ''
@@ -362,6 +398,7 @@ function validateForm(): boolean {
 
 function buildPayload(): Partial<HealthRecord> {
   return {
+    relation: form.relation,
     real_name: form.real_name.trim(),
     gender: form.gender ?? undefined,
     birth_date: form.birth_date || undefined,
@@ -393,7 +430,11 @@ async function handleSubmit() {
   try {
     saving.value = true
     const payload = buildPayload()
-    await saveUserHealthRecord(payload)
+    if (editId) {
+      await updateUserHealthRecord(editId, payload)
+    } else {
+      await createUserHealthRecord(payload)
+    }
     uni.showToast({ title: '保存成功', icon: 'success' })
     setTimeout(() => {
       uni.navigateBack()

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fz_yyc_api/internal/config"
 	"fz_yyc_api/internal/models"
-	"fz_yyc_api/internal/services/followup"
 	"fz_yyc_api/internal/services/orderquery"
 	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/internal/utils"
@@ -137,13 +136,6 @@ func ReturnRentalOrder(c *gin.Context) {
 		refundID := strings.TrimSpace(refundResp.RefundID)
 		_ = orderquery.SyncRefundAndOrderStatus(database.DB, &order, &depositRefundRecord, refundResp.Status, refundID, refundResp.SuccessTime)
 	}
-
-	// 租赁归还自动生成租后回访随访任务（失败仅记录，不影响归还原有逻辑）
-	assignedStaffID := uint64(0)
-	if order.AssignedStaffID != nil {
-		assignedStaffID = *order.AssignedStaffID
-	}
-	_ = followup.CreateFollowUpTask(order.UserID, utils.FollowUpTypeReturnVisit, utils.FollowUpSourceRentalReturn, order.ID, assignedStaffID)
 
 	// 重新加载订单
 	database.DB.Preload("Items").First(&order, id)

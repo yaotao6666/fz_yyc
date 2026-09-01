@@ -7,6 +7,7 @@ import (
 
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/services/wechatpay"
+	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
 
@@ -17,6 +18,7 @@ type ListOptions struct {
 	Status          *int
 	OrderType       *int
 	BizStatus       *int
+	Category        *uint8 // 订单分类: 1=实物订单 2=服务订单
 	AssignedStaffID *uint64
 	StartDate       string
 	EndDate         string
@@ -83,6 +85,8 @@ func GetOrderDetail(orderID uint64, options DetailOptions) (*models.Order, error
 		return nil, err
 	}
 
+	FillOrderRecordInfo(&order)
+
 	client, err := wechatpay.NewServiceProviderClient()
 	if err == nil {
 		refreshSingleOrderRefundStatus(context.Background(), client, &order, options)
@@ -97,6 +101,37 @@ func BuildAccessibleOrder(order models.Order) models.Order {
 		order.Items[index].Image = BuildAccessibleOrderItemImage(order.Items[index].Image)
 	}
 	return order
+}
+
+// FillOrderRecordInfo 为服务订单批量填充服务对象（健康档案）展示字段
+func FillOrderRecordInfo(orders ...*models.Order) {
+	recordIDs := make([]uint64, 0)
+	for _, order := range orders {
+		if order != nil && order.RecordID != nil && *order.RecordID > 0 {
+			recordIDs = append(recordIDs, *order.RecordID)
+		}
+	}
+	if len(recordIDs) == 0 {
+		return
+	}
+	var records []models.HealthRecord
+	if err := database.DB.Find(&records, recordIDs).Error; err != nil {
+		return
+	}
+	recordMap := make(map[uint64]models.HealthRecord, len(records))
+	for _, record := range records {
+		recordMap[record.ID] = record
+	}
+	for _, order := range orders {
+		if order == nil || order.RecordID == nil {
+			continue
+		}
+		if record, ok := recordMap[*order.RecordID]; ok {
+			order.RecordName = record.RealName
+			order.RecordGender = record.Gender
+			order.RecordBirthDate = record.BirthDate
+		}
+	}
 }
 
 func BuildAccessibleOrderItemImage(image string) string {
@@ -169,6 +204,15 @@ func applyOrderScopes(query *gorm.DB, options ListOptions) *gorm.DB {
 	}
 	if options.OrderType != nil {
 		scopedQuery = scopedQuery.Where("orders.order_type = ?", *options.OrderType)
+	}
+	// 订单分类过滤：实物 order_type 1-2，服务 order_type 3-6
+	if options.Category != nil {
+		switch *options.Category {
+		case utils.OrderCategoryGoods:
+			scopedQuery = scopedQuery.Where("orders.order_type >= ? AND orders.order_type <= ?", utils.OrderTypeGoodsMin, utils.OrderTypeGoodsMax)
+		case utils.OrderCategoryService:
+			scopedQuery = scopedQuery.Where("orders.order_type >= ? AND orders.order_type <= ?", utils.OrderTypeServiceMin, utils.OrderTypeServiceMax)
+		}
 	}
 	if options.BizStatus != nil {
 		scopedQuery = scopedQuery.Where("orders.biz_status = ?", *options.BizStatus)

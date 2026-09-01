@@ -8,7 +8,6 @@ import (
 	serviceStaffHandler "fz_yyc_api/internal/handlers/service_staff"
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
-	"fz_yyc_api/internal/services/followup"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
@@ -19,6 +18,7 @@ import (
 // CreateAssessmentRequest 用户/服务人员提交评估的请求
 type CreateAssessmentRequest struct {
 	FormID      uint64            `json:"form_id" binding:"required"`
+	RecordID    *uint64           `json:"record_id"`
 	Answers     map[string]string `json:"answers"`
 	SymptomDesc string            `json:"symptom_desc"`
 }
@@ -90,23 +90,26 @@ func computeAssessmentScore(form *models.HealthAssessmentForm, answers map[strin
 }
 
 // saveAssessmentAndSyncLevel 保存评估记录并回写健康档案的评估等级。
-// 回写仅在档案已存在时生效，未建档用户不做强约束；
-// 评估保存成功后自动生成评估回访随访任务（失败仅记录，不影响评估主流程）。
+// 回写优先落在 record_id 指定的档案；若未指定则回写用户最近档案。
 func saveAssessmentAndSyncLevel(c *gin.Context, assessment *models.HealthAssessment) {
 	if err := database.DB.Create(assessment).Error; err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "保存评估记录失败")
 		return
 	}
-	database.DB.Model(&models.HealthRecord{}).
-		Where("user_id = ?", assessment.UserID).
-		Update("assessment_level", assessment.Level)
-
-	// 评估完成自动生成评估回访随访任务（服务人员登记传当前 staff.ID，用户自助传 0）
-	staffID := uint64(0)
-	if assessment.StaffID != nil {
-		staffID = *assessment.StaffID
+	// 回写评估等级：优先按 record_id；否则按 user_id 最近一条档案
+	if assessment.RecordID != nil && *assessment.RecordID > 0 {
+		database.DB.Model(&models.HealthRecord{}).
+			Where("id = ?", *assessment.RecordID).
+			Update("assessment_level", assessment.Level)
+	} else {
+		var lastRecord models.HealthRecord
+		if database.DB.Where("user_id = ?", assessment.UserID).
+			Order("updated_at DESC").First(&lastRecord).Error == nil {
+			database.DB.Model(&models.HealthRecord{}).
+				Where("id = ?", lastRecord.ID).
+				Update("assessment_level", assessment.Level)
+		}
 	}
-	_ = followup.CreateFollowUpTask(assessment.UserID, utils.FollowUpTypeAssessment, utils.FollowUpSourceAssessment, assessment.ID, staffID)
 
 	response.Success(c, assessment)
 }
@@ -128,7 +131,7 @@ func UserGetAssessmentForms(c *gin.Context) {
 	response.Success(c, forms)
 }
 
-// UserListAssessments C端用户查看自己的评估记录（分页倒序）
+// UserListAssessments C端用户查看自己的评估记录（分页倒序，支持按 record_id 过滤）
 func UserListAssessments(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -140,13 +143,19 @@ func UserListAssessments(c *gin.Context) {
 		pageSize = 10
 	}
 
+	recordIDStr := c.Query("record_id")
+	baseQuery := database.DB.Model(&models.HealthAssessment{}).Where("user_id = ?", userID)
+	if recordIDStr != "" {
+		if rid, err := strconv.ParseUint(recordIDStr, 10, 64); err == nil && rid > 0 {
+			baseQuery = baseQuery.Where("record_id = ?", rid)
+		}
+	}
+
 	var total int64
-	database.DB.Model(&models.HealthAssessment{}).
-		Where("user_id = ?", userID).Count(&total)
+	baseQuery.Count(&total)
 
 	var list []models.HealthAssessment
-	database.DB.Preload("Form").
-		Where("user_id = ?", userID).
+	baseQuery.Preload("Form").
 		Order("created_at DESC").
 		Offset((page - 1) * pageSize).
 		Limit(pageSize).
@@ -172,11 +181,24 @@ func UserCreateAssessment(c *gin.Context) {
 		return
 	}
 
+	userID := middleware.GetUserID(c)
+	// 若传了 record_id：校验档案归属本人
+	var recordID *uint64
+	if req.RecordID != nil && *req.RecordID > 0 {
+		var rec models.HealthRecord
+		if err := database.DB.Where("id = ? AND user_id = ?", *req.RecordID, userID).First(&rec).Error; err != nil {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "档案不存在或无权使用")
+			return
+		}
+		recordID = req.RecordID
+	}
+
 	answersRaw, _ := json.Marshal(req.Answers)
 	totalScore, level, conclusion := computeAssessmentScore(&form, req.Answers)
 
 	assessment := models.HealthAssessment{
-		UserID:       middleware.GetUserID(c),
+		UserID:       userID,
+		RecordID:     recordID,
 		FormID:       form.ID,
 		FormName:     form.Name,
 		AssessorType: utils.AssessmentTypeSelf,
@@ -271,11 +293,23 @@ func StaffCreateAssessment(c *gin.Context) {
 		return
 	}
 
+	// 若传了 record_id：校验档案属于该客户
+	var recordID *uint64
+	if req.RecordID != nil && *req.RecordID > 0 {
+		var rec models.HealthRecord
+		if err := database.DB.Where("id = ? AND user_id = ?", *req.RecordID, userID).First(&rec).Error; err != nil {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "档案不属于该客户")
+			return
+		}
+		recordID = req.RecordID
+	}
+
 	answersRaw, _ := json.Marshal(req.Answers)
 	totalScore, level, conclusion := computeAssessmentScore(&form, req.Answers)
 
 	assessment := models.HealthAssessment{
 		UserID:       userID,
+		RecordID:     recordID,
 		FormID:       form.ID,
 		FormName:     form.Name,
 		AssessorType: utils.AssessmentTypeStaff,

@@ -65,9 +65,24 @@
       }
     },
     {
+      "path": "pages/store/my-coupons",
+      "style": {
+        "navigationBarTitleText": "我的优惠券",
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/store/order-detail",
       "style": {
         "navigationBarTitleText": "订单详情",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/store/review-submit",
+      "style": {
+        "navigationBarTitleText": "服务评价",
         "navigationBarBackgroundColor": "#FFFFFF"
       }
     },
@@ -102,29 +117,6 @@
       }
     },
     {
-      "path": "pages/store/my-care-plans",
-      "style": {
-        "navigationBarTitleText": "我的照护计划",
-        "navigationBarBackgroundColor": "#FFFFFF",
-        "enablePullDownRefresh": true
-      }
-    },
-    {
-      "path": "pages/store/care-plan-detail",
-      "style": {
-        "navigationBarTitleText": "照护计划详情",
-        "navigationBarBackgroundColor": "#FFFFFF"
-      }
-    },
-    {
-      "path": "pages/store/my-follow-ups",
-      "style": {
-        "navigationBarTitleText": "我的康复随访",
-        "navigationBarBackgroundColor": "#FFFFFF",
-        "enablePullDownRefresh": true
-      }
-    },
-    {
       "path": "pages/store/health-education",
       "style": {
         "navigationBarTitleText": "健康宣教",
@@ -139,16 +131,23 @@
       }
     },
     {
-      "path": "pages/store/my-monitoring",
+      "path": "pages/store/category",
       "style": {
-        "navigationBarTitleText": "生命体征记录",
+        "navigationBarTitleText": "全部分类",
         "navigationBarBackgroundColor": "#FFFFFF"
       }
     },
     {
-      "path": "pages/store/category",
+      "path": "pages/store/service-selection",
       "style": {
-        "navigationBarTitleText": "全部分类",
+        "navigationBarTitleText": "服务挑选",
+        "navigationBarBackgroundColor": "#FFFFFF"
+      }
+    },
+    {
+      "path": "pages/store/product-list",
+      "style": {
+        "navigationBarTitleText": "商品列表",
         "navigationBarBackgroundColor": "#FFFFFF"
       }
     },

@@ -12,10 +12,10 @@ const emit = defineEmits<{
 
 // 本地 form 数据
 const form = reactive<WellnessPackageContent>({
-  duration: '',
-  items: [],
-  notes: '',
-  applicable_groups: ''
+  cycle: '',
+  services: [],
+  remark: '',
+  target_audience: ''
 })
 
 // 生成临时 ID
@@ -26,19 +26,19 @@ function genTempId(): string {
 // 初始化：从 props.modelValue 反序列化
 function hydrate(value: WellnessPackageContent | Record<string, unknown> | null | undefined) {
   if (!value || typeof value !== 'object') {
-    form.duration = ''
-    form.items = []
-    form.notes = ''
-    form.applicable_groups = ''
+    form.cycle = ''
+    form.services = []
+    form.remark = ''
+    form.target_audience = ''
     return
   }
   const raw = value as WellnessPackageContent
-  form.duration = raw.duration || ''
-  form.notes = raw.notes || ''
-  form.applicable_groups = raw.applicable_groups || ''
-  // 规范化 items
-  const items: WellnessPackageItem[] = Array.isArray(raw.items)
-    ? raw.items.map((item) => ({
+  form.cycle = raw.cycle || ''
+  form.remark = raw.remark || ''
+  form.target_audience = raw.target_audience || ''
+  // 规范化 services
+  const services: WellnessPackageItem[] = Array.isArray(raw.services)
+    ? raw.services.map((item) => ({
         id: item.id || genTempId(),
         name: item.name || '',
         description: item.description || '',
@@ -46,14 +46,22 @@ function hydrate(value: WellnessPackageContent | Record<string, unknown> | null 
         unit: item.unit || '次'
       }))
     : []
-  form.items = items
+  form.services = services
 }
 
 hydrate(props.modelValue)
 
+// 自更新守卫：自身 emit 引发的 modelValue 回写不再反向 hydrate，
+// 否则会与下方 form 变化监听形成“回写→重建→再回写”死循环，导致输入被还原。
+let selfUpdating = false
+
 watch(
   () => props.modelValue,
   (next) => {
+    if (selfUpdating) {
+      selfUpdating = false
+      return
+    }
     hydrate(next)
   },
   { deep: true }
@@ -62,22 +70,23 @@ watch(
 // 变化时向上 emit
 function emitChange() {
   const payload: WellnessPackageContent = {
-    duration: form.duration || undefined,
-    items: (form.items || []).map((item) => ({
+    cycle: form.cycle || undefined,
+    services: (form.services || []).map((item) => ({
       id: item.id,
       name: item.name,
       description: item.description || undefined,
       count: Number(item.count || 0),
       unit: item.unit || '次'
     })),
-    notes: form.notes || undefined,
-    applicable_groups: form.applicable_groups || undefined
+    remark: form.remark || undefined,
+    target_audience: form.target_audience || undefined
   }
+  selfUpdating = true
   emit('update:modelValue', payload)
 }
 
 watch(
-  () => [form.duration, form.items, form.notes, form.applicable_groups],
+  () => [form.cycle, form.services, form.remark, form.target_audience],
   () => {
     emitChange()
   },
@@ -85,7 +94,7 @@ watch(
 )
 
 function addItem() {
-  form.items?.push({
+  form.services?.push({
     id: genTempId(),
     name: '',
     description: '',
@@ -95,7 +104,7 @@ function addItem() {
 }
 
 function removeItem(index: number) {
-  form.items?.splice(index, 1)
+  form.services?.splice(index, 1)
 }
 </script>
 
@@ -104,7 +113,7 @@ function removeItem(index: number) {
     <div class="editor-grid">
       <el-form-item label="套餐周期">
         <el-input
-          v-model="form.duration"
+          v-model="form.cycle"
           maxlength="64"
           placeholder="如：一个月、三个月、半年"
           clearable
@@ -112,7 +121,7 @@ function removeItem(index: number) {
       </el-form-item>
       <el-form-item label="适用人群">
         <el-input
-          v-model="form.applicable_groups"
+          v-model="form.target_audience"
           maxlength="128"
           placeholder="如：高血压人群、术后康复者"
           clearable
@@ -122,11 +131,11 @@ function removeItem(index: number) {
 
     <el-form-item label="服务项列表">
       <div class="items-editor">
-        <div v-if="!form.items || form.items.length === 0" class="empty-items">
+        <div v-if="!form.services || form.services.length === 0" class="empty-items">
           未配置服务项，请点击下方按钮添加。
         </div>
         <div
-          v-for="(item, index) in form.items"
+          v-for="(item, index) in form.services"
           :key="item.id ?? index"
           class="item-card"
         >
@@ -170,7 +179,7 @@ function removeItem(index: number) {
 
     <el-form-item label="套餐备注">
       <el-input
-        v-model="form.notes"
+        v-model="form.remark"
         type="textarea"
         :rows="3"
         maxlength="500"

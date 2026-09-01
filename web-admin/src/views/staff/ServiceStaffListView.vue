@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { createServiceStaff, deleteServiceStaff, getServiceStaffList, resetServiceStaffPassword, updateServiceStaffStatus } from '@/api/sp'
+import { updateServiceStaffRegion } from '@/api/safety'
 import type { ServiceStaffItem } from '@/types/sp'
 
 const loading = ref(false)
@@ -111,6 +112,30 @@ async function handleCreate() {
   }
 }
 
+/* ----- 服务区域维护 ----- */
+const regionDialogVisible = ref(false)
+const regionSaving = ref(false)
+const regionForm = ref<{ staffId: number; staffName: string; serviceRegion: string }>({ staffId: 0, staffName: '', serviceRegion: '' })
+
+function openRegionEdit(row: ServiceStaffItem) {
+  regionForm.value = { staffId: row.id, staffName: row.name || row.username, serviceRegion: row.service_region || '' }
+  regionDialogVisible.value = true
+}
+
+async function handleRegionSave() {
+  regionSaving.value = true
+  try {
+    await updateServiceStaffRegion(regionForm.value.staffId, regionForm.value.serviceRegion.trim())
+    ElMessage.success('服务区域已更新')
+    regionDialogVisible.value = false
+    loadData()
+  } catch (e) {
+    // 错误已由拦截器提示
+  } finally {
+    regionSaving.value = false
+  }
+}
+
 onMounted(loadData)
 </script>
 
@@ -146,6 +171,30 @@ onMounted(loadData)
       </template>
     </el-dialog>
 
+    <!-- 服务区域维护弹窗 -->
+    <el-dialog v-model="regionDialogVisible" title="维护服务区域" width="500px">
+      <el-alert
+        :title="`服务人员：${regionForm.staffName}`"
+        type="info"
+        :closable="false"
+        style="margin-bottom: 16px"
+      />
+      <el-form label-width="90px">
+        <el-form-item label="服务区域">
+          <el-input
+            v-model="regionForm.serviceRegion"
+            placeholder="区县名称，逗号分隔，如：鼓楼区,台江区；留空表示不限"
+            maxlength="256"
+          />
+        </el-form-item>
+      </el-form>
+      <div class="region-tip">服务人员接单池将仅展示服务地址所在区县匹配的订单；留空表示可接全部区域订单。</div>
+      <template #footer>
+        <el-button @click="regionDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="regionSaving" @click="handleRegionSave">保存</el-button>
+      </template>
+    </el-dialog>
+
     <el-table v-loading="loading" :data="list" stripe>
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="姓名" width="120" />
@@ -156,12 +205,19 @@ onMounted(loadData)
           <el-tag :type="statusType(row.status)">{{ statusText(row.status) }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="服务区域" min-width="150">
+        <template #default="{ row }">
+          <span v-if="row.service_region">{{ row.service_region }}</span>
+          <el-tag v-else type="info" size="small">不限</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="last_login_at" label="最后登录" width="180" />
       <el-table-column prop="created_at" label="注册时间" width="180" />
-      <el-table-column label="操作" width="280" fixed="right">
+      <el-table-column label="操作" width="340" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status !== 1" size="small" type="primary" @click="handleStatusChange(row, 1)">{{ row.status === 0 ? '审核通过' : '启用' }}</el-button>
           <el-button v-if="row.status === 1" size="small" type="warning" @click="handleStatusChange(row, 2)">禁用</el-button>
+          <el-button size="small" @click="openRegionEdit(row)">服务区域</el-button>
           <el-button size="small" @click="handleResetPassword(row)">重置密码</el-button>
           <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
         </template>
@@ -184,4 +240,5 @@ onMounted(loadData)
 .page-card { background: #fff; border-radius: 16px; padding: 24px; }
 .filter-bar { display: flex; gap: 12px; margin-bottom: 20px; }
 .pagination { margin-top: 20px; justify-content: flex-end; }
+.region-tip { margin: 0 0 8px; font-size: 12px; color: #909399; }
 </style>

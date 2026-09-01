@@ -130,6 +130,9 @@ type Mode = 'assess' | 'records'
 
 const mode = ref<Mode>('assess')
 
+// 当前成员档案 ID（可选，用于按档案隔离评估记录）
+const recordId = ref<number | undefined>(undefined)
+
 // 量表列表
 const forms = ref<AssessmentForm[]>([])
 const formsLoading = ref(false)
@@ -152,6 +155,7 @@ const pageSize = 10
 
 onLoad(async (options: any) => {
   mode.value = options?.mode === 'records' ? 'records' : 'assess'
+  recordId.value = Number(options?.record_id) || undefined
 
   const { ensureAuth } = useAuth()
   const authed = await ensureAuth()
@@ -225,6 +229,7 @@ async function handleSubmit() {
         submitting.value = true
         const assessment = await createUserAssessment({
           form_id: currentForm.value.id,
+          record_id: recordId.value,
           answers: { ...answers },
           symptom_desc: symptomDesc.value.trim() || undefined
         })
@@ -251,7 +256,7 @@ async function loadRecords(reset = false) {
 
   recordsLoading.value = true
   try {
-    const res = await getUserAssessments({ page: recordsPage.value, page_size: pageSize })
+    const res = await getUserAssessments({ page: recordsPage.value, page_size: pageSize, record_id: recordId.value })
     const list = res?.list || []
     if (reset) {
       records.value = list

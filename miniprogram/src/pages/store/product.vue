@@ -27,7 +27,6 @@
         <text v-if="product.product_type === 2 || product.sale_type === 2" class="rental-badge">租赁</text>
         <text v-else-if="product.product_type === 3" class="wellness-badge">套餐</text>
         <text v-else-if="product.product_type === 4" class="escort-badge">陪诊</text>
-        <text v-else-if="product.product_type === 5" class="info-badge">资讯</text>
       </view>
       <view class="product-meta">
         <text>库存: {{ selectedStock }}</text>
@@ -86,17 +85,6 @@
         </view>
         <view class="service-info-row" v-if="product.service_content?.includes">
           服务包含：{{ product.service_content.includes }}
-        </view>
-      </view>
-    </view>
-
-    <!-- 科普资讯 -->
-    <view class="info-section" v-if="product.product_type === 5">
-      <view class="section-title">📚 内容介绍</view>
-      <view class="info-content-box">
-        <view class="info-type-tag">科普资讯</view>
-        <view class="info-text" v-if="product.service_content?.content">
-          {{ product.service_content.content }}
         </view>
       </view>
     </view>
@@ -635,37 +623,7 @@ function goCart() {
   margin-bottom: 10rpx;
   line-height: 1.6;
 }
-.service-info-row:last-child { margin-bottom: 0; }
-
-/* 科普资讯 */
-.info-section {
-  background: #ffffff;
-  padding: 32rpx;
-  margin-bottom: 20rpx;
-}
-
-.info-content-box {
-  background: #f8fafc;
-  border-radius: 12rpx;
-  padding: 20rpx 24rpx;
-  border-left: 6rpx solid #64748b;
-}
-
-.info-type-tag {
-  display: inline-block;
-  font-size: 22rpx;
-  color: #ffffff;
-  background: #64748b;
-  padding: 4rpx 12rpx;
-  border-radius: 6rpx;
-  margin-bottom: 14rpx;
-}
-
-.info-text {
-  font-size: 26rpx;
-  color: #334155;
-  line-height: 1.8;
-}
+.service-info-row { margin-bottom: 0; }
 
 .rental-section {
   background: #ffffff;

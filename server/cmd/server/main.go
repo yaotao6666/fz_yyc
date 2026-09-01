@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"fz_yyc_api/internal/config"
+	"fz_yyc_api/internal/handlers/agreement"
 	"fz_yyc_api/internal/handlers/callbacks"
 	"fz_yyc_api/internal/handlers/health"
 	"fz_yyc_api/internal/handlers/merchant"
@@ -14,6 +15,7 @@ import (
 	"fz_yyc_api/internal/handlers/user"
 	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/internal/middleware"
+	"fz_yyc_api/internal/tasks"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/qiniu"
 
@@ -53,6 +55,12 @@ func main() {
 
 	// 路由设置
 	setupRoutes(r)
+
+	// 启动优惠券定时任务（过期刷新 + 30天唤回发券）
+	go tasks.StartCouponTasks()
+
+	// 启动服务安全定时任务（超时预警 + 录音30天清理）
+	go tasks.StartServiceSafetyTasks()
 
 	// 启动服务器
 	addr := config.Config.App.GetAddr()
@@ -121,13 +129,21 @@ func setupRoutes(r *gin.Engine) {
 			storeGroup.GET("/delivery-rules", user.GetStoreDeliveryRules)
 			storeGroup.GET("/products", user.GetProducts)
 			storeGroup.GET("/products/:product_id", user.GetProductDetail)
+			storeGroup.GET("/coupons/available", user.GetAvailableCoupons)
 			storeGroup.POST("/visit", user.RecordUserVisit)
 			storeGroup.POST("/event", user.RecordBehaviorEvent)
+			// 健康宣教独立板块（阶段五 8.3）：公开按分类浏览
+			storeGroup.GET("/education/categories", health.StoreListEducationCategories)
+			storeGroup.GET("/education/articles", health.StoreListEducationArticles)
+			storeGroup.GET("/education/articles/:id", health.UserGetEducationArticle)
 
 			storeAuthedGroup := storeGroup.Group("")
 			storeAuthedGroup.Use(middleware.JWTAuth(), middleware.UserAuth())
 			{
 				storeAuthedGroup.POST("/orders", user.CreateOrder)
+				storeAuthedGroup.POST("/coupons/:template_id/receive", user.ReceiveCoupon)
+				storeAuthedGroup.GET("/coupons/usable", user.GetOrderUsableCoupons)
+				storeAuthedGroup.GET("/my-coupons", user.GetMyCoupons)
 			}
 		}
 
@@ -140,13 +156,20 @@ func setupRoutes(r *gin.Engine) {
 			userGroup.POST("/orders/:order_id/cancel", user.CancelOrder)
 			userGroup.POST("/orders/:order_id/refund", user.ApplyRefund)
 			userGroup.POST("/orders/:order_id/renew", user.RenewOrder)
+			// 服务评价（PRD V2.0 阶段四）
+			userGroup.GET("/orders/:order_id/review", user.GetReview)
+			userGroup.POST("/orders/:order_id/review", user.SubmitReview)
 			userGroup.GET("/addresses", user.GetAddresses)
 			userGroup.POST("/addresses", user.CreateAddress)
 			userGroup.PUT("/addresses/:id", user.UpdateAddress)
 			userGroup.DELETE("/addresses/:id", user.DeleteAddress)
-			// 健康服务：居民健康档案 + 健康评估
+			// 健康服务：居民健康档案 + 健康评估（阶段五 8.2 多档案：列表/新增/按ID更新/删除）
 			userGroup.GET("/health-record", health.UserGetHealthRecord)
 			userGroup.PUT("/health-record", health.UserUpsertHealthRecord)
+			userGroup.GET("/health-records", health.UserListHealthRecords)
+			userGroup.POST("/health-records", health.UserCreateHealthRecord)
+			userGroup.PUT("/health-records/:id", health.UserUpdateHealthRecord)
+			userGroup.DELETE("/health-records/:id", health.UserDeleteHealthRecord)
 			userGroup.GET("/assessment-forms", health.UserGetAssessmentForms)
 			userGroup.GET("/assessments", health.UserListAssessments)
 			userGroup.POST("/assessments", health.UserCreateAssessment)
@@ -154,15 +177,12 @@ func setupRoutes(r *gin.Engine) {
 			userGroup.GET("/fitting-recommendations", health.UserListFittingRecommendations)
 			userGroup.GET("/fitting-recommendations/:id", health.UserGetFittingRecommendation)
 			userGroup.POST("/fitting-recommendations/:id/confirm", health.UserConfirmFittingRecommendation)
-			// 居家康养照护计划
-			userGroup.GET("/care-plans", health.UserListCarePlans)
-			userGroup.GET("/care-plans/:id", health.UserGetCarePlan)
-			// 持续健康服务：随访任务 + 健康宣教 + 生命体征监测
-			userGroup.GET("/follow-ups", health.UserListFollowUpTasks)
+			// 健康宣教
 			userGroup.GET("/health-education", health.UserListEducationArticles)
 			userGroup.GET("/health-education/:id", health.UserGetEducationArticle)
-			userGroup.GET("/monitoring", health.UserListMonitoring)
-			userGroup.POST("/monitoring", health.UserCreateMonitoring)
+			// 协议（用户协议/隐私政策/录音定位授权，服务开始前确认）
+			userGroup.GET("/agreements", agreement.GetActiveAgreement)
+			userGroup.POST("/agreements/:id/consent", agreement.ConsentAgreement)
 		}
 
 		// 商家管理员接口（含 RBAC 权限控制）
@@ -199,6 +219,7 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.PUT("/service-staff/:id/status", middleware.RBAC("staff:update"), merchant.UpdateServiceStaffStatus)
 				merchantOnlyGroup.POST("/service-staff/:id/reset-password", middleware.RBAC("staff:reset-password"), merchant.ResetServiceStaffPassword)
 				merchantOnlyGroup.DELETE("/service-staff/:id", middleware.RBAC("staff:delete"), merchant.DeleteServiceStaff)
+				merchantOnlyGroup.PUT("/service-staff/:id/service-region", middleware.RBAC("staff:update"), merchant.UpdateServiceStaffRegion)
 
 				// 服务人员审核中心（独立权限）
 				merchantOnlyGroup.GET("/staff-audits", middleware.RBAC("staffaudit:view"), merchant.ListStaffAudits)
@@ -222,6 +243,23 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.POST("/orders/:order_id/dispatch", middleware.RBAC("order:dispatch"), merchant.DispatchOrder)
 				merchantOnlyGroup.POST("/orders/:order_id/renew", middleware.RBAC("order:renew"), merchant.RenewOrder)
 				merchantOnlyGroup.GET("/orders/statistics", middleware.RBAC("orders:view"), merchant.GetOrderStatistics)
+				merchantOnlyGroup.GET("/orders/:order_id/service-record", middleware.RBAC("orders:view"), merchant.GetOrderServiceRecord)
+
+				// 预警中心（阶段三：服务过程安全）
+				merchantOnlyGroup.GET("/alert-events", middleware.RBAC("alert-events:view"), merchant.GetAlertEvents)
+				merchantOnlyGroup.GET("/alert-events/:id", middleware.RBAC("alert-events:view"), merchant.GetAlertEventDetail)
+				merchantOnlyGroup.POST("/alert-events/:id/handle", middleware.RBAC("alert-events:update"), merchant.HandleAlertEvent)
+
+				// 协议管理（阶段三：服务过程安全）
+				merchantOnlyGroup.GET("/agreements", middleware.RBAC("agreements:view"), merchant.GetAgreements)
+				merchantOnlyGroup.GET("/agreements/:id", middleware.RBAC("agreements:view"), merchant.GetAgreementDetail)
+				merchantOnlyGroup.POST("/agreements", middleware.RBAC("agreements:create"), merchant.CreateAgreement)
+				merchantOnlyGroup.PUT("/agreements/:id", middleware.RBAC("agreements:update"), merchant.UpdateAgreement)
+				merchantOnlyGroup.POST("/agreements/:id/publish", middleware.RBAC("agreements:update"), merchant.PublishAgreement)
+
+				// 服务评价（阶段四：评价与服务质量分）
+				merchantOnlyGroup.GET("/service-reviews", middleware.RBAC("service-reviews:view"), merchant.GetServiceReviews)
+				merchantOnlyGroup.POST("/service-reviews/:id/hide", middleware.RBAC("service-reviews:update"), merchant.HideServiceReview)
 
 				// 数据分析
 				merchantOnlyGroup.GET("/analytics/overview", middleware.RBAC("analytics:view"), merchant.GetAnalyticsOverview)
@@ -252,6 +290,16 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.GET("/products/:product_id/specs", middleware.RBAC("products:specs"), merchant.GetProductSpecs)
 				merchantOnlyGroup.PUT("/products/:product_id/specs", middleware.RBAC("products:specs"), merchant.UpdateProductSpecs)
 				merchantOnlyGroup.DELETE("/products/:product_id/specs", middleware.RBAC("products:specs"), merchant.DeleteProductSpecs)
+
+			// 优惠券管理（PRD V2.0 阶段二）
+				merchantOnlyGroup.GET("/coupon-templates", middleware.RBAC("coupon-templates:view"), merchant.GetCouponTemplates)
+				merchantOnlyGroup.GET("/coupon-templates/:id", middleware.RBAC("coupon-templates:view"), merchant.GetCouponTemplate)
+				merchantOnlyGroup.POST("/coupon-templates", middleware.RBAC("coupon-templates:create"), merchant.CreateCouponTemplate)
+				merchantOnlyGroup.PUT("/coupon-templates/:id", middleware.RBAC("coupon-templates:update"), merchant.UpdateCouponTemplate)
+				merchantOnlyGroup.POST("/coupon-templates/:id/status", middleware.RBAC("coupon-templates:update"), merchant.UpdateCouponTemplateStatus)
+				merchantOnlyGroup.DELETE("/coupon-templates/:id", middleware.RBAC("coupon-templates:delete"), merchant.DeleteCouponTemplate)
+				merchantOnlyGroup.POST("/coupon-templates/:id/grant", middleware.RBAC("coupon-templates:create"), merchant.GrantCoupon)
+				merchantOnlyGroup.GET("/user-coupons", middleware.RBAC("user-coupons:view"), merchant.GetUserCoupons)
 
 				// 小程序轮播图配置
 				merchantOnlyGroup.GET("/miniprogram-banners", middleware.RBAC("banners:view"), merchant.GetBanners)
@@ -294,23 +342,15 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.GET("/fitting-recommendations/:id", middleware.RBAC("fitting:view"), health.MerchantGetFittingRecommendation)
 				merchantOnlyGroup.PUT("/fitting-recommendations/:id", middleware.RBAC("fitting:update"), health.MerchantUpdateFittingRecommendation)
 				merchantOnlyGroup.DELETE("/fitting-recommendations/:id", middleware.RBAC("fitting:update"), health.MerchantDeleteFittingRecommendation)
-				// 居家康养照护计划与上门照护记录
-				merchantOnlyGroup.GET("/care-plans", middleware.RBAC("care:view"), health.MerchantListCarePlans)
-				merchantOnlyGroup.GET("/care-plans/:id", middleware.RBAC("care:view"), health.MerchantGetCarePlan)
-				merchantOnlyGroup.POST("/care-plans", middleware.RBAC("care:create"), health.MerchantCreateCarePlan)
-				merchantOnlyGroup.PUT("/care-plans/:id", middleware.RBAC("care:update"), health.MerchantUpdateCarePlan)
-				merchantOnlyGroup.DELETE("/care-plans/:id", middleware.RBAC("care:delete"), health.MerchantDeleteCarePlan)
-				merchantOnlyGroup.GET("/care-visits", middleware.RBAC("care:view"), health.MerchantListCareVisits)
-				// 持续健康服务：随访任务 + 生命体征监测 + 健康宣教
-				merchantOnlyGroup.GET("/follow-up-tasks", middleware.RBAC("followup:view"), health.MerchantListFollowUpTasks)
-				merchantOnlyGroup.GET("/follow-up-tasks/:id", middleware.RBAC("followup:view"), health.MerchantGetFollowUpTask)
-				merchantOnlyGroup.POST("/follow-up-tasks", middleware.RBAC("followup:update"), health.MerchantCreateFollowUpTask)
-				merchantOnlyGroup.POST("/follow-up-tasks/:id/complete", middleware.RBAC("followup:update"), health.MerchantCompleteFollowUpTask)
-				merchantOnlyGroup.GET("/monitoring", middleware.RBAC("monitor:view"), health.MerchantListMonitoring)
+				// 健康宣教（独立板块：内容 + 两级分类）
 				merchantOnlyGroup.GET("/health-education", middleware.RBAC("education:view"), health.MerchantListEducationArticles)
 				merchantOnlyGroup.POST("/health-education", middleware.RBAC("education:create"), health.MerchantCreateEducationArticle)
 				merchantOnlyGroup.PUT("/health-education/:id", middleware.RBAC("education:create"), health.MerchantUpdateEducationArticle)
 				merchantOnlyGroup.DELETE("/health-education/:id", middleware.RBAC("education:create"), health.MerchantDeleteEducationArticle)
+				merchantOnlyGroup.GET("/education-categories", middleware.RBAC("education-categories:view"), health.MerchantListEducationCategories)
+				merchantOnlyGroup.POST("/education-categories", middleware.RBAC("education-categories:create"), health.MerchantCreateEducationCategory)
+				merchantOnlyGroup.PUT("/education-categories/:id", middleware.RBAC("education-categories:update"), health.MerchantUpdateEducationCategory)
+				merchantOnlyGroup.DELETE("/education-categories/:id", middleware.RBAC("education-categories:delete"), health.MerchantDeleteEducationCategory)
 
 				// 服务商分账
 				merchantOnlyGroup.GET("/profit-sharing/receivers", middleware.RBAC("profit:view"), merchant.GetProfitSharingReceivers)
@@ -347,27 +387,29 @@ func setupRoutes(r *gin.Engine) {
 			staffAuthedGroup.POST("/orders/:id/accept", serviceStaff.AcceptOrder)
 			staffAuthedGroup.POST("/orders/:id/check-in", serviceStaff.CheckIn)
 			staffAuthedGroup.POST("/orders/:id/check-out", serviceStaff.CheckOut)
+			// 服务过程安全（阶段三）：定位上报 / 录音提交 / SOS / 服务区域
+			staffAuthedGroup.POST("/orders/:id/location", serviceStaff.ReportLocation)
+			staffAuthedGroup.POST("/orders/:id/audio", serviceStaff.SubmitAudio)
+			staffAuthedGroup.POST("/sos", serviceStaff.SOS)
+			staffAuthedGroup.GET("/my-region", serviceStaff.GetMyRegion)
+			// 协议（录音/定位授权等，服务前确认）
+			staffAuthedGroup.GET("/agreements", agreement.GetActiveAgreement)
+			staffAuthedGroup.POST("/agreements/:id/consent", agreement.ConsentAgreement)
+			// 服务评价（阶段四）：我的质量分与近期评价
+			staffAuthedGroup.GET("/my-quality-score", serviceStaff.GetMyQualityScore)
 			staffAuthedGroup.GET("/statistics", serviceStaff.GetStatistics)
-			// 健康服务：客户档案与评估
+			// 健康服务：客户档案与评估（阶段五 8.2 多档案：列表 + 按档案ID更新健康数值）
 			staffAuthedGroup.GET("/assessment-forms", health.StaffGetAssessmentForms)
 			staffAuthedGroup.GET("/residents/:user_id/health-record", health.StaffGetResidentHealthRecord)
+			staffAuthedGroup.GET("/residents/:user_id/health-records", health.StaffListResidentHealthRecords)
+			staffAuthedGroup.PUT("/residents/:user_id/health-records/:record_id/values", health.StaffUpdateResidentHealthValues)
 			staffAuthedGroup.GET("/residents/:user_id/assessments", health.StaffListResidentAssessments)
 			staffAuthedGroup.POST("/residents/:user_id/assessments", health.StaffCreateAssessment)
 			// 康复辅具适配建议
 			staffAuthedGroup.GET("/residents/:user_id/fitting-recommendations", health.StaffListResidentFittingRecommendations)
 			staffAuthedGroup.POST("/residents/:user_id/fitting-recommendations", health.StaffCreateFittingRecommendation)
-			// 居家康养照护计划与上门照护记录
-			staffAuthedGroup.GET("/care-plans", health.StaffListCarePlans)
-			staffAuthedGroup.GET("/care-plans/:id", health.StaffGetCarePlan)
-			staffAuthedGroup.POST("/care-visits", health.StaffCreateCareVisit)
-			// 持续健康服务：随访任务 + 健康宣教 + 生命体征监测
-			staffAuthedGroup.GET("/follow-up-tasks", health.StaffListFollowUpTasks)
-			staffAuthedGroup.GET("/follow-up-tasks/:id", health.StaffGetFollowUpTask)
-			staffAuthedGroup.POST("/follow-up-tasks/:id/complete", health.StaffCompleteFollowUpTask)
-			staffAuthedGroup.POST("/follow-up-tasks/:id/skip", health.StaffSkipFollowUpTask)
+			// 健康宣教
 			staffAuthedGroup.GET("/health-education", health.StaffListEducationArticles)
-			staffAuthedGroup.GET("/residents/:user_id/monitoring", health.StaffListResidentMonitoring)
-			staffAuthedGroup.POST("/residents/:user_id/monitoring", health.StaffCreateResidentMonitoring)
 		}
 	}
 }

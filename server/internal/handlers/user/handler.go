@@ -3,11 +3,13 @@ package user
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"fz_yyc_api/internal/config"
 	wsHandler "fz_yyc_api/internal/handlers/ws"
 	"fz_yyc_api/internal/models"
 	categorypkg "fz_yyc_api/internal/services/category"
+	couponpkg "fz_yyc_api/internal/services/coupon"
 	"fz_yyc_api/internal/services/orderquery"
 	"fz_yyc_api/internal/services/wechatpay"
 	"fz_yyc_api/internal/utils"
@@ -253,6 +255,13 @@ func buildAccessibleOrder(order models.Order) models.Order {
 		}
 	}
 
+	// 待评价标记：服务订单已完成(biz_status=5)且未评价
+	if utils.OrderCategory(order.OrderType) == utils.OrderCategoryService && order.BizStatus == 5 {
+		var reviewCount int64
+		database.DB.Model(&models.ServiceReview{}).Where("order_id = ?", order.ID).Count(&reviewCount)
+		order.CanReview = reviewCount == 0
+	}
+
 	return order
 }
 
@@ -476,12 +485,23 @@ func GetStoreHome(c *gin.Context) {
 		})
 	}
 
+	// 待评价数（首页红点，已登录用户的服务订单已完成且未评价）
+	pendingReviewCount := int64(0)
+	if uid := utils.GetUserID(c); uid > 0 {
+		database.DB.Model(&models.Order{}).
+			Where("user_id = ? AND biz_status = ? AND order_type BETWEEN ? AND ?",
+				uid, 5, utils.OrderTypeServiceMin, utils.OrderTypeServiceMax).
+			Where("id NOT IN (?)", database.DB.Model(&models.ServiceReview{}).Select("order_id")).
+			Count(&pendingReviewCount)
+	}
+
 	response.Success(c, gin.H{
-		"merchant":          merchant,
-		"categories":        categoryResponses,
-		"hot_products":      hotProductResponses,
-		"delivery_settings": deliverySettings,
-		"banners":           bannerResponses,
+		"merchant":             merchant,
+		"categories":           categoryResponses,
+		"hot_products":         hotProductResponses,
+		"delivery_settings":    deliverySettings,
+		"banners":              bannerResponses,
+		"pending_review_count": pendingReviewCount,
 	})
 }
 
@@ -533,6 +553,18 @@ func GetProducts(c *gin.Context) {
 	}
 	if keyword != "" {
 		query = query.Where("name LIKE ?", "%"+keyword+"%")
+	}
+	// 按商品类型过滤（逗号分隔多值，如 product_types=3,4 取康养套餐+陪诊服务）
+	if ptStr := c.Query("product_types"); ptStr != "" {
+		var ptValues []int
+		for _, part := range strings.Split(ptStr, ",") {
+			if v, err := strconv.Atoi(strings.TrimSpace(part)); err == nil && v > 0 {
+				ptValues = append(ptValues, v)
+			}
+		}
+		if len(ptValues) > 0 {
+			query = query.Where("product_type IN ?", ptValues)
+		}
 	}
 
 	var total int64
@@ -691,6 +723,9 @@ type CreateOrderRequest struct {
 	BizStatus       uint8   `json:"biz_status"`
 	ScheduledAt     string  `json:"scheduled_at"`
 	AssignedStaffID uint64  `json:"assigned_staff_id"`
+	RecordID        uint64  `json:"record_id"`
+	AddressID       uint64  `json:"address_id"`
+	UserCouponID    uint64  `json:"user_coupon_id"`
 	DeliveryAddress string  `json:"delivery_address"`
 	ContactName     string  `json:"contact_name"`
 	ContactPhone    string  `json:"contact_phone"`
@@ -748,6 +783,8 @@ func CreateOrder(c *gin.Context) {
 	var totalDeposit float64
 	var orderItems []models.OrderItem
 	var maxProductType uint8 // 跟踪最高商品类型以推断 order_type
+	productIDs := make([]uint64, 0, len(req.Items))
+	categoryIDs := make([]uint64, 0, len(req.Items))
 
 	for _, item := range req.Items {
 		var product models.Product
@@ -758,6 +795,12 @@ func CreateOrder(c *gin.Context) {
 
 		if product.ProductType > maxProductType {
 			maxProductType = product.ProductType
+		}
+
+		// 记录商品/分类ID集合，供优惠券适用范围匹配
+		productIDs = append(productIDs, product.ID)
+		if product.CategoryID != nil && *product.CategoryID > 0 {
+			categoryIDs = append(categoryIDs, *product.CategoryID)
 		}
 
 		if product.Status != 1 {
@@ -840,6 +883,28 @@ func CreateOrder(c *gin.Context) {
 
 	discountAmount := 0.0
 
+	// 优惠券抵扣（PRD V2.0 阶段二）：提前校验并预计算抵扣金额，
+	// 押金与配送费不参与抵扣；核销在下单事务内二次校验后执行
+	if req.UserCouponID > 0 {
+		var uc models.UserCoupon
+		if err := database.DB.Where("id = ? AND user_id = ?", req.UserCouponID, userID).
+			First(&uc).Error; err != nil {
+			response.Fail(c, http.StatusBadRequest, response.CodeCouponNotUsable, "优惠券不存在")
+			return
+		}
+		var tmpl models.CouponTemplate
+		if err := database.DB.First(&tmpl, uc.TemplateID).Error; err != nil {
+			response.Fail(c, http.StatusBadRequest, response.CodeCouponNotUsable, "优惠券不存在")
+			return
+		}
+		d, err := couponpkg.UsableCheck(uc, tmpl, totalAmount, productIDs, categoryIDs, time.Now())
+		if err != nil {
+			response.Fail(c, http.StatusBadRequest, response.CodeCouponNotUsable, err.Error())
+			return
+		}
+		discountAmount = d
+	}
+
 	payAmount := totalAmount + deliveryFee - discountAmount + totalDeposit
 	if payAmount < 0 {
 		payAmount = 0
@@ -859,7 +924,7 @@ func CreateOrder(c *gin.Context) {
 			orderType = 5 // 上门服务
 		case 4: // 陪诊服务
 			orderType = 4 // 预约服务
-		default: // 零售/资讯
+		default: // 零售
 			orderType = 1 // 普通商品
 		}
 	}
@@ -867,6 +932,34 @@ func CreateOrder(c *gin.Context) {
 	// 服务类订单（康养/陪诊）支付后需要派工，初始 biz_status=1（待接单）
 	if bizStatus == 0 && (orderType == 3 || orderType == 4 || orderType == 5) {
 		bizStatus = 1 // 待接单
+	}
+
+	// 服务订单硬性规则：必须绑定 1 个本人账号下的健康档案（PRD V2.0 订单口径）
+	var recordID *uint64
+	if utils.OrderCategory(orderType) == utils.OrderCategoryService {
+		if req.RecordID == 0 {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "服务订单必须指定服务对象（健康档案）")
+			return
+		}
+		var record models.HealthRecord
+		if err := database.DB.Where("id = ? AND user_id = ?", req.RecordID, userID).First(&record).Error; err != nil {
+			response.Fail(c, http.StatusBadRequest, response.CodeNotFound, "健康档案不存在或不属于当前用户，请先建档")
+			return
+		}
+		if record.Status == utils.HealthRecordStatusArchived {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "服务对象档案已归档，请重新选择")
+			return
+		}
+		recordID = &req.RecordID
+	}
+
+	// 从收货地址提取区县，供服务订单区域匹配使用
+	var deliveryDistrict string
+	if req.AddressID > 0 {
+		var address models.UserAddress
+		if err := database.DB.Where("id = ? AND user_id = ?", req.AddressID, userID).First(&address).Error; err == nil {
+			deliveryDistrict = address.District
+		}
 	}
 
 	tx := database.DB.Begin()
@@ -878,6 +971,8 @@ func CreateOrder(c *gin.Context) {
 		BizStatus:       bizStatus,
 		ScheduledAt:     scheduledAt,
 		AssignedStaffID: assignedStaffID,
+		RecordID:        recordID,
+		DeliveryDistrict: deliveryDistrict,
 		TotalAmount:     totalAmount,
 		DeliveryFee:     deliveryFee,
 		DiscountAmount:  discountAmount,
@@ -897,6 +992,19 @@ func CreateOrder(c *gin.Context) {
 		tx.Rollback()
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "创建订单失败")
 		return
+	}
+
+	// 优惠券核销（事务内二次校验，防止并发重复使用）
+	if req.UserCouponID > 0 {
+		if _, err := couponpkg.Redeem(tx, userID, req.UserCouponID, totalAmount, productIDs, categoryIDs, order.ID, orderNo); err != nil {
+			tx.Rollback()
+			if errors.Is(err, couponpkg.ErrCouponNotUsable) || errors.Is(err, couponpkg.ErrCouponNotFound) {
+				response.Fail(c, http.StatusBadRequest, response.CodeCouponNotUsable, err.Error())
+			} else {
+				response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "优惠券核销失败")
+			}
+			return
+		}
 	}
 
 	for i := range orderItems {
@@ -1052,6 +1160,7 @@ func GetOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	status := c.Query("status")
+	category := c.Query("category") // 1=实物订单 2=服务订单（不传=全部）
 
 	if page < 1 {
 		page = 1
@@ -1065,6 +1174,12 @@ func GetOrders(c *gin.Context) {
 	if status != "" {
 		statusInt, _ := strconv.Atoi(status)
 		query = query.Where("status = ?", statusInt)
+	}
+	// 订单分类过滤：实物 order_type 1-2，服务 order_type 3-6
+	if category == strconv.Itoa(int(utils.OrderCategoryGoods)) {
+		query = query.Where("order_type >= ? AND order_type <= ?", utils.OrderTypeGoodsMin, utils.OrderTypeGoodsMax)
+	} else if category == strconv.Itoa(int(utils.OrderCategoryService)) {
+		query = query.Where("order_type >= ? AND order_type <= ?", utils.OrderTypeServiceMin, utils.OrderTypeServiceMax)
 	}
 
 	var total int64
@@ -1103,6 +1218,7 @@ func GetOrderDetail(c *gin.Context) {
 		return
 	}
 
+	orderquery.FillOrderRecordInfo(&order)
 	response.Success(c, buildAccessibleOrder(order))
 }
 
@@ -1130,6 +1246,16 @@ func CancelOrder(c *gin.Context) {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "取消订单失败")
 		return
 	}
+
+	// 未支付订单取消：返还已核销的优惠券（过期时间不变，仅恢复未使用状态）
+	database.DB.Model(&models.UserCoupon{}).
+		Where("order_id = ? AND status = ?", order.ID, utils.UserCouponStatusUsed).
+		Updates(map[string]interface{}{
+			"status":   utils.UserCouponStatusUnused,
+			"used_at":  nil,
+			"order_id": nil,
+			"order_no": "",
+		})
 
 	response.Success(c, gin.H{"message": "订单已取消"})
 }

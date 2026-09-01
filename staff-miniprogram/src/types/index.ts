@@ -77,10 +77,11 @@ export interface ScheduleDay {
 // 注意：后端 JSON 列（past_history 等）可能返回字符串，取值时需做数组规范化
 // ============================================
 
-// 居民健康档案
+// 居民健康档案（relation: 1本人 2父母 3其他亲属，阶段五 8.2 多档案）
 export interface HealthRecord {
   id: number
   user_id: number
+  relation?: number   // 1本人 2父母 3其他亲属
   real_name?: string
   gender?: number        // 1男2女
   birth_date?: string
@@ -184,101 +185,11 @@ export interface StoreProduct {
 }
 
 // ============================================
-// 我的照护计划 / 上门照护记录（阶段三：基层健康服务闭环）
-// 注意：后端 items/visits/nursing_items/vitals/photos 可能返回 JSON 字符串，取值时需做规范化
+// 健康宣教
+// 注意：后端 tags 可能返回 JSON 字符串，取值时需做规范化
 // ============================================
 
-// 照护计划-护理项
-export interface CarePlanItem {
-  name: string
-  desc?: string
-}
-
-// 照护计划
-export interface CarePlan {
-  id: number
-  user_id: number
-  name: string
-  plan_type?: number // 1生活照料 2基础护理 3康复训练 4综合康养
-  start_date?: string
-  end_date?: string
-  frequency?: string
-  goals?: string
-  items: CarePlanItem[]
-  assigned_staff_id?: number | null
-  order_id?: number | null
-  status?: number // 0草稿 1执行中 2已暂停 3已完成
-  visit_count?: number
-  created_at?: string
-  updated_at?: string
-  visits?: CareVisit[]
-}
-
-// 照护记录-护理项完成情况
-export interface CareVisitNursingItem {
-  name: string
-  done?: boolean
-  remark?: string
-}
-
-// 照护记录-生命体征
-export interface CareVisitVitals {
-  blood_pressure?: string
-  blood_glucose?: string
-  heart_rate?: string
-  oxygen?: string
-  weight?: string
-}
-
-// 上门照护记录
-export interface CareVisit {
-  id: number
-  plan_id?: number | null
-  order_id?: number | null
-  user_id: number
-  staff_id?: number
-  visit_at?: string
-  nursing_items: CareVisitNursingItem[]
-  vitals?: CareVisitVitals
-  photos?: string[]
-  remark?: string
-  follow_up_advice?: string
-  created_at?: string
-}
-
-// ============================================
-// 随访任务 / 生命体征监测 / 健康宣教（阶段四：基层健康服务闭环）
-// 注意：后端 result/tags/extra 可能返回 JSON 字符串，取值时需做规范化
-// ============================================
-
-// 随访结果内容（result JSON 字段）
-export interface FollowUpTaskResult {
-  contact_method?: number // 1电话 2上门 3微信
-  content?: string
-  education_article_ids?: number[]
-  satisfaction?: number // 满意度 1-5
-  remark?: string
-}
-
-// 随访任务
-export interface FollowUpTask {
-  id: number
-  user_id: number
-  task_type?: number // 1康复随访 2租后回访 3慢病随访 4评估回访
-  source_type?: number // 1服务完成 2租赁归还 3评估完成 4手动
-  source_id?: number | null
-  plan_follow_time?: string
-  staff_id?: number | null
-  contact_method?: number // 1电话 2上门 3微信
-  status?: number // 0待执行 1已完成 2已跳过
-  result?: FollowUpTaskResult
-  completed_at?: string
-  remark?: string
-  created_at?: string
-  user?: { id: number; nickname?: string; phone?: string }
-}
-
-// 健康宣教文章（仅已发布，供随访选用）
+// 健康宣教文章
 export interface EducationArticle {
   id: number
   title: string
@@ -288,18 +199,4 @@ export interface EducationArticle {
   tags?: string[]
   status?: number
   publish_at?: string
-}
-
-// 生命体征监测记录
-export interface HealthMonitoring {
-  id: number
-  user_id: number
-  record_type?: number // 1血压 2血糖 3心率 4血氧 5体重
-  value?: number
-  unit?: string
-  extra?: Record<string, unknown>
-  recorded_by?: number
-  recorded_at?: string
-  remark?: string
-  created_at?: string
 }

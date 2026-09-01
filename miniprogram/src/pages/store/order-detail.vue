@@ -165,7 +165,36 @@
       </view>
     </view>
 
+    <view class="section" v-if="review">
+      <view class="section-title">服务评价</view>
+      <view class="review-score-row">
+        <view class="review-stars">
+          <text v-for="n in 5" :key="n" class="review-star" :class="{ active: n <= review.score }">★</text>
+        </view>
+        <view class="review-sub-scores">
+          <text class="sub-tag">态度 {{ review.attitude_score }}</text>
+          <text class="sub-tag">专业 {{ review.professional_score }}</text>
+          <text class="sub-tag">准时 {{ review.punctual_score }}</text>
+        </view>
+      </view>
+      <view class="review-content" v-if="review.content">{{ review.content }}</view>
+      <view class="review-images" v-if="reviewImages.length">
+        <image
+          v-for="(img, idx) in reviewImages"
+          :key="idx"
+          class="review-image"
+          :src="img"
+          mode="aspectFill"
+          @click="previewReviewImage(idx)"
+        />
+      </view>
+      <view class="review-time" v-if="review.created_at">{{ formatDateTime(review.created_at) }}</view>
+    </view>
+
     <view class="bottom-bar">
+      <button v-if="canReview" class="btn primary" :disabled="submitting" @click="goReview">
+        去评价
+      </button>
       <button v-if="canCancel" class="btn secondary" :disabled="submitting" @click="cancelOrder">
         取消订单
       </button>
@@ -183,14 +212,30 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { cancelMyOrder, getMyOrderDetail, renewOrder } from '@api'
+import { cancelMyOrder, getMyOrderDetail, getReview, renewOrder } from '@api'
 import { OrderStatus, OrderStatusText } from '@types'
-import type { Order } from '@types'
+import type { Order, ServiceReview } from '@types'
 import { BrandAsset } from '../../utils/constants'
 import { useAuth } from '../../utils/useAuth'
 
 const order = ref<Order | null>(null)
+const review = ref<ServiceReview | null>(null)
 const submitting = ref(false)
+
+const canReview = computed(() => !!order.value?.can_review && !review.value)
+const reviewImages = computed<string[]>(() => {
+  const images = review.value?.images
+  if (Array.isArray(images)) return images
+  if (typeof images === 'string' && images) {
+    try {
+      const parsed = JSON.parse(images)
+      if (Array.isArray(parsed)) return parsed.filter((i): i is string => typeof i === 'string')
+    } catch (error) {
+      return []
+    }
+  }
+  return []
+})
 
 const canCancel = computed(() => order.value?.status === OrderStatus.PENDING_PAYMENT)
 const canRefund = computed(() => {
@@ -261,6 +306,25 @@ async function loadOrder(id: number) {
   } catch (error: any) {
     uni.showToast({ title: error.message || '加载失败', icon: 'none' })
   }
+
+  // 拉取评价（若已评价则展示）
+  try {
+    review.value = await getReview(id)
+  } catch (error) {
+    review.value = null
+  }
+}
+
+function goReview() {
+  if (!order.value) return
+  uni.navigateTo({ url: `/pages/store/review-submit?id=${order.value.id}` })
+}
+
+function previewReviewImage(index: number) {
+  uni.previewImage({
+    current: reviewImages.value[index],
+    urls: reviewImages.value
+  })
 }
 
 function getStatusText() {
@@ -701,6 +765,66 @@ function contactMerchantForRefund() {
 .btn.warning {
   color: #ffffff;
   background: #fa8c16;
+}
+
+.review-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.review-stars {
+  display: flex;
+  gap: 4rpx;
+}
+
+.review-star {
+  font-size: 40rpx;
+  color: #e5e6eb;
+}
+
+.review-star.active {
+  color: #ff9500;
+}
+
+.review-sub-scores {
+  display: flex;
+  gap: 12rpx;
+}
+
+.sub-tag {
+  font-size: 22rpx;
+  color: #4e5969;
+  background: #f2f3f5;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+}
+
+.review-content {
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  color: #1f2329;
+  line-height: 1.6;
+}
+
+.review-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 20rpx;
+}
+
+.review-image {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 12rpx;
+  background: #f2f3f5;
+}
+
+.review-time {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  color: #c0c4cc;
 }
 
 </style>

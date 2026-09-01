@@ -169,6 +169,45 @@ const noMore = ref(false)
 const sidebarScrollId = ref('')
 const scrollViewTop = ref(0)
 
+// 加购弹窗相关状态
+const showAddDialog = ref(false)
+const addDialogLoading = ref(false)
+const addDialogProduct = ref<Product | null>(null)
+const addDialogQuantity = ref(1)
+const addDialogSelectedSpecs = reactive<Record<string, string>>({})
+const showAddSuccessTip = ref(false)
+const addSuccessText = ref('')
+let addSuccessTipTimer: ReturnType<typeof setTimeout> | null = null
+
+const addDialogSelectedPrice = computed(() => {
+  if (!addDialogProduct.value) return 0
+  let price = addDialogProduct.value.price
+  if (addDialogProduct.value.specs?.length) {
+    for (const spec of addDialogProduct.value.specs) {
+      const selectedName = addDialogSelectedSpecs[spec.name]
+      const option = spec.options?.find(o => o.name === selectedName)
+      if (option) {
+        price += option.price
+      }
+    }
+  }
+  return price
+})
+
+const addDialogSelectedStock = computed(() => {
+  if (!addDialogProduct.value) return 0
+  if (addDialogProduct.value.specs?.length) {
+    for (const spec of addDialogProduct.value.specs) {
+      const selectedName = addDialogSelectedSpecs[spec.name]
+      const option = spec.options?.find(o => o.name === selectedName)
+      if (option) {
+        return option.stock ?? addDialogProduct.value.stock
+      }
+    }
+  }
+  return addDialogProduct.value.stock
+})
+
 onLoad(() => {
   loadData()
 })
@@ -303,6 +342,115 @@ function goProduct(productId: number) {
 
 function goHome() {
   uni.switchTab({ url: `/pages/store/home` })
+}
+
+// 加购相关方法
+function onProductQuickAdd(product: any) {
+  const pt = Number(product.product_type ?? 0)
+  if (pt === 2 || pt === 3 || pt === 4 || pt === 5 || Number(product.sale_type) === 2) {
+    goProduct(product.id)
+    return
+  }
+  addToCart(product)
+}
+
+async function addToCart(product: any) {
+  showAddDialog.value = true
+  addDialogLoading.value = true
+  addDialogProduct.value = null
+  addDialogQuantity.value = 1
+  Object.keys(addDialogSelectedSpecs).forEach((key) => {
+    delete addDialogSelectedSpecs[key]
+  })
+
+  try {
+    const detail = await getStoreProduct(product.id)
+    addDialogProduct.value = detail
+
+    if (detail.specs?.length) {
+      for (const spec of detail.specs) {
+        if (spec.options?.length) {
+          addDialogSelectedSpecs[spec.name] = spec.options[0].name
+        }
+      }
+    }
+  } catch (error) {
+    uni.showToast({ title: '加载商品失败', icon: 'none' })
+    closeAddDialog()
+  } finally {
+    addDialogLoading.value = false
+  }
+}
+
+function selectAddDialogSpec(specName: string, option: SpecOption) {
+  if (option.stock === 0) return
+  addDialogSelectedSpecs[specName] = option.name
+  if (addDialogQuantity.value > addDialogSelectedStock.value) {
+    addDialogQuantity.value = addDialogSelectedStock.value
+  }
+}
+
+function decreaseAddDialogQuantity() {
+  if (addDialogQuantity.value > 1) {
+    addDialogQuantity.value -= 1
+  }
+}
+
+function increaseAddDialogQuantity() {
+  if (addDialogQuantity.value < addDialogSelectedStock.value) {
+    addDialogQuantity.value += 1
+  }
+}
+
+function getAddDialogSpecString(): string {
+  const specs: string[] = []
+  for (const spec of addDialogProduct.value?.specs || []) {
+    if (addDialogSelectedSpecs[spec.name]) {
+      specs.push(addDialogSelectedSpecs[spec.name])
+    }
+  }
+  return specs.join('/')
+}
+
+function confirmAddDialog() {
+  if (!addDialogProduct.value) return
+  if (addDialogSelectedStock.value <= 0) {
+    return uni.showToast({ title: '库存不足', icon: 'none' })
+  }
+
+  const merchantName = '' // 分类页暂未获取商户名称，可后续补充
+
+  cartStore.addItem({
+    merchant_name: merchantName,
+    product_id: addDialogProduct.value.id,
+    product_name: addDialogProduct.value.name,
+    image: addDialogProduct.value.images?.[0] || '',
+    price: addDialogSelectedPrice.value,
+    quantity: addDialogQuantity.value,
+    specs: getAddDialogSpecString(),
+    max_stock: addDialogSelectedStock.value
+  })
+
+  uni.showToast({ title: '已加入购物车', icon: 'success' })
+  showAddToCartFeedback(addDialogProduct.value.name, addDialogQuantity.value)
+  closeAddDialog()
+}
+
+function showAddToCartFeedback(productName: string, quantity: number) {
+  addSuccessText.value = `${productName} x${quantity} 已加入购物车`
+  showAddSuccessTip.value = true
+
+  if (addSuccessTipTimer) {
+    clearTimeout(addSuccessTipTimer)
+  }
+
+  addSuccessTipTimer = setTimeout(() => {
+    showAddSuccessTip.value = false
+  }, 1600)
+}
+
+function closeAddDialog() {
+  showAddDialog.value = false
 }
 </script>
 
@@ -484,5 +632,226 @@ function goHome() {
   text-align: center;
   font-size: 22rpx;
   color: #999999;
+}
+
+/* 加购按钮 */
+.add-btn {
+  width: 48rpx;
+  height: 48rpx;
+  background: #007AFF;
+  border-radius: 50%;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  font-weight: 300;
+  margin-left: auto;
+}
+
+/* 加购成功提示 */
+.add-success-tip {
+  position: fixed;
+  left: 50%;
+  bottom: calc(160rpx + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  max-width: 620rpx;
+  padding: 18rpx 28rpx;
+  border-radius: 999rpx;
+  background: rgba(26, 26, 26, 0.86);
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 1.5;
+  text-align: center;
+  z-index: 120;
+  box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.18);
+}
+
+/* 加购弹窗 */
+.add-dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.add-dialog {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+}
+
+.add-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.add-dialog-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  flex: 1;
+  padding-right: 24rpx;
+}
+
+.add-dialog-close {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 28rpx;
+  background: #f0f2f5;
+  color: #333333;
+  font-size: 40rpx;
+  line-height: 56rpx;
+  text-align: center;
+}
+
+.add-dialog-loading {
+  padding: 40rpx 0;
+  text-align: center;
+  color: #666666;
+  font-size: 28rpx;
+}
+
+.add-dialog-price {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 0;
+}
+
+.price-label {
+  font-size: 26rpx;
+  color: #666666;
+}
+
+.price-value {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #ff4d4f;
+}
+
+.add-dialog-specs {
+  margin-top: 8rpx;
+}
+
+.add-spec-group {
+  margin-top: 20rpx;
+}
+
+.add-spec-name {
+  font-size: 28rpx;
+  color: #333333;
+  margin-bottom: 14rpx;
+}
+
+.add-spec-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+}
+
+.add-spec-option {
+  padding: 16rpx 22rpx;
+  background: #f5f5f5;
+  border-radius: 14rpx;
+  border: 2rpx solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.add-spec-option.selected {
+  background: rgba(0, 122, 255, 0.1);
+  border-color: #007AFF;
+}
+
+.add-spec-option.disabled {
+  opacity: 0.5;
+}
+
+.option-name {
+  font-size: 26rpx;
+  color: #1a1a1a;
+}
+
+.option-price {
+  font-size: 22rpx;
+  color: #666666;
+}
+
+.add-dialog-quantity {
+  margin-top: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quantity-title {
+  font-size: 28rpx;
+  color: #333333;
+}
+
+.quantity-control {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.quantity-btn {
+  width: 64rpx;
+  height: 64rpx;
+  background: #f5f5f5;
+  border-radius: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  color: #666666;
+}
+
+.quantity-btn.disabled {
+  opacity: 0.5;
+}
+
+.quantity-value {
+  min-width: 60rpx;
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.stock-tip {
+  font-size: 22rpx;
+  color: #999999;
+}
+
+.add-dialog-footer {
+  margin-top: 28rpx;
+}
+
+.add-dialog-confirm {
+  height: 88rpx;
+  border-radius: 44rpx;
+  background: linear-gradient(135deg, #ff9500 0%, #ff5e3a 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-dialog-confirm:active {
+  opacity: 0.9;
 }
 </style>

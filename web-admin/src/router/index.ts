@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import LoginView from '@/views/login/LoginView.vue'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
 import ProductsView from '@/views/product/ProductsView.vue'
+import ServiceProductsView from '@/views/product/ServiceProductsView.vue'
 import CategoriesView from '@/views/product/CategoriesView.vue'
 import OrderListView from '@/views/order/OrderListView.vue'
 import OrderDetailView from '@/views/order/OrderDetailView.vue'
@@ -20,8 +21,13 @@ import HealthRecordsView from '@/views/health/HealthRecordsView.vue'
 import HealthAssessmentFormsView from '@/views/health/HealthAssessmentFormsView.vue'
 import HealthAssessmentsView from '@/views/health/HealthAssessmentsView.vue'
 import FittingRecommendationsView from '@/views/health/FittingRecommendationsView.vue'
-import CarePlansView from '@/views/health/CarePlansView.vue'
 import MiniProgramBannersView from '@/views/miniprogram/MiniProgramBannersView.vue'
+import CouponTemplatesView from '@/views/marketing/CouponTemplatesView.vue'
+// 服务过程安全（PRD V2.0 阶段三）
+import AlertEventsView from '@/views/safety/AlertEventsView.vue'
+import AgreementsView from '@/views/system/AgreementsView.vue'
+// 服务评价管理（PRD V2.0 阶段四）
+import ServiceReviewsView from '@/views/safety/ServiceReviewsView.vue'
 import { setupRouterGuards } from './guards'
 
 const routes = [
@@ -68,10 +74,43 @@ const routes = [
         meta: { title: '商品管理', requiresAuth: true, permission: 'products:view' }
       },
       {
+        path: '/service-products',
+        name: 'service-products',
+        component: ServiceProductsView,
+        meta: { title: '服务管理', requiresAuth: true, permission: 'service-products:view' }
+      },
+      {
         path: '/categories',
         name: 'categories',
         component: CategoriesView,
         meta: { title: '分类管理', requiresAuth: true, permission: 'categories:view' }
+      },
+      // 优惠券管理（PRD V2.0 阶段二）
+      {
+        path: '/coupon-templates',
+        name: 'coupon-templates',
+        component: CouponTemplatesView,
+        meta: { title: '优惠券管理', requiresAuth: true, permission: 'coupon-templates:view' }
+      },
+      // 服务过程安全（PRD V2.0 阶段三）
+      {
+        path: '/alert-events',
+        name: 'alert-events',
+        component: AlertEventsView,
+        meta: { title: '预警中心', requiresAuth: true, permission: 'alert-events:view' }
+      },
+      {
+        path: '/system/agreements',
+        name: 'system-agreements',
+        component: AgreementsView,
+        meta: { title: '协议管理', requiresAuth: true, permission: 'agreements:view' }
+      },
+      // 服务评价管理（PRD V2.0 阶段四）
+      {
+        path: '/service-reviews',
+        name: 'service-reviews',
+        component: ServiceReviewsView,
+        meta: { title: '服务评价', requiresAuth: true, permission: 'service-reviews:view' }
       },
       {
         path: '/staff',
@@ -155,28 +194,16 @@ const routes = [
         meta: { title: '适配建议管理', requiresAuth: true, permission: 'fitting:view' }
       },
       {
-        path: '/health/care-plans',
-        name: 'health-care-plans',
-        component: CarePlansView,
-        meta: { title: '照护计划管理', requiresAuth: true, permission: 'care:view' }
-      },
-      {
-        path: '/health/follow-ups',
-        name: 'health-follow-ups',
-        component: () => import('@/views/health/FollowUpTasksView.vue'),
-        meta: { title: '随访任务管理', requiresAuth: true, permission: 'followup:view' }
-      },
-      {
-        path: '/health/monitoring',
-        name: 'health-monitoring',
-        component: () => import('@/views/health/HealthMonitoringView.vue'),
-        meta: { title: '生命体征监测', requiresAuth: true, permission: 'monitor:view' }
-      },
-      {
         path: '/health/education',
         name: 'health-education',
         component: () => import('@/views/health/EducationArticlesView.vue'),
         meta: { title: '健康宣教管理', requiresAuth: true, permission: 'education:view' }
+      },
+      {
+        path: '/health/education-categories',
+        name: 'health-education-categories',
+        component: () => import('@/views/health/HealthEducationCategoriesView.vue'),
+        meta: { title: '宣教分类管理', requiresAuth: true, permission: 'education-categories:view' }
       },
       // 分账管理（服务商分账）
       {

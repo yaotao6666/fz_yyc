@@ -176,7 +176,7 @@ func UpdateBannerStatus(c *gin.Context) {
 	}
 
 	var req struct {
-		Status uint8 `json:"status" binding:"required,oneof=0 1"`
+		Status *uint8 `json:"status" binding:"required,oneof=0 1"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误: "+err.Error())
@@ -186,7 +186,7 @@ func UpdateBannerStatus(c *gin.Context) {
 	result := database.DB.
 		Model(&models.MiniProgramBanner{}).
 		Where("id = ? AND merchant_id = ?", id, utils.DefaultMerchantID).
-		Update("status", req.Status)
+		Update("status", *req.Status)
 	if result.Error != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新状态失败")
 		return

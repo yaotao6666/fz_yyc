@@ -1,5 +1,18 @@
 <template>
   <view class="my-orders-container">
+    <!-- 订单分类：实物/服务 -->
+    <view class="category-tabs">
+      <view
+        v-for="tab in categoryTabs"
+        :key="tab.value"
+        class="category-tab-item"
+        :class="{ active: currentCategory === tab.value }"
+        @click="changeCategory(tab.value)"
+      >
+        {{ tab.label }}
+      </view>
+    </view>
+
     <!-- 状态筛选 -->
     <view class="status-tabs">
       <view
@@ -32,6 +45,7 @@
           <view class="order-status" :class="getStatusClass(order.status)">
             {{ getStatusText(order.status) }}
           </view>
+          <text v-if="order.can_review" class="review-badge">待评价</text>
         </view>
 
         <view class="order-items" @click="goDetail(order.id)">
@@ -86,6 +100,7 @@
           <template v-if="order.status === 2">
             <view class="action-btn refund" @click="contactMerchantForRefund(order)">联系商家退款</view>
           </template>
+          <view v-if="order.can_review" class="action-btn review" @click="goReview(order)">去评价</view>
           <view class="action-btn primary" @click="goDetail(order.id)">查看详情</view>
         </view>
       </view>
@@ -118,7 +133,14 @@ const statusTabs = [
   { label: '已完成', value: OrderStatus.COMPLETED }
 ]
 
+const categoryTabs = [
+  { label: '全部订单', value: 0 },
+  { label: '实物订单', value: 1 },
+  { label: '服务订单', value: 2 }
+]
+
 const currentStatus = ref(0)
+const currentCategory = ref(0) // 0=全部 1=实物订单 2=服务订单
 const orders = ref<Order[]>([])
 const loading = ref(false)
 const noMore = ref(false)
@@ -170,6 +192,10 @@ async function loadOrders(reset = false) {
       params.status = currentStatus.value
     }
 
+    if (currentCategory.value !== 0) {
+      params.category = currentCategory.value
+    }
+
     const res = await getMyOrders(params)
 
     if (reset) {
@@ -196,6 +222,11 @@ function loadMore() {
 
 function changeStatus(status: number) {
   currentStatus.value = status
+  loadOrders(true)
+}
+
+function changeCategory(category: number) {
+  currentCategory.value = category
   loadOrders(true)
 }
 
@@ -243,6 +274,10 @@ function getOrderItemImage(item: any) {
 
 function goDetail(orderId: number) {
   uni.navigateTo({ url: `/pages/store/order-detail?id=${orderId}` })
+}
+
+function goReview(order: Order) {
+  uni.navigateTo({ url: `/pages/store/review-submit?id=${order.id}` })
 }
 
 function goShopping() {
@@ -302,6 +337,29 @@ function contactMerchantForRefund(order: Order) {
 .my-orders-container {
   min-height: 100vh;
   background: #f5f5f5;
+}
+
+.category-tabs {
+  display: flex;
+  gap: 16rpx;
+  padding: 24rpx 24rpx 8rpx;
+  background: #f5f5f5;
+}
+
+.category-tab-item {
+  flex: 1;
+  text-align: center;
+  font-size: 26rpx;
+  color: #666666;
+  padding: 14rpx 0;
+  border-radius: 999rpx;
+  background: #ffffff;
+}
+
+.category-tab-item.active {
+  color: #ffffff;
+  font-weight: 600;
+  background: #007AFF;
 }
 
 .status-tabs {
@@ -524,6 +582,20 @@ function contactMerchantForRefund(order: Order) {
 .action-btn.refund {
   background: #fff1f0;
   color: #ff4d4f;
+}
+
+.action-btn.review {
+  background: #e6f7ff;
+  color: #007AFF;
+}
+
+.review-badge {
+  font-size: 22rpx;
+  color: #ff4d4f;
+  background: #fff1f0;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  margin-left: 12rpx;
 }
 
 .loading, .no-more {

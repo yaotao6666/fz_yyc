@@ -26,7 +26,6 @@
             <text v-if="Number(item.product_type) === 2 || Number(item.sale_type) === 2" class="rental-badge">租赁</text>
             <text v-else-if="Number(item.product_type) === 3" class="wellness-badge">套餐</text>
             <text v-else-if="Number(item.product_type) === 4" class="escort-badge">陪诊</text>
-            <text v-else-if="Number(item.product_type) === 5" class="info-badge">资讯</text>
           </view>
           <view class="item-spec" v-if="item.specs">{{ item.specs }}</view>
           <view class="item-rental" v-if="Number(item.sale_type) === 2">

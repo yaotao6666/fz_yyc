@@ -122,11 +122,12 @@
   - 下单均价
   - 日 / 周 / 月 / 年订单量
   - 商品排行维度切换
-- `GET /api/v1/merchant/orders` 需支持 `status`、`start_date`、`end_date`、`keyword`、`page`、`page_size` 筛选，返回当前商户名下订单。
-- `GET /api/v1/merchant/orders/:order_id` 返回订单详情结构，包含商品明细、用户信息、配送信息、支付单号、核销码、核销时间与核销人。
+- `GET /api/v1/merchant/orders` 需支持 `status`、`category`（1=实物订单 order_type 1-2 / 2=服务订单 order_type 3-6，不传=全部）、`order_type`、`biz_status`、`start_date`、`end_date`、`keyword`、`page`、`page_size` 筛选，返回当前商户名下订单。
+- `GET /api/v1/merchant/orders/:order_id` 返回订单详情结构，包含商品明细、用户信息、配送信息、支付单号、核销码、核销时间与核销人；服务订单额外返回服务对象档案摘要（`record_id`/`record_name`/`record_gender`/`record_birth_date`）。
 - `GET /api/v1/merchant/orders/analytics` 返回 `day/week/month/year` 四组订单量桶。
 - `/api/v1/merchant/announcements*` 商户公告接口由 PC 后台直接调用。
 - 商品分类、商品、规格管理通过 `/api/v1/merchant/categories*`、`/api/v1/merchant/products*`、`/api/v1/merchant/products/:product_id/specs` 接口完成，由 PC 后台直接调用，无需透传 `merchant_id`。
+- `GET /api/v1/merchant/products` 支持 `product_type`（单值）与 `product_types`（逗号分隔多值，如 `3,4` 服务项目 / `1,2,5` 实物商品）筛选；「服务管理」菜单（`service-products:view`，按钮权限 `service-products:create/update/delete`）仅维护康养套餐（3）与陪诊服务（4），「商品管理」仅维护实物商品（1/2/5）。
 
 ### 2.3 商户管理接口（PC后台）
 
@@ -233,6 +234,15 @@
   - 订单 `total_amount` 仅含租金（一口价为商品金额），`total_deposit` 为押金合计，`pay_amount = total_amount + total_deposit + delivery_fee - discount_amount`
   - 创建订单与订单详情接口的 `order` 对象需返回 `total_deposit`、`deposit_status`、`deposit_refund_amount`、`deposit_deduct_amount`、`deposit_refunded_at`、`rental_returned_at`、`rental_return_remark`
   - 订单详情的 `items` 需返回 `sale_type`、`rental_unit`、`rental_duration`、`unit_rental_price`、`rental_subtotal`、`deposit`、`deposit_deduct`
+- **订单分类口径（PRD V2.0）**：
+  - 实物订单 `order_type ∈ {1,2}`（1=普通商品 2=租赁商品），主状态走 `orders.status`
+  - 服务订单 `order_type ∈ {3,4,5,6}`（3=即时 4=预约 5=上门 6=到店），工单状态走 `orders.biz_status`
+  - C 端订单列表 `GET /api/v1/user/orders` 与后台订单列表均支持 `category` 参数（1=实物 2=服务，不传=全部）
+- **服务订单绑定档案（硬性规则）**：
+  - 服务订单下单（购物车含康养套餐/陪诊等 `product_type ∈ {3,4}` 商品，推断 `order_type ∈ {3,4,5,6}`）必须传 `record_id`（健康档案ID），档案不存在或不属于下单用户 → 拒绝下单（提示先建档）
+  - 请求体新增 `record_id`（服务单必填）与 `address_id`（可选，服务端从收货地址提取 `delivery_district` 写入订单，供区域匹配）
+  - 实物订单不要求 `record_id`
+  - 订单详情（C 端与后台）返回服务对象摘要：`record_id`/`record_name`/`record_gender`/`record_birth_date`
 - **归还租赁商品接口约束**：
   - 仅 `status=paid` 且 `total_deposit > 0` 且 `deposit_status=1` 的订单可发起归还
   - 请求体：`deduct_amount`（扣除金额，0=全额退还）、`remark`（验机备注）

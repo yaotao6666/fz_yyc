@@ -3,10 +3,10 @@ package service_staff
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"fz_yyc_api/internal/models"
-	"fz_yyc_api/internal/services/followup"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
@@ -15,8 +15,10 @@ import (
 )
 
 // PendingOrders 待接订单列表（已支付 + biz_status=1 待接单 + 未被接单）
+// 阶段三：接单池按服务人员 service_region 与订单 delivery_district 区域过滤（区域为空=不限）
 func PendingOrders(c *gin.Context) {
-	if _, err := GetCurrentStaff(c); err != nil {
+	staff, err := GetCurrentStaff(c)
+	if err != nil {
 		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "获取信息失败")
 		return
 	}
@@ -30,10 +32,21 @@ func PendingOrders(c *gin.Context) {
 		pageSize = 20
 	}
 
+	// 区域过滤：区域为空视为不限；否则仅返回 delivery_district 匹配的订单
+	regionCond := ""
+	if regions := parseRegions(staff.ServiceRegion); len(regions) > 0 {
+		regionCond = " AND (delivery_district = '' OR delivery_district IS NULL"
+		for _, r := range regions {
+			regionCond += " OR delivery_district LIKE '%" + strings.ReplaceAll(r, "'", "''") + "%'"
+		}
+		regionCond += ")"
+	}
+
+	baseSQL := "status = 2 AND biz_status = 1 AND assigned_staff_id IS NULL" + regionCond
+
 	var orders []models.Order
 	query := database.DB.
-		Where("status = ? AND biz_status = ? AND assigned_staff_id IS NULL",
-			2, 1). // status=2已支付, biz_status=1待接单
+		Where(baseSQL).
 		Order("paid_at DESC").
 		Offset((page - 1) * pageSize).
 		Limit(pageSize)
@@ -45,8 +58,7 @@ func PendingOrders(c *gin.Context) {
 
 	var total int64
 	database.DB.Model(&models.Order{}).
-		Where("status = ? AND biz_status = ? AND assigned_staff_id IS NULL",
-			2, 1).Count(&total)
+		Where(baseSQL).Count(&total)
 
 	response.Success(c, gin.H{
 		"list":  orders,
@@ -220,6 +232,20 @@ func CheckIn(c *gin.Context) {
 		return
 	}
 
+	// 阶段三：签到时创建服务记录（start_time 快照）
+	var record models.ServiceRecord
+	if err := database.DB.Where("order_id = ?", orderID).First(&record).Error; err != nil {
+		record = models.ServiceRecord{
+			OrderID:   orderID,
+			StaffID:   staff.ID,
+			StartTime: &now,
+			Status:    utils.ServiceRecordStatusNormal,
+		}
+		_ = database.DB.Create(&record).Error
+	} else if record.StartTime == nil {
+		_ = database.DB.Model(&record).Update("start_time", now).Error
+	}
+
 	response.SuccessWithMessage(c, "签到成功", gin.H{
 		"id":               orderID,
 		"actual_started_at": now,
@@ -228,8 +254,9 @@ func CheckIn(c *gin.Context) {
 
 // CheckOutRequest 签退请求
 type CheckOutRequest struct {
-	Remark string   `json:"remark"`
-	Images []string `json:"images"`
+	Remark   string   `json:"remark"`
+	Images   []string `json:"images"`
+	AudioURL string   `json:"audio_url"` // 阶段三：服务录音URL（客户端七牛直传后随签退提交）
 }
 
 // CheckOut 签退（结束服务）
@@ -276,13 +303,32 @@ func CheckOut(c *gin.Context) {
 		database.DB.Model(&order).Update("rental_returned_at", now)
 	}
 
-	// 服务完成自动生成随访任务（失败仅记录，不影响签退主流程）
-	if order.OrderType == 2 {
-		// 租赁服务：租后回访
-		_ = followup.CreateFollowUpTask(order.UserID, utils.FollowUpTypeReturnVisit, utils.FollowUpSourceRentalReturn, order.ID, staff.ID)
+	// 阶段三：签退时写入服务记录（end_time + 录音快照）
+	recordUpdates := map[string]interface{}{
+		"end_time": now,
+		"staff_id": staff.ID,
+	}
+	if req.AudioURL != "" {
+		recordUpdates["audio_url"] = req.AudioURL
+		recordUpdates["audio_uploaded_at"] = now
+	}
+	var record models.ServiceRecord
+	if err := database.DB.Where("order_id = ?", orderID).First(&record).Error; err != nil {
+		// 无记录时兜底创建（含签到缺失场景）
+		newRecord := models.ServiceRecord{
+			OrderID:         orderID,
+			StaffID:         staff.ID,
+			StartTime:       order.ActualStartedAt,
+			EndTime:         &now,
+			AudioURL:        req.AudioURL,
+			Status:          utils.ServiceRecordStatusNormal,
+		}
+		if req.AudioURL != "" {
+			newRecord.AudioUploadedAt = &now
+		}
+		_ = database.DB.Create(&newRecord).Error
 	} else {
-		// 普通服务：康复随访
-		_ = followup.CreateFollowUpTask(order.UserID, utils.FollowUpTypeRehab, utils.FollowUpSourceService, order.ID, staff.ID)
+		_ = database.DB.Model(&record).Updates(recordUpdates).Error
 	}
 
 	response.SuccessWithMessage(c, "签退成功", gin.H{

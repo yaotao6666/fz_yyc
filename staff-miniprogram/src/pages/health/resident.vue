@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { staffHealthApi } from '@/api'
-import type { HealthRecord, HealthAssessment, AssessmentFormQuestion, FittingRecommendation, HealthMonitoring } from '@/types'
+import type { HealthRecord, HealthAssessment, AssessmentFormQuestion, FittingRecommendation } from '@/types'
 import { formatDate } from '@/utils/format'
 
 const userId = ref<string>('')
@@ -16,9 +16,6 @@ const total = ref(0)
 // 适配建议列表
 const fittingList = ref<FittingRecommendation[]>([])
 const fittingTotal = ref(0)
-// 生命体征监测
-const monitoringList = ref<HealthMonitoring[]>([])
-const monitoringTotal = ref(0)
 
 // 评估详情弹层
 const detailItem = ref<HealthAssessment | null>(null)
@@ -165,120 +162,8 @@ async function loadData() {
     } catch (e) {
       console.error('[HealthResident] load fitting recommendations error', e)
     }
-    // 生命体征独立加载，失败不影响其他区块
-    await loadMonitoring()
   } finally {
     loading.value = false
-  }
-}
-
-// 生命体征类型选项与默认单位
-const monitoringTypeOptions = [
-  { value: 1, label: '血压', unit: 'mmHg' },
-  { value: 2, label: '血糖', unit: 'mmol/L' },
-  { value: 3, label: '心率', unit: '次/分' },
-  { value: 4, label: '血氧', unit: '%' },
-  { value: 5, label: '体重', unit: 'kg' }
-]
-// 类型选择器文案
-const monitorTypeLabels = monitoringTypeOptions.map(o => o.label)
-
-function monitoringTypeText(type?: number) {
-  const map: Record<number, string> = { 1: '血压', 2: '血糖', 3: '心率', 4: '血氧', 5: '体重' }
-  return type == null ? '' : (map[type] || '未知')
-}
-
-// 生命体征录入弹层表单
-const showMonitorForm = ref(false)
-const submittingMonitoring = ref(false)
-const monitorForm = reactive({
-  record_type: 1,
-  value: '',
-  unit: 'mmHg',
-  recorded_date: '',
-  recorded_time: '',
-  remark: ''
-})
-
-async function loadMonitoring() {
-  if (!userId.value) return
-  try {
-    const monRes: any = await staffHealthApi.getResidentMonitoring(userId.value, { page: 1, page_size: 20 })
-    monitoringList.value = monRes?.list || []
-    monitoringTotal.value = monRes?.total || 0
-  } catch (e) {
-    console.error('[HealthResident] load monitoring error', e)
-  }
-}
-
-function openMonitorForm() {
-  // 打开时重置为默认值（记录时间默认当前）
-  monitorForm.record_type = 1
-  monitorForm.value = ''
-  monitorForm.unit = monitoringTypeOptions[0].unit
-  monitorForm.recorded_date = formatDate(new Date(), 'YYYY-MM-DD')
-  monitorForm.recorded_time = formatDate(new Date(), 'HH:mm')
-  monitorForm.remark = ''
-  showMonitorForm.value = true
-}
-
-function closeMonitorForm() {
-  if (submittingMonitoring.value) return
-  showMonitorForm.value = false
-}
-
-function onMonitorTypeChange(e: any) {
-  const idx = Number(e?.detail?.value) || 0
-  const opt = monitoringTypeOptions[idx]
-  if (!opt) return
-  monitorForm.record_type = opt.value
-  // 按类型预填单位
-  monitorForm.unit = opt.unit
-}
-
-function onRecordedDateChange(e: any) {
-  monitorForm.recorded_date = e?.detail?.value || monitorForm.recorded_date
-}
-
-function onRecordedTimeChange(e: any) {
-  monitorForm.recorded_time = e?.detail?.value || monitorForm.recorded_time
-}
-
-// 将日期时间转为带本地时区偏移的 RFC3339 字符串（后端 time.Time 绑定格式）
-function toIsoString(d: Date): string {
-  const pad = (n: number) => (n < 10 ? '0' + n : '' + n)
-  const offset = -d.getTimezoneOffset()
-  const sign = offset >= 0 ? '+' : '-'
-  const abs = Math.abs(offset)
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
-}
-
-async function handleSubmitMonitoring() {
-  const value = Number(monitorForm.value)
-  if (!monitorForm.value || isNaN(value) || value <= 0) {
-    uni.showToast({ title: '请填写正确的测量值', icon: 'none' })
-    return
-  }
-  submittingMonitoring.value = true
-  try {
-    // 本地日期时间拼装后带时区发送
-    const [y, m, d] = monitorForm.recorded_date.split('-').map(Number)
-    const [hh, mm] = monitorForm.recorded_time.split(':').map(Number)
-    await staffHealthApi.createResidentMonitoring(userId.value, {
-      record_type: monitorForm.record_type,
-      value,
-      unit: monitorForm.unit,
-      recorded_at: toIsoString(new Date(y, m - 1, d, hh, mm, 0)),
-      remark: monitorForm.remark.trim() || undefined
-    })
-    uni.showToast({ title: '已保存', icon: 'success' })
-    showMonitorForm.value = false
-    // 录入成功后刷新列表
-    loadMonitoring()
-  } catch (e) {
-    console.error('[HealthResident] handleSubmitMonitoring error', e)
-  } finally {
-    submittingMonitoring.value = false
   }
 }
 
@@ -460,30 +345,6 @@ onLoad((options: any) => {
             </view>
           </view>
         </view>
-
-        <!-- 生命体征 -->
-        <view class="card section-card">
-          <view class="card-title-row">
-            <text class="card-title">生命体征</text>
-            <text v-if="monitoringTotal" class="record-total">共 {{ monitoringTotal }} 条</text>
-          </view>
-          <view v-if="monitoringList.length === 0" class="no-data">暂无体征记录，点击下方按钮录入</view>
-          <view v-else>
-            <view v-for="item in monitoringList" :key="item.id" class="monitor-item">
-              <view class="monitor-head">
-                <text class="monitor-type">{{ monitoringTypeText(item.record_type) }}</text>
-                <text class="monitor-value">
-                  {{ item.value }}<text v-if="item.unit" class="monitor-unit">{{ item.unit }}</text>
-                </text>
-              </view>
-              <view class="monitor-footer">
-                <text class="monitor-time">{{ formatDate(item.recorded_at || item.created_at, 'YYYY-MM-DD HH:mm') }}</text>
-                <text class="monitor-recorder">{{ item.recorded_by ? '服务人员录入' : '客户本人录入' }}</text>
-              </view>
-            </view>
-          </view>
-          <view class="monitor-add-btn" @tap="openMonitorForm">＋ 录入体征</view>
-        </view>
       </template>
     </view>
 
@@ -556,55 +417,6 @@ onLoad((options: any) => {
           </view>
         </scroll-view>
         <button class="modal-close" @tap="closeFittingDetail">关闭</button>
-      </view>
-    </view>
-
-    <!-- 生命体征录入弹层 -->
-    <view v-if="showMonitorForm" class="modal-mask" @tap="closeMonitorForm">
-      <view class="modal-content" @tap.stop>
-        <view class="modal-title">录入生命体征</view>
-        <view class="monitor-form">
-          <view class="form-row">
-            <text class="form-label">类型</text>
-            <picker :range="monitorTypeLabels" :value="monitorForm.record_type - 1" @change="onMonitorTypeChange">
-              <view class="form-picker">{{ monitoringTypeText(monitorForm.record_type) }}</view>
-            </picker>
-          </view>
-          <view class="form-row">
-            <text class="form-label">测量值</text>
-            <input
-              v-model="monitorForm.value"
-              class="form-input"
-              type="digit"
-              placeholder="请输入测量值"
-            />
-            <text class="form-unit">{{ monitorForm.unit }}</text>
-          </view>
-          <view class="form-row">
-            <text class="form-label">测量时间</text>
-            <view class="form-pickers">
-              <picker mode="date" :value="monitorForm.recorded_date" @change="onRecordedDateChange">
-                <view class="form-picker">{{ monitorForm.recorded_date }}</view>
-              </picker>
-              <picker mode="time" :value="monitorForm.recorded_time" @change="onRecordedTimeChange">
-                <view class="form-picker">{{ monitorForm.recorded_time }}</view>
-              </picker>
-            </view>
-          </view>
-          <view class="form-row form-row-top">
-            <text class="form-label">备注</text>
-            <textarea
-              v-model="monitorForm.remark"
-              class="form-textarea"
-              placeholder="选填"
-              maxlength="200"
-            />
-          </view>
-        </view>
-        <button class="modal-submit" :disabled="submittingMonitoring" @tap="handleSubmitMonitoring">
-          {{ submittingMonitoring ? '保存中...' : '保存' }}
-        </button>
-        <button class="modal-cancel" @tap="closeMonitorForm">取消</button>
       </view>
     </view>
   </view>
@@ -888,117 +700,6 @@ onLoad((options: any) => {
   font-size: 30rpx;
   color: #fff;
   background: var(--primary-color);
-  border-radius: 12rpx;
-  line-height: 2.2;
-  &::after { border: none; }
-}
-
-/* 生命体征 */
-.monitor-item {
-  padding: 20rpx 0;
-  border-bottom: 2rpx solid var(--border-color);
-  &:last-child { border-bottom: none; }
-}
-.monitor-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 8rpx;
-  .monitor-type { font-size: 28rpx; color: #666; }
-  .monitor-value { font-size: 34rpx; font-weight: 600; color: #333; }
-  .monitor-unit { font-size: 24rpx; color: #999; font-weight: normal; margin-left: 8rpx; }
-}
-.monitor-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  .monitor-time { font-size: 24rpx; color: #999; }
-  .monitor-recorder { font-size: 22rpx; color: var(--info-color); background: #e6f4ff; padding: 2rpx 12rpx; border-radius: 8rpx; }
-}
-.monitor-add-btn {
-  margin-top: 20rpx;
-  text-align: center;
-  font-size: 28rpx;
-  color: var(--primary-color);
-  background: rgba(81, 117, 40, 0.08);
-  border-radius: 12rpx;
-  padding: 20rpx 0;
-  border: 2rpx dashed var(--primary-color);
-}
-
-/* 生命体征录入弹层表单 */
-.monitor-form {
-  padding: 8rpx 0 16rpx;
-}
-.form-row {
-  display: flex;
-  align-items: center;
-  padding: 16rpx 0;
-  .form-label { width: 150rpx; font-size: 28rpx; color: #666; flex-shrink: 0; }
-}
-.form-pickers {
-  flex: 1;
-  display: flex;
-  gap: 16rpx;
-  min-width: 0;
-}
-.form-picker {
-  flex: 1;
-  min-width: 0;
-  height: 72rpx;
-  background: var(--bg-color);
-  border-radius: 12rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26rpx;
-  color: #333;
-}
-.form-input {
-  flex: 1;
-  height: 72rpx;
-  background: var(--bg-color);
-  border-radius: 12rpx;
-  padding: 0 20rpx;
-  font-size: 28rpx;
-  box-sizing: border-box;
-}
-.form-unit {
-  width: 120rpx;
-  font-size: 26rpx;
-  color: #999;
-  text-align: right;
-}
-.form-row-top {
-  align-items: flex-start;
-  .form-label { line-height: 72rpx; }
-}
-.form-textarea {
-  flex: 1;
-  height: 140rpx;
-  background: var(--bg-color);
-  border-radius: 12rpx;
-  padding: 16rpx 20rpx;
-  font-size: 26rpx;
-  box-sizing: border-box;
-}
-.modal-submit {
-  margin-top: 16rpx;
-  width: 100%;
-  font-size: 30rpx;
-  color: #fff;
-  background: var(--primary-color);
-  border-radius: 12rpx;
-  line-height: 2.2;
-  &::after { border: none; }
-  &[disabled] { opacity: 0.5; }
-}
-.modal-cancel {
-  margin-top: 16rpx;
-  width: 100%;
-  font-size: 30rpx;
-  color: #666;
-  background: #f5f5f5;
   border-radius: 12rpx;
   line-height: 2.2;
   &::after { border: none; }

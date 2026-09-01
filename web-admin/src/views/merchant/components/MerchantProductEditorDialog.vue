@@ -22,8 +22,10 @@ const props = withDefaults(defineProps<{
   modelValue: boolean
   categories: MerchantCategory[]
   productId?: number | null
+  mode?: 'goods' | 'service'
 }>(), {
-  productId: null
+  productId: null,
+  mode: 'goods'
 })
 
 const emit = defineEmits<{
@@ -67,14 +69,23 @@ const form = reactive({
   specs: [] as MerchantProductEditableSpec[]
 })
 
-// 商品类型选项：1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务 5=科普资讯
-const PRODUCT_TYPE_OPTIONS = [
+// 商品类型选项：1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务
+// mode=goods 时仅实物类型（1/2），mode=service 时仅服务类型（3/4），防止跨模块编辑串类型
+const ALL_PRODUCT_TYPE_OPTIONS = [
   { label: '辅具零售', value: 1 },
   { label: '辅具租赁', value: 2 },
   { label: '康养套餐', value: 3 },
-  { label: '陪诊服务', value: 4 },
-  { label: '科普资讯', value: 5 }
+  { label: '陪诊服务', value: 4 }
 ]
+
+const PRODUCT_TYPE_OPTIONS = computed(() =>
+  props.mode === 'service'
+    ? ALL_PRODUCT_TYPE_OPTIONS.filter((t) => [3, 4].includes(t.value))
+    : ALL_PRODUCT_TYPE_OPTIONS.filter((t) => [1, 2].includes(t.value))
+)
+
+// 当前模式默认商品类型：服务=康养套餐，商品=辅具零售
+const DEFAULT_PRODUCT_TYPE = computed(() => (props.mode === 'service' ? 3 : 1))
 
 // 商品类型切换时自动归一化 sale_type：租赁=2，其他=1
 function handleProductTypeChange(value: number) {
@@ -92,10 +103,10 @@ function handleProductTypeChange(value: number) {
   // 康养套餐自动初始化 service_content 空结构
   if (value === 3 && !form.service_content) {
     form.service_content = {
-      duration: '',
-      items: [],
-      notes: '',
-      applicable_groups: ''
+      cycle: '',
+      target_audience: '',
+      services: [],
+      remark: ''
     }
   }
   // 非康养套餐清理 service_content
@@ -104,7 +115,8 @@ function handleProductTypeChange(value: number) {
   }
 }
 
-const dialogTitle = computed(() => props.productId ? '编辑商品' : '新增商品')
+const entityLabel = computed(() => (props.mode === 'service' ? '服务' : '商品'))
+const dialogTitle = computed(() => `${props.productId ? '编辑' : '新增'}${entityLabel.value}`)
 
 function revokeImagePreview(image: ProductImageItem) {
   if (image.previewUrl.startsWith('blob:')) {
@@ -128,7 +140,7 @@ function resetForm() {
   form.original_price = 0
   form.stock = 0
   form.unit = ''
-  form.product_type = 1
+  form.product_type = DEFAULT_PRODUCT_TYPE.value
   form.service_content = null
   form.sale_type = 1
   form.rental_unit = 0
@@ -260,9 +272,9 @@ function validatePayload(payload: MerchantProductUpsertPayload) {
   // 康养套餐校验
   if (payload.product_type === 3) {
     const content = payload.service_content as WellnessPackageContent | null | undefined
-    if (content && Array.isArray(content.items)) {
-      for (let i = 0; i < content.items.length; i++) {
-        const item = content.items[i]
+    if (content && Array.isArray(content.services)) {
+      for (let i = 0; i < content.services.length; i++) {
+        const item = content.services[i]
         if (!item?.name?.trim()) {
           return `服务项 ${i + 1} 请填写服务项名称`
         }

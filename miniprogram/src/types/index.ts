@@ -77,8 +77,8 @@ export interface ProductApiSpec {
   options?: ProductApiSpecOption[] | null
 }
 
-// 商品类型: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务 5=科普资讯
-export type ProductType = 1 | 2 | 3 | 4 | 5
+// 商品类型: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务
+export type ProductType = 1 | 2 | 3 | 4
 
 // 康养套餐服务内容配置
 export interface WellnessPackageItem {
@@ -258,6 +258,8 @@ export interface Order {
   biz_status?: number
   assigned_staff_id?: number
   assigned_staff_name?: string
+  // 服务评价（阶段四）：服务订单已完成且未评价时为 true
+  can_review?: boolean
   rental_end_at?: string
   parent_order_id?: number
   renew_flag?: number
@@ -297,6 +299,9 @@ export interface CreateOrderRequest {
     rental_duration?: number
   }[]
   delivery_distance?: number
+  record_id?: number
+  address_id?: number
+  user_coupon_id?: number
   delivery_address?: string
   contact_name?: string
   contact_phone?: string
@@ -393,6 +398,8 @@ export interface StoreHomeInfo {
     rental_price?: number
     deposit?: number
   }[]
+  // 待评价服务订单数量（阶段四：首页红点）
+  pending_review_count?: number
 }
 
 // 店铺商品列表（按分类分组）
@@ -425,10 +432,11 @@ export interface MerchantBehaviorEventRequest {
 
 // ============ 基层健康服务 ============
 
-// 健康档案（字段与后端一致）
+// 健康档案（字段与后端一致；关系 relation: 1本人 2父母 3其他亲属，阶段五 8.2 多档案）
 export interface HealthRecord {
   id: number
   user_id: number
+  relation?: number     // 1本人 2父母 3其他亲属
   real_name?: string
   gender?: number        // 1男 2女
   birth_date?: string    // YYYY-MM-DD
@@ -479,6 +487,7 @@ export interface HealthAssessment {
   id: number
   user_id: number
   form_id: number
+  record_id?: number
   form_name?: string
   assessor_type?: number
   answers?: Record<string, string>
@@ -515,90 +524,13 @@ export interface FittingRecommendation {
   updated_at?: string
 }
 
-// ============ 我的照护计划 ============
-
-/** 照护计划-护理项 */
-export interface CarePlanItem {
-  name: string
-  desc?: string
-}
-
-/** 照护计划（字段与后端一致） */
-export interface CarePlan {
-  id: number
-  user_id: number
-  name: string
-  plan_type?: number // 1生活照料 2基础护理 3康复训练 4综合康养
-  start_date?: string
-  end_date?: string
-  frequency?: string
-  goals?: string
-  items: CarePlanItem[]
-  assigned_staff_id?: number | null
-  order_id?: number | null
-  status?: number // 0草稿 1执行中 2已暂停 3已完成
-  visit_count?: number
-  created_at?: string
-  updated_at?: string
-  visits?: CareVisit[]
-}
-
-/** 照护计划-上门照护记录 */
-export interface CareVisit {
-  id: number
-  plan_id?: number | null
-  order_id?: number | null
-  user_id: number
-  staff_id?: number
-  visit_at?: string
-  nursing_items: { name: string; done?: boolean; remark?: string }[]
-  vitals?: {
-    blood_pressure?: string
-    blood_glucose?: string
-    heart_rate?: string
-    oxygen?: string
-    weight?: string
-  }
-  photos?: string[]
-  remark?: string
-  follow_up_advice?: string
-  created_at?: string
-}
-
-// ============ 我的康复随访 ============
-
-/** 随访任务结果（可能以 JSON 字符串返回，接口封装时规范化） */
-export interface FollowUpTaskResult {
-  contact_method?: number // 实际随访方式 1电话 2上门 3微信
-  content?: string
-  education_article_ids?: number[]
-  satisfaction?: number
-  remark?: string
-}
-
-/** 随访任务（字段与后端一致） */
-export interface FollowUpTask {
-  id: number
-  user_id: number
-  task_type?: number // 1康复随访 2租后回访 3慢病随访 4评估回访
-  source_type?: number // 1服务完成 2租赁归还 3评估完成 4手动
-  source_id?: number | null
-  plan_follow_time?: string
-  staff_id?: number | null
-  contact_method?: number // 1电话 2上门 3微信
-  status?: number // 0待执行 1已完成 2已跳过
-  result?: FollowUpTaskResult
-  completed_at?: string
-  remark?: string
-  created_at?: string
-}
-
 // ============ 健康宣教 ============
 
 /** 宣教文章（字段与后端一致） */
 export interface EducationArticle {
   id: number
   title: string
+  category_id?: number
   category?: string
   cover?: string
   content?: string
@@ -608,20 +540,42 @@ export interface EducationArticle {
   views?: number
 }
 
-// ============ 生命体征记录 ============
-
-/** 生命体征记录（字段与后端一致） */
-export interface HealthMonitoring {
+/** 健康宣教分类（两级：parent_id=0 为一级；status 1启用 0停用） */
+export interface HealthEducationCategory {
   id: number
+  parent_id: number
+  name: string
+  sort: number
+  status: number
+}
+
+// ============ 服务评价（阶段四） ============
+
+/** 服务评价（字段与后端 service_reviews 一致） */
+export interface ServiceReview {
+  id: number
+  order_id: number
   user_id: number
-  record_type?: number // 1血压 2血糖 3心率 4血氧 5体重
-  value?: number
-  unit?: string
-  extra?: Record<string, unknown>
-  recorded_by?: number
-  recorded_at?: string
-  remark?: string
+  staff_id: number
+  score: number
+  attitude_score: number
+  professional_score: number
+  punctual_score: number
+  content?: string
+  images?: string[]
+  status: number
   created_at?: string
+  updated_at?: string
+}
+
+/** 提交服务评价请求 */
+export interface ServiceReviewSubmit {
+  score: number
+  attitude_score: number
+  professional_score: number
+  punctual_score: number
+  content?: string
+  images?: string[]
 }
 
 // ============ 错误码 ============

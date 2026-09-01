@@ -147,7 +147,7 @@ function normalizeServiceContent(value: unknown): WellnessPackageContent | undef
 
 function normalizeProduct(product: ProductApiResponse | null | undefined): Product {
   const pt = normalizeNumberValue(product?.product_type)
-  const productType: ProductType = (pt === 1 || pt === 2 || pt === 3 || pt === 4 || pt === 5) ? pt : (Number(product?.sale_type) === 2 ? 2 : 1)
+  const productType: ProductType = (pt === 1 || pt === 2 || pt === 3 || pt === 4) ? pt : (Number(product?.sale_type) === 2 ? 2 : 1)
   return {
     ...product,
     id: normalizeRequiredNumber(product?.id),
@@ -208,7 +208,13 @@ export function getStoreHome() {
   })
 }
 
-export function getStoreProducts(params?: { category_id?: number; keyword?: string; page?: number; page_size?: number }) {
+export function getStoreProducts(params?: {
+  category_id?: number
+  keyword?: string
+  product_types?: string
+  page?: number
+  page_size?: number
+}) {
   return get<ProductListResponse>(`/api/v1/store/products`, params).then(response => {
     const normalized = normalizeListField(response)
     return {

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { staffWorkorderApi } from '@/api'
+import { staffWorkorderApi, staffSafetyApi } from '@/api'
 import { OrderTypeText } from '@/types'
 import { formatDate, fromNow } from '@/utils/format'
+import { startSafety, stopSafety, isSafetyActive } from '@/utils/safety'
 
 const orderId = ref<string>('')
 const loading = ref(false)
@@ -12,6 +13,11 @@ const detail = ref<any>(null)
 // 签退备注弹窗
 const checkoutRemark = ref('')
 const showCheckoutModal = ref(false)
+
+// 录音/定位授权协议弹窗（服务开始前确认）
+const showAgreementModal = ref(false)
+const agreementInfo = ref<any>(null)
+let agreementResolve: ((agree: boolean) => void) | null = null
 
 const orderTypeText = computed(() => {
   if (!detail.value) return ''
@@ -82,12 +88,60 @@ async function handleAccept() {
   })
 }
 
+// 服务开始前确认录音/定位授权协议（已同意或未配置则直接放行）
+function ensureAgreementConsented(): Promise<boolean> {
+  return new Promise(async (resolve) => {
+    try {
+      const res: any = await staffSafetyApi.getActiveAgreement(3)
+      const agreement = res?.data?.agreement
+      if (res?.code !== 0 || !agreement) {
+        resolve(true)
+        return
+      }
+      if (res?.data?.consented) {
+        resolve(true)
+        return
+      }
+      // 未同意：弹窗展示协议内容
+      agreementInfo.value = agreement
+      showAgreementModal.value = true
+      agreementResolve = resolve
+    } catch {
+      // 协议拉取失败不阻塞签到
+      resolve(true)
+    }
+  })
+}
+
+// 同意协议 → 留痕 → 放行签到
+async function confirmAgreement() {
+  if (!agreementInfo.value) return
+  try {
+    await staffSafetyApi.consentAgreement(agreementInfo.value.id)
+  } catch {
+    // 留痕失败不阻塞
+  }
+  showAgreementModal.value = false
+  agreementResolve?.(true)
+  agreementResolve = null
+}
+
+// 拒绝协议 → 阻断签到
+function rejectAgreement() {
+  showAgreementModal.value = false
+  agreementResolve?.(false)
+  agreementResolve = null
+}
+
 function handleCheckIn() {
   uni.showModal({
     title: '确认签到',
-    content: '签到后将开始记录服务时间，确认已到达服务地点？',
+    content: '签到后将开始记录服务时间并开启录音与定位（服务过程留痕），确认已到达服务地点？',
     success: async (res) => {
       if (!res.confirm) return
+      // 服务开始前确认录音/定位授权协议
+      const agreed = await ensureAgreementConsented()
+      if (!agreed) return
       // 尝试获取定位（失败也不阻塞，后端不强制要求）
       let lat: number | undefined
       let lng: number | undefined
@@ -104,6 +158,8 @@ function handleCheckIn() {
         const result: any = await staffWorkorderApi.checkIn(orderId.value, lat, lng)
         if (result.code === 0) {
           uni.showToast({ title: '签到成功', icon: 'success' })
+          // 启动服务安全监控：录音 + 60s 定位上报
+          startSafety(orderId.value)
           loadDetail()
         } else {
           uni.showToast({ title: result.message || '签到失败', icon: 'none' })
@@ -126,6 +182,12 @@ async function confirmCheckOut() {
     const result: any = await staffWorkorderApi.checkOut(orderId.value, checkoutRemark.value)
     if (result.code === 0) {
       uni.showToast({ title: '签退成功', icon: 'success' })
+      // 停止服务安全监控：停止录音并上传（异步，不阻塞页面）
+      stopSafety().then((audioUrl) => {
+        if (audioUrl) {
+          uni.showToast({ title: '服务录音已存档', icon: 'none' })
+        }
+      })
       loadDetail()
       // 签退成功后询问是否录入本次上门照护记录
       uni.showModal({
@@ -141,6 +203,49 @@ async function confirmCheckOut() {
   } catch (e: any) {
     uni.showToast({ title: e?.data?.message || '签退失败', icon: 'none' })
   }
+}
+
+// 一键SOS（服务中/待支付尾款阶段可触发）
+const sosSubmitting = ref(false)
+async function handleSOS() {
+  if (sosSubmitting.value) return
+  uni.showModal({
+    title: '一键SOS',
+    content: '确认发出紧急求助？商家将立即收到预警并联系您',
+    confirmText: '立即求助',
+    confirmColor: '#e64340',
+    success: async (res) => {
+      if (!res.confirm) return
+      sosSubmitting.value = true
+      let lat = 0
+      let lng = 0
+      try {
+        const loc: any = await new Promise((resolve, reject) => {
+          uni.getLocation({ type: 'gcj02', success: resolve, fail: reject })
+        })
+        lat = loc.latitude
+        lng = loc.longitude
+      } catch {
+        // 定位失败仍可发出SOS（不带位置）
+      }
+      try {
+        const result: any = await staffSafetyApi.sos({
+          order_id: detail.value?.id ? Number(detail.value.id) : undefined,
+          lat,
+          lng
+        })
+        if (result.code === 0) {
+          uni.showToast({ title: 'SOS已发出，商家将尽快处理', icon: 'none' })
+        } else {
+          uni.showToast({ title: result.message || 'SOS发送失败，请电话联系商家', icon: 'none' })
+        }
+      } catch (e: any) {
+        uni.showToast({ title: e?.data?.message || 'SOS发送失败，请电话联系商家', icon: 'none' })
+      } finally {
+        sosSubmitting.value = false
+      }
+    }
+  })
 }
 
 function callPhone(phone: string) {
@@ -169,6 +274,10 @@ onShow(() => {
   // 从其他页面返回时刷新
   if (orderId.value && detail.value) {
     loadDetail()
+  }
+  // 服务中但监控未运行（如小程序被杀重启后进入）：恢复录音与定位上报
+  if (orderId.value && detail.value?.biz_status === 3 && !isSafetyActive()) {
+    startSafety(orderId.value)
   }
 })
 </script>
@@ -350,6 +459,27 @@ onShow(() => {
           <button class="modal-btn confirm" @tap="confirmCheckOut">确认签退</button>
         </view>
       </view>
+    </view>
+
+    <!-- 录音/定位授权协议弹窗（服务开始前确认） -->
+    <view v-if="showAgreementModal" class="modal-mask">
+      <view class="modal-content agreement-modal" @tap.stop>
+        <view class="modal-title">{{ agreementInfo?.title || '录音/定位授权协议' }}</view>
+        <view class="modal-desc agreement-version">版本：{{ agreementInfo?.version }}</view>
+        <scroll-view scroll-y class="agreement-content">
+          <rich-text :nodes="agreementInfo?.content || ''"></rich-text>
+        </scroll-view>
+        <view class="modal-actions">
+          <button class="modal-btn cancel" @tap="rejectAgreement">不同意</button>
+          <button class="modal-btn confirm" @tap="confirmAgreement">同意并开始服务</button>
+        </view>
+      </view>
+    </view>
+
+    <!-- 一键SOS悬浮按钮（服务中显示） -->
+    <view v-if="canCheckOut" class="sos-fab" @tap="handleSOS">
+      <text class="sos-fab-text">SOS</text>
+      <text class="sos-fab-sub">紧急求助</text>
     </view>
   </view>
 
@@ -550,6 +680,48 @@ onShow(() => {
   &::after { border: none; }
   &.cancel { background: var(--bg-color); color: #666; }
   &.confirm { background: var(--primary-color); color: #fff; }
+}
+
+/* 录音/定位授权协议弹窗 */
+.agreement-modal { display: flex; flex-direction: column; max-height: 70vh; }
+.agreement-version { margin-bottom: 12rpx; }
+.agreement-content {
+  height: 50vh;
+  background: var(--bg-color);
+  border-radius: 8rpx;
+  padding: 20rpx;
+  font-size: 26rpx;
+  color: #333;
+  box-sizing: border-box;
+  margin-bottom: 32rpx;
+}
+
+/* 一键SOS悬浮按钮 */
+.sos-fab {
+  position: fixed;
+  right: 32rpx;
+  bottom: 220rpx;
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff4d4f, #e64340);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 24rpx rgba(230, 67, 64, 0.4);
+  z-index: 150;
+}
+.sos-fab-text {
+  color: #fff;
+  font-size: 34rpx;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.sos-fab-sub {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 20rpx;
+  line-height: 1.2;
 }
 
 .empty {

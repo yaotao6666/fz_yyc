@@ -14,6 +14,7 @@ import {
 import type { SpOrder, SpOrderItem } from '@/types/sp'
 import { SpOrderStatusText, OrderTypeText, BizStatusText } from '@/types/sp'
 import { formatAmount, formatDateTime, getDepositStatusText, getRentalUnitText } from '@/utils/format'
+import { getOrderServiceRecord, type ServiceRecordResponse } from '@/api/safety'
 
 const route = useRoute()
 const router = useRouter()
@@ -133,7 +134,7 @@ async function handleRenew() {
   }
 }
 
-function formatOptionalDateTime(value?: string) {
+function formatOptionalDateTime(value?: string | null) {
   return value ? formatDateTime(value) : '-'
 }
 
@@ -162,9 +163,36 @@ async function loadOrderDetail() {
   loading.value = true
   try {
     order.value = await getOrderDetail(orderId.value)
+    // 服务订单加载服务记录（签到签退/录音/轨迹/SOS）
+    if (isServiceOrder.value) {
+      loadServiceRecord()
+    }
   } finally {
     loading.value = false
   }
+}
+
+/* ============ 服务记录（阶段三：服务过程安全） ============ */
+const serviceRecord = ref<ServiceRecordResponse | null>(null)
+const serviceRecordLoading = ref(false)
+
+async function loadServiceRecord() {
+  if (!orderId.value) return
+  serviceRecordLoading.value = true
+  try {
+    serviceRecord.value = await getOrderServiceRecord(orderId.value)
+  } catch (_e) {
+    serviceRecord.value = null
+  } finally {
+    serviceRecordLoading.value = false
+  }
+}
+
+function durationText(minutes: number) {
+  if (minutes < 0) return '服务进行中/未记录'
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return h > 0 ? `${h} 小时 ${m} 分钟` : `${m} 分钟`
 }
 
 function goBack() {
@@ -294,6 +322,64 @@ onMounted(loadOrderDetail)
             <div class="info-row"><span>预约时间</span><span>{{ formatOptionalDateTime(order.scheduled_at) }}</span></div>
             <div class="info-row"><span>开始服务</span><span>{{ formatOptionalDateTime(order.actual_started_at) }}</span></div>
             <div class="info-row"><span>结束服务</span><span>{{ formatOptionalDateTime(order.actual_ended_at) }}</span></div>
+          </div>
+        </el-card>
+
+        <el-card v-if="isServiceOrder" class="page-card" shadow="never" v-loading="serviceRecordLoading">
+          <template #header>
+            服务记录
+            <el-tag v-if="serviceRecord?.service_record?.sos_triggered" type="danger" size="small" style="margin-left: 8px;">触发过SOS</el-tag>
+            <el-tag
+              v-if="serviceRecord?.service_record"
+              :type="serviceRecord.service_record.status === 2 ? 'danger' : 'success'"
+              size="small"
+              style="margin-left: 8px;"
+            >
+              {{ serviceRecord.service_record.status === 2 ? '异常' : '正常' }}
+            </el-tag>
+          </template>
+          <template v-if="serviceRecord?.service_record">
+            <div class="info-list">
+              <div class="info-row">
+                <span>服务人员</span>
+                <span>{{ serviceRecord.service_record.staff?.name || `#${serviceRecord.service_record.staff_id}` }}</span>
+              </div>
+              <div class="info-row"><span>签到时间</span><span>{{ formatOptionalDateTime(serviceRecord.service_record.start_time) }}</span></div>
+              <div class="info-row"><span>签退时间</span><span>{{ formatOptionalDateTime(serviceRecord.service_record.end_time) }}</span></div>
+              <div class="info-row"><span>服务时长</span><span>{{ durationText(serviceRecord.service_record.duration_minutes) }}</span></div>
+              <div class="info-row">
+                <span>服务录音</span>
+                <span>
+                  <audio
+                    v-if="serviceRecord.service_record.audio_url"
+                    :src="serviceRecord.service_record.audio_url"
+                    controls
+                    preload="none"
+                    class="service-audio"
+                  />
+                  <span v-else-if="serviceRecord.service_record.audio_deleted_at" class="audio-deleted">已超过 30 天保留期自动删除</span>
+                  <span v-else>暂无录音</span>
+                </span>
+              </div>
+              <div class="info-row">
+                <span>定位轨迹</span>
+                <span>{{ serviceRecord.track_count > 0 ? `${serviceRecord.track_count} 个轨迹点` : '暂无轨迹' }}</span>
+              </div>
+            </div>
+            <el-collapse v-if="serviceRecord.tracks && serviceRecord.tracks.length > 0" class="track-collapse">
+              <el-collapse-item :title="`轨迹点明细（共 ${serviceRecord.track_count} 个）`">
+                <el-table :data="serviceRecord.tracks" size="small" max-height="260">
+                  <el-table-column prop="reported_at" label="上报时间" width="180">
+                    <template #default="{ row }">{{ formatDateTime(row.reported_at) }}</template>
+                  </el-table-column>
+                  <el-table-column prop="lat" label="纬度" width="120" />
+                  <el-table-column prop="lng" label="经度" width="120" />
+                </el-table>
+              </el-collapse-item>
+            </el-collapse>
+          </template>
+          <div v-else class="info-list">
+            <div class="info-row"><span>服务记录</span><span>暂无（签到后自动生成）</span></div>
           </div>
         </el-card>
 
@@ -477,6 +563,20 @@ onMounted(loadOrderDetail)
 
 .error-row span:last-child {
   color: #f56c6c;
+}
+
+.service-audio {
+  height: 36px;
+  max-width: 100%;
+}
+
+.audio-deleted {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.track-collapse {
+  margin-top: 14px;
 }
 
 .item-list {

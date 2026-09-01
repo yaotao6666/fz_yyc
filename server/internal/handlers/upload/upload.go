@@ -24,9 +24,17 @@ func (h *UploadHandler) GetToken(c *gin.Context) {
 	prefix := "uploads/common"
 	if userType == "merchant" {
 		prefix = fmt.Sprintf("uploads/merchant/%d", userID)
+	} else if userType == "service_staff" {
+		prefix = fmt.Sprintf("uploads/service-staff/%d", userID)
 	}
 
-	token, err := qiniu.GetService().GetUploadToken()
+	// 录音等非图片上传：?mime=audio/*（默认 image/*）
+	mimeLimit := c.DefaultQuery("mime", "image/*")
+	if mimeLimit != "audio/*" {
+		mimeLimit = "image/*"
+	}
+
+	token, err := qiniu.GetService().GetUploadTokenWithMime(mimeLimit)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, response.CodeQiniuUploadFailed, "获取上传凭证失败")
 		return

@@ -547,6 +547,7 @@ func GetProducts(c *gin.Context) {
 	keyword := c.Query("keyword")
 	saleType := c.Query("sale_type")
 	productType := c.Query("product_type")
+	productTypes := c.Query("product_types") // 逗号分隔多值：如 3,4（服务管理）/1,2,5（商品管理）
 
 	if page < 1 {
 		page = 1
@@ -572,6 +573,16 @@ func GetProducts(c *gin.Context) {
 	if productType != "" {
 		productTypeInt, _ := strconv.Atoi(productType)
 		query = query.Where("product_type = ?", productTypeInt)
+	} else if productTypes != "" {
+		typeList := make([]int, 0)
+		for _, part := range strings.Split(productTypes, ",") {
+			if value, err := strconv.Atoi(strings.TrimSpace(part)); err == nil && value > 0 {
+				typeList = append(typeList, value)
+			}
+		}
+		if len(typeList) > 0 {
+			query = query.Where("product_type IN ?", typeList)
+		}
 	}
 	if keyword != "" {
 		query = query.Where("name LIKE ?", "%"+keyword+"%")
@@ -630,7 +641,7 @@ type ProductRequest struct {
 }
 
 // normalizeProductType 根据 product_type 和 sale_type 自动归一化，保持业务语义一致
-// product_type: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务 5=科普资讯
+// product_type: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务
 // sale_type:    1=一口价 2=租赁
 // 规则：辅具租赁固定 sale_type=2；其他类型固定 sale_type=1
 func normalizeProductType(productType uint8, saleType uint8) (uint8, uint8) {
@@ -645,7 +656,7 @@ func normalizeProductType(productType uint8, saleType uint8) (uint8, uint8) {
 	switch productType {
 	case 2: // 辅具租赁
 		saleType = 2
-	default: // 辅具零售/康养套餐/陪诊/科普
+	default: // 辅具零售/康养套餐/陪诊
 		saleType = 1
 	}
 	return productType, saleType

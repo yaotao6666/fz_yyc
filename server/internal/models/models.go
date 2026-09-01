@@ -169,7 +169,7 @@ type Product struct {
 	OriginalPrice      float64       `gorm:"type:decimal(10,2);comment:划线原价(元,0表示不展示)" json:"original_price"`
 	Stock              uint          `gorm:"not null;default:0;comment:库存数量" json:"stock"`
 	Unit               string        `gorm:"size:16;not null;default:份;comment:计量单位" json:"unit"`
-	ProductType        uint8         `gorm:"not null;default:1;comment:商品类型: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务 5=科普资讯" json:"product_type"`
+	ProductType        uint8         `gorm:"not null;default:1;comment:商品类型: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务" json:"product_type"`
 	ServiceContent     JSON          `gorm:"type:json;comment:服务内容配置JSON" json:"service_content"`
 	SaleType           uint8         `gorm:"not null;default:1;comment:销售类型: 1=一口价 2=租赁" json:"sale_type"`
 	RentalUnit         uint8         `gorm:"not null;default:0;comment:租赁计费周期: 0=非租赁 1=按天 2=按周 3=按月" json:"rental_unit"`
@@ -285,6 +285,7 @@ type Order struct {
 	BizStatus            uint8       `gorm:"not null;default:0;comment:业务状态: 0=无 1=待接单 2=已接单 3=服务中 4=待支付(尾款) 5=已完成 6=已取消" json:"biz_status"`
 	ScheduledAt          *time.Time  `gorm:"comment:预约服务时间" json:"scheduled_at"`
 	AssignedStaffID      *uint64     `gorm:"index;comment:指派服务员工ID" json:"assigned_staff_id"`
+	AssignedAt           *time.Time  `gorm:"comment:指派/接单时间" json:"assigned_at"`
 	ActualStartedAt      *time.Time  `gorm:"comment:实际开始时间" json:"actual_started_at"`
 	ActualEndedAt        *time.Time  `gorm:"comment:实际结束时间" json:"actual_ended_at"`
 	TotalAmount          float64     `gorm:"type:decimal(10,2);not null;default:0;comment:商品总金额(元)" json:"total_amount"`
@@ -302,10 +303,16 @@ type Order struct {
 	ParentOrderID        *uint64     `gorm:"index;comment:续租关联原订单ID(0/空=普通订单)" json:"parent_order_id,omitempty"`
 	RenewFlag            uint8       `gorm:"not null;default:0;comment:是否续租单: 1=续租 0=非" json:"renew_flag"`
 	AssignedStaffName    string      `gorm:"-" json:"assigned_staff_name"`
+	RecordID             *uint64     `gorm:"index;comment:服务订单绑定的健康档案ID(服务单必填)" json:"record_id,omitempty"`
+	RecordName           string      `gorm:"-" json:"record_name,omitempty"`
+	RecordGender         uint8       `gorm:"-" json:"record_gender,omitempty"`
+	RecordBirthDate      string      `gorm:"-" json:"record_birth_date,omitempty"`
+	DeliveryDistrict     string      `gorm:"size:32;comment:收货区县(服务订单区域匹配用)" json:"delivery_district"`
 	DeliveryAddress      string      `gorm:"size:256;comment:收货地址(配送时填写)" json:"delivery_address"`
 	ContactName          string      `gorm:"size:64;comment:联系人姓名(配送时填写)" json:"contact_name"`
 	ContactPhone         string      `gorm:"size:20;comment:联系电话(配送时填写)" json:"contact_phone"`
 	Status               uint8       `gorm:"not null;default:1;comment:订单状态: 1=待支付 2=已支付 3=已完成 4=已取消 5=退款中 6=已退款" json:"status"`
+	CanReview            bool        `gorm:"-" json:"can_review,omitempty"` // 待评价标记（服务订单已完成且未评价，瞬时字段）
 	Remark               string      `gorm:"size:256;comment:用户备注" json:"remark"`
 	TransactionID        string      `gorm:"size:64;comment:微信支付交易单号" json:"transaction_id"`
 	PaidAt               *time.Time  `gorm:"comment:支付完成时间" json:"paid_at"`
@@ -518,6 +525,8 @@ type ServiceStaff struct {
 	OpenID        string     `gorm:"column:openid;size:64;index;comment:微信OpenID(用于快捷登录)" json:"openid"`
 	Avatar        string     `gorm:"size:512;comment:头像URL" json:"avatar"`
 	Qualifications JSON     `gorm:"type:json;comment:资质材料列表JSON[{type,name,url}]" json:"qualifications,omitempty"`
+	ServiceRegion string     `gorm:"size:256;comment:服务区域(区县,逗号分隔,空=不限)" json:"service_region"`
+	QualityScore  float64    `gorm:"type:decimal(3,1);not null;default:5.0;comment:服务质量分(阶段四写入)" json:"quality_score"`
 	Status        uint8      `gorm:"not null;default:0;comment:状态: 0=待审核 1=启用 2=禁用" json:"status"`
 	AuditStatus   uint8      `gorm:"not null;default:0;comment:审核状态: 0=无/已通过 1=待审核(与status解耦)" json:"audit_status"`
 	PendingFields JSON       `gorm:"type:json;comment:审核中待变更字段快照" json:"pending_fields,omitempty"`
@@ -553,6 +562,156 @@ type StaffAuditRecord struct {
 
 func (StaffAuditRecord) TableName() string {
 	return "service_staff_audit_records"
+}
+
+// ============================================
+// 服务记录表 (service_records)
+// 用途：服务订单完结时写入的签到/签退/录音快照（PRD V2.0 阶段三：服务过程安全）
+// ============================================
+type ServiceRecord struct {
+	ID                uint64     `gorm:"primaryKey;autoIncrement;comment:服务记录ID" json:"id"`
+	OrderID           uint64     `gorm:"not null;uniqueIndex;comment:订单ID" json:"order_id"`
+	StaffID           uint64     `gorm:"not null;index;comment:服务人员ID" json:"staff_id"`
+	StartTime         *time.Time `gorm:"comment:签到时间(orders快照)" json:"start_time"`
+	EndTime           *time.Time `gorm:"comment:签退时间(orders快照)" json:"end_time"`
+	GPSTrackURL       string     `gorm:"size:512;comment:轨迹聚合文件URL(可选)" json:"gps_track_url"`
+	AudioURL          string     `gorm:"size:512;comment:服务录音URL(七牛)" json:"audio_url"`
+	AudioUploadedAt   *time.Time `gorm:"comment:录音上传时间(30天清理依据)" json:"audio_uploaded_at"`
+	AudioDeletedAt    *time.Time `gorm:"comment:录音删除标记时间" json:"audio_deleted_at"`
+	SOSTriggered      uint8      `gorm:"not null;default:0;comment:是否触发SOS: 0=否 1=是" json:"sos_triggered"`
+	Status            uint8      `gorm:"not null;default:1;comment:状态: 1=正常 2=异常" json:"status"`
+	CreatedAt         time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt         time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+}
+
+func (ServiceRecord) TableName() string {
+	return "service_records"
+}
+
+// ============================================
+// 服务轨迹点表 (service_location_tracks)
+// 用途：服务中工单的高频定位上报（60s/次）
+// ============================================
+type ServiceLocationTrack struct {
+	ID         uint64    `gorm:"primaryKey;autoIncrement;comment:轨迹点ID" json:"id"`
+	OrderID    uint64    `gorm:"not null;index;comment:订单ID" json:"order_id"`
+	StaffID    uint64    `gorm:"not null;index;comment:服务人员ID" json:"staff_id"`
+	Lat        float64   `gorm:"type:decimal(10,6);not null;comment:纬度" json:"lat"`
+	Lng        float64   `gorm:"type:decimal(10,6);not null;comment:经度" json:"lng"`
+	ReportedAt time.Time `gorm:"not null;index;comment:上报时间" json:"reported_at"`
+	CreatedAt  time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+}
+
+func (ServiceLocationTrack) TableName() string {
+	return "service_location_tracks"
+}
+
+// ============================================
+// 服务预警事件表 (service_alert_events)
+// 用途：统一承载 SOS 求助与服务超时预警（PRD V2.0 阶段三）
+// ============================================
+type ServiceAlertEvent struct {
+	ID           uint64     `gorm:"primaryKey;autoIncrement;comment:预警事件ID" json:"id"`
+	OrderID      *uint64    `gorm:"index;comment:关联订单ID(可空)" json:"order_id"`
+	StaffID      *uint64    `gorm:"index;comment:服务人员ID(订单级预警可空)" json:"staff_id"`
+	AlertType    uint8      `gorm:"not null;comment:预警类型: 1=SOS求助 2=服务超时未结束" json:"alert_type"`
+	Lat          float64    `gorm:"type:decimal(10,6);comment:触发位置纬度" json:"lat"`
+	Lng          float64    `gorm:"type:decimal(10,6);comment:触发位置经度" json:"lng"`
+	Address      string     `gorm:"size:256;comment:触发位置地址" json:"address"`
+	Summary      string     `gorm:"size:256;comment:预警摘要(订单级预警触发说明)" json:"summary"`
+	Status       uint8      `gorm:"not null;default:1;index;comment:状态: 1=待处理 2=处理中 3=已处理" json:"status"`
+	HandlerID    *uint64    `gorm:"comment:处理人ID(merchant_staffs.id)" json:"handler_id"`
+	HandlerName  string     `gorm:"size:64;comment:处理人姓名快照" json:"handler_name"`
+	HandleRemark string     `gorm:"size:512;comment:处理备注留痕" json:"handle_remark"`
+	HandledAt    *time.Time `gorm:"comment:处理时间" json:"handled_at"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime;index;comment:创建时间" json:"created_at"`
+	UpdatedAt    time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+}
+
+func (ServiceAlertEvent) TableName() string {
+	return "service_alert_events"
+}
+
+// ============================================
+// 预警配置表 (alert_settings)
+// 用途：单行配置，控制预警总开关与各预警场景的触发阈值（PRD V2.0 阶段五）
+// ============================================
+type AlertSettings struct {
+	ID                      uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	Enabled                 bool      `gorm:"not null;default:true;comment:预警总开关" json:"enabled"`
+	GoodsUnverifiedHours    int       `gorm:"not null;default:24;comment:实物超时未核销(小时)" json:"goods_unverified_hours"`
+	ServiceUnassignedHours  int       `gorm:"not null;default:2;comment:服务超时未指派(小时)" json:"service_unassigned_hours"`
+	EscortUnfinishedMinutes int       `gorm:"not null;default:120;comment:陪诊超时未完成(分钟)" json:"escort_unfinished_minutes"`
+	ServiceUnstartedMinutes int       `gorm:"not null;default:30;comment:指派超时未签到(分钟)" json:"service_unstarted_minutes"`
+	RentalOverdueHours      int       `gorm:"not null;default:24;comment:租赁逾期未归还(小时)" json:"rental_overdue_hours"`
+	RefundStuckHours        int       `gorm:"not null;default:24;comment:退款卡在处理中(小时)" json:"refund_stuck_hours"`
+	CreatedAt               time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt               time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (AlertSettings) TableName() string {
+	return "alert_settings"
+}
+
+// ============================================
+// 协议表 (agreements)
+// 用途：用户协议/隐私政策/录音定位授权协议等版本化管理（PRD V2.0 阶段三 6.5）
+// ============================================
+type Agreement struct {
+	ID          uint64     `gorm:"primaryKey;autoIncrement;comment:协议ID" json:"id"`
+	Type        uint8      `gorm:"not null;index;comment:协议类型: 1=用户协议 2=隐私政策 3=录音/定位授权协议" json:"type"`
+	Title       string     `gorm:"size:128;not null;comment:协议标题" json:"title"`
+	Content     string     `gorm:"type:text;comment:协议正文(富文本)" json:"content"`
+	Version     string     `gorm:"size:32;not null;comment:版本号(同类型递增,如v1.2)" json:"version"`
+	Status      uint8      `gorm:"not null;default:0;comment:状态: 1=已发布(当前生效) 0=草稿/停用" json:"status"`
+	PublishedAt *time.Time `gorm:"comment:发布时间" json:"published_at"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+}
+
+func (Agreement) TableName() string {
+	return "agreements"
+}
+
+// ============================================
+// 协议同意留痕表 (agreement_consents)
+// 用途：记录用户/服务人员对某版本协议的同意行为
+// ============================================
+type AgreementConsent struct {
+	ID          uint64    `gorm:"primaryKey;autoIncrement;comment:留痕ID" json:"id"`
+	AgreementID uint64    `gorm:"not null;index;comment:协议ID" json:"agreement_id"`
+	UserType    uint8     `gorm:"not null;default:1;comment:用户类型: 1=C端用户 2=服务人员" json:"user_type"`
+	UserID      uint64    `gorm:"not null;index;comment:用户ID" json:"user_id"`
+	Version     string    `gorm:"size:32;not null;comment:同意时协议版本号快照" json:"version"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;comment:同意时间" json:"created_at"`
+}
+
+func (AgreementConsent) TableName() string {
+	return "agreement_consents"
+}
+
+// ============================================
+// 服务评价表 (service_reviews)
+// 用途：服务订单完结后的用户评价，一单一评，驱动服务质量分计算（PRD V2.0 阶段四）
+// ============================================
+type ServiceReview struct {
+	ID                uint64    `gorm:"primaryKey;autoIncrement;comment:评价ID" json:"id"`
+	OrderID           uint64    `gorm:"not null;uniqueIndex;comment:订单ID(一单一评)" json:"order_id"`
+	UserID            uint64    `gorm:"not null;index;comment:下单用户ID" json:"user_id"`
+	StaffID           uint64    `gorm:"not null;index;comment:被评价服务人员ID" json:"staff_id"`
+	Score             uint8     `gorm:"not null;comment:总体评分 1-5" json:"score"`
+	AttitudeScore     uint8     `gorm:"not null;comment:服务态度分 1-5" json:"attitude_score"`
+	ProfessionalScore uint8     `gorm:"not null;comment:专业技能分 1-5" json:"professional_score"`
+	PunctualScore     uint8     `gorm:"not null;comment:准时守约分 1-5" json:"punctual_score"`
+	Content           string    `gorm:"size:512;comment:评价内容" json:"content"`
+	Images            JSON      `gorm:"type:json;comment:评价图片URL列表" json:"images"`
+	Status            uint8     `gorm:"not null;default:1;comment:状态: 1=正常展示 0=后台隐藏" json:"status"`
+	CreatedAt         time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt         time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+}
+
+func (ServiceReview) TableName() string {
+	return "service_reviews"
 }
 
 // ============================================
@@ -653,7 +812,8 @@ func (MerchantStaffRole) TableName() string {
 // ============================================
 type HealthRecord struct {
 	ID               uint64     `gorm:"primaryKey;autoIncrement;comment:档案ID" json:"id"`
-	UserID           uint64     `gorm:"not null;uniqueIndex;comment:用户ID" json:"user_id"`
+	UserID           uint64     `gorm:"not null;index:idx_health_records_user_id;comment:用户ID（多档案：普通索引）" json:"user_id"`
+	Relation         uint8      `gorm:"not null;default:1;comment:与账号关系:1本人2父母3其他亲属" json:"relation"`
 	RealName         string     `gorm:"size:64;comment:真实姓名" json:"real_name"`
 	Gender           uint8      `gorm:"not null;default:0;comment:性别:1男2女" json:"gender"`
 	BirthDate        string     `gorm:"size:16;comment:出生日期" json:"birth_date"`
@@ -713,6 +873,7 @@ func (HealthAssessmentForm) TableName() string {
 type HealthAssessment struct {
 	ID           uint64    `gorm:"primaryKey;autoIncrement;comment:评估ID" json:"id"`
 	UserID       uint64    `gorm:"not null;index:idx_health_assessments_user_id;comment:用户ID" json:"user_id"`
+	RecordID     *uint64   `gorm:"index:idx_health_assessments_record_id;comment:关联档案ID（阶段五 8.2 多档案）" json:"record_id"`
 	FormID       uint64    `gorm:"not null;index:idx_health_assessments_form_id;comment:量表ID" json:"form_id"`
 	FormName     string    `gorm:"size:64;comment:量表名称快照" json:"form_name"`
 	AssessorType uint8     `gorm:"not null;default:1;comment:1自助2服务人员" json:"assessor_type"`
@@ -726,6 +887,7 @@ type HealthAssessment struct {
 	CreatedAt    time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
 	Form         *HealthAssessmentForm `gorm:"foreignKey:FormID" json:"form,omitempty"`
 	User         *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Record       *HealthRecord `gorm:"foreignKey:RecordID" json:"record,omitempty"`
 }
 
 func (HealthAssessment) TableName() string {
@@ -739,6 +901,7 @@ func (HealthAssessment) TableName() string {
 type FittingRecommendation struct {
 	ID                  uint64            `gorm:"primaryKey;autoIncrement;comment:建议ID" json:"id"`
 	UserID              uint64            `gorm:"not null;index:idx_fitting_recommendations_user_id;comment:居民用户ID" json:"user_id"`
+	RecordID            *uint64           `gorm:"index:idx_fitting_recommendations_record_id;comment:关联档案ID（阶段五 8.2 多档案）" json:"record_id"`
 	AssessmentID        *uint64           `gorm:"comment:关联评估记录ID" json:"assessment_id"`
 	SymptomDesc         string            `gorm:"size:512;comment:症状/需求描述" json:"symptom_desc"`
 	FittingResult       string            `gorm:"size:512;comment:适配结论" json:"fitting_result"`
@@ -749,6 +912,7 @@ type FittingRecommendation struct {
 	CreatedAt           time.Time         `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
 	UpdatedAt           time.Time         `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
 	User                *User             `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Record              *HealthRecord     `gorm:"foreignKey:RecordID" json:"record,omitempty"`
 	Assessment          *HealthAssessment `gorm:"foreignKey:AssessmentID" json:"assessment,omitempty"`
 }
 
@@ -757,123 +921,40 @@ func (FittingRecommendation) TableName() string {
 }
 
 // ============================================
-// 照护计划表 (care_plans)
-// 用途：居家康养照护计划，指派服务人员按计划上门执行护理项
+// 健康宣教分类表 (health_education_categories)
+// 用途：两级分类（parent_id=0 为一级），商家后台树形 CRUD，C 端仅展示启用项
 // ============================================
-type CarePlan struct {
-	ID              uint64         `gorm:"primaryKey;autoIncrement;comment:计划ID" json:"id"`
-	UserID          uint64         `gorm:"not null;index:idx_care_plans_user_id;comment:居民用户ID" json:"user_id"`
-	Name            string         `gorm:"size:64;not null;comment:计划名称" json:"name"`
-	PlanType        uint8          `gorm:"not null;default:1;comment:类型:1生活照料2基础护理3康复训练4综合康养" json:"plan_type"`
-	StartDate       string         `gorm:"size:16;comment:开始日期" json:"start_date"`
-	EndDate         string         `gorm:"size:16;comment:结束日期" json:"end_date"`
-	Frequency       string         `gorm:"size:64;comment:照护频次" json:"frequency"`
-	Goals           string         `gorm:"size:512;comment:照护目标" json:"goals"`
-	Items           JSON           `gorm:"type:json;comment:护理项配置[{name,desc}]" json:"items"`
-	AssignedStaffID *uint64        `gorm:"index:idx_care_plans_assigned_staff_id;comment:指派服务人员ID" json:"assigned_staff_id"`
-	OrderID         *uint64        `gorm:"comment:关联服务订单ID(可空)" json:"order_id"`
-	Status          uint8          `gorm:"not null;default:0;comment:状态:0草稿1执行中2已暂停3已完成" json:"status"`
-	CreatedAt       time.Time      `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt       time.Time      `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-	User            *User          `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	AssignedStaff   *ServiceStaff  `gorm:"foreignKey:AssignedStaffID" json:"assigned_staff,omitempty"`
+type HealthEducationCategory struct {
+	ID        uint64    `gorm:"primaryKey;autoIncrement;comment:分类ID" json:"id"`
+	ParentID  uint64    `gorm:"not null;default:0;index:idx_hec_parent_id;comment:父分类ID，0=一级" json:"parent_id"`
+	Name      string    `gorm:"size:64;not null;comment:分类名称" json:"name"`
+	Sort      int32     `gorm:"not null;default:0;comment:排序（小在前）" json:"sort"`
+	Status    uint8     `gorm:"not null;default:1;index:idx_hec_status;comment:状态:1启用0停用" json:"status"`
+	CreatedAt time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
 }
 
-func (CarePlan) TableName() string {
-	return "care_plans"
-}
-
-// ============================================
-// 上门照护记录表 (care_visits)
-// 用途：服务人员上门照护执行后的记录，含护理项、生命体征与照片，作为服务闭环的历史凭证
-// ============================================
-type CareVisit struct {
-	ID             uint64        `gorm:"primaryKey;autoIncrement;comment:记录ID" json:"id"`
-	PlanID         *uint64       `gorm:"index:idx_care_visits_plan_id;comment:关联照护计划ID(可空)" json:"plan_id"`
-	OrderID        *uint64       `gorm:"comment:关联服务订单ID(可空)" json:"order_id"`
-	UserID         uint64        `gorm:"not null;index:idx_care_visits_user_id;comment:居民用户ID" json:"user_id"`
-	StaffID        uint64        `gorm:"not null;comment:录入服务人员ID" json:"staff_id"`
-	VisitAt        *time.Time    `gorm:"comment:到访时间" json:"visit_at"`
-	NursingItems   JSON          `gorm:"type:json;comment:完成的护理项[{name,done,remark}]" json:"nursing_items"`
-	Vitals         JSON          `gorm:"type:json;comment:生命体征{blood_pressure,blood_glucose,heart_rate,oxygen,weight}" json:"vitals"`
-	Photos         JSON          `gorm:"type:json;comment:照片URL数组" json:"photos"`
-	Remark         string        `gorm:"size:512;comment:备注" json:"remark"`
-	FollowUpAdvice string        `gorm:"size:512;comment:下次随访建议" json:"follow_up_advice"`
-	CreatedAt      time.Time     `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	Plan           *CarePlan     `gorm:"foreignKey:PlanID" json:"plan,omitempty"`
-	User           *User         `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Staff          *ServiceStaff `gorm:"foreignKey:StaffID" json:"staff,omitempty"`
-}
-
-func (CareVisit) TableName() string {
-	return "care_visits"
-}
-
-// ============================================
-// 随访任务表 (follow_up_tasks)
-// 用途：服务完成/租赁归还/评估完成后自动生成的随访任务，服务人员可认领执行，
-// 管理端可手动创建与代执行，作为基层健康服务闭环的持续跟进
-// ============================================
-type FollowUpTask struct {
-	ID             uint64         `gorm:"primaryKey;autoIncrement;comment:任务ID" json:"id"`
-	UserID         uint64         `gorm:"not null;index:idx_follow_up_tasks_user_id;comment:居民用户ID" json:"user_id"`
-	TaskType       uint8          `gorm:"not null;default:1;comment:类型:1康复随访2租后回访3慢病随访4评估回访" json:"task_type"`
-	SourceType     uint8          `gorm:"not null;default:1;comment:来源:1服务完成2租赁归还3评估完成4手动" json:"source_type"`
-	SourceID       *uint64        `gorm:"comment:来源ID(订单/评估ID)" json:"source_id"`
-	PlanFollowTime *time.Time     `gorm:"comment:计划随访时间" json:"plan_follow_time"`
-	StaffID        *uint64        `gorm:"index:idx_follow_up_tasks_staff_id;comment:执行服务人员ID(可空=待认领)" json:"staff_id"`
-	ContactMethod  uint8          `gorm:"not null;default:0;comment:随访方式:1电话2上门3微信" json:"contact_method"`
-	Status         uint8          `gorm:"not null;default:0;index:idx_follow_up_tasks_status;comment:状态:0待执行1已完成2已跳过" json:"status"`
-	Result         JSON           `gorm:"type:json;comment:随访结果{contact_method,content,education_article_ids,satisfaction,remark}" json:"result"`
-	CompletedAt    *time.Time     `gorm:"comment:完成时间" json:"completed_at"`
-	Remark         string         `gorm:"size:512;comment:备注" json:"remark"`
-	CreatedAt      time.Time      `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	User           *User          `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Staff          *ServiceStaff  `gorm:"foreignKey:StaffID" json:"staff,omitempty"`
-}
-
-func (FollowUpTask) TableName() string {
-	return "follow_up_tasks"
-}
-
-// ============================================
-// 生命体征监测表 (health_monitoring)
-// 用途：居民血压/血糖/心率/血氧/体重等体征数据，用户自助或服务人员代录，支持持续跟踪
-// ============================================
-type HealthMonitoring struct {
-	ID         uint64    `gorm:"primaryKey;autoIncrement;comment:记录ID" json:"id"`
-	UserID     uint64    `gorm:"not null;index:idx_health_monitoring_user_id;comment:用户ID" json:"user_id"`
-	RecordType uint8     `gorm:"not null;default:1;index:idx_health_monitoring_record_type;comment:类型:1血压2血糖3心率4血氧5体重" json:"record_type"`
-	Value      float64   `gorm:"type:decimal(8,2);not null;default:0;comment:测量值" json:"value"`
-	Unit       string    `gorm:"size:16;comment:单位" json:"unit"`
-	Extra      JSON      `gorm:"type:json;comment:扩展(如血压高低压)" json:"extra"`
-	RecordedBy uint64    `gorm:"not null;default:0;comment:录入人(0=用户本人)" json:"recorded_by"`
-	RecordedAt *time.Time `gorm:"comment:测量时间" json:"recorded_at"`
-	Remark     string    `gorm:"size:512;comment:备注" json:"remark"`
-	CreatedAt  time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	User       *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
-}
-
-func (HealthMonitoring) TableName() string {
-	return "health_monitoring"
+func (HealthEducationCategory) TableName() string {
+	return "health_education_categories"
 }
 
 // ============================================
 // 健康宣教内容表 (health_education_articles)
-// 用途：管理端维护的慢病健康宣教文章，可按慢病标签定向推荐给居民
+// 用途：商家后台维护的慢病健康宣教文章；C 端按分类浏览，tags 作为附加属性
 // ============================================
 type HealthEducationArticle struct {
-	ID        uint64     `gorm:"primaryKey;autoIncrement;comment:文章ID" json:"id"`
-	Title     string     `gorm:"size:128;not null;comment:标题" json:"title"`
-	Category  string     `gorm:"size:32;comment:分类" json:"category"`
-	Cover     string     `gorm:"size:512;comment:封面图URL" json:"cover"`
-	Content   string     `gorm:"type:text;comment:正文" json:"content"`
-	Tags      JSON       `gorm:"type:json;comment:定向慢病标签数组" json:"tags"`
-	Status    uint8      `gorm:"not null;default:0;comment:状态:0草稿1发布" json:"status"`
-	PublishAt *time.Time `gorm:"comment:发布时间" json:"publish_at"`
-	Views     uint       `gorm:"not null;default:0;comment:浏览量" json:"views"`
-	CreatedAt time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	ID         uint64     `gorm:"primaryKey;autoIncrement;comment:文章ID" json:"id"`
+	Title      string     `gorm:"size:128;not null;comment:标题" json:"title"`
+	CategoryID uint64     `gorm:"not null;default:0;index:idx_hea_category_id;comment:分类ID（关联health_education_categories）" json:"category_id"`
+	Category   string     `gorm:"size:32;comment:【兼容保留】旧字符串分类，迁移后仅供历史参考" json:"category"`
+	Cover      string     `gorm:"size:512;comment:封面图URL" json:"cover"`
+	Content    string     `gorm:"type:text;comment:正文" json:"content"`
+	Tags       JSON       `gorm:"type:json;comment:定向慢病标签数组（附加属性，不做板块组织）" json:"tags"`
+	Status     uint8      `gorm:"not null;default:0;comment:状态:0草稿1发布" json:"status"`
+	PublishAt  *time.Time `gorm:"comment:发布时间" json:"publish_at"`
+	Views      uint       `gorm:"not null;default:0;comment:浏览量" json:"views"`
+	CreatedAt  time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt  time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
 }
 
 func (HealthEducationArticle) TableName() string {
@@ -957,4 +1038,59 @@ type ProfitSharingRecordReceiver struct {
 
 func (ProfitSharingRecordReceiver) TableName() string {
 	return "profit_sharing_record_receivers"
+}
+
+// ============================================
+// 优惠券模板表 (coupon_templates)
+// 用途：商户创建的满减券/折扣券模板，控制总量、限领、有效期与适用范围
+// ============================================
+type CouponTemplate struct {
+	ID              uint64     `gorm:"primaryKey;autoIncrement;comment:券模板ID" json:"id"`
+	Name            string     `gorm:"size:64;not null;comment:券名称" json:"name"`
+	Type            uint8      `gorm:"not null;comment:券类型: 1=满减券 2=折扣券" json:"type"`
+	ThresholdAmount float64    `gorm:"type:decimal(10,2);not null;default:0;comment:使用门槛金额(0=无门槛)" json:"threshold_amount"`
+	DiscountAmount  float64    `gorm:"type:decimal(10,2);not null;default:0;comment:满减面值(满减券)" json:"discount_amount"`
+	DiscountRate    float64    `gorm:"type:decimal(3,2);not null;default:0;comment:折扣率如0.90(折扣券)" json:"discount_rate"`
+	TotalCount      int        `gorm:"not null;default:0;comment:发行总量(0=不限)" json:"total_count"`
+	ReceivedCount   int        `gorm:"not null;default:0;comment:已领取数量" json:"received_count"`
+	PerUserLimit    int        `gorm:"not null;default:1;comment:每人限领数量" json:"per_user_limit"`
+	ValidType       uint8      `gorm:"not null;comment:有效期类型: 1=固定期限 2=领取后N天有效" json:"valid_type"`
+	ValidStartAt    *time.Time `gorm:"comment:固定期限开始时间" json:"valid_start_at"`
+	ValidEndAt      *time.Time `gorm:"comment:固定期限结束时间" json:"valid_end_at"`
+	ValidDays       int        `gorm:"comment:领取后有效天数" json:"valid_days"`
+	ApplyScope      uint8      `gorm:"not null;default:1;comment:适用范围: 1=全场 2=指定分类 3=指定商品" json:"apply_scope"`
+	ScopeIds        JSON       `gorm:"type:json;comment:适用范围ID列表" json:"scope_ids"`
+	Status          uint8      `gorm:"not null;default:1;comment:状态: 1=启用 0=停用" json:"status"`
+	Remark          string     `gorm:"size:512;comment:备注" json:"remark"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt       time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+}
+
+func (CouponTemplate) TableName() string {
+	return "coupon_templates"
+}
+
+// ============================================
+// 用户优惠券表 (user_coupons)
+// 用途：用户领取/被发放的券实例，记录核销与过期信息
+// ============================================
+type UserCoupon struct {
+	ID         uint64          `gorm:"primaryKey;autoIncrement;comment:用户券ID" json:"id"`
+	UserID     uint64          `gorm:"not null;index;comment:用户ID" json:"user_id"`
+	TemplateID uint64          `gorm:"not null;index;comment:券模板ID" json:"template_id"`
+	Status     uint8           `gorm:"not null;default:1;comment:状态: 1=未使用 2=已使用 3=已过期 4=已作废" json:"status"`
+	Source     uint8           `gorm:"not null;default:1;comment:来源: 1=自主领取 2=系统发放(30天唤回) 3=运营手动发放" json:"source"`
+	ReceivedAt time.Time       `gorm:"autoCreateTime;comment:领取时间" json:"received_at"`
+	ExpiredAt  time.Time       `gorm:"not null;comment:过期时间(领取时计算落库)" json:"expired_at"`
+	UsedAt     *time.Time      `gorm:"comment:核销时间" json:"used_at"`
+	OrderID    *uint64         `gorm:"index;comment:核销关联订单ID" json:"order_id"`
+	OrderNo    string          `gorm:"size:32;comment:核销关联订单号" json:"order_no"`
+	CreatedAt  time.Time       `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt  time.Time       `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	Template   *CouponTemplate `gorm:"foreignKey:TemplateID" json:"template,omitempty"`
+	User       *User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+func (UserCoupon) TableName() string {
+	return "user_coupons"
 }

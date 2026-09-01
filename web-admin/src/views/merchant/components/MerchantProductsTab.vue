@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   batchUpdateMerchantProductStatus,
@@ -22,6 +22,13 @@ import {
 } from '@/utils/format'
 import MerchantProductEditorDialog from './MerchantProductEditorDialog.vue'
 
+// mode: goods=商品管理（实物：零售/租赁） service=服务管理（康养套餐/陪诊服务）
+const props = withDefaults(defineProps<{
+  mode?: 'goods' | 'service'
+}>(), {
+  mode: 'goods'
+})
+
 const loading = ref(false)
 const categories = ref<MerchantCategory[]>([])
 const products = ref<MerchantProduct[]>([])
@@ -43,8 +50,23 @@ const filters = reactive({
   page_size: 10
 })
 
+// 实物商品类型：1=辅具零售 2=辅具租赁；服务项目类型：3=康养套餐 4=陪诊服务
+const GOODS_TYPE_SCOPE = '1,2'
+const SERVICE_TYPE_SCOPE = '3,4'
+
+const modeTabs = computed(() => {
+  if (props.mode === 'service') {
+    return ProductTypeTabs.filter((t) => ['all', 'wellness', 'escort'].includes(t.key))
+  }
+  return ProductTypeTabs.filter((t) => ['all', 'retail', 'rental'].includes(t.key))
+})
+
+const typeScope = computed(() => (props.mode === 'service' ? SERVICE_TYPE_SCOPE : GOODS_TYPE_SCOPE))
+
+const entityLabel = computed(() => (props.mode === 'service' ? '服务' : '商品'))
+
 function handleTabChange(key: string) {
-  const tab = ProductTypeTabs.find((t) => t.key === key)
+  const tab = modeTabs.value.find((t) => t.key === key)
   filters.product_type = tab?.product_type
   filters.page = 1
   void loadProducts()
@@ -62,6 +84,7 @@ async function loadProducts() {
       status: filters.status,
       sale_type: filters.sale_type || undefined,
       product_type: filters.product_type,
+      product_types: filters.product_type ? undefined : typeScope.value,
       keyword: filters.keyword.trim() || undefined,
       page: filters.page,
       page_size: filters.page_size
@@ -209,7 +232,7 @@ onMounted(loadData)
   <div class="tab-block">
     <el-tabs v-model="activeTab" class="product-tabs" @tab-change="handleTabChange">
       <el-tab-pane
-        v-for="tab in ProductTypeTabs"
+        v-for="tab in modeTabs"
         :key="tab.key"
         :label="tab.label"
         :name="tab.key"
@@ -256,7 +279,7 @@ onMounted(loadData)
         <el-button type="primary" plain @click="handleSearch">查询</el-button>
         <el-button type="success" plain @click="handleBatchUpdate(1)">批量上架</el-button>
         <el-button type="warning" plain @click="handleBatchUpdate(2)">批量下架</el-button>
-        <el-button type="primary" @click="openCreate">新增商品</el-button>
+        <el-button type="primary" @click="openCreate">新增{{ entityLabel }}</el-button>
       </el-space>
     </div>
 
@@ -375,6 +398,7 @@ onMounted(loadData)
       v-model="editorVisible"
       :categories="categories"
       :product-id="editingProductId"
+      :mode="mode"
       @success="handleEditorSuccess"
     />
   </div>

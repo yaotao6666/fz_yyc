@@ -21,16 +21,20 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'sm'
     },
-    server: proxyTarget
-      ? {
-          host: '0.0.0.0',
-          proxy: {
-            '/api': {
-              target: proxyTarget,
-              changeOrigin: true
+    server: {
+      host: '0.0.0.0',
+      // 内网穿透（cpolar 等）域名访问放行，避免 Dev Server 校验 Host 被拦截
+      allowedHosts: ['250c63c0.r15.cpolar.top', '.cpolar.top'],
+      ...(proxyTarget
+        ? {
+            proxy: {
+              '/api': {
+                target: proxyTarget,
+                changeOrigin: true
+              }
             }
           }
-        }
-      : undefined
+        : {})
+    }
   }
 })

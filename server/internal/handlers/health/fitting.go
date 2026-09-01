@@ -25,6 +25,7 @@ type RecommendedProductItem struct {
 
 // FittingRecommendationCreateRequest 服务人员生成适配建议请求
 type FittingRecommendationCreateRequest struct {
+	RecordID            *uint64                  `json:"record_id"`
 	AssessmentID        *uint64                  `json:"assessment_id"`
 	SymptomDesc         string                   `json:"symptom_desc"`
 	FittingResult       string                   `json:"fitting_result"`
@@ -44,6 +45,7 @@ type FittingRecommendationUpdateRequest struct {
 type fittingRecommendationVO struct {
 	ID                  uint64        `json:"id"`
 	UserID              uint64        `json:"user_id"`
+	RecordID            *uint64       `json:"record_id"`
 	AssessmentID        *uint64       `json:"assessment_id"`
 	SymptomDesc         string        `json:"symptom_desc"`
 	FittingResult       string        `json:"fitting_result"`
@@ -106,6 +108,7 @@ func toFittingRecommendationVO(record *models.FittingRecommendation, user *model
 	return fittingRecommendationVO{
 		ID:                  record.ID,
 		UserID:              record.UserID,
+		RecordID:            record.RecordID,
 		AssessmentID:        record.AssessmentID,
 		SymptomDesc:         record.SymptomDesc,
 		FittingResult:       record.FittingResult,
@@ -274,6 +277,17 @@ func StaffCreateFittingRecommendation(c *gin.Context) {
 		return
 	}
 
+	// 若传了 record_id：校验档案属于该客户
+	var recordID *uint64
+	if req.RecordID != nil && *req.RecordID > 0 {
+		var rec models.HealthRecord
+		if err := database.DB.Where("id = ? AND user_id = ?", *req.RecordID, userID).First(&rec).Error; err != nil {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, "档案不属于该客户")
+			return
+		}
+		recordID = req.RecordID
+	}
+
 	recommendedRaw, err := normalizeRecommendedProducts(req.RecommendedProducts)
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
@@ -282,6 +296,7 @@ func StaffCreateFittingRecommendation(c *gin.Context) {
 
 	record := models.FittingRecommendation{
 		UserID:              userID,
+		RecordID:            recordID,
 		AssessmentID:        req.AssessmentID,
 		SymptomDesc:         req.SymptomDesc,
 		FittingResult:       req.FittingResult,

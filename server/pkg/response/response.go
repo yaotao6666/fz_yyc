@@ -53,6 +53,22 @@ const (
 	// 服务商相关
 	CodeProviderConfigError = 8001 // 服务商配置错误
 	CodeQiniuUploadFailed   = 8002 // 七牛云上传失败
+
+	// 优惠券相关
+	CodeCouponNotFound      = 8501 // 券模板不存在
+	CodeCouponUnavailable   = 8502 // 不可领取/已抢光/已停用
+	CodeCouponLimitExceeded = 8503 // 超出限领
+	CodeCouponNotUsable     = 8504 // 券不可用（过期/已使用/门槛不满足）
+
+	// 服务过程安全相关（阶段三）
+	CodeAlertEventNotFound = 8601 // 预警事件不存在
+	CodeAlertEventHandled  = 8602 // 预警事件已处理
+	CodeAgreementNotFound  = 8611 // 协议不存在
+	CodeServiceRecordExist = 8621 // 服务记录已存在
+
+	// 服务评价相关（阶段四）
+	CodeReviewNotFound = 8701 // 评价不存在
+	CodeReviewExists   = 8702 // 该订单已评价
 )
 
 // Response 统一响应结构

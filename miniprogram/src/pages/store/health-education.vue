@@ -6,18 +6,25 @@
       <view class="intro-desc">为您推荐的康复与慢病健康科普文章</view>
     </view>
 
-    <!-- 分类筛选 -->
-    <view class="category-bar">
+    <!-- 分类筛选（按分类表拉取，含子级归属） -->
+    <view v-if="categories.length" class="category-bar">
       <scroll-view scroll-x class="category-scroll" :show-scrollbar="false">
         <view class="category-list">
           <view
-            v-for="category in categories"
-            :key="category"
             class="category-tag"
-            :class="{ active: activeCategory === category }"
-            @click="switchCategory(category)"
+            :class="{ active: !activeCategoryId }"
+            @click="switchCategory(0)"
           >
-            {{ category }}
+            全部
+          </view>
+          <view
+            v-for="category in topCategories"
+            :key="category.id"
+            class="category-tag"
+            :class="{ active: activeCategoryId === category.id }"
+            @click="switchCategory(category.id)"
+          >
+            {{ category.name }}
           </view>
         </view>
       </scroll-view>
@@ -34,7 +41,7 @@
       >
         <view class="article-title">{{ item.title || '未命名文章' }}</view>
         <view class="article-meta">
-          <text v-if="item.category" class="category-chip">{{ item.category }}</text>
+          <text v-if="categoryName(item)" class="category-chip">{{ categoryName(item) }}</text>
           <text v-if="item.publish_at" class="meta-text">{{ formatDate(item.publish_at) }}</text>
           <text v-if="item.views !== undefined" class="meta-text">{{ item.views }} 次浏览</text>
         </view>
@@ -55,32 +62,48 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
-import { getUserEducationArticles } from '../../api/health'
-import type { EducationArticle } from '../../types'
+import { getStoreEducationCategories, getUserEducationArticles } from '../../api/health'
+import type { EducationArticle, HealthEducationCategory } from '../../types'
 import { useAuth } from '../../utils/useAuth'
 
 const articles = ref<EducationArticle[]>([])
+const categories = ref<HealthEducationCategory[]>([])
 const loading = ref(false)
-const activeCategory = ref('')
+const activeCategoryId = ref(0) // 0 = 全部
 
-/** 分类列表：从文章数据中提取去重后，'全部' 置顶 */
-const categories = computed<string[]>(() => {
-  const set = new Set<string>()
-  articles.value.forEach(item => {
-    if (item.category) {
-      set.add(item.category)
-    }
+/** 一级分类（parent_id=0，按 sort 升序） */
+const topCategories = computed<HealthEducationCategory[]>(() =>
+  categories.value
+    .filter(c => c.parent_id === 0)
+    .sort((a, b) => a.sort - b.sort)
+)
+
+/** 一级分类及其全部子级 id 集合：选中一级时，同时命中其下子级文章 */
+function categoryIdSet(topId: number): Set<number> {
+  const ids = new Set<number>([topId])
+  categories.value.forEach(c => {
+    if (c.parent_id === topId) ids.add(c.id)
   })
-  return ['全部', ...Array.from(set)]
-})
+  return ids
+}
 
-/** 按当前分类客户端过滤（简单实现，无需重复请求） */
+/** 按当前分类客户端过滤（选中一级分类，包含其子级文章） */
 const filteredArticles = computed(() => {
-  if (activeCategory.value === '' || activeCategory.value === '全部') {
+  if (!activeCategoryId.value) {
     return articles.value
   }
-  return articles.value.filter(item => item.category === activeCategory.value)
+  const ids = categoryIdSet(activeCategoryId.value)
+  return articles.value.filter(item => item.category_id !== undefined && item.category_id !== null && ids.has(item.category_id))
 })
+
+/** 通过 category_id 解析分类名（优先新分类，回退旧 category 字符串） */
+function categoryName(item: EducationArticle): string {
+  if (item.category_id) {
+    const cat = categories.value.find(c => c.id === item.category_id)
+    if (cat) return cat.name
+  }
+  return item.category || ''
+}
 
 onLoad(async () => {
   const { ensureAuth } = useAuth()
@@ -89,11 +112,12 @@ onLoad(async () => {
     uni.showToast({ title: '登录失败，请重试', icon: 'none' })
     return
   }
+  loadCategories()
   loadList()
 })
 
-function switchCategory(category: string) {
-  activeCategory.value = category
+function switchCategory(id: number) {
+  activeCategoryId.value = id
 }
 
 function formatDate(date?: string): string {
@@ -106,6 +130,14 @@ function formatDate(date?: string): string {
 
 function goDetail(id: number) {
   uni.navigateTo({ url: `/pages/store/education-detail?id=${id}` })
+}
+
+async function loadCategories() {
+  try {
+    categories.value = await getStoreEducationCategories()
+  } catch (error) {
+    console.error('加载宣教分类失败:', error)
+  }
 }
 
 async function loadList() {
@@ -122,7 +154,7 @@ async function loadList() {
 }
 
 onPullDownRefresh(async () => {
-  await loadList()
+  await Promise.all([loadCategories(), loadList()])
   uni.stopPullDownRefresh()
 })
 </script>

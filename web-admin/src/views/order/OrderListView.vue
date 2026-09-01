@@ -87,12 +87,25 @@ const pagination = reactive({
 type SelectOptionValue = number | ''
 
 const filters = reactive({
+  category: 0, // 0=全部 1=实物订单 2=服务订单
   status: '' as SelectOptionValue,
   order_type: '' as SelectOptionValue,
   biz_status: '' as SelectOptionValue,
   keyword: '',
   dateRange: [] as string[]
 })
+
+const categoryTabs = [
+  { label: '全部订单', value: 0 },
+  { label: '实物订单', value: 1 },
+  { label: '服务订单', value: 2 }
+]
+
+function handleCategoryChange(category: number) {
+  filters.category = category
+  pagination.page = 1
+  loadOrders()
+}
 
 const statusOptions = [
   { label: '全部状态', value: '' },
@@ -145,6 +158,7 @@ async function loadOrders() {
     const response = await getOrders({
       page: pagination.page,
       page_size: pagination.page_size,
+      category: filters.category === 0 ? undefined : filters.category,
       status: filters.status === '' ? undefined : filters.status,
       order_type: filters.order_type === '' ? undefined : filters.order_type,
       biz_status: filters.biz_status === '' ? undefined : filters.biz_status,
@@ -165,6 +179,7 @@ function handleSearch() {
 }
 
 function handleReset() {
+  filters.category = 0
   filters.status = ''
   filters.order_type = ''
   filters.biz_status = ''
@@ -227,6 +242,18 @@ onMounted(loadOrders)
     </div>
 
     <el-card class="page-card" shadow="never">
+      <div class="category-tabs">
+        <div
+          v-for="tab in categoryTabs"
+          :key="tab.value"
+          class="category-tab-item"
+          :class="{ active: filters.category === tab.value }"
+          @click="handleCategoryChange(tab.value)"
+        >
+          {{ tab.label }}
+        </div>
+      </div>
+
       <el-form class="toolbar-form" inline>
         <el-select v-model="filters.status" clearable placeholder="订单状态" style="width: 130px;">
           <el-option
@@ -281,6 +308,12 @@ onMounted(loadOrders)
         <el-table-column label="商品" min-width="180" show-overflow-tooltip>
           <template #default="scope">
             {{ getGoodsSummary(scope.row) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="服务对象" width="110">
+          <template #default="scope">
+            <el-tag v-if="scope.row.record_name" type="success" size="small">{{ scope.row.record_name }}</el-tag>
+            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column label="订单金额" width="120">
@@ -358,6 +391,28 @@ onMounted(loadOrders)
 </template>
 
 <style scoped>
+.category-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.category-tab-item {
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.category-tab-item.active {
+  background: #409eff;
+  color: #ffffff;
+  font-weight: 600;
+}
+
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;

@@ -3,23 +3,14 @@ import type {
   AssessmentForm,
   AssessmentFormQuestion,
   AssignRoleMenusRequest,
-  CarePlan,
-  CarePlanItem,
-  CarePlanListResponse,
-  CareVisit,
-  CareVisitListResponse,
   DashboardData,
   EducationArticle,
   EducationArticleListResponse,
+  HealthEducationCategory,
   FittingRecommendation,
   FittingRecommendationListResponse,
   FittingRecommendedProduct,
-  FollowUpTask,
-  FollowUpTaskListResponse,
-  FollowUpTaskResult,
   HealthAssessmentListResponse,
-  HealthMonitoring,
-  HealthMonitoringListResponse,
   HealthRecord,
   HealthRecordListResponse,
   MerchantCategory,
@@ -589,220 +580,6 @@ export function deleteFittingRecommendation(id: number) {
   return request.delete(`/api/v1/merchant/fitting-recommendations/${id}`).then(unwrapApiResponse<{ message: string }>)
 }
 
-/* ---------- 照护计划 ---------- */
-
-// 规范化照护记录中的 JSON 字段（护理项/生命体征/照片可能以字符串返回）
-function normalizeCareVisit(visit: CareVisit): CareVisit {
-  const normalized: CareVisit = { ...visit }
-  const raw = visit as unknown as Record<string, unknown>
-
-  // 护理项列表
-  const nursingItems = raw.nursing_items
-  if (Array.isArray(nursingItems)) {
-    normalized.nursing_items = nursingItems as CareVisit['nursing_items']
-  } else if (typeof nursingItems === 'string') {
-    try {
-      const parsed = JSON.parse(nursingItems)
-      normalized.nursing_items = Array.isArray(parsed) ? parsed : []
-    } catch (_e) {
-      normalized.nursing_items = []
-    }
-  } else {
-    normalized.nursing_items = []
-  }
-
-  // 生命体征对象
-  const vitals = raw.vitals
-  if (vitals && typeof vitals === 'object') {
-    normalized.vitals = vitals as CareVisit['vitals']
-  } else if (typeof vitals === 'string') {
-    try {
-      normalized.vitals = JSON.parse(vitals) || {}
-    } catch (_e) {
-      normalized.vitals = {}
-    }
-  } else {
-    normalized.vitals = {}
-  }
-
-  // 照片数组
-  normalized.photos = normalizeStringArray(raw.photos)
-
-  return normalized
-}
-
-// 规范化照护计划中的 JSON 字段（护理项/内嵌照护记录可能以字符串返回）
-function normalizeCarePlan(record: CarePlan): CarePlan {
-  const normalized: CarePlan = { ...record }
-  const raw = record as unknown as Record<string, unknown>
-
-  // 护理项列表
-  const items = raw.items
-  if (Array.isArray(items)) {
-    normalized.items = items as CarePlanItem[]
-  } else if (typeof items === 'string') {
-    try {
-      const parsed = JSON.parse(items)
-      normalized.items = Array.isArray(parsed) ? parsed : []
-    } catch (_e) {
-      normalized.items = []
-    }
-  } else {
-    normalized.items = []
-  }
-
-  // 内嵌照护记录列表
-  const visits = raw.visits
-  if (Array.isArray(visits)) {
-    normalized.visits = visits.map(normalizeCareVisit)
-  } else if (typeof visits === 'string') {
-    try {
-      const parsed = JSON.parse(visits)
-      normalized.visits = Array.isArray(parsed) ? parsed.map(normalizeCareVisit) : []
-    } catch (_e) {
-      normalized.visits = []
-    }
-  } else {
-    normalized.visits = []
-  }
-
-  return normalized
-}
-
-export function getCarePlans(params?: { keyword?: string; plan_type?: number | string; status?: number | string; page?: number; page_size?: number }) {
-  return request
-    .get('/api/v1/merchant/care-plans', { params })
-    .then(unwrapApiResponse<CarePlanListResponse>)
-    .then((res) => ({ ...res, list: (res.list || []).map(normalizeCarePlan) }))
-}
-
-export function getCarePlan(id: number) {
-  return request
-    .get(`/api/v1/merchant/care-plans/${id}`)
-    .then(unwrapApiResponse<CarePlan>)
-    .then(normalizeCarePlan)
-}
-
-export function createCarePlan(data: Partial<CarePlan>) {
-  return request
-    .post('/api/v1/merchant/care-plans', data)
-    .then(unwrapApiResponse<CarePlan>)
-    .then(normalizeCarePlan)
-}
-
-export function updateCarePlan(id: number, data: Partial<CarePlan>) {
-  return request
-    .put(`/api/v1/merchant/care-plans/${id}`, data)
-    .then(unwrapApiResponse<CarePlan>)
-    .then(normalizeCarePlan)
-}
-
-export function deleteCarePlan(id: number) {
-  return request.delete(`/api/v1/merchant/care-plans/${id}`).then(unwrapApiResponse<{ message: string }>)
-}
-
-export function getCareVisits(params?: { plan_id?: number | string; user_id?: number | string; page?: number; page_size?: number }) {
-  return request
-    .get('/api/v1/merchant/care-visits', { params })
-    .then(unwrapApiResponse<CareVisitListResponse>)
-    .then((res) => ({ ...res, list: (res.list || []).map(normalizeCareVisit) }))
-}
-
-/* ---------- 随访任务 ---------- */
-
-// 规范化随访任务中的 JSON 字段（执行结果可能以字符串返回）
-function normalizeFollowUpTask(task: FollowUpTask): FollowUpTask {
-  const normalized: FollowUpTask = { ...task }
-  const raw = task as unknown as Record<string, unknown>
-
-  // 执行结果对象
-  const result = raw.result
-  if (result && typeof result === 'object') {
-    normalized.result = result as FollowUpTaskResult
-  } else if (typeof result === 'string') {
-    try {
-      normalized.result = JSON.parse(result) || {}
-    } catch (_e) {
-      normalized.result = {}
-    }
-  } else {
-    normalized.result = {}
-  }
-
-  // 结果中的宣教文章 ID 列表（可能以字符串数组返回）
-  if (normalized.result) {
-    const ids = normalized.result.education_article_ids
-    if (Array.isArray(ids)) {
-      normalized.result.education_article_ids = ids
-        .map((id) => Number(id))
-        .filter((id) => !Number.isNaN(id))
-    } else {
-      normalized.result.education_article_ids = []
-    }
-  }
-
-  return normalized
-}
-
-export function getFollowUpTasks(params?: { keyword?: string; task_type?: number | string; status?: number | string; page?: number; page_size?: number }) {
-  return request
-    .get('/api/v1/merchant/follow-up-tasks', { params })
-    .then(unwrapApiResponse<FollowUpTaskListResponse>)
-    .then((res) => ({ ...res, list: (res.list || []).map(normalizeFollowUpTask) }))
-}
-
-export function getFollowUpTask(id: number) {
-  return request
-    .get(`/api/v1/merchant/follow-up-tasks/${id}`)
-    .then(unwrapApiResponse<FollowUpTask>)
-    .then(normalizeFollowUpTask)
-}
-
-export function createFollowUpTask(data: Partial<FollowUpTask>) {
-  return request
-    .post('/api/v1/merchant/follow-up-tasks', data)
-    .then(unwrapApiResponse<FollowUpTask>)
-    .then(normalizeFollowUpTask)
-}
-
-export function completeFollowUpTask(id: number, data: { result: FollowUpTaskResult }) {
-  return request
-    .post(`/api/v1/merchant/follow-up-tasks/${id}/complete`, data)
-    .then(unwrapApiResponse<FollowUpTask>)
-    .then(normalizeFollowUpTask)
-}
-
-/* ---------- 生命体征监测 ---------- */
-
-// 规范化生命体征记录中的 JSON 字段（附加信息可能以字符串返回）
-function normalizeHealthMonitoring(record: HealthMonitoring): HealthMonitoring {
-  const normalized: HealthMonitoring = { ...record }
-  const raw = record as unknown as Record<string, unknown>
-
-  // 附加信息对象
-  const extra = raw.extra
-  if (extra && typeof extra === 'object') {
-    normalized.extra = extra as HealthMonitoring['extra']
-  } else if (typeof extra === 'string') {
-    try {
-      normalized.extra = JSON.parse(extra) || {}
-    } catch (_e) {
-      normalized.extra = {}
-    }
-  } else {
-    normalized.extra = {}
-  }
-
-  return normalized
-}
-
-export function getMonitoring(params?: { keyword?: string; record_type?: number | string; page?: number; page_size?: number }) {
-  return request
-    .get('/api/v1/merchant/monitoring', { params })
-    .then(unwrapApiResponse<HealthMonitoringListResponse>)
-    .then((res) => ({ ...res, list: (res.list || []).map(normalizeHealthMonitoring) }))
-}
-
 /* ---------- 健康宣教 ---------- */
 
 // 规范化宣教文章中的 JSON 字段（定向标签可能以字符串返回）
@@ -835,6 +612,32 @@ export function updateEducationArticle(id: number, data: Partial<EducationArticl
 
 export function deleteEducationArticle(id: number) {
   return request.delete(`/api/v1/merchant/health-education/${id}`).then(unwrapApiResponse<{ message: string }>)
+}
+
+// ---- 健康宣教分类 ----
+
+export function getHealthEducationCategories() {
+  return request
+    .get('/api/v1/merchant/education-categories')
+    .then(unwrapApiResponse<HealthEducationCategory[]>)
+}
+
+export function createHealthEducationCategory(data: { parent_id?: number; name: string; sort?: number; status?: number }) {
+  return request
+    .post('/api/v1/merchant/education-categories', data)
+    .then(unwrapApiResponse<HealthEducationCategory>)
+}
+
+export function updateHealthEducationCategory(id: number, data: { parent_id?: number; name: string; sort?: number; status?: number }) {
+  return request
+    .put(`/api/v1/merchant/education-categories/${id}`, data)
+    .then(unwrapApiResponse<{ message?: string }>)
+}
+
+export function deleteHealthEducationCategory(id: number) {
+  return request
+    .delete(`/api/v1/merchant/education-categories/${id}`)
+    .then(unwrapApiResponse<{ message: string }>)
 }
 
 /* ============ 服务商分账 ============ */

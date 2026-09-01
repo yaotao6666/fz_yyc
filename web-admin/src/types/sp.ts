@@ -98,6 +98,7 @@ export interface MerchantProductQuery {
   status?: number | string
   sale_type?: number | string
   product_type?: number | string
+  product_types?: string
   keyword?: string
 }
 
@@ -150,10 +151,10 @@ export interface WellnessPackageItem {
 }
 
 export interface WellnessPackageContent {
-  duration?: string // 套餐服务周期，如：一个月
-  items?: WellnessPackageItem[] // 服务项列表
-  notes?: string // 套餐备注
-  applicable_groups?: string // 适用人群
+  cycle?: string // 套餐服务周期，如：一个月
+  target_audience?: string // 适用人群
+  services?: WellnessPackageItem[] // 服务项列表
+  remark?: string // 套餐备注
 }
 
 export interface MerchantProductListResponse {
@@ -318,6 +319,12 @@ export interface SpOrder {
   rental_end_at?: string
   parent_order_id?: number
   renew_flag?: number
+  // 服务对象（健康档案）
+  record_id?: number
+  record_name?: string
+  record_gender?: number
+  record_birth_date?: string
+  delivery_district?: string
   // 分账字段
   profit_sharing_status?: number
   profit_sharing_amount?: number
@@ -391,6 +398,7 @@ export interface ServiceStaffItem {
   openid?: string
   avatar?: string
   status: number // 0=待审核 1=启用 2=禁用
+  service_region?: string // 服务区域(区县,逗号分隔,空=不限)
   last_login_at?: string
   created_at?: string
   updated_at?: string
@@ -657,132 +665,25 @@ export interface FittingRecommendationListResponse {
   total: number
 }
 
-// ===================== 照护计划 =====================
+// ===================== 健康宣教 =====================
 
-// 照护计划护理项
-export interface CarePlanItem {
-  name: string
-  desc?: string
-}
-
-// 照护计划
-export interface CarePlan {
+// 健康宣教分类
+export interface HealthEducationCategory {
   id: number
-  user_id: number
+  parent_id: number // 0=一级
   name: string
-  plan_type?: number // 1生活照料 2基础护理 3康复训练 4综合康养
-  start_date?: string
-  end_date?: string
-  frequency?: string
-  goals?: string
-  items: CarePlanItem[]
-  assigned_staff_id?: number | null
-  order_id?: number | null
-  status?: number // 0草稿 1执行中 2已暂停 3已完成
-  visit_count?: number
+  sort: number
+  status: number // 1启用 0停用
   created_at?: string
   updated_at?: string
-  user?: { id: number; nickname?: string; phone?: string }
-  assigned_staff?: { id: number; name?: string; phone?: string }
-  visits?: CareVisit[]
 }
-
-// 照护记录
-export interface CareVisit {
-  id: number
-  plan_id?: number | null
-  order_id?: number | null
-  user_id: number
-  staff_id?: number
-  visit_at?: string
-  nursing_items: { name: string; done?: boolean; remark?: string }[]
-  vitals?: { blood_pressure?: string; blood_glucose?: string; heart_rate?: string; oxygen?: string; weight?: string }
-  photos?: string[]
-  remark?: string
-  follow_up_advice?: string
-  created_at?: string
-  user?: { id: number; nickname?: string; phone?: string }
-  staff?: { id: number; name?: string }
-}
-
-// 照护计划列表响应
-export interface CarePlanListResponse {
-  list: CarePlan[]
-  total: number
-}
-
-// 照护记录列表响应
-export interface CareVisitListResponse {
-  list: CareVisit[]
-  total: number
-}
-
-// ===================== 随访任务 =====================
-
-// 随访执行结果（管理员代执行填写）
-export interface FollowUpTaskResult {
-  contact_method?: number // 1电话 2上门 3微信
-  content?: string
-  education_article_ids?: number[]
-  satisfaction?: number // 满意度 1-5
-  remark?: string
-}
-
-// 随访任务
-export interface FollowUpTask {
-  id: number
-  user_id: number
-  task_type?: number // 1康复随访 2租后回访 3慢病随访 4评估回访
-  source_type?: number // 1服务完成 2租赁归还 3评估完成 4手动
-  source_id?: number | null
-  plan_follow_time?: string
-  staff_id?: number | null
-  contact_method?: number
-  status?: number // 0待执行 1已完成 2已跳过
-  result?: FollowUpTaskResult
-  completed_at?: string
-  remark?: string
-  created_at?: string
-  user?: { id: number; nickname?: string; phone?: string }
-  staff?: { id: number; name?: string; phone?: string }
-}
-
-// 随访任务列表响应
-export interface FollowUpTaskListResponse {
-  list: FollowUpTask[]
-  total: number
-}
-
-// ===================== 生命体征监测 =====================
-
-// 生命体征监测记录
-export interface HealthMonitoring {
-  id: number
-  user_id: number
-  record_type?: number // 1血压 2血糖 3心率 4血氧 5体重
-  value?: number
-  unit?: string
-  extra?: Record<string, unknown>
-  recorded_by?: number
-  recorded_at?: string
-  remark?: string
-  created_at?: string
-  user?: { id: number; nickname?: string; phone?: string }
-}
-
-// 生命体征监测列表响应
-export interface HealthMonitoringListResponse {
-  list: HealthMonitoring[]
-  total: number
-}
-
-// ===================== 健康宣教 =====================
 
 // 健康宣教文章
 export interface EducationArticle {
   id: number
   title: string
-  category?: string
+  category_id?: number
+  category?: string // 兼容保留旧字符串分类
   cover?: string
   content?: string
   tags?: string[]

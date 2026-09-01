@@ -1,16 +1,11 @@
-import { get, post, put } from '../utils/request'
+import { del, get, post, put } from '../utils/request'
 import type {
   AssessmentForm,
-  CarePlan,
-  CarePlanItem,
-  CareVisit,
   EducationArticle,
   FittingRecommendation,
   FittingRecommendedProduct,
-  FollowUpTask,
-  FollowUpTaskResult,
   HealthAssessment,
-  HealthMonitoring,
+  HealthEducationCategory,
   HealthRecord,
   PaginationParams,
   PaginationResponse
@@ -125,12 +120,43 @@ export function getUserHealthRecord() {
 }
 
 /**
- * 保存健康档案（有则更新，无则创建）。需要登录。
+ * 保存健康档案（有则更新，无则创建；兼容单档案前端）。需要登录。
  */
 export function saveUserHealthRecord(data: Partial<HealthRecord>) {
   return put<HealthRecord>('/api/v1/user/health-record', data).then(res => {
     return normalizeHealthRecord(res) as HealthRecord
   })
+}
+
+/**
+ * 列出当前账号下的全部健康档案（多档案列表）。需要登录。
+ */
+export function listUserHealthRecords() {
+  return get<HealthRecord[]>('/api/v1/user/health-records').then(list => {
+    const arr = Array.isArray(list) ? list : []
+    return arr.map(normalizeHealthRecord).filter((item): item is HealthRecord => !!item)
+  })
+}
+
+/**
+ * 新增一条健康档案（支持关系 relation）。需要登录。
+ */
+export function createUserHealthRecord(data: Partial<HealthRecord>) {
+  return post<HealthRecord>('/api/v1/user/health-records', data).then(res => normalizeHealthRecord(res) as HealthRecord)
+}
+
+/**
+ * 按档案 ID 更新健康档案。需要登录。
+ */
+export function updateUserHealthRecord(id: number, data: Partial<HealthRecord>) {
+  return put<HealthRecord>(`/api/v1/user/health-records/${id}`, data).then(res => normalizeHealthRecord(res) as HealthRecord)
+}
+
+/**
+ * 按档案 ID 删除健康档案；若被订单引用会被后端拒绝。需要登录。
+ */
+export function deleteUserHealthRecord(id: number) {
+  return del<{ id: number }>(`/api/v1/user/health-records/${id}`)
 }
 
 /**
@@ -141,9 +167,9 @@ export function getUserAssessmentForms() {
 }
 
 /**
- * 获取我的评估记录列表。需要登录。
+ * 获取我的评估记录列表（可按档案 record_id 过滤）。需要登录。
  */
-export function getUserAssessments(params?: PaginationParams) {
+export function getUserAssessments(params?: PaginationParams & { record_id?: number }) {
   return get<PaginationResponse<HealthAssessment>>('/api/v1/user/assessments', params).then(res => {
     const list = Array.isArray(res?.list) ? res.list : []
     return {
@@ -154,10 +180,11 @@ export function getUserAssessments(params?: PaginationParams) {
 }
 
 /**
- * 提交自助评估。需要登录。
+ * 提交自助评估。需要登录。record_id 可选：指定档案维度，缺省回写最近档案。
  */
 export function createUserAssessment(data: {
   form_id: number
+  record_id?: number
   answers: Record<string, string>
   symptom_desc?: string
 }) {
@@ -234,269 +261,6 @@ export function confirmUserFittingRecommendation(id: number) {
   return post<FittingRecommendation>(`/api/v1/user/fitting-recommendations/${id}/confirm`).then(normalizeFittingRecommendation)
 }
 
-// ============ 我的照护计划 ============
-
-/**
- * 规范化护理项数组字段。
- * 后端 items/nursing_items 可能以 JSON 字符串返回，统一规范化为数组。
- */
-function normalizeCarePlanItems(value: unknown): CarePlanItem[] {
-  if (Array.isArray(value)) {
-    return value
-      .filter((item): item is CarePlanItem => !!item && typeof item === 'object')
-      .map(item => ({
-        name: String(item.name || ''),
-        desc: item.desc !== undefined && item.desc !== null ? String(item.desc) : undefined
-      }))
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value)
-      if (Array.isArray(parsed)) {
-        return normalizeCarePlanItems(parsed)
-      }
-    } catch (error) {
-      console.warn('解析护理项列表失败:', error)
-    }
-  }
-
-  return []
-}
-
-/**
- * 规范化护理记录中的护理项（含完成情况），可能为 JSON 字符串。
- */
-function normalizeNursingItems(value: unknown): { name: string; done?: boolean; remark?: string }[] {
-  if (Array.isArray(value)) {
-    return value
-      .filter((item): item is Record<string, any> => !!item && typeof item === 'object')
-      .map(item => ({
-        name: String(item.name || ''),
-        done: typeof item.done === 'boolean' ? item.done : undefined,
-        remark: item.remark !== undefined && item.remark !== null ? String(item.remark) : undefined
-      }))
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value)
-      if (Array.isArray(parsed)) {
-        return normalizeNursingItems(parsed)
-      }
-    } catch (error) {
-      console.warn('解析护理项完成情况失败:', error)
-    }
-  }
-
-  return []
-}
-
-/**
- * 规范化生命体征字段（可能为 JSON 字符串）。
- */
-function normalizeVitals(value: unknown): CareVisit['vitals'] {
-  if (value && typeof value === 'object') {
-    return value as CareVisit['vitals']
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value)
-      if (parsed && typeof parsed === 'object') {
-        return parsed as CareVisit['vitals']
-      }
-    } catch (error) {
-      console.warn('解析生命体征失败:', error)
-    }
-  }
-
-  return undefined
-}
-
-/**
- * 规范化上门照护记录。
- */
-function normalizeCareVisit(data: any): CareVisit {
-  return {
-    ...data,
-    id: Number(data?.id || 0),
-    user_id: Number(data?.user_id || 0),
-    plan_id: data?.plan_id !== undefined && data?.plan_id !== null ? Number(data.plan_id) : null,
-    order_id: data?.order_id !== undefined && data?.order_id !== null ? Number(data.order_id) : null,
-    staff_id: data?.staff_id !== undefined && data?.staff_id !== null ? Number(data.staff_id) : undefined,
-    visit_at: data?.visit_at ? String(data.visit_at) : undefined,
-    nursing_items: normalizeNursingItems(data?.nursing_items),
-    vitals: normalizeVitals(data?.vitals),
-    photos: normalizeStringArray(data?.photos),
-    remark: data?.remark !== undefined && data?.remark !== null ? String(data.remark) : undefined,
-    follow_up_advice:
-      data?.follow_up_advice !== undefined && data?.follow_up_advice !== null
-        ? String(data.follow_up_advice)
-        : undefined,
-    created_at: data?.created_at ? String(data.created_at) : undefined
-  }
-}
-
-/**
- * 规范化照护计划。
- */
-function normalizeCarePlan(data: any): CarePlan {
-  const rawVisits = data?.visits
-  const visits = Array.isArray(rawVisits)
-    ? rawVisits.filter((item: any) => !!item && typeof item === 'object').map(normalizeCareVisit)
-    : typeof rawVisits === 'string' && rawVisits.trim()
-      ? (() => {
-          try {
-            const parsed = JSON.parse(rawVisits)
-            return Array.isArray(parsed) ? parsed.map(normalizeCareVisit) : undefined
-          } catch (error) {
-            console.warn('解析照护记录列表失败:', error)
-            return undefined
-          }
-        })()
-      : undefined
-
-  return {
-    ...data,
-    id: Number(data?.id || 0),
-    user_id: Number(data?.user_id || 0),
-    name: String(data?.name || ''),
-    plan_type: data?.plan_type !== undefined && data?.plan_type !== null ? Number(data.plan_type) : undefined,
-    start_date: data?.start_date ? String(data.start_date) : undefined,
-    end_date: data?.end_date ? String(data.end_date) : undefined,
-    frequency: data?.frequency ? String(data.frequency) : undefined,
-    goals: data?.goals ? String(data.goals) : undefined,
-    items: normalizeCarePlanItems(data?.items),
-    assigned_staff_id:
-      data?.assigned_staff_id !== undefined && data?.assigned_staff_id !== null
-        ? Number(data.assigned_staff_id)
-        : null,
-    order_id: data?.order_id !== undefined && data?.order_id !== null ? Number(data.order_id) : null,
-    status: data?.status !== undefined && data?.status !== null ? Number(data.status) : undefined,
-    visit_count:
-      data?.visit_count !== undefined && data?.visit_count !== null ? Number(data.visit_count) : undefined,
-    created_at: data?.created_at ? String(data.created_at) : undefined,
-    updated_at: data?.updated_at ? String(data.updated_at) : undefined,
-    visits
-  }
-}
-
-/**
- * 获取我的照护计划列表。需要登录。
- */
-export function getUserCarePlans(params?: PaginationParams) {
-  return get<PaginationResponse<CarePlan>>('/api/v1/user/care-plans', params).then(res => {
-    const list = Array.isArray(res?.list) ? res.list : []
-    return {
-      ...res,
-      list: list.map(normalizeCarePlan)
-    }
-  })
-}
-
-/**
- * 获取照护计划详情（含上门照护记录）。需要登录。
- */
-export function getUserCarePlan(id: number) {
-  return get<CarePlan>(`/api/v1/user/care-plans/${id}`).then(normalizeCarePlan)
-}
-
-// ============ 我的康复随访 ============
-
-/**
- * 规范化数值数组字段（如随访结果中的文章 ID 列表）。
- */
-function normalizeNumberArray(value: unknown): number[] {
-  if (Array.isArray(value)) {
-    return value
-      .map(item => Number(item))
-      .filter(item => Number.isFinite(item))
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value)
-      if (Array.isArray(parsed)) {
-        return normalizeNumberArray(parsed)
-      }
-    } catch (error) {
-      console.warn('解析数值数组字段失败:', error)
-    }
-  }
-
-  return []
-}
-
-/**
- * 规范化随访任务结果字段。
- * 后端 result 可能以 JSON 字符串返回，统一规范化为对象。
- */
-function normalizeFollowUpTaskResult(value: unknown): FollowUpTaskResult | undefined {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const raw = value as Record<string, any>
-    return {
-      contact_method:
-        raw?.contact_method !== undefined && raw?.contact_method !== null ? Number(raw.contact_method) : undefined,
-      content: raw?.content !== undefined && raw?.content !== null ? String(raw.content) : undefined,
-      education_article_ids: normalizeNumberArray(raw?.education_article_ids),
-      satisfaction:
-        raw?.satisfaction !== undefined && raw?.satisfaction !== null ? Number(raw.satisfaction) : undefined,
-      remark: raw?.remark !== undefined && raw?.remark !== null ? String(raw.remark) : undefined
-    }
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value)
-      if (parsed && typeof parsed === 'object') {
-        return normalizeFollowUpTaskResult(parsed)
-      }
-    } catch (error) {
-      console.warn('解析随访任务结果失败:', error)
-    }
-  }
-
-  return undefined
-}
-
-/**
- * 规范化随访任务。
- */
-function normalizeFollowUpTask(data: any): FollowUpTask {
-  return {
-    ...data,
-    id: Number(data?.id || 0),
-    user_id: Number(data?.user_id || 0),
-    task_type: data?.task_type !== undefined && data?.task_type !== null ? Number(data.task_type) : undefined,
-    source_type:
-      data?.source_type !== undefined && data?.source_type !== null ? Number(data.source_type) : undefined,
-    source_id: data?.source_id !== undefined && data?.source_id !== null ? Number(data.source_id) : null,
-    plan_follow_time: data?.plan_follow_time ? String(data.plan_follow_time) : undefined,
-    staff_id: data?.staff_id !== undefined && data?.staff_id !== null ? Number(data.staff_id) : undefined,
-    contact_method:
-      data?.contact_method !== undefined && data?.contact_method !== null ? Number(data.contact_method) : undefined,
-    status: data?.status !== undefined && data?.status !== null ? Number(data.status) : undefined,
-    result: normalizeFollowUpTaskResult(data?.result),
-    completed_at: data?.completed_at ? String(data.completed_at) : undefined,
-    remark: data?.remark !== undefined && data?.remark !== null ? String(data.remark) : undefined,
-    created_at: data?.created_at ? String(data.created_at) : undefined
-  }
-}
-
-/**
- * 获取我的随访任务列表。需要登录。
- */
-export function getUserFollowUps(params?: PaginationParams) {
-  return get<PaginationResponse<FollowUpTask>>('/api/v1/user/follow-ups', params).then(res => {
-    const list = Array.isArray(res?.list) ? res.list : []
-    return {
-      ...res,
-      list: list.map(normalizeFollowUpTask)
-    }
-  })
-}
-
 // ============ 健康宣教 ============
 
 /**
@@ -508,6 +272,7 @@ function normalizeEducationArticle(data: any): EducationArticle {
     ...data,
     id: Number(data?.id || 0),
     title: String(data?.title || ''),
+    category_id: data?.category_id !== undefined && data?.category_id !== null ? Number(data.category_id) || undefined : undefined,
     category: data?.category !== undefined && data?.category !== null ? String(data.category) : undefined,
     cover: data?.cover !== undefined && data?.cover !== null ? String(data.cover) : undefined,
     content: data?.content !== undefined && data?.content !== null ? String(data.content) : undefined,
@@ -534,75 +299,27 @@ export function getUserEducationArticle(id: number) {
   return get<EducationArticle>(`/api/v1/user/health-education/${id}`).then(normalizeEducationArticle)
 }
 
-// ============ 生命体征记录 ============
-
 /**
- * 规范化体征扩展字段。
- * 后端 extra 可能以 JSON 字符串返回，统一规范化为对象。
+ * 获取首页健康宣教文章（公开，无需登录；分页返回 {list,total}）。
  */
-function normalizeExtra(value: unknown): Record<string, unknown> | undefined {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, unknown>
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>
-      }
-    } catch (error) {
-      console.warn('解析体征扩展字段失败:', error)
-    }
-  }
-
-  return undefined
-}
-
-/**
- * 规范化生命体征记录。
- */
-function normalizeHealthMonitoring(data: any): HealthMonitoring {
-  return {
-    ...data,
-    id: Number(data?.id || 0),
-    user_id: Number(data?.user_id || 0),
-    record_type:
-      data?.record_type !== undefined && data?.record_type !== null ? Number(data.record_type) : undefined,
-    value: data?.value !== undefined && data?.value !== null ? Number(data.value) : undefined,
-    unit: data?.unit !== undefined && data?.unit !== null ? String(data.unit) : undefined,
-    extra: normalizeExtra(data?.extra),
-    recorded_by:
-      data?.recorded_by !== undefined && data?.recorded_by !== null ? Number(data.recorded_by) : undefined,
-    recorded_at: data?.recorded_at ? String(data.recorded_at) : undefined,
-    remark: data?.remark !== undefined && data?.remark !== null ? String(data.remark) : undefined,
-    created_at: data?.created_at ? String(data.created_at) : undefined
-  }
-}
-
-/**
- * 获取我的生命体征记录列表。需要登录。
- */
-export function getUserMonitoring(params?: PaginationParams) {
-  return get<PaginationResponse<HealthMonitoring>>('/api/v1/user/monitoring', params).then(res => {
+export function getStoreEducationArticles(params?: { category_id?: number; page?: number; page_size?: number }) {
+  return get<{ list: EducationArticle[]; total: number }>('/api/v1/store/education/articles', params).then(res => {
     const list = Array.isArray(res?.list) ? res.list : []
-    return {
-      ...res,
-      list: list.map(normalizeHealthMonitoring)
-    }
+    return { ...res, list: list.map(normalizeEducationArticle) }
   })
 }
 
 /**
- * 新增生命体征记录。需要登录。
+ * 获取启用中的健康宣教分类（两级，公开无需登录）。
  */
-export function createUserMonitoring(data: {
-  record_type: number
-  value: number
-  unit?: string
-  extra?: Record<string, unknown>
-  recorded_at?: string
-  remark?: string
-}) {
-  return post<HealthMonitoring>('/api/v1/user/monitoring', data).then(normalizeHealthMonitoring)
+export function getStoreEducationCategories() {
+  return get<HealthEducationCategory[]>('/api/v1/store/education/categories').then(list =>
+    (Array.isArray(list) ? list : []).map(item => ({
+      ...item,
+      id: Number(item.id || 0),
+      parent_id: Number(item.parent_id || 0),
+      sort: Number(item.sort || 0),
+      status: Number(item.status ?? 1)
+    }))
+  )
 }

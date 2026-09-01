@@ -5,6 +5,7 @@ import { APP_TITLE } from '@/config/env'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessageBox } from 'element-plus'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import TabsBar from '@/components/TabsBar.vue'
 import type { SysMenu } from '@/types/sp'
 
 const route = useRoute()
@@ -106,6 +107,7 @@ async function handleLogout() {
           <el-button type="primary" plain @click="handleLogout">退出登录</el-button>
         </div>
       </el-header>
+      <TabsBar />
       <el-main class="layout-main">
         <router-view />
       </el-main>

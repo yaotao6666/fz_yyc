@@ -84,6 +84,7 @@ func GetOrders(c *gin.Context) {
 	status := c.Query("status")
 	orderType := c.Query("order_type")
 	bizStatus := c.Query("biz_status")
+	category := c.Query("category") // 1=实物订单 2=服务订单（不传=全部）
 	keyword := c.Query("keyword")
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
@@ -104,11 +105,20 @@ func GetOrders(c *gin.Context) {
 		parsed, _ := strconv.Atoi(bizStatus)
 		bizStatusInt = &parsed
 	}
+	var categoryUint *uint8
+	if category != "" {
+		parsed, _ := strconv.Atoi(category)
+		if parsed > 0 && parsed < 256 {
+			value := uint8(parsed)
+			categoryUint = &value
+		}
+	}
 
 	result, err := orderquery.GetOrderList(c.Request.Context(), orderquery.ListOptions{
 		Status:          statusInt,
 		OrderType:       orderTypeInt,
 		BizStatus:       bizStatusInt,
+		Category:        categoryUint,
 		Keyword:         keyword,
 		StartDate:       startDate,
 		EndDate:         endDate,

@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { getMenuTree, createMenu, updateMenu, deleteMenu } from '@/api/sp'
 import type { SysMenu } from '@/types/sp'
 
 const loading = ref(false)
 const tree = ref<SysMenu[]>([])
+
+// 可选图标库：Element Plus 全部图标名（与侧边栏动态渲染组件名一致）
+const iconNames = computed<string[]>(() =>
+  Object.keys(ElementPlusIconsVue).filter((key) => !key.startsWith('_'))
+)
+const iconOf = (name?: string) => {
+  if (!name) return null
+  return (ElementPlusIconsVue as Record<string, unknown>)[name] || null
+}
 
 async function loadTree() {
   loading.value = true
@@ -142,7 +152,15 @@ onMounted(loadTree)
           <el-tag size="small" :type="row.menu_type === 2 ? 'warning' : 'primary'">{{ menuTypeText(row.menu_type) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="icon" label="图标" width="80" />
+      <el-table-column label="图标" width="120">
+        <template #default="{ row }">
+          <span v-if="row.icon" class="icon-cell">
+            <el-icon v-if="iconOf(row.icon)"><component :is="iconOf(row.icon)" /></el-icon>
+            <span>{{ row.icon }}</span>
+          </span>
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="path" label="路径" min-width="120" />
       <el-table-column prop="permission" label="权限标识" min-width="150" />
       <el-table-column prop="sort" label="排序" width="70" />
@@ -193,7 +211,25 @@ onMounted(loadTree)
           <el-input v-model="form.path" placeholder="菜单必填，如 /products；按钮留空" />
         </el-form-item>
         <el-form-item label="图标">
-          <el-input v-model="form.icon" placeholder="Element Plus 图标名，如 Goods" />
+          <el-select
+            v-model="form.icon"
+            filterable
+            clearable
+            placeholder="选择图标（可输入搜索）"
+            style="width: 100%"
+          >
+            <template #prefix>
+              <el-icon v-if="iconOf(form.icon)" class="icon-prefix">
+                <component :is="iconOf(form.icon)" />
+              </el-icon>
+            </template>
+            <el-option v-for="name in iconNames" :key="name" :label="name" :value="name">
+              <span class="icon-option">
+                <el-icon v-if="iconOf(name)"><component :is="iconOf(name)" /></el-icon>
+                <span>{{ name }}</span>
+              </span>
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="权限标识">
           <el-input v-model="form.permission" placeholder="如 products:view" />
@@ -225,4 +261,7 @@ onMounted(loadTree)
 <style scoped>
 .page-card { background: #fff; border-radius: 16px; padding: 24px; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.icon-prefix { margin-right: 4px; font-size: 15px; }
+.icon-option { display: inline-flex; align-items: center; gap: 8px; }
+.icon-cell { display: inline-flex; align-items: center; gap: 6px; }
 </style>

@@ -1,36 +1,63 @@
 <template>
   <view class="my-health-container">
-    <!-- 顶部健康档案卡片 -->
-    <view class="profile-card" :class="{ 'no-record': !record }">
-      <template v-if="record">
+    <!-- 成员选择区（最多 5 个） -->
+    <view v-if="records.length" class="member-bar">
+      <scroll-view class="member-scroll" scroll-x>
+        <view class="member-list">
+          <view
+            v-for="item in records"
+            :key="item.id"
+            class="member-item"
+            :class="{ active: item.id === activeId }"
+            @click="switchMember(item.id)"
+          >
+            <view class="member-avatar">{{ memberAvatarText(item) }}</view>
+            <view class="member-name">{{ item.real_name || '未填写' }}</view>
+            <view class="member-relation">{{ relationText(item.relation) }}</view>
+          </view>
+          <view v-if="records.length < 5" class="member-item member-add" @click="goAddMember">
+            <view class="member-add-icon">＋</view>
+            <view class="member-name">添加成员</view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- 当前成员健康档案卡片 -->
+    <view class="profile-card" :class="{ 'no-record': !activeRecord }">
+      <template v-if="activeRecord">
         <view class="profile-header">
-          <view class="profile-avatar">{{ profileAvatarText }}</view>
+          <view class="profile-avatar">{{ activeAvatarText }}</view>
           <view class="profile-info">
             <view class="profile-name">
-              {{ record.real_name || '未填写姓名' }}
-              <text class="profile-tag" v-if="genderText">{{ genderText }}</text>
-              <text class="profile-tag" v-if="ageText">{{ ageText }}岁</text>
+              {{ activeRecord.real_name || '未填写姓名' }}
+              <text v-if="relationText(activeRecord.relation)" class="profile-tag">{{ relationText(activeRecord.relation) }}</text>
+              <text v-if="genderText" class="profile-tag">{{ genderText }}</text>
+              <text v-if="ageText" class="profile-tag">{{ ageText }}岁</text>
             </view>
-            <view class="profile-level" v-if="record.assessment_level">
-              健康等级：{{ record.assessment_level }}
+            <view class="profile-level" v-if="activeRecord.assessment_level">
+              健康等级：{{ activeRecord.assessment_level }}
             </view>
             <view class="profile-level" v-else>尚未进行健康评估</view>
           </view>
-          <view class="profile-edit" @click="goEditRecord">编辑 ›</view>
+          <view class="profile-actions">
+            <view class="profile-action" @click="goEditRecord">编辑</view>
+            <view class="profile-action danger" @click="deleteRecord">删除</view>
+          </view>
         </view>
         <view class="chronic-tags" v-if="chronicTags.length">
           <text v-for="tag in chronicTags" :key="tag" class="chronic-tag">{{ tag }}</text>
         </view>
-        <view class="profile-meta" v-if="record.birth_date || record.blood_type">
-          <text v-if="record.birth_date">出生 {{ record.birth_date }}</text>
-          <text v-if="record.blood_type">血型 {{ record.blood_type }}型</text>
+        <view class="profile-meta" v-if="activeRecord.birth_date || activeRecord.blood_type">
+          <text v-if="activeRecord.birth_date">出生 {{ activeRecord.birth_date }}</text>
+          <text v-if="activeRecord.blood_type">血型 {{ activeRecord.blood_type }}型</text>
         </view>
       </template>
       <template v-else>
         <view class="no-record-icon">🩺</view>
-        <view class="no-record-title">还未建立健康档案</view>
-        <view class="no-record-desc">完善健康档案，获取更精准的健康服务</view>
-        <view class="go-create-btn" @click="goEditRecord">去完善档案</view>
+        <view class="no-record-title">还没有健康档案</view>
+        <view class="no-record-desc">支持本人 / 父母 / 其他亲属分别建档，最多 5 个</view>
+        <view class="go-create-btn" @click="goAddMember">去添加成员</view>
       </template>
     </view>
 
@@ -38,8 +65,8 @@
     <view class="entry-grid">
       <view class="entry-item" @click="goEditRecord">
         <view class="entry-icon record">📋</view>
-        <view class="entry-title">健康档案</view>
-        <view class="entry-desc">编辑个人健康信息</view>
+        <view class="entry-title">编辑档案</view>
+        <view class="entry-desc">完善当前成员信息</view>
       </view>
       <view class="entry-item" @click="goAssessment">
         <view class="entry-icon assess">📝</view>
@@ -56,30 +83,10 @@
         <view class="entry-title">适配建议</view>
         <view class="entry-desc">查看辅具适配推荐</view>
       </view>
-      <view class="entry-item" @click="goCarePlans">
-        <view class="entry-icon care">🩺</view>
-        <view class="entry-title">照护计划</view>
-        <view class="entry-desc">查看照护方案与记录</view>
-      </view>
-      <view class="entry-item" @click="goFollowUps">
-        <view class="entry-icon follow">🗓️</view>
-        <view class="entry-title">康复随访</view>
-        <view class="entry-desc">查看随访任务与结果</view>
-      </view>
-      <view class="entry-item" @click="goEducation">
-        <view class="entry-icon edu">📖</view>
-        <view class="entry-title">健康宣教</view>
-        <view class="entry-desc">康复与慢病科普文章</view>
-      </view>
-      <view class="entry-item" @click="goMonitoring">
-        <view class="entry-icon monitor">❤️</view>
-        <view class="entry-title">体征记录</view>
-        <view class="entry-desc">记录每日生命体征</view>
-      </view>
     </view>
 
     <!-- 最近评估记录 -->
-    <view class="recent-card">
+    <view class="recent-card" v-if="activeRecord">
       <view class="section-header">
         <text class="section-title">最近评估</text>
         <text class="section-more" @click="goRecords">全部 ›</text>
@@ -114,30 +121,43 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
-import { getUserHealthRecord, getUserAssessments } from '../../api/health'
+import { listUserHealthRecords, deleteUserHealthRecord, getUserAssessments } from '../../api/health'
 import type { HealthAssessment, HealthRecord } from '../../types'
 import { useAuth } from '../../utils/useAuth'
 
-const record = ref<HealthRecord | null>(null)
+const records = ref<HealthRecord[]>([])
+const activeId = ref<number | null>(null)
 const recentAssessments = ref<HealthAssessment[]>([])
 const loading = ref(false)
 
-const hasRecord = computed(() => !!record.value)
-const chronicTags = computed(() => record.value?.chronic_tags || [])
+const activeRecord = computed(() => records.value.find(item => item.id === activeId.value) || null)
+const chronicTags = computed(() => activeRecord.value?.chronic_tags || [])
 const genderText = computed(() => {
-  const gender = record.value?.gender
+  const gender = activeRecord.value?.gender
   if (gender === 1) return '男'
   if (gender === 2) return '女'
   return ''
 })
 const ageText = computed(() => {
-  const age = calcAge(record.value?.birth_date)
+  const age = calcAge(activeRecord.value?.birth_date)
   return age === null ? '' : String(age)
 })
-const profileAvatarText = computed(() => {
-  const name = record.value?.real_name?.trim()
+const activeAvatarText = computed(() => {
+  const name = activeRecord.value?.real_name?.trim()
   return name ? name.slice(0, 1) : '我'
 })
+
+function memberAvatarText(record: HealthRecord): string {
+  const name = record.real_name?.trim()
+  return name ? name.slice(0, 1) : '?'
+}
+
+function relationText(relation?: number): string {
+  if (relation === 1) return '本人'
+  if (relation === 2) return '父母'
+  if (relation === 3) return '其他亲属'
+  return ''
+}
 
 function calcAge(birthDate?: string): number | null {
   if (!birthDate) return null
@@ -171,17 +191,42 @@ async function loadData() {
   if (loading.value) return
   loading.value = true
   try {
-    const [recordData, assessments] = await Promise.all([
-      getUserHealthRecord(),
-      getUserAssessments({ page: 1, page_size: 3 })
-    ])
-    record.value = recordData
-    recentAssessments.value = assessments?.list || []
+    const list = await listUserHealthRecords()
+    records.value = list
+    if (!list.length) {
+      activeId.value = null
+      recentAssessments.value = []
+    } else {
+      const stillExists = activeId.value !== null && list.some(item => item.id === activeId.value)
+      if (!stillExists) {
+        activeId.value = list[0].id
+      }
+      await loadRecentAssessments()
+    }
   } catch (error) {
-    console.error('加载我的健康数据失败:', error)
+    console.error('加载健康档案失败:', error)
   } finally {
     loading.value = false
   }
+}
+
+async function loadRecentAssessments() {
+  if (!activeId.value) {
+    recentAssessments.value = []
+    return
+  }
+  try {
+    const res = await getUserAssessments({ page: 1, page_size: 3, record_id: activeId.value })
+    recentAssessments.value = res?.list || []
+  } catch (error) {
+    recentAssessments.value = []
+  }
+}
+
+function switchMember(id: number) {
+  if (activeId.value === id) return
+  activeId.value = id
+  loadRecentAssessments()
 }
 
 onShow(async () => {
@@ -199,36 +244,56 @@ onPullDownRefresh(async () => {
   uni.stopPullDownRefresh()
 })
 
-function goEditRecord() {
+function goAddMember() {
   uni.navigateTo({ url: '/pages/store/health-record-edit' })
 }
 
+function requireActiveRecord(): boolean {
+  if (activeId.value) return true
+  uni.showToast({ title: '请先添加健康档案', icon: 'none' })
+  goAddMember()
+  return false
+}
+
+function goEditRecord() {
+  if (activeId.value) {
+    uni.navigateTo({ url: `/pages/store/health-record-edit?id=${activeId.value}` })
+  } else {
+    goAddMember()
+  }
+}
+
 function goAssessment() {
-  uni.navigateTo({ url: '/pages/store/health-assessment?mode=assess' })
+  if (!requireActiveRecord()) return
+  uni.navigateTo({ url: `/pages/store/health-assessment?mode=assess&record_id=${activeId.value}` })
 }
 
 function goRecords() {
-  uni.navigateTo({ url: '/pages/store/health-assessment?mode=records' })
+  if (!requireActiveRecord()) return
+  uni.navigateTo({ url: `/pages/store/health-assessment?mode=records&record_id=${activeId.value}` })
 }
 
 function goFitting() {
   uni.navigateTo({ url: '/pages/store/my-fitting' })
 }
 
-function goCarePlans() {
-  uni.navigateTo({ url: '/pages/store/my-care-plans' })
-}
-
-function goFollowUps() {
-  uni.navigateTo({ url: '/pages/store/my-follow-ups' })
-}
-
-function goEducation() {
-  uni.navigateTo({ url: '/pages/store/health-education' })
-}
-
-function goMonitoring() {
-  uni.navigateTo({ url: '/pages/store/my-monitoring' })
+function deleteRecord() {
+  const record = activeRecord.value
+  if (!record) return
+  uni.showModal({
+    title: '删除档案',
+    content: `确定删除「${record.real_name || '该成员'}」的健康档案吗？`,
+    success: async (res) => {
+      if (!res.confirm) return
+      try {
+        await deleteUserHealthRecord(record.id)
+        uni.showToast({ title: '删除成功', icon: 'success' })
+        await loadData()
+      } catch (error: any) {
+        uni.showToast({ title: error.message || '删除失败', icon: 'none' })
+      }
+    }
+  })
 }
 </script>
 
@@ -238,6 +303,85 @@ function goMonitoring() {
   background: #f5f5f5;
   padding: 24rpx 24rpx 60rpx;
   box-sizing: border-box;
+}
+
+/* 成员选择区 */
+.member-bar {
+  margin-bottom: 24rpx;
+}
+
+.member-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.member-list {
+  display: inline-flex;
+  gap: 16rpx;
+}
+
+.member-item {
+  width: 140rpx;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx 8rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 2rpx solid transparent;
+}
+
+.member-item.active {
+  border-color: #007AFF;
+  background: rgba(0, 122, 255, 0.06);
+}
+
+.member-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: rgba(0, 122, 255, 0.12);
+  color: #007AFF;
+  font-size: 32rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12rpx;
+}
+
+.member-name {
+  font-size: 24rpx;
+  color: #1a1a1a;
+  max-width: 120rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 4rpx;
+}
+
+.member-relation {
+  font-size: 20rpx;
+  color: #999999;
+}
+
+.member-add {
+  justify-content: center;
+}
+
+.member-add-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #f0f2f5;
+  color: #666666;
+  font-size: 40rpx;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12rpx;
 }
 
 /* 健康档案卡片 */
@@ -301,12 +445,25 @@ function goMonitoring() {
   opacity: 0.9;
 }
 
-.profile-edit {
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+
+.profile-action {
   font-size: 24rpx;
   padding: 8rpx 20rpx;
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.18);
-  flex-shrink: 0;
+  text-align: center;
+}
+
+.profile-action.danger {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffd9d9;
 }
 
 .chronic-tags {
@@ -407,22 +564,6 @@ function goMonitoring() {
 
 .entry-icon.fitting {
   background: rgba(99, 102, 241, 0.1);
-}
-
-.entry-icon.care {
-  background: rgba(0, 191, 166, 0.1);
-}
-
-.entry-icon.follow {
-  background: rgba(255, 59, 48, 0.1);
-}
-
-.entry-icon.edu {
-  background: rgba(94, 92, 230, 0.1);
-}
-
-.entry-icon.monitor {
-  background: rgba(255, 45, 85, 0.1);
 }
 
 .entry-title {

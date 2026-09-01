@@ -22,6 +22,8 @@ import type {
   CreateOrderResponse,
   MerchantBehaviorEventRequest,
   UserAddress,
+  ServiceReview,
+  ServiceReviewSubmit,
 } from '../types'
 
 export { get, post, put, del }
@@ -435,6 +437,22 @@ export function getMyOrderDetail(orderId: number) {
   return get<Order>(`/api/v1/user/orders/${orderId}`).then(normalizeOrder)
 }
 
+// ============ C端服务评价（PRD V2.0 阶段四） ============
+
+/**
+ * 查看订单评价（未评价时后端返回 data=null）
+ */
+export function getReview(orderId: number) {
+  return get<ServiceReview | null>(`/api/v1/user/orders/${orderId}/review`)
+}
+
+/**
+ * 提交服务评价
+ */
+export function submitReview(orderId: number, data: ServiceReviewSubmit) {
+  return post<{ id: number }>(`/api/v1/user/orders/${orderId}/review`, data)
+}
+
 // ============ C端地址管理 ============
 
 export function getUserAddresses() {
@@ -472,6 +490,9 @@ export default {
   renewOrder,
   // C端订单详情
   getMyOrderDetail,
+  // C端服务评价
+  getReview,
+  submitReview,
   // C端地址管理
   getUserAddresses,
   createUserAddress,

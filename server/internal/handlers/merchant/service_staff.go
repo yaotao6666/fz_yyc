@@ -214,3 +214,40 @@ func DeleteServiceStaff(c *gin.Context) {
 
 	response.SuccessWithMessage(c, "删除成功", gin.H{"id": id})
 }
+
+// UpdateServiceStaffRegionRequest 维护服务人员服务区域请求
+type UpdateServiceStaffRegionRequest struct {
+	// 逗号分隔的区县列表，空字符串=不限区域
+	ServiceRegion string `json:"service_region" binding:"max=256"`
+}
+
+// UpdateServiceStaffRegion 商家维护服务人员服务区域（接单池过滤依据）
+func UpdateServiceStaffRegion(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "服务人员ID错误")
+		return
+	}
+
+	var req UpdateServiceStaffRegionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
+		return
+	}
+
+	var staff models.ServiceStaff
+	if err := database.DB.Where("id = ?", id).First(&staff).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "服务人员不存在")
+		return
+	}
+
+	if err := database.DB.Model(&staff).Update("service_region", req.ServiceRegion).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "服务区域更新失败")
+		return
+	}
+
+	response.SuccessWithMessage(c, "服务区域更新成功", gin.H{
+		"id":             staff.ID,
+		"service_region": req.ServiceRegion,
+	})
+}

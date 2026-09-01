@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { staffProfileApi, staffHealthApi } from '@/api'
+import { staffProfileApi, staffHealthApi, staffSafetyApi } from '@/api'
+import { formatDate } from '@/utils/format'
 
 const profile = ref<any>(null)
 const stats = ref({
@@ -10,16 +11,16 @@ const stats = ref({
   totalAmount: 0
 })
 const loading = ref(false)
-// 待执行随访任务数（角标）
-const pendingFollowUps = ref(0)
+// 我的服务区域（阶段三）
+const myRegion = ref<any>(null)
+// 我的质量分与近期评价（阶段四）
+const quality = ref<any>(null)
 
 const menuGroups = computed(() => [
   {
     title: '服务',
     items: [
-      { icon: '📋', label: '全部工单', path: '/pages/workorder/index' },
-      { icon: '🩺', label: '我的照护计划', path: '/pages/health/care-plans' },
-      { icon: '📞', label: '随访任务', path: '/pages/health/follow-ups', badge: pendingFollowUps.value }
+      { icon: '📋', label: '全部工单', path: '/pages/workorder/index' }
     ]
   },
   {
@@ -55,13 +56,27 @@ async function loadData() {
   }
 }
 
-// 加载待执行随访任务数，用于入口角标
-async function loadPendingFollowUps() {
+// 加载我的服务区域（阶段三：接单池按区域过滤）
+async function loadMyRegion() {
   try {
-    const res: any = await staffHealthApi.getMyFollowUpTasks({ status: 0, page: 1, page_size: 1 })
-    pendingFollowUps.value = res?.total || 0
+    const res: any = await staffSafetyApi.getMyRegion()
+    if (res?.code === 0) {
+      myRegion.value = res.data
+    }
   } catch (e) {
-    console.error('[Profile] loadPendingFollowUps error', e)
+    console.error('[Profile] loadMyRegion error', e)
+  }
+}
+
+// 加载我的质量分与近期评价（阶段四）
+async function loadMyQualityScore() {
+  try {
+    const res: any = await staffProfileApi.getMyQualityScore()
+    if (res?.code === 0) {
+      quality.value = res.data || null
+    }
+  } catch (e) {
+    console.error('[Profile] loadMyQualityScore error', e)
   }
 }
 
@@ -92,13 +107,28 @@ function onLogout() {
   })
 }
 
+// 服务区域详情：区域变更需联系商家后台维护
+function showRegionDetail() {
+  const limitless = myRegion.value?.region_limitless
+  const list = myRegion.value?.region_list || []
+  uni.showModal({
+    title: '我的服务区域',
+    content: limitless
+      ? '当前未限定服务区域，可接全城订单。'
+      : `当前服务区域：${list.join('、')}。待接订单池将按区域过滤，区域变更请联系商家后台维护。`,
+    showCancel: false,
+    confirmText: '知道了'
+  })
+}
+
 onMounted(() => {
   loadData()
-  loadPendingFollowUps()
+  loadMyRegion()
+  loadMyQualityScore()
 })
 onShow(() => {
-  // 每次显示时刷新统计数据与待执行随访任务数
-  loadPendingFollowUps()
+  // 每次显示时刷新统计数据与质量分
+  loadMyQualityScore()
   if (profile.value) {
     staffProfileApi.getStatistics().then((res: any) => {
       if (res.code === 0) {
@@ -140,6 +170,43 @@ onShow(() => {
     </view>
 
     <view class="container" style="margin-top: -32rpx;">
+      <!-- 我的服务区域（阶段三：接单池按区域过滤） -->
+      <view class="card region-card" v-if="myRegion">
+        <view class="region-row" @tap="showRegionDetail">
+          <view class="region-info">
+            <text class="region-title">我的服务区域</text>
+            <text class="region-value">
+              {{ myRegion.region_limitless ? '不限区域（可接全城订单）' : (myRegion.region_list || []).join('、') }}
+            </text>
+          </view>
+          <text class="arrow">›</text>
+        </view>
+      </view>
+
+      <!-- 我的质量分与近期评价（阶段四） -->
+      <view class="card quality-card" v-if="quality">
+        <view class="quality-head">
+          <view class="quality-main">
+            <text class="quality-score">{{ quality.quality_score ?? '5.0' }}</text>
+            <text class="quality-unit">分</text>
+          </view>
+          <view class="quality-meta">
+            <text class="quality-count">共 {{ quality.review_count }} 条评价</text>
+            <text class="quality-sub">态度 {{ quality.avg_attitude }} · 专业 {{ quality.avg_professional }} · 准时 {{ quality.avg_punctual }}</text>
+          </view>
+        </view>
+        <view class="quality-review-list" v-if="quality.recent_reviews?.length">
+          <view v-for="r in quality.recent_reviews" :key="r.id" class="quality-review-item">
+            <view class="quality-review-top">
+              <text class="quality-review-stars">{{ '★★★★★'.slice(0, r.score) }}</text>
+              <text class="quality-review-time">{{ formatDate(r.created_at) }}</text>
+            </view>
+            <text v-if="r.content" class="quality-review-content">{{ r.content }}</text>
+          </view>
+        </view>
+        <text v-else class="quality-empty">暂无评价</text>
+      </view>
+
       <view
         v-for="group in menuGroups"
         :key="group.title"
@@ -197,6 +264,69 @@ onShow(() => {
 }
 
 .menu-card { padding: 0 32rpx !important; }
+
+/* 我的服务区域卡片（阶段三） */
+.region-card { padding: 24rpx 32rpx !important; }
+.region-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.region-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  flex: 1;
+}
+.region-title { font-size: 30rpx; font-weight: 600; color: #333; }
+.region-value { font-size: 26rpx; color: #666; line-height: 1.5; }
+.region-card .arrow { font-size: 36rpx; color: #ccc; }
+
+/* 我的质量分卡片（阶段四） */
+.quality-card { padding: 24rpx 32rpx !important; }
+.quality-head {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 2rpx solid var(--border-color);
+}
+.quality-main {
+  display: flex;
+  align-items: baseline;
+}
+.quality-score {
+  font-size: 64rpx;
+  font-weight: 700;
+  color: #517528;
+  line-height: 1;
+}
+.quality-unit { font-size: 24rpx; color: #999; margin-left: 8rpx; }
+.quality-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  flex: 1;
+}
+.quality-count { font-size: 26rpx; color: #333; }
+.quality-sub { font-size: 22rpx; color: #999; }
+.quality-review-list { margin-top: 8rpx; }
+.quality-review-item {
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid var(--border-color);
+}
+.quality-review-item:last-child { border-bottom: none; }
+.quality-review-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.quality-review-stars { font-size: 28rpx; color: #ff9500; }
+.quality-review-time { font-size: 22rpx; color: #999; }
+.quality-review-content { font-size: 26rpx; color: #555; line-height: 1.5; margin-top: 8rpx; }
+.quality-empty { font-size: 26rpx; color: #999; padding: 24rpx 0; text-align: center; }
+
 .group-title {
   font-size: 24rpx; color: #999;
   padding: 24rpx 0 16rpx;

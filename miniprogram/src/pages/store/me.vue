@@ -48,6 +48,7 @@ const features = [
 
 const menuItems = [
   { key: 'orders', icon: '📦', title: '我的订单' },
+  { key: 'coupons', icon: '🎟️', title: '我的优惠券' },
   { key: 'health', icon: '❤️', title: '我的健康' },
   { key: 'address', icon: '📍', title: '收货地址' },
   { key: 'contact', icon: '📞', title: '联系商家' }
@@ -84,6 +85,8 @@ function onFeature(key: string) {
 function onMenu(key: string) {
   if (key === 'orders') {
     uni.navigateTo({ url: '/pages/store/my-orders' })
+  } else if (key === 'coupons') {
+    uni.navigateTo({ url: '/pages/store/my-coupons' })
   } else if (key === 'health') {
     uni.navigateTo({ url: '/pages/store/my-health' })
   } else if (key === 'address') {
