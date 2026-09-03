@@ -265,7 +265,7 @@ const rentalDueText = computed(() => {
   return `剩余${days}天`
 })
 const bizStatusText = computed(() => {
-  return { 1: '待接单', 2: '已指派/待出发', 3: '服务中', 4: '待支付尾款', 5: '已完成', 6: '已取消' }[Number(order.value?.biz_status)] || ''
+  return { 1: '待接单', 2: '已指派/待出发', 3: '服务中', 5: '已完成', 6: '已取消' }[Number(order.value?.biz_status)] || ''
 })
 
 function getRentalUnitText(unit?: number): string {
@@ -379,6 +379,12 @@ function getOrderItemImage(item: any) {
   return BrandAsset.DEFAULT_PRODUCT_IMAGE
 }
 
+// 按当前订单分类返回对应订单列表页：order_type>=3 为服务订单，否则为实物订单
+function orderListBaseUrl(): string {
+  const orderType = Number(order.value?.order_type || 0)
+  return orderType >= 3 ? '/pages/store/my-orders-service' : '/pages/store/my-orders-goods'
+}
+
 function copyOrderNo() {
   if (!order.value?.order_no) return
   uni.setClipboardData({ data: order.value.order_no, success: () => uni.showToast({ title: '已复制', icon: 'success' }) })
@@ -429,7 +435,7 @@ async function renewOrderNow() {
               uni.hideLoading()
               uni.showToast({ title: '续租支付成功', icon: 'success' })
               setTimeout(() => {
-                uni.redirectTo({ url: '/pages/store/my-orders?status=2' })
+                uni.redirectTo({ url: `${orderListBaseUrl()}?status=2` })
               }, 1500)
             },
             fail: (err) => {
@@ -437,7 +443,7 @@ async function renewOrderNow() {
               if (err.errMsg?.includes('cancel')) {
                 uni.showToast({ title: '支付已取消', icon: 'none' })
                 setTimeout(() => {
-                  uni.redirectTo({ url: '/pages/store/my-orders?status=1' })
+                  uni.redirectTo({ url: `${orderListBaseUrl()}?status=1` })
                 }, 1200)
               } else {
                 uni.showToast({ title: '支付失败', icon: 'none' })
@@ -453,13 +459,13 @@ async function renewOrderNow() {
               showCancel: false,
               confirmText: '知道了',
               success: () => {
-                uni.redirectTo({ url: '/pages/store/my-orders?status=1' })
+                uni.redirectTo({ url: `${orderListBaseUrl()}?status=1` })
               }
             })
           } else {
             uni.showToast({ title: '续租订单已生成', icon: 'success' })
             setTimeout(() => {
-              uni.redirectTo({ url: '/pages/store/my-orders' })
+              uni.redirectTo({ url: orderListBaseUrl() })
             }, 1200)
           }
         }

@@ -11,8 +11,8 @@ const DefaultMerchantID uint64 = 1
 // 服务订单 order_type ∈ {3,4,5,6}：工单状态走 orders.biz_status
 // ============================================
 const (
-	OrderCategoryGoods   uint8 = 1 // 实物订单（1=普通商品 2=租赁商品）
-	OrderCategoryService uint8 = 2 // 服务订单（3=即时 4=预约 5=上门 6=到店）
+	OrderCategoryGoods   uint8 = 1 // 实物订单（1=零售 2=租赁）
+	OrderCategoryService uint8 = 2 // 服务订单（3=康养上门 4=陪诊；5/6 为历史/预留类型，仅保留以兼容分类过滤）
 )
 
 // OrderTypeGoodsMin/OrderTypeGoodsMax 实物订单 order_type 范围
@@ -23,8 +23,8 @@ const (
 
 // OrderTypeServiceMin/OrderTypeServiceMax 服务订单 order_type 范围
 const (
-	OrderTypeServiceMin uint8 = 3 // 即时服务
-	OrderTypeServiceMax uint8 = 6 // 到店服务
+	OrderTypeServiceMin uint8 = 3 // 康养上门
+	OrderTypeServiceMax uint8 = 6 // 服务订单上界（5/6 为历史/预留类型，用于分类过滤，需保留）
 )
 
 // OrderCategory 按 order_type 返回订单分类：1=实物订单 2=服务订单
@@ -131,8 +131,25 @@ const (
 // 服务过程安全（PRD V2.0 阶段三）
 // ============================================
 const (
-	AlertTypeSOS     uint8 = 1 // SOS求助
-	AlertTypeTimeout uint8 = 2 // 服务超时未结束
+	AlertTypeSOS                uint8 = 1 // SOS求助
+	AlertTypeTimeout            uint8 = 2 // 服务超时未结束
+	AlertTypeGoodsUnverified    uint8 = 3 // 实物超时未核销
+	AlertTypeServiceUnassigned  uint8 = 4 // 服务超时未指派
+	AlertTypeEscortUnfinished   uint8 = 5 // 陪诊超时未完成
+	AlertTypeServiceUnstarted   uint8 = 6 // 指派超时未签到
+	AlertTypeRentalOverdue      uint8 = 7 // 租赁逾期未归还
+	AlertTypeRefundStuck        uint8 = 8 // 退款卡在处理中
+)
+
+// 订单/业务超时预警默认阈值（与 alert_settings 表默认值一致）
+const (
+	AlertDefaultGoodsUnverifiedHours    = 24  // 实物超时未核销(小时)
+	AlertDefaultServiceUnassignedHours  = 2   // 服务超时未指派(小时)
+	AlertDefaultEscortUnfinishedMinutes = 120 // 陪诊超时未完成(分钟)
+	AlertDefaultServiceUnstartedMinutes = 30  // 指派超时未签到(分钟)
+	AlertDefaultRentalOverdueHours      = 24  // 租赁逾期未归还(小时)
+	AlertDefaultRefundStuckHours        = 24  // 退款卡在处理中(小时)
+	AlertDefaultServiceAudioRetainDays  = 30  // 服务录音保留天数(天)
 )
 
 const (
@@ -164,9 +181,6 @@ const (
 
 // ServiceTimeoutAlertHours 服务超时预警阈值（小时）：签到后超过该时长未签退则触发预警
 const ServiceTimeoutAlertHours = 4
-
-// ServiceAudioRetainDays 服务录音保留天数（超过自动删除）
-const ServiceAudioRetainDays = 30
 
 // ============================================
 // 服务评价（PRD V2.0 阶段四）

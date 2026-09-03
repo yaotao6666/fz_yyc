@@ -26,34 +26,6 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
--- Table structure for table `activities`
---
-
-DROP TABLE IF EXISTS `activities`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `activities` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `type` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `content` text COLLATE utf8mb4_unicode_ci,
-  `image` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `link_type` varchar(16) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `link_value` varchar(256) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `sort` int unsigned NOT NULL DEFAULT '0',
-  `status` tinyint unsigned NOT NULL DEFAULT '1',
-  `start_time` datetime DEFAULT NULL,
-  `end_time` datetime DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_activities_type` (`type`),
-  KEY `idx_activities_status` (`status`),
-  KEY `idx_activities_sort` (`sort`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='平台活动表';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `announcements`
 --
 

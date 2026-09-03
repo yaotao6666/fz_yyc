@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -265,6 +266,53 @@ func (q *QiniuService) normalizeResourceURL(resource string) (string, bool) {
 	}
 
 	return domain + "/" + path, true
+}
+
+// imgSrcRe 匹配 HTML 正文中的图片地址（含双引号/单引号，不区分大小写）。
+// 分组：1=src="或src='，2=URL，3=闭合引号。
+var imgSrcRe = regexp.MustCompile(`(?i)(src\s*=\s*["'])([^"']+)(["'])`)
+
+// SignContentImages 对 HTML 正文中每个 <img src="..."> 的七牛私有地址进行签名。
+// 非七牛域名或空资源会被 BuildPrivateURL 原样透传，安全无副作用。
+func (q *QiniuService) SignContentImages(content string) string {
+	if content == "" || q == nil {
+		return content
+	}
+	return imgSrcRe.ReplaceAllStringFunc(content, func(m string) string {
+		sub := imgSrcRe.FindStringSubmatch(m)
+		if len(sub) != 4 {
+			return m
+		}
+		return sub[1] + q.BuildPrivateURL(sub[2]) + sub[3]
+	})
+}
+
+// StripContentSignatures 去除 HTML 正文中每个 <img src="..."> 的七牛签名参数（e、token），
+// 还原为未签名的原始地址，用于入库持久化。
+func (q *QiniuService) StripContentSignatures(content string) string {
+	if content == "" {
+		return content
+	}
+	return imgSrcRe.ReplaceAllStringFunc(content, func(m string) string {
+		sub := imgSrcRe.FindStringSubmatch(m)
+		if len(sub) != 4 {
+			return m
+		}
+		return sub[1] + stripSignatureQuery(sub[2]) + sub[3]
+	})
+}
+
+// stripSignatureQuery 从 URL 中移除七牛下载签名的 query 参数（e/token），保留其余参数。
+func stripSignatureQuery(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	query := parsed.Query()
+	query.Del("e")
+	query.Del("token")
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func GenerateKey(prefix string, filename string) string {

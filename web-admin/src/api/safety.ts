@@ -65,6 +65,7 @@ export interface AlertSettings {
   service_unstarted_minutes: number
   rental_overdue_hours: number
   refund_stuck_hours: number
+  service_audio_retain_days: number
 }
 
 export function getAlertSettings() {
@@ -73,6 +74,31 @@ export function getAlertSettings() {
 
 export function updateAlertSettings(data: AlertSettings) {
   return request.put('/api/v1/merchant/alert-settings', data).then(unwrapApiResponse<{ message: string }>)
+}
+
+/* ---- 通用系统配置（system_configs key-value + JSON + 备注） ---- */
+
+export interface SystemConfigEntry {
+  id?: number
+  config_key: string
+  config_value: string
+  remark?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export function getSystemConfigs() {
+  return request.get('/api/v1/merchant/system-configs').then(unwrapApiResponse<SystemConfigEntry[]>)
+}
+
+export function updateSystemConfigs(items: { config_key: string; config_value: string; remark?: string }[]) {
+  return request.put('/api/v1/merchant/system-configs', { items }).then(unwrapApiResponse<{ message: string }>)
+}
+
+export function deleteSystemConfig(configKey: string) {
+  return request
+    .delete(`/api/v1/merchant/system-configs/${encodeURIComponent(configKey)}`)
+    .then(unwrapApiResponse<{ message: string }>)
 }
 
 /* ---- 协议管理 ---- */

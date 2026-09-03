@@ -63,11 +63,6 @@
 
     <!-- 功能入口网格 -->
     <view class="entry-grid">
-      <view class="entry-item" @click="goEditRecord">
-        <view class="entry-icon record">📋</view>
-        <view class="entry-title">编辑档案</view>
-        <view class="entry-desc">完善当前成员信息</view>
-      </view>
       <view class="entry-item" @click="goAssessment">
         <view class="entry-icon assess">📝</view>
         <view class="entry-title">自助评估</view>

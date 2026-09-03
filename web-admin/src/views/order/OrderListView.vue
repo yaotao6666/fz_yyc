@@ -122,9 +122,7 @@ const orderTypeOptions = [
   { label: '零售', value: 1 },
   { label: '租赁', value: 2 },
   { label: '康养上门', value: 3 },
-  { label: '陪诊服务', value: 4 },
-  { label: '科普体验', value: 5 },
-  { label: '长护险服务', value: 6 }
+  { label: '陪诊服务', value: 4 }
 ]
 
 const bizStatusOptions = [
@@ -132,7 +130,6 @@ const bizStatusOptions = [
   { label: '待接单', value: 1 },
   { label: '待出发', value: 2 },
   { label: '服务中', value: 3 },
-  { label: '待支付尾款', value: 4 },
   { label: '已完成', value: 5 },
   { label: '已取消', value: 6 }
 ]

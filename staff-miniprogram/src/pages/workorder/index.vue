@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { onPullDownRefresh } from '@dcloudio/uni-app'
 import { staffWorkorderApi } from '@/api'
 import { OrderTypeText } from '@/types'
-import { fromNow } from '@/utils/format'
+import { fromNow, formatDate, calcAge } from '@/utils/format'
 
 const tabs = [
   { key: 'all', label: '全部', bizStatus: 0 },
@@ -13,6 +13,12 @@ const tabs = [
   { key: 'done', label: '已完成', bizStatus: 5 }
 ]
 const activeTab = ref('all')
+const categories = [
+  { key: 0, label: '全部' },
+  { key: 1, label: '实物' },
+  { key: 2, label: '服务' }
+]
+const activeCategory = ref(0)
 const loading = ref(false)
 const list = ref<any[]>([])
 
@@ -21,16 +27,18 @@ async function refresh() {
   try {
     const tab = tabs.find(t => t.key === activeTab.value)
     const bizStatus = tab?.bizStatus || 0
+    const category = activeCategory.value || undefined
 
     if (activeTab.value === 'pending') {
       // 待接单：调用 pending 接口
-      const res: any = await staffWorkorderApi.getPendingOrders()
+      const res: any = await staffWorkorderApi.getPendingOrders({ category })
       if (res.code === 0) {
         list.value = res.data?.list || []
       }
     } else {
       // 已接订单：调用 accepted 接口
-      const params = bizStatus ? { biz_status: bizStatus } : {}
+      const params: any = { category }
+      if (bizStatus) params.biz_status = bizStatus
       const res: any = await staffWorkorderApi.getAcceptedOrders(params)
       if (res.code === 0) {
         list.value = res.data?.list || []
@@ -49,8 +57,27 @@ function changeTab(key: string) {
   refresh()
 }
 
+function changeCategory(key: number) {
+  activeCategory.value = key
+  refresh()
+}
+
 function getOrderTypeText(type: number) {
   return OrderTypeText[type as keyof typeof OrderTypeText] || '未知'
+}
+
+// 服务对象性别文案（1男 2女）
+function getGenderText(gender?: number) {
+  if (gender === 1) return '男'
+  if (gender === 2) return '女'
+  return ''
+}
+
+// 服务对象展示文案：{姓名}{性别}{年龄}岁（有 real_name 才返回）
+function getServiceObjectText(item: any) {
+  const record = item?.customer?.record
+  if (!record?.real_name) return ''
+  return `${record.real_name}${getGenderText(record.gender)}${calcAge(record.birth_date)}岁`
 }
 
 function getBizStatusText(status: number) {
@@ -99,6 +126,22 @@ onMounted(refresh)
 
 <template>
   <view>
+    <!-- 分类维度 -->
+    <scroll-view scroll-x class="tabs-wrap tabs-category" show-scrollbar="false">
+      <view class="tabs">
+        <view
+          v-for="c in categories"
+          :key="c.key"
+          class="tab-item"
+          :class="{ active: activeCategory === c.key }"
+          @tap="changeCategory(c.key)"
+        >
+          <text>{{ c.label }}</text>
+          <view v-if="activeCategory === c.key" class="tab-underline"></view>
+        </view>
+      </view>
+    </scroll-view>
+
     <!-- 顶部 Tabs -->
     <scroll-view scroll-x class="tabs-wrap" show-scrollbar="false">
       <view class="tabs">
@@ -134,11 +177,22 @@ onMounted(refresh)
           </text>
         </view>
         <view class="item-no">单号：{{ item.order_no }}</view>
-        <view class="item-info" v-if="item.contact_name">
+        <view class="item-info" v-if="getServiceObjectText(item)">
+          <text class="item-service">服务对象</text>
+          <text>{{ getServiceObjectText(item) }}</text>
+        </view>
+        <view class="item-info" v-if="item.customer?.record?.real_name && item.contact_name">
+          <text class="item-service">下单人</text>
+          <text>{{ item.contact_name }}</text>
+          <text v-if="item.contact_phone" class="item-phone">{{ item.contact_phone }}</text>
+        </view>
+        <view class="item-info" v-else-if="item.contact_name">
           <text>{{ item.contact_name }}</text>
           <text v-if="item.contact_phone" class="item-phone">{{ item.contact_phone }}</text>
         </view>
         <view class="item-addr" v-if="item.delivery_address">{{ item.delivery_address }}</view>
+        <view class="item-extra" v-if="item.delivery_district">{{ item.delivery_district }}</view>
+        <view class="item-extra" v-if="item.scheduled_at">预约时间：{{ formatDate(item.scheduled_at) }}</view>
         <view class="item-remark" v-if="item.remark">备注：{{ item.remark }}</view>
         <view class="item-footer">
           <view class="item-amount">¥{{ Number(item.pay_amount || 0).toFixed(2) }}</view>
@@ -164,6 +218,18 @@ onMounted(refresh)
   position: sticky;
   top: 0;
   z-index: 10;
+}
+.tabs-category {
+  position: static;
+  border-bottom: none;
+  background: #f7f8fa;
+  .tab-item {
+    padding: 20rpx 28rpx;
+    font-size: 28rpx;
+  }
+  .tab-underline {
+    bottom: 8rpx;
+  }
 }
 .tabs { display: inline-flex; padding: 0 16rpx; }
 .tab-item {
@@ -212,8 +278,18 @@ onMounted(refresh)
 }
 .item-no { font-size: 24rpx; color: #999; margin-bottom: 8rpx; }
 .item-info { display: flex; gap: 16rpx; font-size: 28rpx; color: #333; margin-bottom: 4rpx; }
+.item-service {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #fff;
+  background: var(--primary-color);
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  align-self: center;
+}
 .item-phone { color: #666; }
 .item-addr { font-size: 26rpx; color: #666; margin-bottom: 4rpx; }
+.item-extra { font-size: 24rpx; color: #999; margin-bottom: 4rpx; }
 .item-remark { font-size: 26rpx; color: #999; margin-bottom: 8rpx; }
 .item-footer {
   display: flex;

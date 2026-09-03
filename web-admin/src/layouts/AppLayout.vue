@@ -39,6 +39,12 @@ function buildMenuNodes(nodes: SysMenu[]): SysMenu[] {
 const menuNodes = computed<SysMenu[]>(() => buildMenuNodes(authStore.menus))
 
 const activeMenu = computed(() => {
+  if (route.path.startsWith('/orders/goods')) {
+    return '/orders/goods'
+  }
+  if (route.path.startsWith('/orders/service')) {
+    return '/orders/service'
+  }
   if (route.path.startsWith('/orders')) {
     return '/orders'
   }

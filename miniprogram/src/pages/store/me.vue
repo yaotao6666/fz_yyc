@@ -1,13 +1,13 @@
 <template>
   <view class="me-container">
     <!-- 用户信息卡片 -->
-    <view class="profile-card">
+    <!-- <view class="profile-card">
       <image class="avatar" :src="user?.avatar || BrandAsset.DEFAULT_MERCHANT_LOGO" mode="aspectFill" />
       <view class="profile-info">
         <view class="nickname">{{ user?.nickname || '微信用户' }}</view>
         <view class="sub">{{ user?.phone ? maskPhone(user.phone) : '点击个人服务查看订单与健康记录' }}</view>
       </view>
-    </view>
+    </view> -->
 
     <!-- 核心入口 -->
     <view class="feature-grid">
@@ -47,7 +47,8 @@ const features = [
 ]
 
 const menuItems = [
-  { key: 'orders', icon: '📦', title: '我的订单' },
+  { key: 'orders_goods', icon: '📦', title: '实物订单' },
+  { key: 'orders_service', icon: '🧑', title: '服务订单' },
   { key: 'coupons', icon: '🎟️', title: '我的优惠券' },
   { key: 'health', icon: '❤️', title: '我的健康' },
   { key: 'address', icon: '📍', title: '收货地址' },
@@ -83,8 +84,10 @@ function onFeature(key: string) {
 }
 
 function onMenu(key: string) {
-  if (key === 'orders') {
-    uni.navigateTo({ url: '/pages/store/my-orders' })
+  if (key === 'orders' || key === 'orders_goods') {
+    uni.navigateTo({ url: '/pages/store/my-orders-goods' })
+  } else if (key === 'orders_service') {
+    uni.navigateTo({ url: '/pages/store/my-orders-service' })
   } else if (key === 'coupons') {
     uni.navigateTo({ url: '/pages/store/my-coupons' })
   } else if (key === 'health') {

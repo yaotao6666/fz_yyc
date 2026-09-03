@@ -5,16 +5,20 @@ import {
   changePassword,
   getMerchantProfile,
   getMerchantQRCode,
+  getMerchantSettings,
   updateMerchantProfile,
+  updateMerchantSettings,
+  updateMerchantStatus,
   updatePaymentConfig
 } from '@/api/sp'
-import type { MerchantDetail } from '@/types/sp'
+import type { MerchantDetail, MerchantSettings } from '@/types/sp'
 import { formatDateTime, getMerchantStatusText, getPaymentConfigText } from '@/utils/format'
 import { uploadSpImage } from '@/utils/qiniu'
 
 const loading = ref(false)
 const savingProfile = ref(false)
 const savingPayment = ref(false)
+const savingSettings = ref(false)
 const merchant = ref<MerchantDetail | null>(null)
 
 const logoInputRef = ref<HTMLInputElement | null>(null)
@@ -45,10 +49,13 @@ const qrcodeUrl = ref('')
 async function loadProfile() {
   loading.value = true
   try {
-    const result = await getMerchantProfile()
+    const [result, settings] = await Promise.all([getMerchantProfile(), getMerchantSettings()])
     merchant.value = result.merchant
     syncProfileForm(result.merchant)
     syncPaymentForm(result.merchant)
+    // 营业状态：商家资料 status=1 表示营业中
+    openStatus.value = result.merchant.status === 1
+    loadSettings(settings)
   } finally {
     loading.value = false
   }
@@ -66,6 +73,55 @@ function syncProfileForm(m: MerchantDetail) {
 
 function syncPaymentForm(m: MerchantDetail) {
   paymentForm.sub_mch_id = m.sub_mch_id || ''
+}
+
+// 商家运营设置：营业状态 + 下单方式
+const openStatus = ref(false) // true=营业中 false=休息中
+const updatingStatus = ref(false)
+const settingsForm = reactive<MerchantSettings>({
+  takeout_enabled: false,
+  dine_in_enabled: false,
+  pickup_enabled: false
+})
+
+function loadSettings(settings: MerchantSettings) {
+  settingsForm.takeout_enabled = Boolean(settings.takeout_enabled)
+  settingsForm.dine_in_enabled = Boolean(settings.dine_in_enabled)
+  settingsForm.pickup_enabled = Boolean(settings.pickup_enabled)
+}
+
+async function toggleStatus(val: boolean) {
+  if (updatingStatus.value) return
+  updatingStatus.value = true
+  // 失败时回滚开关状态，保证即时回显一致
+  const prev = !val
+  try {
+    await updateMerchantStatus(val ? 1 : 0)
+    openStatus.value = val
+    ElMessage.success(val ? '已切换为营业中' : '已切换为休息中')
+  } catch (error) {
+    openStatus.value = prev
+    ElMessage.error(error instanceof Error ? error.message : '营业状态切换失败')
+  } finally {
+    updatingStatus.value = false
+  }
+}
+
+async function submitSettings() {
+  if (savingSettings.value) return
+  savingSettings.value = true
+  try {
+    await updateMerchantSettings({
+      takeout_enabled: settingsForm.takeout_enabled,
+      dine_in_enabled: settingsForm.dine_in_enabled,
+      pickup_enabled: settingsForm.pickup_enabled
+    })
+    ElMessage.success('下单方式已更新')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '下单方式更新失败')
+  } finally {
+    savingSettings.value = false
+  }
 }
 
 async function submitProfile() {
@@ -264,6 +320,33 @@ onMounted(loadProfile)
               </el-form-item>
             </el-form>
           </el-card>
+
+          <el-card class="page-card" shadow="never">
+            <template #header>商家设置</template>
+            <el-form label-width="100px">
+              <el-form-item label="营业状态">
+                <div class="setting-row">
+                  <el-switch
+                    v-model="openStatus"
+                    :loading="updatingStatus"
+                    active-text="营业中"
+                    inactive-text="休息中"
+                    @change="toggleStatus"
+                  />
+                </div>
+              </el-form-item>
+              <el-form-item label="下单方式">
+                <div class="method-list">
+                  <el-switch v-model="settingsForm.takeout_enabled" active-text="外卖配送" inactive-text="外卖配送" />
+                  <el-switch v-model="settingsForm.dine_in_enabled" active-text="堂食" inactive-text="堂食" />
+                  <el-switch v-model="settingsForm.pickup_enabled" active-text="自提" inactive-text="自提" />
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" plain :loading="savingSettings" @click="submitSettings">保存下单方式</el-button>
+              </el-form-item>
+            </el-form>
+          </el-card>
         </div>
       </div>
     </template>
@@ -344,6 +427,12 @@ onMounted(loadProfile)
   margin-top: 16px;
   color: #6b7280;
   font-size: 13px;
+}
+
+.method-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .qrcode-wrap {

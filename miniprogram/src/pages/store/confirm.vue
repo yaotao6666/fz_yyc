@@ -1,8 +1,8 @@
 <template>
   <view class="confirm-container">
-    <!-- 收货信息 -->
+    <!-- 收货信息（服务订单为「服务地址」） -->
     <view class="section delivery-section">
-      <view class="section-title">收货信息</view>
+      <view class="section-title">{{ hasServiceItems ? '服务地址' : '收货信息' }}</view>
 
       <view class="address-card" :class="{ empty: !selectedAddress }" @click="goAddressList">
         <view v-if="selectedAddress" class="address-main">
@@ -31,7 +31,7 @@
         <input
           v-model="remark"
           class="form-input"
-          placeholder="口味、偏好等要求（选填）"
+          placeholder="下单备注信息（选填）"
         />
       </view>
     </view>
@@ -112,7 +112,8 @@
         <text class="amount-label">{{ hasFinalPricing ? '押金' : '预估押金' }}</text>
         <text class="amount-value">¥{{ displayDepositAmount.toFixed(2) }}</text>
       </view>
-      <view class="amount-row">
+      <!-- 服务订单不计配送费，隐藏配送费明细行 -->
+      <view v-if="!hasServiceItems" class="amount-row">
         <text class="amount-label">{{ hasFinalPricing ? '配送费' : '预估配送费' }}</text>
         <text class="amount-value">¥{{ displayDeliveryFee.toFixed(2) }}</text>
       </view>
@@ -345,6 +346,13 @@ const hasRentalItems = computed(() => displayItems.value.some(item => Number(ite
 
 // 服务订单（康养套餐/陪诊服务）：必须绑定服务对象（健康档案）
 const hasServiceItems = computed(() => displayItems.value.some(item => [3, 4].includes(Number(item.product_type))))
+// 实物订单（普通商品/实物租赁）：与服务商品互斥，禁止混单支付
+const hasGoodsItems = computed(() => displayItems.value.some(item => [1, 2].includes(Number(item.product_type))))
+
+// 支付成功/取消后跳转对应的订单列表页（订单含服务项→服务订单页，否则→实物订单页）
+const orderListUrl = computed(() =>
+  hasServiceItems.value ? '/pages/store/my-orders-service' : '/pages/store/my-orders-goods'
+)
 
 const healthRecord = ref<HealthRecord | null>(null)
 const loadingRecord = ref(false)
@@ -446,7 +454,10 @@ onShow(async () => {
   applyEntryOptions(currentPage?.options)
   cartStore.restoreFromStorage()
 
-  await loadDeliveryRules()
+  // 服务订单不计配送费，也无需配送规则/档位；仅在实物订单时加载配送规则
+  if (!hasServiceItems.value) {
+    await loadDeliveryRules()
+  }
 
   const { ensureAuth } = useAuth()
   const authed = await ensureAuth()
@@ -589,6 +600,11 @@ const amountCaption = computed(() => {
 })
 
 const deliveryFee = computed(() => {
+  // 服务订单不计配送费（不受商家配送参数约束）
+  if (hasServiceItems.value) {
+    return 0
+  }
+
   if (goodsAmount.value >= deliveryConfig.value.free_delivery_amount && deliveryConfig.value.free_delivery_amount > 0) {
     return 0
   }
@@ -657,15 +673,25 @@ async function submitOrder() {
   if (!selectedAddress.value) {
     return uni.showToast({ title: loadingAddresses.value ? '地址加载中，请稍后' : '请选择收货地址', icon: 'none' })
   }
-  if (!deliveryRules.value.length) {
-    return uni.showToast({ title: '当前暂无可选配送档位', icon: 'none' })
+
+  // 禁止实物商品与服务商品混单支付
+  if (hasServiceItems.value && hasGoodsItems.value) {
+    return uni.showToast({ title: '订单不能同时包含实物商品与服务商品，请拆分下单', icon: 'none' })
   }
-  if (!selectedDeliveryRule.value) {
-    return uni.showToast({ title: '请选择配送距离档位', icon: 'none' })
+
+  // 服务订单不受商家配送参数约束，跳过配送档位/距离校验
+  if (!hasServiceItems.value) {
+    if (!deliveryRules.value.length) {
+      return uni.showToast({ title: '当前暂无可选配送档位', icon: 'none' })
+    }
+    if (!selectedDeliveryRule.value) {
+      return uni.showToast({ title: '请选择配送距离档位', icon: 'none' })
+    }
+    if (deliveryDistance.value > deliveryConfig.value.max_distance) {
+      return uni.showToast({ title: '已超出商家配送范围', icon: 'none' })
+    }
   }
-  if (deliveryDistance.value > deliveryConfig.value.max_distance) {
-    return uni.showToast({ title: '已超出商家配送范围', icon: 'none' })
-  }
+
   if (!/^1\d{10}$/.test(selectedAddress.value.phone || '')) {
     return uni.showToast({ title: '请输入正确的联系电话', icon: 'none' })
   }
@@ -735,7 +761,7 @@ async function submitOrder() {
 
           setTimeout(() => {
             uni.redirectTo({
-              url: `/pages/store/my-orders?status=2`
+              url: `${orderListUrl.value}?status=2`
             })
           }, 1500)
         },
@@ -746,14 +772,14 @@ async function submitOrder() {
 
             setTimeout(() => {
               uni.redirectTo({
-                url: `/pages/store/my-orders?status=1`
+                url: `${orderListUrl.value}?status=1`
               })
             }, 1500)
           } else {
             uni.showToast({ title: '支付失败', icon: 'none' })
             setTimeout(() => {
               uni.redirectTo({
-                url: `/pages/store/my-orders?status=1`
+                url: `${orderListUrl.value}?status=1`
               })
             }, 1500)
           }
@@ -779,7 +805,7 @@ async function submitOrder() {
           success: () => {
             setTimeout(() => {
               uni.redirectTo({
-                url: `/pages/store/my-orders?status=1`
+                url: `${orderListUrl.value}?status=1`
               })
             }, 300)
           }
@@ -788,7 +814,7 @@ async function submitOrder() {
         uni.showToast({ title: '订单创建成功', icon: 'success' })
         setTimeout(() => {
           uni.redirectTo({
-            url: `/pages/store/my-orders`
+            url: orderListUrl.value
           })
         }, 1500)
       }

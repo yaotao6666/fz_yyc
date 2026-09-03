@@ -399,6 +399,7 @@ export function getMyOrders(params?: {
   page?: number
   page_size?: number
   status?: number
+  category?: number
 }) {
   return get<OrderListResponse>('/api/v1/user/orders', params).then((response) => {
     const normalized = normalizeListField(response)

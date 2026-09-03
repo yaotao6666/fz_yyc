@@ -10,6 +10,7 @@ import type {
   FittingRecommendation,
   FittingRecommendationListResponse,
   FittingRecommendedProduct,
+  HealthAssessment,
   HealthAssessmentListResponse,
   HealthRecord,
   HealthRecordListResponse,
@@ -47,7 +48,14 @@ import type {
   MiniProgramBanner,
   MiniProgramBannerListResponse,
   MiniProgramBannerPayload,
+  HomeRecommend,
+  HomeRecommendListResponse,
+  HomeRecommendPayload,
   UploadTokenResponse,
+  MerchantSettings,
+  Printer,
+  PrinterListResponse,
+  PrinterPayload,
 } from '@/types/sp'
 
 /* ============ 认证 ============ */
@@ -81,6 +89,45 @@ export function getMerchantQRCode() {
   return request.get('/api/v1/merchant/qrcode').then(
     unwrapApiResponse<{ qrcode_url: string; page?: string; scene?: string }>
   )
+}
+
+/* ============ 商家运营设置 ============ */
+
+// 获取商家营业设置（下单方式/配送/公告/营业时间等）
+export function getMerchantSettings() {
+  return request.get('/api/v1/merchant/settings').then(unwrapApiResponse<MerchantSettings>)
+}
+
+// 更新商家营业设置（下单方式开关等）
+export function updateMerchantSettings(payload: Partial<MerchantSettings>) {
+  return request.put('/api/v1/merchant/settings', payload).then(unwrapApiResponse<MerchantSettings>)
+}
+
+// 更新营业状态：status 0=休息中 1=营业中
+export function updateMerchantStatus(status: number) {
+  return request.post('/api/v1/merchant/status', { status }).then(unwrapApiResponse<{ status: number }>)
+}
+
+/* ============ 打印机管理 ============ */
+
+export function getPrinters() {
+  return request.get('/api/v1/merchant/printers').then(unwrapApiResponse<PrinterListResponse>)
+}
+
+export function createPrinter(data: PrinterPayload) {
+  return request.post('/api/v1/merchant/printers', data).then(unwrapApiResponse<Printer>)
+}
+
+export function updatePrinter(printerId: number, data: Partial<PrinterPayload> & { is_default?: number }) {
+  return request.put(`/api/v1/merchant/printers/${printerId}`, data).then(unwrapApiResponse<Printer>)
+}
+
+export function deletePrinter(printerId: number) {
+  return request.delete(`/api/v1/merchant/printers/${printerId}`).then(unwrapApiResponse<{ message: string }>)
+}
+
+export function testPrinter(printerId: number) {
+  return request.post(`/api/v1/merchant/printers/${printerId}/test`, {}).then(unwrapApiResponse<{ message: string }>)
 }
 
 /* ============ 商品分类 ============ */
@@ -265,6 +312,14 @@ export function getUploadToken() {
   return request.get('/api/v1/upload/token').then(unwrapApiResponse<UploadTokenResponse>)
 }
 
+// 对单个七牛资源地址进行私有签名，供富文本编辑器实时预览粘贴/上传的图片使用
+export function signMediaUrl(url: string) {
+  return request
+    .post('/api/v1/upload/sign', { url })
+    .then(unwrapApiResponse<{ url: string }>)
+    .then((data) => data?.url || url)
+}
+
 /* ============ RBAC 系统管理 ============ */
 
 // 获取当前登录员工的可见菜单树与权限码（登录后刷新权限）
@@ -435,18 +490,34 @@ export function getHealthRecords(params?: { keyword?: string; assessment_level?:
 export function getHealthRecord(id: number) {
   return request
     .get(`/api/v1/merchant/health-records/${id}`)
-    .then(unwrapApiResponse<HealthRecord>)
-    .then(normalizeHealthRecord)
+    .then(unwrapApiResponse<{ record: HealthRecord; assessments: HealthAssessment[] }>)
+    .then((res) => normalizeHealthRecord({ ...(res.record || {}), assessments: res.assessments ?? [] }))
+}
+
+export function getRecordAssessments(id: number) {
+  return request.get(`/api/v1/merchant/health-records/${id}/assessments`).then(unwrapApiResponse<HealthAssessment[]>)
 }
 
 export function updateHealthRecord(
   id: number,
   data: {
+    relation?: number
     real_name?: string
     gender?: number
+    birth_date?: string
+    id_card?: string
+    phone?: string
+    emergency_contact?: string
+    emergency_phone?: string
+    address?: string
     height_cm?: number | null
     weight_kg?: number | null
     blood_type?: string
+    past_history?: string[]
+    allergy_history?: string[]
+    family_history?: string[]
+    surgery_history?: string[]
+    medication_list?: string[]
     chronic_tags?: string[]
     smoking?: string
     drinking?: string
@@ -734,5 +805,37 @@ export function updateMiniProgramBannerStatus(id: number, status: number) {
 export function deleteMiniProgramBanner(id: number) {
   return request
     .delete(`/api/v1/merchant/miniprogram-banners/${id}`)
+    .then(unwrapApiResponse<{ message: string }>)
+}
+
+/* ============ 小程序首页推荐配置 ============ */
+
+export function getHomeRecommends() {
+  return request
+    .get('/api/v1/merchant/home-recommends')
+    .then(unwrapApiResponse<HomeRecommendListResponse>)
+}
+
+export function createHomeRecommend(data: HomeRecommendPayload) {
+  return request
+    .post('/api/v1/merchant/home-recommends', data)
+    .then(unwrapApiResponse<HomeRecommend>)
+}
+
+export function updateHomeRecommend(id: number, data: Partial<HomeRecommendPayload>) {
+  return request
+    .put(`/api/v1/merchant/home-recommends/${id}`, data)
+    .then(unwrapApiResponse<HomeRecommend>)
+}
+
+export function updateHomeRecommendStatus(id: number, status: number) {
+  return request
+    .patch(`/api/v1/merchant/home-recommends/${id}/status`, { status })
+    .then(unwrapApiResponse<{ message?: string }>)
+}
+
+export function deleteHomeRecommend(id: number) {
+  return request
+    .delete(`/api/v1/merchant/home-recommends/${id}`)
     .then(unwrapApiResponse<{ message: string }>)
 }

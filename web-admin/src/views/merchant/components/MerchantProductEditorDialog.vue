@@ -498,7 +498,7 @@ watch(
             <div v-if="form.specs.length === 0" class="empty-spec">未配置规格，保存后将按单规格商品处理。</div>
             <div v-for="(spec, specIndex) in form.specs" :key="spec.id ?? specIndex" class="spec-card">
               <div class="spec-card-header">
-                <el-input v-model="spec.name" placeholder="规格名，如：口味、温度" />
+                <el-input v-model="spec.name" placeholder="规格名，如：尺寸、服务时间" />
                 <el-button link type="danger" @click="removeSpec(specIndex)">删除规格</el-button>
               </div>
               <div v-for="(_, valueIndex) in spec.values" :key="valueIndex" class="spec-value-row">

@@ -2,6 +2,7 @@ package orderquery
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -132,6 +133,116 @@ func FillOrderRecordInfo(orders ...*models.Order) {
 			order.RecordBirthDate = record.BirthDate
 		}
 	}
+}
+
+// FillServiceCustomerInfo 为服务工单批量填充 customer 增强展示信息（下单用户 + 健康档案，不含身份证等敏感字段）
+func FillServiceCustomerInfo(orders ...*models.Order) {
+	if len(orders) == 0 {
+		return
+	}
+
+	// 收集需要补查的用户ID与档案ID
+	userIDs := make([]uint64, 0)
+	seenUser := make(map[uint64]bool)
+	recordIDs := make([]uint64, 0)
+	for _, order := range orders {
+		if order == nil {
+			continue
+		}
+		// User 部分：仅当未预加载时才补查，避免重复查询同一用户
+		if order.User == nil && order.UserID > 0 && !seenUser[order.UserID] {
+			seenUser[order.UserID] = true
+			userIDs = append(userIDs, order.UserID)
+		}
+		if order.RecordID != nil && *order.RecordID > 0 {
+			recordIDs = append(recordIDs, *order.RecordID)
+		}
+	}
+
+	// 批量查询用户
+	userMap := make(map[uint64]models.User, len(userIDs))
+	if len(userIDs) > 0 {
+		var users []models.User
+		if err := database.DB.Find(&users, userIDs).Error; err == nil {
+			for _, user := range users {
+				userMap[user.ID] = user
+			}
+		}
+	}
+
+	// 批量查询健康档案
+	recordMap := make(map[uint64]models.HealthRecord, len(recordIDs))
+	if len(recordIDs) > 0 {
+		var records []models.HealthRecord
+		if err := database.DB.Find(&records, recordIDs).Error; err == nil {
+			for _, record := range records {
+				recordMap[record.ID] = record
+			}
+		}
+	}
+
+	for _, order := range orders {
+		if order == nil {
+			continue
+		}
+		info := &models.CustomerInfo{}
+		switch {
+		case order.User != nil:
+			info.User = buildCustomerUser(*order.User)
+		default:
+			if user, ok := userMap[order.UserID]; ok {
+				info.User = buildCustomerUser(user)
+			}
+		}
+		if order.RecordID != nil {
+			if record, ok := recordMap[*order.RecordID]; ok {
+				info.Record = buildCustomerRecord(record)
+			}
+		}
+		if info.User != nil || info.Record != nil {
+			order.Customer = info
+		}
+	}
+}
+
+func buildCustomerUser(user models.User) *models.CustomerUser {
+	return &models.CustomerUser{
+		Nickname:    user.Nickname,
+		Avatar:      user.Avatar,
+		Phone:       user.Phone,
+		TotalOrders: user.TotalOrders,
+		TotalSpent:  user.TotalSpent,
+	}
+}
+
+func buildCustomerRecord(record models.HealthRecord) *models.CustomerRecord {
+	return &models.CustomerRecord{
+		ID:               record.ID,
+		RealName:         record.RealName,
+		Gender:           record.Gender,
+		BirthDate:        record.BirthDate,
+		Relation:         record.Relation,
+		AssessmentLevel:  record.AssessmentLevel,
+		Phone:            record.Phone,
+		Address:          record.Address,
+		AllergyHistory:   parseJSONStringSlice(record.AllergyHistory),
+		ChronicTags:      parseJSONStringSlice(record.ChronicTags),
+		MedicationList:   parseJSONStringSlice(record.MedicationList),
+		EmergencyContact: record.EmergencyContact,
+		EmergencyPhone:   record.EmergencyPhone,
+	}
+}
+
+// parseJSONStringSlice 将 models.JSON(json.RawMessage) 解析为字符串切片；空或解析失败返回空数组
+func parseJSONStringSlice(data models.JSON) []string {
+	if len(data) == 0 {
+		return make([]string, 0)
+	}
+	var result []string
+	if err := json.Unmarshal(data, &result); err != nil || result == nil {
+		return make([]string, 0)
+	}
+	return result
 }
 
 func BuildAccessibleOrderItemImage(image string) string {

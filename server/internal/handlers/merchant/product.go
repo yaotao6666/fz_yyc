@@ -560,7 +560,14 @@ func GetProducts(c *gin.Context) {
 
 	if categoryID != "" {
 		id, _ := strconv.ParseUint(categoryID, 10, 64)
-		query = query.Where("category_id = ?", id)
+		if id > 0 {
+			// 按一级分类查询时，同时命中其下全部子孙分类的商品（分类最多三级）
+			if ids, err := categorypkg.CollectSubtreeIDs(database.DB, id); err == nil && len(ids) > 0 {
+				query = query.Where("category_id IN ?", ids)
+			} else {
+				query = query.Where("category_id = ?", id)
+			}
+		}
 	}
 	if status != "" {
 		statusInt, _ := strconv.Atoi(status)

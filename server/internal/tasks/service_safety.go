@@ -70,8 +70,13 @@ func RunServiceTimeoutAlert() (int, error) {
 // ============================================
 
 // RunServiceAudioCleanup 清理超过保留期的服务录音（失败次日重试：仅标记成功删除的）
+// 保留天数读取 alert_settings.service_audio_retain_days（可视化配置），未配置时用默认值
 func RunServiceAudioCleanup() (int, error) {
-	deadline := time.Now().AddDate(0, 0, -utils.ServiceAudioRetainDays)
+	retainDays := loadAlertSettings().ServiceAudioRetainDays
+	if retainDays < 1 {
+		retainDays = utils.AlertDefaultServiceAudioRetainDays
+	}
+	deadline := time.Now().AddDate(0, 0, -retainDays)
 
 	// 已到保留期且未标记删除的录音
 	var records []models.ServiceRecord

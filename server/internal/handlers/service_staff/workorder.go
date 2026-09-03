@@ -1,12 +1,15 @@
 package service_staff
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/notify"
+	"fz_yyc_api/internal/services/orderquery"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
@@ -42,19 +45,32 @@ func PendingOrders(c *gin.Context) {
 		regionCond += ")"
 	}
 
+	// 分类过滤：1=实物 2=服务（缺省不过滤）
 	baseSQL := "status = 2 AND biz_status = 1 AND assigned_staff_id IS NULL" + regionCond
+	if cond := orderCategoryCond(c); cond != "" {
+		baseSQL += " AND " + cond
+	}
+
+	sortMode := c.Query("sort")
+	orderBy := "paid_at DESC"
+	if sortMode == "scheduled_at" {
+		// 按预约时间排序（无预约时间的排在后面）
+		orderBy = "scheduled_at IS NULL, scheduled_at ASC"
+	}
 
 	var orders []models.Order
 	query := database.DB.
 		Where(baseSQL).
-		Order("paid_at DESC").
+		Order(orderBy).
 		Offset((page - 1) * pageSize).
 		Limit(pageSize)
 
-	if err := query.Preload("Items").Find(&orders).Error; err != nil {
+	if err := query.Preload("Items").Preload("User").Find(&orders).Error; err != nil {
 		response.Success(c, gin.H{"list": []interface{}{}, "total": 0})
 		return
 	}
+
+	orderquery.FillServiceCustomerInfo(ordersSlice(orders)...)
 
 	var total int64
 	database.DB.Model(&models.Order{}).
@@ -88,7 +104,8 @@ func AcceptOrder(c *gin.Context) {
 			orderID, 2, 1).
 		Updates(map[string]interface{}{
 			"assigned_staff_id": staff.ID,
-			"biz_status":        2, // 已接单
+			"assigned_at":       now, // 接单时间（已指派超时未签到预警依据）
+			"biz_status":        2,   // 已接单
 			"actual_started_at": nil,
 		})
 
@@ -104,10 +121,56 @@ func AcceptOrder(c *gin.Context) {
 	var order models.Order
 	database.DB.First(&order, orderID)
 
+	// 异步尽力而为地通知下单用户已接单（吞错，不阻塞接单成功响应）
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = notify.OrderAccepted(ctx, &order, staff.Name, staff.Phone)
+	}()
+
 	response.SuccessWithMessage(c, "接单成功", gin.H{
 		"id":                order.ID,
 		"assigned_staff_id": staff.ID,
 		"accepted_at":       now,
+	})
+}
+
+// GiveUpOrder 放弃工单（已接单退回待接单池）：仅待出发工单可放弃
+func GiveUpOrder(c *gin.Context) {
+	staff, err := GetCurrentStaff(c)
+	if err != nil {
+		response.Fail(c, http.StatusUnauthorized, response.CodeUnauthorized, "获取信息失败")
+		return
+	}
+
+	orderIDStr := c.Param("id")
+	orderID, err := strconv.ParseUint(orderIDStr, 10, 64)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单ID错误")
+		return
+	}
+
+	// 原子放弃：仅本人已接单(biz_status=2)的工单可退回待接单池
+	result := database.DB.Model(&models.Order{}).
+		Where("id = ? AND assigned_staff_id = ? AND biz_status = ?",
+			orderID, staff.ID, 2). // biz_status=2 已接单(待出发)
+		Updates(map[string]interface{}{
+			"biz_status":        1, // 退回待接单
+			"assigned_staff_id": nil,
+			"actual_started_at": nil,
+		})
+
+	if result.Error != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "放弃工单失败")
+		return
+	}
+	if result.RowsAffected == 0 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "仅待出发工单可放弃，或工单已变更")
+		return
+	}
+
+	response.SuccessWithMessage(c, "已放弃工单，退回待接单池", gin.H{
+		"id": orderID,
 	})
 }
 
@@ -141,12 +204,18 @@ func AcceptedOrders(c *gin.Context) {
 			query = query.Where("biz_status = ?", bs)
 		}
 	}
+	// 分类过滤：1=实物 2=服务（缺省不过滤）
+	if cond := orderCategoryCond(c); cond != "" {
+		query = query.Where(cond)
+	}
 
 	var orders []models.Order
-	if err := query.Preload("Items").Find(&orders).Error; err != nil {
+	if err := query.Preload("Items").Preload("User").Find(&orders).Error; err != nil {
 		response.Success(c, gin.H{"list": []interface{}{}, "total": 0})
 		return
 	}
+
+	orderquery.FillServiceCustomerInfo(ordersSlice(orders)...)
 
 	var total int64
 	countQuery := database.DB.Model(&models.Order{}).
@@ -155,6 +224,9 @@ func AcceptedOrders(c *gin.Context) {
 		if bs, err := strconv.Atoi(bizStatus); err == nil {
 			countQuery = countQuery.Where("biz_status = ?", bs)
 		}
+	}
+	if cond := orderCategoryCond(c); cond != "" {
+		countQuery = countQuery.Where(cond)
 	}
 	countQuery.Count(&total)
 
@@ -180,10 +252,11 @@ func OrderDetail(c *gin.Context) {
 	}
 
 	var order models.Order
-	if err := database.DB.Preload("Items").First(&order, orderID).Error; err != nil {
+	if err := database.DB.Preload("User").Preload("Items").First(&order, orderID).Error; err != nil {
 		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "订单不存在")
 		return
 	}
+	orderquery.FillServiceCustomerInfo(&order)
 
 	// 只能查看自己接的或待接的订单
 	if order.AssignedStaffID != nil && *order.AssignedStaffID != staff.ID {
@@ -247,7 +320,7 @@ func CheckIn(c *gin.Context) {
 	}
 
 	response.SuccessWithMessage(c, "签到成功", gin.H{
-		"id":               orderID,
+		"id":                orderID,
 		"actual_started_at": now,
 	})
 }
@@ -316,12 +389,12 @@ func CheckOut(c *gin.Context) {
 	if err := database.DB.Where("order_id = ?", orderID).First(&record).Error; err != nil {
 		// 无记录时兜底创建（含签到缺失场景）
 		newRecord := models.ServiceRecord{
-			OrderID:         orderID,
-			StaffID:         staff.ID,
-			StartTime:       order.ActualStartedAt,
-			EndTime:         &now,
-			AudioURL:        req.AudioURL,
-			Status:          utils.ServiceRecordStatusNormal,
+			OrderID:   orderID,
+			StaffID:   staff.ID,
+			StartTime: order.ActualStartedAt,
+			EndTime:   &now,
+			AudioURL:  req.AudioURL,
+			Status:    utils.ServiceRecordStatusNormal,
 		}
 		if req.AudioURL != "" {
 			newRecord.AudioUploadedAt = &now
@@ -332,7 +405,7 @@ func CheckOut(c *gin.Context) {
 	}
 
 	response.SuccessWithMessage(c, "签退成功", gin.H{
-		"id":             orderID,
+		"id":              orderID,
 		"actual_ended_at": now,
 	})
 }
@@ -348,8 +421,10 @@ func GetTodoList(c *gin.Context) {
 	var orders []models.Order
 	database.DB.Where("assigned_staff_id = ? AND biz_status IN ?", staff.ID, []uint8{2, 3}).
 		Preload("Items").
+		Preload("User").
 		Order("updated_at DESC").
 		Find(&orders)
+	orderquery.FillServiceCustomerInfo(ordersSlice(orders)...)
 
 	// 统计
 	var todayAssigned, todayCompleted int64
@@ -364,10 +439,37 @@ func GetTodoList(c *gin.Context) {
 			staff.ID, 5, today, tomorrow).Count(&todayCompleted)
 
 	response.Success(c, gin.H{
-		"list":  orders,
+		"list": orders,
 		"stats": gin.H{
 			"today_assigned":  todayAssigned,
 			"today_completed": todayCompleted,
 		},
 	})
+}
+
+// ordersSlice 将值切片转为指针切片，用于批量填充 customer 增强展示信息
+func ordersSlice(orders []models.Order) []*models.Order {
+	result := make([]*models.Order, len(orders))
+	for index := range orders {
+		result[index] = &orders[index]
+	}
+	return result
+}
+
+// orderCategoryCond 解析 category 查询参数（1=实物 2=服务，缺省/非法返回空串=不过滤）
+// 返回可直接用于 WHERE 拼接的 order_type 范围条件字符串。
+func orderCategoryCond(c *gin.Context) string {
+	category := c.Query("category")
+	if category == "" {
+		return ""
+	}
+	switch category {
+	case "1":
+		return "order_type >= " + strconv.Itoa(int(utils.OrderTypeGoodsMin)) +
+			" AND order_type <= " + strconv.Itoa(int(utils.OrderTypeGoodsMax))
+	case "2":
+		return "order_type >= " + strconv.Itoa(int(utils.OrderTypeServiceMin)) +
+			" AND order_type <= " + strconv.Itoa(int(utils.OrderTypeServiceMax))
+	}
+	return ""
 }

@@ -216,7 +216,9 @@ async function loadData() {
   loading.value = true
   try {
     const home = await getStoreHome()
-    categories.value = home.categories || []
+    // 左侧只展示一级分类；右侧商品由后端按该分类子树过滤（含子孙分类），
+    // 未设置分类的商品/服务天然被排除
+    categories.value = (home.categories || []).filter((cat: any) => Number(cat.level) === 1)
     if (categories.value.length) {
       currentIndex.value = 0
       noMore.value = false

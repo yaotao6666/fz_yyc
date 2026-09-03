@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, type UploadRawFile, type UploadProps } from 'element-plus'
 import { getEducationArticles, createEducationArticle, updateEducationArticle, deleteEducationArticle, getHealthEducationCategories } from '@/api/sp'
 import type { EducationArticle, HealthEducationCategory } from '@/types/sp'
 import { ChronicTagOptions } from '@/types/sp'
 import { formatDateTime } from '@/utils/format'
+import { uploadSpImage } from '@/utils/qiniu'
+import WangEditor from '@/components/WangEditor.vue'
 
 const loading = ref(false)
 const list = ref<EducationArticle[]>([])
@@ -148,13 +150,44 @@ function openEdit(row: EducationArticle) {
   dialogVisible.value = true
 }
 
+/* ----- 封面图上传 ----- */
+const coverUploading = ref(false)
+const beforeCoverUpload: UploadProps['beforeUpload'] = (rawFile: UploadRawFile) => {
+  if (!/^image\/(png|jpe?g|gif|webp)$/i.test(rawFile.type)) {
+    ElMessage.warning('仅支持 JPG/PNG/GIF/WebP 图片')
+    return false
+  }
+  if (rawFile.size / 1024 / 1024 > 5) {
+    ElMessage.warning('图片大小不能超过 5MB')
+    return false
+  }
+  return true
+}
+const customCoverUpload: UploadProps['httpRequest'] = async (options) => {
+  const file = options.file as File
+  coverUploading.value = true
+  try {
+    const { key } = await uploadSpImage(file)
+    editForm.cover = key
+    ElMessage.success('上传成功')
+    options.onSuccess?.({ key })
+  } catch (e: any) {
+    const msg = e?.message || '上传失败，请重试'
+    ElMessage.error(msg)
+    options.onError?.({ name: 'UploadError', message: msg, status: 0, method: 'POST', url: '' } as any)
+  } finally {
+    coverUploading.value = false
+  }
+}
+
 async function handleSave() {
   if (!editForm.title.trim()) {
     ElMessage.warning('请填写文章标题')
     return
   }
-  // 前端与后端保持一致：正文必填（后端 content binding:required）
-  if (!editForm.content.trim()) {
+  // 正文必填：去除 HTML 标签后需有实际文字（避免仅含 <p><br> 空内容通过）
+  const plainText = editForm.content.replace(/<[^>]+>/g, '').trim()
+  if (!plainText) {
     ElMessage.warning('请填写文章正文')
     return
   }
@@ -284,8 +317,8 @@ onMounted(async () => {
       </el-table-column>
       <el-table-column label="操作" width="130" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" v-permission="'education:create'" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="danger" v-permission="'education:create'" @click="handleDelete(row)">删除</el-button>
+          <el-button link type="primary" v-permission="'education:update'" @click="openEdit(row)">编辑</el-button>
+          <el-button link type="danger" v-permission="'education:delete'" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -326,11 +359,26 @@ onMounted(async () => {
             :loading="categoryLoading"
           />
         </el-form-item>
-        <el-form-item label="封面 URL">
-          <el-input v-model="editForm.cover" placeholder="封面图片地址（可空）" />
+        <el-form-item label="封面图">
+          <el-upload
+            :show-file-list="false"
+            accept="image/*"
+            :before-upload="beforeCoverUpload"
+            :http-request="customCoverUpload"
+          >
+            <div v-if="editForm.cover" class="cover-upload-preview">
+              <el-image :src="editForm.cover" fit="cover" class="cover-preview-image" />
+              <div class="cover-preview-mask">点击更换</div>
+            </div>
+            <div v-else class="cover-upload-placeholder">
+              <el-icon class="cover-upload-icon"><Plus /></el-icon>
+              <p>上传封面图（建议 750×360，≤5MB）</p>
+            </div>
+          </el-upload>
+          <p v-if="coverUploading" class="cover-upload-tip">上传中…</p>
         </el-form-item>
         <el-form-item label="正文" required>
-          <el-input v-model="editForm.content" type="textarea" :rows="6" placeholder="文章正文内容（必填）" />
+          <WangEditor v-model="editForm.content" class="editor-wrap" placeholder="请输入文章正文内容（必填）" />
         </el-form-item>
         <el-form-item label="定向慢病标签">
           <el-select
@@ -375,4 +423,35 @@ onMounted(async () => {
 .pagination-wrap { display: flex; justify-content: flex-end; margin-top: 20px; }
 .cover-dot { margin-left: 6px; font-size: 12px; }
 .tag-item { margin-right: 6px; }
+
+.cover-upload-preview,
+.cover-upload-placeholder {
+  width: 480px;
+  height: 240px;
+  border-radius: 12px;
+  border: 2px dashed #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.cover-upload-preview:hover { border-color: #007AFF; }
+.cover-upload-preview .cover-preview-image { width: 100%; height: 100%; }
+.cover-upload-preview .cover-preview-mask {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.45); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .15s;
+}
+.cover-upload-preview:hover .cover-preview-mask { opacity: 1; }
+
+.cover-upload-placeholder { flex-direction: column; background: #fafafa; }
+.cover-upload-placeholder:hover { border-color: #007AFF; }
+.cover-upload-icon { font-size: 40px; color: #9ca3af; margin-bottom: 8px; }
+.cover-upload-placeholder p { color: #9ca3af; font-size: 13px; margin: 0; }
+.cover-upload-tip { margin: 6px 0 0; font-size: 12px; color: #6b7280; }
+.editor-wrap { width: 100%; }
 </style>

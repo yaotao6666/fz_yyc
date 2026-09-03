@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getHealthRecords, getHealthRecord, updateHealthRecord } from '@/api/sp'
-import type { HealthRecord } from '@/types/sp'
+import { getHealthRecords, getHealthRecord, updateHealthRecord, getRecordAssessments } from '@/api/sp'
+import type { HealthRecord, HealthAssessment } from '@/types/sp'
 import { ChronicTagOptions } from '@/types/sp'
 import { formatDateTime } from '@/utils/format'
+
+// 病史/过敏/家族/手术史等标签的可选预置项（支持 allow-create 自定义输入）
+const historyOptions = ['高血压', '糖尿病', '冠心病', '高血脂', '脑卒中', '慢性支气管炎', '甲状腺疾病', '骨质疏松']
 
 const loading = ref(false)
 const list = ref<HealthRecord[]>([])
@@ -110,18 +113,47 @@ async function openDetail(row: HealthRecord) {
   }
 }
 
+/* ----- 评估记录（独立抽屉） ----- */
+const assessDrawerVisible = ref(false)
+const assessLoading = ref(false)
+const assessList = ref<HealthAssessment[]>([])
+
+async function openAssessments(row: HealthRecord) {
+  assessList.value = []
+  assessDrawerVisible.value = true
+  assessLoading.value = true
+  try {
+    assessList.value = (await getRecordAssessments(row.id)) || []
+  } catch (_e) {
+    // 错误已由拦截器提示
+  } finally {
+    assessLoading.value = false
+  }
+}
+
 /* ----- 编辑 ----- */
 const saving = ref(false)
 const editForm = reactive({
+  relation: null as number | null,
   real_name: '',
   gender: null as number | null,
+  birth_date: '',
+  id_card: '',
+  phone: '',
+  emergency_contact: '',
+  emergency_phone: '',
+  address: '',
   height_cm: null as number | null,
   weight_kg: null as number | null,
   blood_type: '',
+  past_history: [] as string[],
+  allergy_history: [] as string[],
+  family_history: [] as string[],
+  surgery_history: [] as string[],
+  medication_list: [] as string[],
   chronic_tags: [] as string[],
   smoking: '',
   drinking: '',
-  assessment_level: '',
   remark: ''
 })
 
@@ -129,15 +161,26 @@ function openEdit() {
   if (!current.value) return
   editMode.value = true
   Object.assign(editForm, {
+    relation: current.value.relation ?? null,
     real_name: current.value.real_name || '',
     gender: current.value.gender ?? null,
+    birth_date: current.value.birth_date || '',
+    id_card: current.value.id_card || '',
+    phone: current.value.phone || '',
+    emergency_contact: current.value.emergency_contact || '',
+    emergency_phone: current.value.emergency_phone || '',
+    address: current.value.address || '',
     height_cm: current.value.height_cm ?? null,
     weight_kg: current.value.weight_kg ?? null,
     blood_type: current.value.blood_type || '',
+    past_history: [...(current.value.past_history || [])],
+    allergy_history: [...(current.value.allergy_history || [])],
+    family_history: [...(current.value.family_history || [])],
+    surgery_history: [...(current.value.surgery_history || [])],
+    medication_list: [...(current.value.medication_list || [])],
     chronic_tags: [...(current.value.chronic_tags || [])],
     smoking: current.value.smoking || '',
     drinking: current.value.drinking || '',
-    assessment_level: current.value.assessment_level || '',
     remark: current.value.remark || ''
   })
 }
@@ -146,16 +189,29 @@ async function handleSave() {
   if (!current.value) return
   saving.value = true
   try {
-    const updated = await updateHealthRecord(current.value.id, {
+    // 提交完整编辑字段（与 C 端可编辑字段一致），评估等级仅由评估流程回写，编辑时不回传
+    const detail = current.value
+    const updated = await updateHealthRecord(detail.id, {
+      relation: editForm.relation ?? undefined,
       real_name: editForm.real_name.trim() || undefined,
       gender: editForm.gender ?? undefined,
+      birth_date: editForm.birth_date || undefined,
+      id_card: editForm.id_card.trim() || undefined,
+      phone: editForm.phone.trim() || undefined,
+      emergency_contact: editForm.emergency_contact.trim() || undefined,
+      emergency_phone: editForm.emergency_phone.trim() || undefined,
+      address: editForm.address.trim() || undefined,
       height_cm: editForm.height_cm,
       weight_kg: editForm.weight_kg,
       blood_type: editForm.blood_type.trim() || undefined,
+      past_history: editForm.past_history,
+      allergy_history: editForm.allergy_history,
+      family_history: editForm.family_history,
+      surgery_history: editForm.surgery_history,
+      medication_list: editForm.medication_list,
       chronic_tags: editForm.chronic_tags,
       smoking: editForm.smoking.trim() || undefined,
       drinking: editForm.drinking.trim() || undefined,
-      assessment_level: editForm.assessment_level || undefined,
       remark: editForm.remark.trim() || undefined
     })
     current.value = updated
@@ -230,9 +286,10 @@ onMounted(loadData)
           {{ formatDateTime(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+          <el-button link type="success" v-permission="'health:assessment'" @click="openAssessments(row)">评估记录</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -256,6 +313,13 @@ onMounted(loadData)
         <template v-if="current">
           <!-- 编辑模式 -->
           <el-form v-if="editMode" label-width="100px">
+            <el-form-item label="关系">
+              <el-radio-group v-model="editForm.relation">
+                <el-radio :value="1">本人</el-radio>
+                <el-radio :value="2">父母</el-radio>
+                <el-radio :value="3">其他亲属</el-radio>
+              </el-radio-group>
+            </el-form-item>
             <el-form-item label="真实姓名">
               <el-input v-model="editForm.real_name" placeholder="真实姓名" />
             </el-form-item>
@@ -264,6 +328,21 @@ onMounted(loadData)
                 <el-radio :value="1">男</el-radio>
                 <el-radio :value="2">女</el-radio>
               </el-radio-group>
+            </el-form-item>
+            <el-form-item label="出生日期">
+              <el-date-picker v-model="editForm.birth_date" type="date" value-format="YYYY-MM-DD" placeholder="选择出生日期" style="width: 160px" />
+            </el-form-item>
+            <el-form-item label="身份证号">
+              <el-input v-model="editForm.id_card" placeholder="身份证号" maxlength="18" />
+            </el-form-item>
+            <el-form-item label="手机号">
+              <el-input v-model="editForm.phone" placeholder="手机号" maxlength="11" />
+            </el-form-item>
+            <el-form-item label="紧急联系人">
+              <el-input v-model="editForm.emergency_contact" placeholder="紧急联系人" />
+            </el-form-item>
+            <el-form-item label="紧急电话">
+              <el-input v-model="editForm.emergency_phone" placeholder="紧急联系电话" maxlength="11" />
             </el-form-item>
             <el-form-item label="身高(cm)">
               <el-input-number v-model="editForm.height_cm" :min="0" :max="300" :controls="false" style="width: 160px" />
@@ -274,6 +353,16 @@ onMounted(loadData)
             <el-form-item label="血型">
               <el-select v-model="editForm.blood_type" clearable placeholder="选择血型" style="width: 160px">
                 <el-option v-for="b in ['A', 'B', 'AB', 'O']" :key="b" :label="b" :value="b" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="吸烟">
+              <el-select v-model="editForm.smoking" clearable placeholder="吸烟情况" style="width: 160px">
+                <el-option v-for="s in ['不吸烟', '偶尔吸烟', '经常吸烟', '已戒烟']" :key="s" :label="s" :value="s" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="饮酒">
+              <el-select v-model="editForm.drinking" clearable placeholder="饮酒情况" style="width: 160px">
+                <el-option v-for="d in ['不饮酒', '偶尔饮酒', '经常饮酒', '已戒酒']" :key="d" :label="d" :value="d" />
               </el-select>
             </el-form-item>
             <el-form-item label="慢病标签">
@@ -289,20 +378,73 @@ onMounted(loadData)
                 <el-option v-for="tag in ChronicTagOptions" :key="tag" :label="tag" :value="tag" />
               </el-select>
             </el-form-item>
-            <el-form-item label="吸烟">
-              <el-select v-model="editForm.smoking" clearable placeholder="吸烟情况" style="width: 160px">
-                <el-option v-for="s in ['不吸烟', '偶尔吸烟', '经常吸烟', '已戒烟']" :key="s" :label="s" :value="s" />
+            <el-form-item label="既往病史">
+              <el-select
+                v-model="editForm.past_history"
+                multiple
+                allow-create
+                filterable
+                default-first-option
+                placeholder="选择或输入既往病史"
+                style="width: 100%"
+              >
+                <el-option v-for="t in historyOptions" :key="t" :label="t" :value="t" />
               </el-select>
             </el-form-item>
-            <el-form-item label="饮酒">
-              <el-select v-model="editForm.drinking" clearable placeholder="饮酒情况" style="width: 160px">
-                <el-option v-for="d in ['不饮酒', '偶尔饮酒', '经常饮酒', '已戒酒']" :key="d" :label="d" :value="d" />
+            <el-form-item label="过敏史">
+              <el-select
+                v-model="editForm.allergy_history"
+                multiple
+                allow-create
+                filterable
+                default-first-option
+                placeholder="选择或输入过敏史"
+                style="width: 100%"
+              >
+                <el-option v-for="t in historyOptions" :key="t" :label="t" :value="t" />
               </el-select>
             </el-form-item>
-            <el-form-item label="评估等级">
-              <el-select v-model="editForm.assessment_level" clearable placeholder="评估等级" style="width: 160px">
-                <el-option v-for="o in assessmentLevelOptions.filter((x) => x.value !== '')" :key="o.value" :label="o.label" :value="o.value" />
+            <el-form-item label="家族史">
+              <el-select
+                v-model="editForm.family_history"
+                multiple
+                allow-create
+                filterable
+                default-first-option
+                placeholder="选择或输入家族史"
+                style="width: 100%"
+              >
+                <el-option v-for="t in historyOptions" :key="t" :label="t" :value="t" />
               </el-select>
+            </el-form-item>
+            <el-form-item label="手术史">
+              <el-select
+                v-model="editForm.surgery_history"
+                multiple
+                allow-create
+                filterable
+                default-first-option
+                placeholder="选择或输入手术史"
+                style="width: 100%"
+              >
+                <el-option v-for="t in historyOptions" :key="t" :label="t" :value="t" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="用药清单">
+              <el-select
+                v-model="editForm.medication_list"
+                multiple
+                allow-create
+                filterable
+                default-first-option
+                placeholder="选择或输入用药清单"
+                style="width: 100%"
+              >
+                <el-option v-for="t in historyOptions" :key="t" :label="t" :value="t" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="常住地址">
+              <el-input v-model="editForm.address" type="textarea" :rows="2" placeholder="常住地址" />
             </el-form-item>
             <el-form-item label="备注">
               <el-input v-model="editForm.remark" type="textarea" :rows="3" placeholder="备注" />
@@ -355,22 +497,6 @@ onMounted(loadData)
                 <span v-if="!current.chronic_tags || !current.chronic_tags.length">-</span>
               </el-descriptions-item>
             </el-descriptions>
-
-            <div class="section-title">评估记录（{{ (current.assessments || []).length }}）</div>
-            <el-table :data="current.assessments || []" size="small" stripe>
-              <el-table-column prop="id" label="ID" width="70" />
-              <el-table-column prop="form_name" label="量表" min-width="140" />
-              <el-table-column label="总分" width="80">
-                <template #default="{ row }">{{ row.total_score ?? '-' }}</template>
-              </el-table-column>
-              <el-table-column prop="level" label="等级" width="100" />
-              <el-table-column label="结论" min-width="160" show-overflow-tooltip>
-                <template #default="{ row }">{{ row.conclusion || '-' }}</template>
-              </el-table-column>
-              <el-table-column label="时间" width="160">
-                <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
-              </el-table-column>
-            </el-table>
           </template>
         </template>
       </div>
@@ -386,6 +512,32 @@ onMounted(loadData)
             <el-button @click="drawerVisible = false">关闭</el-button>
           </template>
         </template>
+      </template>
+    </el-drawer>
+
+    <!-- 评估记录抽屉 -->
+    <el-drawer v-model="assessDrawerVisible" title="评估记录" size="720px" :close-on-click-modal="false">
+      <div v-loading="assessLoading">
+        <div v-if="!assessLoading">
+          <el-empty v-if="!assessList.length" description="该档案暂无评估记录" />
+          <el-table v-else :data="assessList" size="small" stripe>
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column prop="form_name" label="量表" min-width="140" />
+            <el-table-column label="总分" width="80">
+              <template #default="{ row }">{{ row.total_score ?? '-' }}</template>
+            </el-table-column>
+            <el-table-column prop="level" label="等级" width="100" />
+            <el-table-column label="结论" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.conclusion || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="时间" width="160">
+              <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="assessDrawerVisible = false">关闭</el-button>
       </template>
     </el-drawer>
   </div>

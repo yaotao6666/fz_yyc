@@ -1,0 +1,21 @@
+-- 019_printers.sql
+-- 打印机表：商家云打印设备配置（单商户，单实例），供 PC 后台管理
+SET NAMES utf8mb4;
+
+CREATE TABLE IF NOT EXISTS printers (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '打印机ID',
+  name VARCHAR(64) NOT NULL COMMENT '打印机名称',
+  type TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '类型: 1=飞鹅 2=通用云打印',
+  feie_user VARCHAR(128) DEFAULT NULL COMMENT '飞鹅云账号',
+  feie_ukey VARCHAR(128) DEFAULT NULL COMMENT '飞鹅云UKey(API密钥)',
+  feie_sn VARCHAR(32) DEFAULT NULL COMMENT '飞鹅云打印机编号',
+  status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '状态: 1=启用 0=禁用',
+  auto_print TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否自动打印小票: 0=否 1=是',
+  is_default TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否为默认打印机: 0=否 1=是',
+  print_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '累计打印次数',
+  last_print_at DATETIME DEFAULT NULL COMMENT '最后打印时间',
+  remark VARCHAR(256) DEFAULT NULL COMMENT '备注',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  KEY idx_printers_default (is_default)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='打印机表';

@@ -9,10 +9,29 @@ import (
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
+	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
+
+// signContent 对正文内七牛图片签名（读取时对外返回用）
+func signContent(content string) string {
+	q := qiniu.GetService()
+	if q == nil {
+		return content
+	}
+	return q.SignContentImages(content)
+}
+
+// stripContentSignatures 去除正文内七牛图片签名参数（写入时入库前用）
+func stripContentSignatures(content string) string {
+	q := qiniu.GetService()
+	if q == nil {
+		return content
+	}
+	return q.StripContentSignatures(content)
+}
 
 // ---------- C端 ----------
 
@@ -39,6 +58,10 @@ func UserListEducationArticles(c *gin.Context) {
 	var list []models.HealthEducationArticle
 	db.Order("id DESC").Find(&list)
 
+	for i := range list {
+		list[i].Content = signContent(list[i].Content)
+	}
+
 	response.Success(c, list)
 }
 
@@ -60,6 +83,8 @@ func UserGetEducationArticle(c *gin.Context) {
 	database.DB.Model(&article).UpdateColumn("views", article.Views+1)
 	article.Views++
 
+	article.Content = signContent(article.Content)
+
 	response.Success(c, article)
 }
 
@@ -72,6 +97,11 @@ func StaffListEducationArticles(c *gin.Context) {
 		Where("status = ?", utils.EducationStatusPublished).
 		Order("id DESC").
 		Find(&list)
+
+	for i := range list {
+		list[i].Content = signContent(list[i].Content)
+	}
+
 	response.Success(c, list)
 }
 
@@ -119,6 +149,10 @@ func MerchantListEducationArticles(c *gin.Context) {
 		Limit(pageSize).
 		Find(&list)
 
+	for i := range list {
+		list[i].Content = signContent(list[i].Content)
+	}
+
 	response.Success(c, gin.H{"list": list, "total": total})
 }
 
@@ -159,7 +193,7 @@ func MerchantCreateEducationArticle(c *gin.Context) {
 		CategoryID: req.CategoryID,
 		Category:   req.Category,
 		Cover:      req.Cover,
-		Content:    req.Content,
+		Content:    stripContentSignatures(req.Content),
 		Status:     req.Status,
 	}
 	if len(req.Tags) > 0 {
@@ -217,7 +251,7 @@ func MerchantUpdateEducationArticle(c *gin.Context) {
 		"category_id": req.CategoryID,
 		"category":    req.Category,
 		"cover":       req.Cover,
-		"content":     req.Content,
+		"content":     stripContentSignatures(req.Content),
 		"status":      req.Status,
 	}
 	if len(req.Tags) > 0 {

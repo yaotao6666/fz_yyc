@@ -19,10 +19,6 @@
         <view class="store-detail">
           <view class="store-name">{{ storeInfo?.merchant?.name || '加载中...' }}</view>
           <view class="store-meta">
-            <view class="rating" v-if="storeInfo?.merchant?.rating">
-              <text class="stars">★★★★★</text>
-              <text class="rating-value">{{ storeInfo?.merchant?.rating }}</text>
-            </view>
             <text v-if="merchantPhone" class="merchant-phone" @click.stop="callMerchant">
               📞 {{ merchantPhone }}
             </text>
@@ -164,150 +160,47 @@
         </scroll-view>
       </view>
 
-      <!-- 分类和商品 -->
-      <view class="main-content">
-        <!-- 左侧分类 -->
-        <scroll-view
-          class="category-sidebar"
-          scroll-y
-          scroll-with-animation
-          :scroll-into-view="categorySidebarScrollIntoView"
-        >
-          <view v-if="!hasCategories" class="category-empty">
-            暂无分类
+      <!-- 首页推荐（PC 后台配置） -->
+      <view class="recommend-module">
+        <view class="recommend-header">✨ 首页推荐</view>
+
+        <view v-if="recommendLoading" class="recommend-skeleton-list">
+          <view v-for="item in 2" :key="item" class="recommend-skeleton-card">
+            <view class="recommend-skeleton-image"></view>
+            <view class="recommend-skeleton-line"></view>
+            <view class="recommend-skeleton-line short"></view>
           </view>
+        </view>
+
+        <view v-else-if="!recommends.length" class="recommend-empty">暂无可推荐商品</view>
+
+        <view v-else class="recommend-list">
           <view
-            v-for="(category, index) in storeInfo.categories"
-            :key="category.id"
-            :id="getCategoryMenuId(category.id)"
-            class="category-item"
-            :class="{ active: currentCategoryIndex === index }"
-            @click="selectCategory(index)"
+            v-for="item in recommends"
+            :key="item.id"
+            class="recommend-card"
+            @click="goRecommendItem(item)"
           >
-            <text class="category-name">{{ category.name }}</text>
-            <text class="category-count" v-if="category.product_count">{{ category.product_count }}</text>
-          </view>
-        </scroll-view>
-
-        <!-- 右侧商品 -->
-        <scroll-view
-          class="product-list"
-          scroll-y
-          scroll-with-animation
-          :scroll-into-view="productScrollIntoView"
-          @scroll="handleProductListScroll"
-          @scrolltolower="loadMoreProducts"
-        >
-          <view class="product-list-top-anchor" id="product-list-top"></view>
-
-          <!-- 热销推荐 -->
-          <view class="hot-products" v-if="showHotProducts">
-            <view class="hot-title">🔥 热销推荐</view>
-            <view class="product-grid">
-              <view
-                v-for="product in storeInfo.hot_products"
-                :key="product.id"
-                class="product-card"
-                @click="goProductDetail(product.id)"
-              >
-                <image
-                  class="product-image"
-                  :src="getHotProductImage(product)"
-                  mode="aspectFill"
-                />
-                <view class="product-info">
-                  <view class="product-name">
-                    {{ product.name }}
-                    <text v-if="Number(product.sale_type) === 2" class="product-rental-tag">租赁</text>
-                    <text v-else-if="Number(product.product_type) === 3" class="product-wellness-tag">套餐</text>
-                    <text v-else-if="Number(product.product_type) === 4" class="product-escort-tag">陪诊</text>
-                  </view>
-                  <view class="product-bottom">
-                    <view class="product-price">
-                      <template v-if="Number(product.sale_type) === 2">
-                        <text class="price">¥{{ Number(product.rental_price || 0).toFixed(2) }}/{{ getRentalUnitText(product.rental_unit) }}</text>
-                      </template>
-                      <template v-else>
-                        <text class="price">¥{{ product.price.toFixed(2) }}</text>
-                        <text v-if="(product.original_price || 0) > 0" class="original-price">
-                          ¥{{ (product.original_price || 0).toFixed(2) }}
-                        </text>
-                      </template>
-                    </view>
-                  </view>
-                  <view class="product-sales">已售 {{ product.sales || 0 }}</view>
-                </view>
+            <image class="recommend-image" :src="getRecommendImage(item)" mode="aspectFill" />
+            <view class="recommend-info">
+              <view class="recommend-name">
+                {{ getRecommendTitle(item) }}
+                <text
+                  v-if="getRecommendTag(item)"
+                  :class="getRecommendTagClass(item)"
+                >{{ getRecommendTag(item) }}</text>
+              </view>
+              <view class="recommend-price">
+                <template v-if="Number(item.product?.sale_type) === 2">
+                  ¥{{ Number(item.product?.rental_price || 0).toFixed(2) }}/{{ getRentalUnitText(item.product?.rental_unit) }}
+                </template>
+                <template v-else>
+                  ¥{{ (item.product?.price || 0).toFixed(2) }}
+                </template>
               </view>
             </view>
           </view>
-
-          <!-- 分类商品列表 -->
-          <view v-if="showProductSkeleton" class="product-skeleton-list">
-            <view v-for="item in 3" :key="item" class="product-skeleton-item">
-              <view class="product-skeleton-image"></view>
-              <view class="product-skeleton-content">
-                <view class="product-skeleton-line primary"></view>
-                <view class="product-skeleton-line secondary"></view>
-                <view class="product-skeleton-line short"></view>
-              </view>
-            </view>
-          </view>
-
-          <view v-else class="product-list-items">
-            <view
-              v-for="section in productSections"
-              :key="section.category.id"
-              :id="getCategorySectionId(section.category.id)"
-              class="product-section"
-            >
-              <view class="category-title">{{ section.category.name }}</view>
-              <view v-if="section.products.length" class="product-section-list">
-                <view
-                  v-for="product in section.products"
-                  :key="product.id"
-                  class="product-list-item"
-                  @click="goProductDetail(product.id)"
-                >
-                  <image
-                    class="item-image"
-                    :src="getProductImage(product)"
-                    mode="aspectFill"
-                  />
-                  <view class="item-info">
-                    <view class="item-name">
-                      {{ product.name }}
-                      <text v-if="Number(product.product_type) === 2 || Number(product.sale_type) === 2" class="product-rental-tag">租赁</text>
-                      <text v-else-if="Number(product.product_type) === 3" class="product-wellness-tag">套餐</text>
-                      <text v-else-if="Number(product.product_type) === 4" class="product-escort-tag">陪诊</text>
-                    </view>
-                    <view class="item-desc" v-if="product.description">{{ product.description }}</view>
-                    <view class="item-bottom">
-                      <view class="item-price">
-                        <template v-if="Number(product.sale_type) === 2">
-                          <text class="price">¥{{ Number(product.rental_price || 0).toFixed(2) }}/{{ getRentalUnitText(product.rental_unit) }}</text>
-                          <text class="rental-deposit-tip">押金 ¥{{ Number(product.deposit || 0).toFixed(2) }}</text>
-                        </template>
-                        <template v-else>
-                          <text class="price">¥{{ product.price.toFixed(2) }}</text>
-                          <text v-if="(product.original_price || 0) > 0" class="original-price">
-                            ¥{{ (product.original_price || 0).toFixed(2) }}
-                          </text>
-                        </template>
-                      </view>
-                    </view>
-                  </view>
-                </view>
-              </view>
-              <view v-else class="section-empty">当前分类暂无上架商品</view>
-            </view>
-          </view>
-
-          <view v-if="loadingProducts && hasLoadedAnyProducts" class="loading">加载中...</view>
-          <view v-else-if="showProductEmpty" class="product-empty">
-            <view class="product-empty-title">当前暂无可展示商品</view>
-            <view class="product-empty-desc">可以下拉刷新试试，或稍后再来看看商家上新。</view>
-          </view>
-        </scroll-view>
+        </view>
       </view>
 
       </template>
@@ -316,16 +209,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, nextTick, getCurrentInstance, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { onLoad, onPullDownRefresh, onShow } from '@dcloudio/uni-app'
-import { getStoreHome, getStoreProducts } from '../../api/store'
+import { getStoreHome, getStoreHomeRecommends } from '../../api/store'
+import type { StoreRecommendItem } from '../../api/store'
 import { getAvailableCoupons, receiveCoupon } from '../../api/coupon'
 import { getStoreEducationArticles } from '../../api/health'
 import type { CouponTemplate } from '../../types/coupon'
 import { useAnalytics } from '@utils/analytics'
 import { getCachedImagePath, cacheImage } from '@utils/imageCache'
 import { parseStoreEntryOptions } from '@utils/storeEntry'
-import type { StoreHomeInfo, Product, StoreProductGroup, ProductType, EducationArticle } from '@types'
+import type { StoreHomeInfo, ProductType, EducationArticle } from '@types'
 import { BrandAsset } from '../../utils/constants'
 
 // 商品类型分区配置（首页 icon 宫格只展示 4 大业务分类）
@@ -343,22 +237,15 @@ const PRODUCT_TYPE_SECTIONS: Array<{
 ]
 
 const { trackVisit, trackPageView } = useAnalytics()
-const instance = getCurrentInstance()
 
 const storeInfo = ref<StoreHomeInfo | null>(null)
 const currentCategoryIndex = ref(0)
-const loadingProducts = ref(false)
 const merchantLogo = ref('')
 const merchantCover = ref('')
 const entrySource = ref('scan')
 const isInitialLoading = ref(false)
 const pageErrorMessage = ref('')
 const isNoticeExpanded = ref(false)
-const categoryProductsMap = reactive<Record<number, Product[]>>({})
-const productSectionOffsets = ref<number[]>([])
-const productScrollIntoView = ref('')
-const categorySidebarScrollIntoView = ref('')
-const productListScrollTop = ref(0)
 const showStickyHeader = ref(false)
 
 /* ============ 领券中心（PRD V2.0 阶段二） ============ */
@@ -366,6 +253,10 @@ const availableCoupons = ref<CouponTemplate[]>([])
 
 /* ============ 健康宣教（首页板块，轮播图高度） ============ */
 const educationArticles = ref<EducationArticle[]>([])
+
+/* ============ 首页推荐（PC 后台配置） ============ */
+const recommends = ref<StoreRecommendItem[]>([])
+const recommendLoading = ref(false)
 
 async function loadAvailableCoupons() {
   try {
@@ -403,6 +294,18 @@ async function loadEducationArticles() {
   }
 }
 
+async function loadRecommends() {
+  recommendLoading.value = true
+  try {
+    const res = await getStoreHomeRecommends()
+    recommends.value = res.list || []
+  } catch (_e) {
+    recommends.value = []
+  } finally {
+    recommendLoading.value = false
+  }
+}
+
 function goEducationDetail(id: number) {
   uni.navigateTo({ url: `/pages/store/education-detail?id=${id}` })
 }
@@ -414,17 +317,6 @@ function goEducationCenter() {
 const currentCategory = computed(() => {
   return storeInfo.value?.categories?.[currentCategoryIndex.value] || null
 })
-const hasCategories = computed(() => !!storeInfo.value?.categories?.length)
-const showHotProducts = computed(() => !!storeInfo.value?.hot_products?.length)
-const productSections = computed<StoreProductGroup[]>(() => {
-  return (storeInfo.value?.categories || []).map(category => ({
-    category: {
-      id: category.id,
-      name: category.name
-    },
-    products: categoryProductsMap[category.id] || []
-  }))
-})
 // 首页轮播图：仅展示接口 banners，为空时不回退商家封面占位
 const bannerImages = computed<string[]>(() => {
   const banners = storeInfo.value?.banners
@@ -433,10 +325,7 @@ const bannerImages = computed<string[]>(() => {
   }
   return []
 })
-const hasLoadedAnyProducts = computed(() => productSections.value.some(section => section.products.length > 0))
-const showProductEmpty = computed(() => !loadingProducts.value && !hasLoadedAnyProducts.value && !showHotProducts.value)
 const showPageError = computed(() => !!pageErrorMessage.value && !storeInfo.value)
-const showProductSkeleton = computed(() => loadingProducts.value && !hasLoadedAnyProducts.value)
 const canToggleNotice = computed(() => {
   const notice = storeInfo.value?.merchant?.announcement || ''
   return notice.trim().length > 28
@@ -448,7 +337,6 @@ const merchantPhone = computed(() => {
 
 let showPromise: Promise<void> | null = null
 let _loadRetryCount = 0
-let manualCategoryScrollTimer: ReturnType<typeof setTimeout> | null = null
 
 function callMerchant() {
   const phone = merchantPhone.value
@@ -466,7 +354,6 @@ function callMerchant() {
     }
   })
 }
-let ignoreScrollSync = false
 
 function resetStoreHomeState() {
   storeInfo.value = null
@@ -475,23 +362,8 @@ function resetStoreHomeState() {
   merchantCover.value = ''
   pageErrorMessage.value = ''
   isNoticeExpanded.value = false
-  productSectionOffsets.value = []
-  productScrollIntoView.value = ''
-  categorySidebarScrollIntoView.value = ''
-  productListScrollTop.value = 0
   showStickyHeader.value = false
-  Object.keys(categoryProductsMap).forEach((key) => {
-    delete categoryProductsMap[Number(key)]
-  })
 }
-
-watch(currentCategoryIndex, () => {
-  const categoryId = currentCategory.value?.id
-  if (!categoryId) {
-    return
-  }
-  categorySidebarScrollIntoView.value = getCategoryMenuId(categoryId)
-})
 
 function parseEntryOptions(options?: Record<string, any>) {
   return parseStoreEntryOptions(options)
@@ -526,6 +398,7 @@ onShow(() => {
     }
     void loadAvailableCoupons()
     void loadEducationArticles()
+    void loadRecommends()
   })().finally(() => {
     showPromise = null
   })
@@ -545,11 +418,6 @@ async function loadStoreHome(silent = false) {
     cacheMerchantImages(res)
     updatePendingReviewBadge(res.pending_review_count)
 
-    if (res.categories?.length) {
-      await loadAllCategoryProducts(res.categories, silent)
-      await nextTick()
-      measureProductSections()
-    }
     return true
   } catch (error) {
     if (!silent) {
@@ -599,49 +467,6 @@ function toggleNotice() {
   isNoticeExpanded.value = !isNoticeExpanded.value
 }
 
-async function loadAllCategoryProducts(
-  categories: Array<{ id: number; name: string; sort: number; product_count: number }>,
-  silent = false
-) {
-  if (!silent) {
-    loadingProducts.value = true
-  }
-
-  Object.keys(categoryProductsMap).forEach((key) => {
-    delete categoryProductsMap[Number(key)]
-  })
-
-  try {
-    const results = await Promise.allSettled(categories.map(async (category) => {
-      const res = await getStoreProducts({ category_id: category.id })
-      return { categoryId: category.id, list: res.list || [] }
-    }))
-
-    results.forEach((result, index) => {
-      const categoryId = categories[index].id
-      if (result.status === 'fulfilled') {
-        categoryProductsMap[categoryId] = result.value.list
-      } else {
-        categoryProductsMap[categoryId] = []
-      }
-    })
-  } catch (error) {
-    if (!silent) {
-      console.error('加载商品失败:', error)
-    }
-  } finally {
-    loadingProducts.value = false
-  }
-}
-
-function getCategoryMenuId(categoryId: number) {
-  return `category-menu-${categoryId}`
-}
-
-function getCategorySectionId(categoryId: number) {
-  return `category-section-${categoryId}`
-}
-
 function cacheMerchantImages(info: StoreHomeInfo) {
   const logo = info?.merchant?.logo
   const cover = info?.merchant?.cover_image
@@ -671,46 +496,6 @@ function cacheMerchantImages(info: StoreHomeInfo) {
   }
 }
 
-function measureProductSections() {
-  if (!instance?.proxy || !productSections.value.length) {
-    productSectionOffsets.value = []
-    return
-  }
-
-  const currentScrollTop = productListScrollTop.value
-  const query = uni.createSelectorQuery().in(instance.proxy)
-  query.select('.product-list').boundingClientRect()
-  query.selectAll('.product-section').boundingClientRect()
-  query.exec((result) => {
-    const containerRect = result?.[0] as { top: number } | undefined
-    const sectionRects = (result?.[1] || []) as Array<{ top: number }>
-    if (!containerRect || !sectionRects.length) {
-      productSectionOffsets.value = []
-      return
-    }
-
-    productSectionOffsets.value = sectionRects.map(rect => rect.top - containerRect.top + currentScrollTop)
-  })
-}
-
-function setManualCategoryScrollLock() {
-  ignoreScrollSync = true
-  if (manualCategoryScrollTimer) {
-    clearTimeout(manualCategoryScrollTimer)
-  }
-  manualCategoryScrollTimer = setTimeout(() => {
-    ignoreScrollSync = false
-  }, 420)
-}
-
-function scrollToCategory(categoryId: number) {
-  setManualCategoryScrollLock()
-  productScrollIntoView.value = ''
-  nextTick(() => {
-    productScrollIntoView.value = getCategorySectionId(categoryId)
-  })
-}
-
 function onBannerTap(index: number) {
   const banner = storeInfo.value?.banners?.[index]
   if (!banner) return
@@ -733,69 +518,47 @@ function goTypeSection(productType: number) {
   uni.navigateTo({ url: `/pages/store/product-list?type=${productType}` })
 }
 
-function selectCategory(index: number) {
-  const category = storeInfo.value?.categories?.[index]
-  if (!category) {
-    return
-  }
-
-  currentCategoryIndex.value = index
-  scrollToCategory(category.id)
-}
-
-function loadMoreProducts() {
-  // 加载更多逻辑
-}
-
-function syncCurrentCategoryByScroll(scrollTop: number) {
-  if (!productSectionOffsets.value.length || !storeInfo.value?.categories?.length) {
-    return
-  }
-
-  const activeScrollTop = scrollTop + 24
-  let nextIndex = 0
-
-  for (let index = 0; index < productSectionOffsets.value.length; index++) {
-    if (activeScrollTop >= productSectionOffsets.value[index]) {
-      nextIndex = index
-    } else {
-      break
-    }
-  }
-
-  currentCategoryIndex.value = nextIndex
-}
-
-function handleProductListScroll(event: any) {
-  const scrollTop = Number(event?.detail?.scrollTop || 0)
-  productListScrollTop.value = scrollTop
-  showStickyHeader.value = scrollTop > 96
-
-  if (!ignoreScrollSync) {
-    syncCurrentCategoryByScroll(scrollTop)
-  }
-}
-
-function getHotProductImage(product: any) {
-  if (Array.isArray(product?.images) && product.images.length > 0) {
-    return product.images[0]
-  }
-
-  return getProductImage(product)
-}
-
-function getProductImage(product: any) {
-  if (Array.isArray(product?.images) && product.images.length > 0) {
-    return product.images[0]
-  }
-
-  return product?.image || BrandAsset.DEFAULT_PRODUCT_IMAGE
-}
-
 function goProductDetail(productId: number) {
   uni.navigateTo({
     url: `/pages/store/product?product_id=${productId}`
   })
+}
+
+/* ============ 首页推荐（PC 后台配置） ============ */
+function getRecommendImage(item: StoreRecommendItem): string {
+  return item.product?.images?.[0] || item.product?.image || BrandAsset.DEFAULT_PRODUCT_IMAGE
+}
+
+function getRecommendTitle(item: StoreRecommendItem): string {
+  return item.title || item.product?.name || ''
+}
+
+function getRecommendTag(item: StoreRecommendItem): string {
+  const targetType = Number(item.target_type || 0)
+  const productType = Number(item.product?.product_type || 0)
+  const saleType = Number(item.product?.sale_type || 0)
+  if (targetType === 2 || productType === 3) return '套餐'
+  if (productType === 4) return '陪诊'
+  if (saleType === 2) return '租赁'
+  return ''
+}
+
+function getRecommendTagClass(item: StoreRecommendItem): string {
+  const tag = getRecommendTag(item)
+  if (tag === '租赁') return 'product-rental-tag'
+  if (tag === '套餐') return 'product-wellness-tag'
+  if (tag === '陪诊') return 'product-escort-tag'
+  return ''
+}
+
+function goRecommendItem(item: StoreRecommendItem) {
+  const productId = item.product_id || item.product?.id
+  if (!productId) {
+    uni.showToast({ title: '该推荐商品暂不可用', icon: 'none' })
+    return
+  }
+  // 实物与服务推荐统一跳转到商品/服务详情页
+  goProductDetail(productId)
 }
 
 function getRentalUnitText(unit?: number): string {
@@ -893,16 +656,6 @@ function getRentalUnitText(unit?: number): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.stars {
-  color: #ffd700;
-  font-size: 24rpx;
-}
-
-.rating-value {
-  font-size: 24rpx;
-  margin-left: 8rpx;
 }
 
 .store-notice {
@@ -1327,110 +1080,6 @@ function getRentalUnitText(unit?: number): string {
   background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
 }
 
-.main-content {
-  display: flex;
-  /* header(400rpx) + margin-top(24rpx) 正好填满 tabBar 之上可视区，
-     商品列表在内部 scroll-view 滚动，页面本身不滚动，避免 tabBar 上方出现空白 */
-  height: calc(100vh - 424rpx);
-  background: #ffffff;
-  margin-top: 24rpx;
-}
-
-.category-sidebar {
-  width: 180rpx;
-  background: #f8f9fa;
-}
-
-.category-empty {
-  padding: 48rpx 20rpx;
-  text-align: center;
-  font-size: 24rpx;
-  color: #999999;
-  line-height: 1.5;
-}
-
-.category-item {
-  padding: 32rpx 24rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 26rpx;
-  color: #666666;
-  border-left: 6rpx solid transparent;
-}
-
-.category-item.active {
-  background: #ffffff;
-  color: #007AFF;
-  border-left-color: #007AFF;
-}
-
-.category-name {
-  margin-bottom: 8rpx;
-}
-
-.category-count {
-  font-size: 22rpx;
-  background: #f0f0f0;
-  padding: 2rpx 12rpx;
-  border-radius: 12rpx;
-}
-
-.product-list {
-  flex: 1;
-  width: calc(100% - 48rpx);
-  padding: 24rpx;
-}
-
-.product-list-top-anchor {
-  height: 2rpx;
-}
-
-.category-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 24rpx;
-}
-
-.hot-title {
-  font-size: 28rpx;
-  color: #666666;
-  margin-bottom: 20rpx;
-}
-
-.product-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20rpx;
-  margin-bottom: 32rpx;
-}
-
-.product-card {
-  background: #f8f9fa;
-  border-radius: 16rpx;
-  overflow: hidden;
-}
-
-.product-image {
-  width: 100%;
-  height: 300rpx;
-  background: #e0e0e0;
-}
-
-.product-info {
-  padding: 16rpx;
-}
-
-.product-name {
-  font-size: 28rpx;
-  color: #1a1a1a;
-  margin-bottom: 12rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .product-rental-tag {
   display: inline-block;
   font-size: 20rpx;
@@ -1464,224 +1113,102 @@ function getRentalUnitText(unit?: number): string {
   vertical-align: middle;
 }
 
-.product-info-tag {
-  display: inline-block;
-  font-size: 20rpx;
-  color: #ffffff;
-  background: #64748b;
-  padding: 2rpx 10rpx;
-  border-radius: 6rpx;
-  margin-left: 8rpx;
-  vertical-align: middle;
+/* 首页推荐（PC 后台配置） */
+.recommend-module {
+  margin: 20rpx 24rpx 0;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx 24rpx 32rpx;
 }
 
-.rental-deposit-tip {
-  display: block;
-  font-size: 22rpx;
-  color: #ff9500;
-  margin-top: 4rpx;
+.recommend-header {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 20rpx;
 }
 
-.product-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8rpx;
+.recommend-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
 }
 
-.product-price .price {
+.recommend-card {
+  background: #ffffff;
+  border: 1rpx solid #f0f0f0;
+  border-radius: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.05);
+}
+
+.recommend-image {
+  width: 100%;
+  height: 300rpx;
+  background: #e0e0e0;
+}
+
+.recommend-info {
+  padding: 16rpx;
+}
+
+.recommend-name {
+  font-size: 28rpx;
+  color: #1a1a1a;
+  margin-bottom: 12rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.recommend-price {
   font-size: 32rpx;
   font-weight: 600;
   color: #ff4d4f;
 }
 
-.original-price {
-  font-size: 22rpx;
-  color: #999999;
-  text-decoration: line-through;
-  margin-left: 8rpx;
-}
-
-.product-sales {
-  font-size: 22rpx;
+.recommend-empty {
+  padding: 48rpx 24rpx;
+  text-align: center;
+  font-size: 26rpx;
   color: #999999;
 }
 
-.product-list-items {
-  display: flex;
-  flex-direction: column;
+.recommend-skeleton-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
 }
 
-.product-section {
-  margin-bottom: 20rpx;
+.recommend-skeleton-card {
+  background: #ffffff;
+  border: 1rpx solid #f0f0f0;
+  border-radius: 16rpx;
+  overflow: hidden;
 }
 
-.product-section:last-child {
-  margin-bottom: 0;
-}
-
-.product-section-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.product-skeleton-list {
-  display: flex;
-  flex-direction: column;
-  gap: 18rpx;
-}
-
-.product-skeleton-item {
-  display: flex;
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid #f2f3f5;
-}
-
-.product-skeleton-image {
-  width: 200rpx;
-  height: 200rpx;
-  margin-right: 20rpx;
-  border-radius: 12rpx;
+.recommend-skeleton-image {
+  width: 100%;
+  height: 300rpx;
   background: linear-gradient(90deg, #f2f3f5 0%, #e9ecef 50%, #f2f3f5 100%);
   background-size: 200% 100%;
   animation: loadingShimmer 1.2s linear infinite;
 }
 
-.product-skeleton-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 18rpx;
-}
-
-.product-skeleton-line {
+.recommend-skeleton-line {
   height: 24rpx;
   border-radius: 12rpx;
   background: linear-gradient(90deg, #f2f3f5 0%, #e9ecef 50%, #f2f3f5 100%);
   background-size: 200% 100%;
   animation: loadingShimmer 1.2s linear infinite;
+  margin: 16rpx 16rpx 0;
 }
 
-.product-skeleton-line.primary {
-  width: 68%;
-}
-
-.product-skeleton-line.secondary {
-  width: 92%;
-}
-
-.product-skeleton-line.short {
-  width: 38%;
-}
-
-.product-list-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid #f0f0f0;
-}
-
-.product-list-item:last-child {
-  border-bottom: none;
-}
-
-.section-empty {
-  padding: 24rpx 0 32rpx;
-  font-size: 24rpx;
-  color: #999999;
-  text-align: center;
-}
-
-.item-image {
-  width: 200rpx;
-  min-width: 200rpx;
-  height: 200rpx;
-  border-radius: 12rpx;
-  background: #f0f0f0;
-  margin-right: 20rpx;
-  flex-shrink: 0;
-}
-
-.item-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.item-name {
-  font-size: 30rpx;
-  color: #1a1a1a;
-  font-weight: 500;
-  line-height: 1.4;
-  word-break: break-all;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-}
-
-.item-desc {
-  font-size: 24rpx;
-  color: #999999;
-  margin-top: 8rpx;
-  line-height: 1.5;
-  word-break: break-all;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-}
-
-.item-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16rpx;
-  margin-top: 16rpx;
-}
-
-.item-price {
-  flex: 1;
-  min-width: 0;
-}
-
-.item-price .price {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #ff4d4f;
-}
-
-.loading {
-  text-align: center;
-  padding: 24rpx;
-  font-size: 26rpx;
-  color: #999999;
-}
-
-.product-empty {
-  margin-top: 24rpx;
-  padding: 48rpx 24rpx;
-  background: #f8f9fa;
-  border-radius: 20rpx;
-  text-align: center;
-}
-
-.product-empty-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #333333;
-}
-
-.product-empty-desc {
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: #888888;
-  line-height: 1.6;
+.recommend-skeleton-line.short {
+  width: 40%;
+  margin-bottom: 24rpx;
 }
 
 @keyframes loadingShimmer {

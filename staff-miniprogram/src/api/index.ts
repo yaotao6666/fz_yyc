@@ -140,11 +140,11 @@ export const staffWorkorderApi = {
     request({ url: '/api/v1/service-staff/todo' }),
 
   /** 待接订单列表 */
-  getPendingOrders: (params?: { page?: number; page_size?: number }) =>
+  getPendingOrders: (params?: { category?: number; page?: number; page_size?: number }) =>
     request({ url: '/api/v1/service-staff/orders/pending', data: params }),
 
   /** 已接订单列表 */
-  getAcceptedOrders: (params?: { biz_status?: number; page?: number; page_size?: number }) =>
+  getAcceptedOrders: (params?: { category?: number; biz_status?: number; page?: number; page_size?: number }) =>
     request({ url: '/api/v1/service-staff/orders/accepted', data: params }),
 
   /** 订单详情 */
@@ -161,7 +161,11 @@ export const staffWorkorderApi = {
 
   /** 签退 */
   checkOut: (id: string | number, remark?: string) =>
-    request({ url: `/api/v1/service-staff/orders/${id}/check-out`, method: 'POST', data: { remark } })
+    request({ url: `/api/v1/service-staff/orders/${id}/check-out`, method: 'POST', data: { remark } }),
+
+  /** 放弃工单（待出发阶段，biz_status === 2） */
+  giveUpOrder: (id: string | number) =>
+    request({ url: `/api/v1/service-staff/orders/${id}/give-up`, method: 'POST' })
 }
 
 /* ============ 服务过程安全接口（阶段三） ============ */
@@ -303,8 +307,8 @@ export const staffHealthApi = {
     return normalizeHealthRecord(res?.data)
   },
 
-  /** 获取客户评估记录（分页倒序） */
-  async getResidentAssessments(userId: number | string, params?: { page?: number; page_size?: number }) {
+  /** 获取客户评估记录（分页倒序；传入 record_id 时仅返回该档案的评估） */
+  async getResidentAssessments(userId: number | string, params?: { page?: number; page_size?: number; record_id?: number | string }) {
     const res: any = await request({ url: `/api/v1/service-staff/residents/${userId}/assessments`, data: params })
     if (res?.code !== 0) {
       uni.showToast({ title: res?.message || '请求失败', icon: 'none' })

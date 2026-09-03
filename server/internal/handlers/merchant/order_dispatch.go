@@ -72,11 +72,17 @@ func DispatchOrder(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单须为已支付状态才能派单")
 		return
 	}
+	// 已完成订单不允许再修改派单人员（服务单完成时仅 biz_status=5，orders.status 仍为 2）
+	if order.Status == 3 || order.BizStatus == 5 {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "已完成订单不允许修改派单人员")
+		return
+	}
 
 	now := time.Now()
 	updates := map[string]interface{}{
 		"assigned_staff_id": req.StaffID,
-		"biz_status":        2, // 已接单/待出发
+		"assigned_at":       now, // 指派时间（已指派超时未签到预警依据）
+		"biz_status":        2,   // 已接单/待出发
 	}
 	result := database.DB.Model(&models.Order{}).Where("id = ?", orderID).Updates(updates)
 	if result.Error != nil {

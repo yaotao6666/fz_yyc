@@ -1,6 +1,7 @@
 package service_staff
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 
@@ -50,8 +51,20 @@ func RequestProfileChange(c *gin.Context) {
 		return
 	}
 
-	// 校验变更是否有效（与当前值全同则无需审核）
-	if req.Name == staff.Name && req.Phone == staff.Phone && req.Avatar == staff.Avatar {
+	// 校验变更是否有效（姓名/手机号/头像/资质材料均与当前值一致则无需审核）
+	currQualifications := []QualificationItem{}
+	if len(staff.Qualifications) > 0 {
+		_ = json.Unmarshal(staff.Qualifications, &currQualifications)
+	}
+	reqQualifications := req.Qualifications
+	if reqQualifications == nil {
+		reqQualifications = []QualificationItem{}
+	}
+	currQualsJSON, _ := json.Marshal(currQualifications)
+	reqQualsJSON, _ := json.Marshal(reqQualifications)
+	qualsUnchanged := bytes.Equal(currQualsJSON, reqQualsJSON)
+
+	if req.Name == staff.Name && req.Phone == staff.Phone && req.Avatar == staff.Avatar && qualsUnchanged {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "未检测到信息变更")
 		return
 	}

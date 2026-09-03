@@ -1,12 +1,14 @@
 package merchant
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
+	"fz_yyc_api/internal/services/alertcfg"
 	"fz_yyc_api/internal/utils"
 	"fz_yyc_api/pkg/database"
 	"fz_yyc_api/pkg/response"
@@ -256,6 +258,18 @@ func alertTypeText(t uint8) string {
 		return "SOS求助"
 	case utils.AlertTypeTimeout:
 		return "服务超时未结束"
+	case utils.AlertTypeGoodsUnverified:
+		return "实物超时未核销"
+	case utils.AlertTypeServiceUnassigned:
+		return "服务超时未指派"
+	case utils.AlertTypeEscortUnfinished:
+		return "陪诊超时未完成"
+	case utils.AlertTypeServiceUnstarted:
+		return "指派超时未签到"
+	case utils.AlertTypeRentalOverdue:
+		return "租赁逾期未归还"
+	case utils.AlertTypeRefundStuck:
+		return "退款卡在处理中"
 	default:
 		return "未知"
 	}
@@ -273,4 +287,109 @@ func alertStatusText(s uint8) string {
 	default:
 		return "未知"
 	}
+}
+
+// ============================================
+// 预警配置（alert_settings，单行）
+// ============================================
+
+// loadOrInitAlertSettings 读取预警配置（从通用 system_configs 聚合并回退默认值）
+func loadOrInitAlertSettings() (models.AlertSettings, error) {
+	return alertcfg.Load(), nil
+}
+
+// GetAlertSettings 获取预警配置
+func GetAlertSettings(c *gin.Context) {
+	s, err := loadOrInitAlertSettings()
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "读取预警配置失败")
+		return
+	}
+	response.Success(c, s)
+}
+
+// UpdateAlertSettingsRequest 更新预警配置请求（指针字段允许 enabled=false 零值校验）
+type UpdateAlertSettingsRequest struct {
+	Enabled                 *bool `json:"enabled"`
+	GoodsUnverifiedHours    *int  `json:"goods_unverified_hours"`
+	ServiceUnassignedHours  *int  `json:"service_unassigned_hours"`
+	EscortUnfinishedMinutes *int  `json:"escort_unfinished_minutes"`
+	ServiceUnstartedMinutes *int  `json:"service_unstarted_minutes"`
+	RentalOverdueHours      *int  `json:"rental_overdue_hours"`
+	RefundStuckHours        *int  `json:"refund_stuck_hours"`
+	ServiceAudioRetainDays  *int  `json:"service_audio_retain_days"`
+}
+
+// UpdateAlertSettings 更新预警配置（数值范围校验 + 幂等 upsert 单行）
+func UpdateAlertSettings(c *gin.Context) {
+	var req UpdateAlertSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误: "+err.Error())
+		return
+	}
+
+	// 数值范围校验：小时 1~720、分钟 1~1440
+	validateRange := func(name string, v *int, min, max int) string {
+		if v == nil {
+			return ""
+		}
+		if *v < min || *v > max {
+			return name + "须在 " + fmt.Sprintf("%d~%d", min, max) + " 之间"
+		}
+		return ""
+	}
+	for _, e := range []string{
+		validateRange("实物超时未核销(小时)", req.GoodsUnverifiedHours, 1, 720),
+		validateRange("服务超时未指派(小时)", req.ServiceUnassignedHours, 1, 720),
+		validateRange("陪诊超时未完成(分钟)", req.EscortUnfinishedMinutes, 1, 1440),
+		validateRange("指派超时未签到(分钟)", req.ServiceUnstartedMinutes, 1, 1440),
+		validateRange("租赁逾期未归还(小时)", req.RentalOverdueHours, 1, 720),
+		validateRange("退款卡在处理中(小时)", req.RefundStuckHours, 1, 720),
+		validateRange("服务录音保留天数(天)", req.ServiceAudioRetainDays, 1, 365),
+	} {
+		if e != "" {
+			response.Fail(c, http.StatusBadRequest, response.CodeParamError, e)
+			return
+		}
+	}
+
+	s, err := loadOrInitAlertSettings()
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "读取预警配置失败")
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.Enabled != nil {
+		updates[alertcfg.KeyEnabled] = *req.Enabled
+	}
+	if req.GoodsUnverifiedHours != nil {
+		updates[alertcfg.KeyGoodsUnverifiedHours] = *req.GoodsUnverifiedHours
+	}
+	if req.ServiceUnassignedHours != nil {
+		updates[alertcfg.KeyServiceUnassignedHours] = *req.ServiceUnassignedHours
+	}
+	if req.EscortUnfinishedMinutes != nil {
+		updates[alertcfg.KeyEscortUnfinishedMinutes] = *req.EscortUnfinishedMinutes
+	}
+	if req.ServiceUnstartedMinutes != nil {
+		updates[alertcfg.KeyServiceUnstartedMinutes] = *req.ServiceUnstartedMinutes
+	}
+	if req.RentalOverdueHours != nil {
+		updates[alertcfg.KeyRentalOverdueHours] = *req.RentalOverdueHours
+	}
+	if req.RefundStuckHours != nil {
+		updates[alertcfg.KeyRefundStuckHours] = *req.RefundStuckHours
+	}
+	if req.ServiceAudioRetainDays != nil {
+		updates[alertcfg.KeyServiceAudioRetainDays] = *req.ServiceAudioRetainDays
+	}
+
+	if err := alertcfg.Save(updates); err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "保存预警配置失败")
+		return
+	}
+
+	s = alertcfg.Load()
+	response.SuccessWithMessage(c, "保存成功", s)
 }

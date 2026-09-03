@@ -6,6 +6,8 @@ import type { HealthRecord, HealthAssessment, AssessmentFormQuestion, FittingRec
 import { formatDate } from '@/utils/format'
 
 const userId = ref<string>('')
+// 外部（如订单详情）指定档案时，评估记录仅显示该档案；为空则回退到当前最近档案
+const targetRecordId = ref<number | ''>('')
 const loading = ref(false)
 const record = ref<HealthRecord | null>(null)
 const recordLoaded = ref(false)
@@ -143,16 +145,23 @@ async function loadData() {
       console.error('[HealthResident] load record error', e)
     }
     recordLoaded.value = true
-    try {
-      const assessRes: any = await staffHealthApi.getResidentAssessments(userId.value, { page: 1, page_size: 20 })
-      const list = assessRes?.list || []
-      assessments.value = list.map((a: any) => ({
-        ...a,
-        answers: normalizeAnswers(a.answers)
-      }))
-      total.value = assessRes?.total || 0
-    } catch (e) {
-      console.error('[HealthResident] load assessments error', e)
+    // 评估记录按档案隔离：优先外部指定档案，其次当前最近档案；无档案时不同步全部评估，避免串档
+    const rid = targetRecordId.value || record.value?.id || 0
+    if (rid) {
+      try {
+        const assessRes: any = await staffHealthApi.getResidentAssessments(userId.value, { page: 1, page_size: 20, record_id: rid })
+        const list = assessRes?.list || []
+        assessments.value = list.map((a: any) => ({
+          ...a,
+          answers: normalizeAnswers(a.answers)
+        }))
+        total.value = assessRes?.total || 0
+      } catch (e) {
+        console.error('[HealthResident] load assessments error', e)
+      }
+    } else {
+      assessments.value = []
+      total.value = 0
     }
     // 适配建议独立加载，失败不影响档案与评估展示
     try {
@@ -211,6 +220,8 @@ function goFitting() {
 
 onLoad((options: any) => {
   userId.value = options?.userId || ''
+  const pRid = options?.recordId || options?.record_id
+  targetRecordId.value = pRid ? Number(pRid) || '' : ''
   if (!userId.value) {
     uni.showToast({ title: '缺少客户ID', icon: 'none' })
     setTimeout(() => uni.navigateBack(), 1500)

@@ -136,7 +136,8 @@ const settingsForm = reactive<AlertSettings>({
   escort_unfinished_minutes: 60,
   service_unstarted_minutes: 60,
   rental_overdue_hours: 24,
-  refund_stuck_hours: 24
+  refund_stuck_hours: 24,
+  service_audio_retain_days: 30
 })
 
 async function openSettings() {
@@ -351,6 +352,9 @@ onMounted(loadList)
         </el-form-item>
         <el-form-item label="退款卡在处理中（小时）">
           <el-input-number v-model="settingsForm.refund_stuck_hours" :min="1" :max="720" />
+        </el-form-item>
+        <el-form-item label="服务录音保留（天）">
+          <el-input-number v-model="settingsForm.service_audio_retain_days" :min="1" :max="365" />
         </el-form-item>
       </el-form>
       <template #footer>

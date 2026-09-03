@@ -199,6 +199,10 @@ function goBack() {
   router.back()
 }
 
+function handlePrint() {
+  window.print()
+}
+
 function openReturnDialog() {
   returnForm.value = { deduct_amount: 0, remark: '' }
   returnDialogVisible.value = true
@@ -277,7 +281,10 @@ onMounted(loadOrderDetail)
         <h1 class="page-title">订单详情</h1>
         <p class="page-subtitle">查看订单状态、商品明细、工单进度与核销信息。</p>
       </div>
-      <el-button @click="goBack">返回列表</el-button>
+      <div class="header-actions">
+        <el-button type="primary" plain @click="handlePrint" v-if="order">打印订单</el-button>
+        <el-button @click="goBack">返回列表</el-button>
+      </div>
     </div>
 
     <template v-if="order">
@@ -496,6 +503,46 @@ onMounted(loadOrderDetail)
         <el-button type="primary" :loading="dispatching" @click="confirmDispatch">确认派单</el-button>
       </template>
     </el-dialog>
+
+    <!-- 打印模板（屏幕隐藏，打印时仅显示该区块） -->
+    <div v-if="order" class="print-order">
+      <h2 class="print-title">订单信息</h2>
+      <table class="print-table">
+        <tbody>
+          <tr><td>订单编号</td><td>{{ order.order_no }}</td></tr>
+          <tr><td>订单类型</td><td>{{ order.order_type ? (OrderTypeText[order.order_type] || '-') : '-' }}</td></tr>
+          <tr><td>订单状态</td><td>{{ SpOrderStatusText[order.status] || '未知状态' }}</td></tr>
+          <tr><td>下单时间</td><td>{{ formatDateTime(order.created_at) }}</td></tr>
+          <tr><td>支付时间</td><td>{{ formatOptionalDateTime(order.paid_at) }}</td></tr>
+          <tr><td>收货地址</td><td>{{ resolveDeliveryAddress() }}</td></tr>
+          <tr><td>联系人</td><td>{{ resolveContactInfo() }}</td></tr>
+          <tr v-if="order.remark"><td>订单备注</td><td>{{ order.remark }}</td></tr>
+        </tbody>
+      </table>
+      <h2 class="print-title">商品明细</h2>
+      <table class="print-table print-items">
+        <thead><tr><th>商品</th><th>规格</th><th>单价</th><th>数量</th><th>小计</th></tr></thead>
+        <tbody>
+          <tr v-for="item in order.items" :key="`${item.product_id}-${item.id || item.product_name}`">
+            <td>{{ item.product_name }}</td>
+            <td>{{ resolveSpecText(item) }}</td>
+            <td>¥{{ formatAmount(item.price) }}</td>
+            <td>x{{ item.quantity }}</td>
+            <td>¥{{ formatAmount(item.subtotal !== undefined ? item.subtotal : item.rental_subtotal) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <h2 class="print-title">金额明细</h2>
+      <table class="print-table">
+        <tbody>
+          <tr><td>商品金额</td><td>¥{{ formatAmount(order.total_amount) }}</td></tr>
+          <tr v-if="isRentalOrder"><td>押金</td><td>¥{{ formatAmount(order.total_deposit) }}</td></tr>
+          <tr><td>配送费</td><td>¥{{ formatAmount(order.delivery_fee) }}</td></tr>
+          <tr><td>优惠金额</td><td>-¥{{ formatAmount(order.discount_amount) }}</td></tr>
+          <tr class="print-total"><td>实付金额</td><td>¥{{ formatAmount(order.pay_amount) }}</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -629,6 +676,54 @@ onMounted(loadOrderDetail)
 @media (max-width: 1200px) {
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 打印：仅展示 .print-order，隐藏后台其余界面 */
+.print-order {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-order,
+  .print-order * {
+    visibility: visible;
+  }
+  .print-order {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 8px 0;
+    color: #111827;
+    font-size: 13px;
+  }
+  .print-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 12px 0 6px;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 4px;
+  }
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .print-table td,
+  .print-table th {
+    border: 1px solid #d1d5db;
+    padding: 5px 8px;
+    text-align: left;
+  }
+  .print-items th {
+    background: #f3f4f6;
+  }
+  .print-total td {
+    font-weight: 700;
   }
 }
 </style>

@@ -3,7 +3,7 @@ import { onMounted, ref, computed } from 'vue'
 import { onPullDownRefresh } from '@dcloudio/uni-app'
 import { staffWorkorderApi } from '@/api'
 import { OrderTypeText, WorkorderBizStatus } from '@/types'
-import { formatDate, fromNow } from '@/utils/format'
+import { formatDate, fromNow, calcAge } from '@/utils/format'
 
 const loading = ref(false)
 const stats = ref({
@@ -36,6 +36,14 @@ async function refresh() {
 
 function getOrderTypeText(type: number) {
   return OrderTypeText[type as keyof typeof OrderTypeText] || '未知'
+}
+
+// 服务对象展示文案：{姓名}{性别}{年龄}岁（有 real_name 才返回）
+function getServiceObjectText(item: any) {
+  const record = item?.customer?.record
+  if (!record?.real_name) return ''
+  const gender = record.gender === 1 ? '男' : record.gender === 2 ? '女' : ''
+  return `${record.real_name}${gender}${calcAge(record.birth_date)}岁`
 }
 
 function getBizStatusText(status: number) {
@@ -105,11 +113,21 @@ onMounted(refresh)
         </text>
       </view>
       <view class="todo-no">单号：{{ item.order_no }}</view>
-      <view class="todo-info" v-if="item.contact_name || item.contact_phone">
+      <view class="todo-info" v-if="getServiceObjectText(item)">
+        <text class="todo-service">服务对象</text>
+        <text>{{ getServiceObjectText(item) }}</text>
+      </view>
+      <view class="todo-info" v-if="item.customer?.record?.real_name && item.contact_name">
+        <text class="todo-service">下单人</text>
+        <text>{{ item.contact_name }}</text>
+        <text v-if="item.contact_phone" class="todo-phone">{{ item.contact_phone }}</text>
+      </view>
+      <view class="todo-info" v-else-if="item.contact_name">
         <text>{{ item.contact_name }}</text>
         <text v-if="item.contact_phone" class="todo-phone">{{ item.contact_phone }}</text>
       </view>
       <view class="todo-addr" v-if="item.delivery_address">{{ item.delivery_address }}</view>
+      <view class="todo-addr" v-if="item.scheduled_at">预约时间：{{ formatDate(item.scheduled_at) }}</view>
       <view class="todo-footer">
         <text class="todo-amount">¥{{ Number(item.pay_amount || 0).toFixed(2) }}</text>
         <text class="todo-time">{{ fromNow(item.actual_started_at || item.paid_at || item.created_at) }}</text>
@@ -188,6 +206,15 @@ onMounted(refresh)
   font-size: 28rpx;
   color: #333;
   margin-bottom: 4rpx;
+  .todo-service {
+    flex-shrink: 0;
+    font-size: 22rpx;
+    color: #fff;
+    background: var(--primary-color);
+    padding: 2rpx 12rpx;
+    border-radius: 6rpx;
+    align-self: center;
+  }
   .todo-phone { color: #666; }
 }
 .todo-addr {

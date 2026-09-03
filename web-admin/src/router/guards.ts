@@ -31,9 +31,17 @@ export function setupRouterGuards(router: Router, pinia: Pinia) {
       }
     }
 
-    // 页面级权限控制：meta.permission 定义所需权限码
-    const required = typeof to.meta.permission === 'string' ? to.meta.permission : ''
-    if (required && authStore.isAuthenticated && !authStore.hasPermission(required) && to.path !== '/dashboard') {
+    // 页面级权限控制：meta.permission 定义所需权限码（可为 string 或 string[]，数组时任一命中即放行）
+    const required = to.meta.permission
+    let hasRequired = false
+    if (typeof required === 'string') {
+      hasRequired = required ? authStore.hasPermission(required) : true
+    } else if (Array.isArray(required)) {
+      hasRequired = required.length === 0 || required.some((code) => authStore.hasPermission(code))
+    } else {
+      hasRequired = true
+    }
+    if (required && authStore.isAuthenticated && !hasRequired && to.path !== '/dashboard') {
       return '/dashboard'
     }
 

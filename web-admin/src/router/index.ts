@@ -6,7 +6,8 @@ import DashboardView from '@/views/dashboard/DashboardView.vue'
 import ProductsView from '@/views/product/ProductsView.vue'
 import ServiceProductsView from '@/views/product/ServiceProductsView.vue'
 import CategoriesView from '@/views/product/CategoriesView.vue'
-import OrderListView from '@/views/order/OrderListView.vue'
+import GoodsOrderListView from '@/views/order/GoodsOrderListView.vue'
+import ServiceOrderListView from '@/views/order/ServiceOrderListView.vue'
 import OrderDetailView from '@/views/order/OrderDetailView.vue'
 import RentalDueListView from '@/views/order/RentalDueListView.vue'
 import ServiceStaffListView from '@/views/staff/ServiceStaffListView.vue'
@@ -17,11 +18,14 @@ import MenuManagementView from '@/views/system/MenuManagementView.vue'
 import RoleManagementView from '@/views/system/RoleManagementView.vue'
 import DepartmentManagementView from '@/views/system/DepartmentManagementView.vue'
 import StaffManagementView from '@/views/system/StaffManagementView.vue'
+import PrinterManageView from '@/views/system/PrinterManageView.vue'
+import SystemConfigView from '@/views/system/SystemConfigView.vue'
 import HealthRecordsView from '@/views/health/HealthRecordsView.vue'
 import HealthAssessmentFormsView from '@/views/health/HealthAssessmentFormsView.vue'
 import HealthAssessmentsView from '@/views/health/HealthAssessmentsView.vue'
 import FittingRecommendationsView from '@/views/health/FittingRecommendationsView.vue'
 import MiniProgramBannersView from '@/views/miniprogram/MiniProgramBannersView.vue'
+import HomeRecommendView from '@/views/miniprogram/HomeRecommendView.vue'
 import CouponTemplatesView from '@/views/marketing/CouponTemplatesView.vue'
 // 服务过程安全（PRD V2.0 阶段三）
 import AlertEventsView from '@/views/safety/AlertEventsView.vue'
@@ -52,8 +56,19 @@ const routes = [
       {
         path: '/orders',
         name: 'orders',
-        component: OrderListView,
-        meta: { title: '订单管理', requiresAuth: true, permission: 'orders:view' }
+        redirect: '/orders/goods'
+      },
+      {
+        path: '/orders/goods',
+        name: 'orders-goods',
+        component: GoodsOrderListView,
+        meta: { title: '实物订单', requiresAuth: true, permission: 'order:goods' }
+      },
+      {
+        path: '/orders/service',
+        name: 'orders-service',
+        component: ServiceOrderListView,
+        meta: { title: '服务订单', requiresAuth: true, permission: 'order:service' }
       },
       {
         path: '/orders/rental-due',
@@ -65,7 +80,7 @@ const routes = [
         path: '/orders/:id',
         name: 'order-detail',
         component: OrderDetailView,
-        meta: { title: '订单详情', requiresAuth: true, permission: 'orders:view' }
+        meta: { title: '订单详情', requiresAuth: true, permission: ['order:goods', 'order:service', 'orders:view'] }
       },
       {
         path: '/products',
@@ -143,6 +158,12 @@ const routes = [
         component: MiniProgramBannersView,
         meta: { title: '小程序轮播图', requiresAuth: true, permission: 'banners:view' }
       },
+      {
+        path: '/home-recommends',
+        name: 'home-recommends',
+        component: HomeRecommendView,
+        meta: { title: '首页推荐', requiresAuth: true, permission: 'home-recommend:view' }
+      },
       // 系统管理（RBAC）
       {
         path: '/system/menus',
@@ -167,6 +188,18 @@ const routes = [
         name: 'system-staff',
         component: StaffManagementView,
         meta: { title: '员工管理', requiresAuth: true, permission: 'system:staff:view' }
+      },
+      {
+        path: '/system/printers',
+        name: 'system-printers',
+        component: PrinterManageView,
+        meta: { title: '打印机管理', requiresAuth: true, permission: 'printers:view' }
+      },
+      {
+        path: '/system/config',
+        name: 'system-config',
+        component: SystemConfigView,
+        meta: { title: '系统配置', requiresAuth: true, permission: 'systemconfig:view' }
       },
       // 健康服务（基层健康服务闭环）
       {

@@ -71,9 +71,12 @@ type Merchant struct {
 	BusinessCategory     string    `gorm:"size:64;comment:经营类目" json:"business_category"`
 	BusinessHours        string    `gorm:"size:64;comment:营业时间描述" json:"business_hours"`
 	Announcement         string    `gorm:"type:text;comment:商家公告" json:"announcement"`
-	SubMchID            string  `gorm:"size:32;comment:微信支付子商户号(线下进件后回填)" json:"sub_mch_id"`
-	PaymentConfigStatus uint8   `gorm:"not null;default:0;comment:支付配置状态: 0=未完成配置 1=已完成配置(已回填sub_mch_id)" json:"payment_config_status"`
-	ProfitSharingEnabled bool  `gorm:"not null;default:false;comment:是否开启自动分账: true=开启 false=关闭" json:"profit_sharing_enabled"`
+	TakeoutEnabled       bool      `gorm:"not null;default:true;comment:是否支持配送" json:"takeout_enabled"`
+	DineInEnabled        bool      `gorm:"not null;default:true;comment:是否支持堂食" json:"dine_in_enabled"`
+	PickupEnabled        bool      `gorm:"not null;default:true;comment:是否支持自提" json:"pickup_enabled"`
+	SubMchID             string    `gorm:"size:32;comment:微信支付子商户号(线下进件后回填)" json:"sub_mch_id"`
+	PaymentConfigStatus  uint8     `gorm:"not null;default:0;comment:支付配置状态: 0=未完成配置 1=已完成配置(已回填sub_mch_id)" json:"payment_config_status"`
+	ProfitSharingEnabled bool      `gorm:"not null;default:false;comment:是否开启自动分账: true=开启 false=关闭" json:"profit_sharing_enabled"`
 	Status               uint8     `gorm:"not null;default:1;comment:营业状态: 1=营业中 0=休息中" json:"status"`
 	Rating               float64   `gorm:"type:decimal(2,1);not null;default:5.0;comment:商家评分(1.0-5.0)" json:"rating"`
 	SalesCount           uint      `gorm:"not null;default:0;comment:累计销量" json:"sales_count"`
@@ -109,23 +112,23 @@ func (MerchantDeliverySettings) TableName() string {
 // 用途：商家端登录账号，支持owner/staff角色与微信快捷登录
 // ============================================
 type MerchantStaff struct {
-	ID                  uint64     `gorm:"primaryKey;autoIncrement;comment:员工ID" json:"id"`
-	Username            string     `gorm:"size:64;not null;comment:登录用户名" json:"username"`
-	Password            string     `gorm:"size:128;not null;comment:加密密码(不返回)" json:"-"`
-	Name                string     `gorm:"size:64;comment:员工显示名称" json:"name"`
-	Phone               string     `gorm:"size:20;comment:员工手机号" json:"phone"`
-	OpenID              string     `gorm:"column:openid;size:64;comment:微信OpenID(用于快捷登录)" json:"openid"`
-	UnionID             string     `gorm:"column:unionid;size:64;comment:微信UnionID" json:"unionid"`
-	WechatBoundAt       *time.Time `gorm:"comment:微信绑定时间" json:"wechat_bound_at"`
-	Role                string     `gorm:"size:32;not null;default:staff;comment:角色: owner=店主(可管理员工) staff=普通员工" json:"role"`
-	NotifyEnabled       bool       `gorm:"not null;default:true;comment:是否开启新订单声音提醒: true=开启 false=关闭" json:"notify_enabled"`
-	BrowseNotifyEnabled bool       `gorm:"not null;default:true;comment:是否开启用户进店声音提醒: true=开启 false=关闭" json:"browse_notify_enabled"`
-	Status              uint8      `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
-	DepartmentID        *uint64    `gorm:"comment:部门ID(sys_departments.id)" json:"department_id"`
-	LastLoginAt         *time.Time `gorm:"comment:最后账号密码登录时间" json:"last_login_at"`
-	LastWechatLoginAt   *time.Time `gorm:"comment:最后微信快捷登录时间" json:"last_wechat_login_at"`
-	CreatedAt           time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt           time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	ID                  uint64         `gorm:"primaryKey;autoIncrement;comment:员工ID" json:"id"`
+	Username            string         `gorm:"size:64;not null;comment:登录用户名" json:"username"`
+	Password            string         `gorm:"size:128;not null;comment:加密密码(不返回)" json:"-"`
+	Name                string         `gorm:"size:64;comment:员工显示名称" json:"name"`
+	Phone               string         `gorm:"size:20;comment:员工手机号" json:"phone"`
+	OpenID              string         `gorm:"column:openid;size:64;comment:微信OpenID(用于快捷登录)" json:"openid"`
+	UnionID             string         `gorm:"column:unionid;size:64;comment:微信UnionID" json:"unionid"`
+	WechatBoundAt       *time.Time     `gorm:"comment:微信绑定时间" json:"wechat_bound_at"`
+	Role                string         `gorm:"size:32;not null;default:staff;comment:角色: owner=店主(可管理员工) staff=普通员工" json:"role"`
+	NotifyEnabled       bool           `gorm:"not null;default:true;comment:是否开启新订单声音提醒: true=开启 false=关闭" json:"notify_enabled"`
+	BrowseNotifyEnabled bool           `gorm:"not null;default:true;comment:是否开启用户进店声音提醒: true=开启 false=关闭" json:"browse_notify_enabled"`
+	Status              uint8          `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
+	DepartmentID        *uint64        `gorm:"comment:部门ID(sys_departments.id)" json:"department_id"`
+	LastLoginAt         *time.Time     `gorm:"comment:最后账号密码登录时间" json:"last_login_at"`
+	LastWechatLoginAt   *time.Time     `gorm:"comment:最后微信快捷登录时间" json:"last_wechat_login_at"`
+	CreatedAt           time.Time      `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt           time.Time      `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
 	Department          *SysDepartment `gorm:"foreignKey:DepartmentID" json:"department,omitempty"`
 	Roles               []SysRole      `gorm:"many2many:merchant_staff_roles;joinForeignKey:staff_id;joinReferences:role_id" json:"roles,omitempty"`
 }
@@ -139,16 +142,16 @@ func (MerchantStaff) TableName() string {
 // 用途：商家商品分类管理，支持排序与上下架
 // ============================================
 type Category struct {
-	ID           uint64        `gorm:"primaryKey;autoIncrement;comment:分类ID" json:"id"`
-	Name         string        `gorm:"size:64;not null;comment:分类名称" json:"name"`
-	ParentID     *uint64       `gorm:"index;comment:父分类ID(空=一级)" json:"parent_id"`
-	Level        uint8         `gorm:"not null;default:1;comment:层级: 1=一级 2=二级 3=三级" json:"level"`
-	CategoryType uint8         `gorm:"not null;default:1;comment:分类类型: 1=商品分类 2=服务分类" json:"category_type"`
-	Sort         uint          `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
-	Status       uint8         `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
-	CreatedAt    time.Time     `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt    time.Time     `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-	Children     []*Category   `gorm:"-" json:"children,omitempty"`
+	ID           uint64      `gorm:"primaryKey;autoIncrement;comment:分类ID" json:"id"`
+	Name         string      `gorm:"size:64;not null;comment:分类名称" json:"name"`
+	ParentID     *uint64     `gorm:"index;comment:父分类ID(空=一级)" json:"parent_id"`
+	Level        uint8       `gorm:"not null;default:1;comment:层级: 1=一级 2=二级 3=三级" json:"level"`
+	CategoryType uint8       `gorm:"not null;default:1;comment:分类类型: 1=商品分类 2=服务分类" json:"category_type"`
+	Sort         uint        `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
+	Status       uint8       `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
+	CreatedAt    time.Time   `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt    time.Time   `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	Children     []*Category `gorm:"-" json:"children,omitempty"`
 }
 
 func (Category) TableName() string {
@@ -160,30 +163,30 @@ func (Category) TableName() string {
 // 用途：商家商品信息，包含价格、库存、规格与上下架状态
 // ============================================
 type Product struct {
-	ID                 uint64        `gorm:"primaryKey;autoIncrement;comment:商品ID" json:"id"`
-	CategoryID         *uint64       `gorm:"index;comment:所属分类ID(可为空)" json:"category_id"`
-	Name               string        `gorm:"size:128;not null;comment:商品名称" json:"name"`
-	Description        string        `gorm:"type:text;comment:商品描述" json:"description"`
-	Images             JSON          `gorm:"type:json;comment:商品图片URL数组JSON" json:"images"`
-	Price              float64       `gorm:"type:decimal(10,2);not null;comment:商品基础价格(元)" json:"price"`
-	OriginalPrice      float64       `gorm:"type:decimal(10,2);comment:划线原价(元,0表示不展示)" json:"original_price"`
-	Stock              uint          `gorm:"not null;default:0;comment:库存数量" json:"stock"`
-	Unit               string        `gorm:"size:16;not null;default:份;comment:计量单位" json:"unit"`
-	ProductType        uint8         `gorm:"not null;default:1;comment:商品类型: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务" json:"product_type"`
-	ServiceContent     JSON          `gorm:"type:json;comment:服务内容配置JSON" json:"service_content"`
-	SaleType           uint8         `gorm:"not null;default:1;comment:销售类型: 1=一口价 2=租赁" json:"sale_type"`
-	RentalUnit         uint8         `gorm:"not null;default:0;comment:租赁计费周期: 0=非租赁 1=按天 2=按周 3=按月" json:"rental_unit"`
-	RentalPrice        float64       `gorm:"type:decimal(10,2);not null;default:0;comment:单位租金(元)" json:"rental_price"`
-	Deposit            float64       `gorm:"type:decimal(10,2);not null;default:0;comment:押金(元)" json:"deposit"`
-	MaxRentalDuration  uint          `gorm:"not null;default:0;comment:最大租赁时长(0=不限)" json:"max_rental_duration"`
-	Sales              uint          `gorm:"not null;default:0;comment:累计销量" json:"sales"`
-	Sort               uint          `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
-	Status             uint8         `gorm:"not null;default:1;comment:状态: 1=上架 2=下架" json:"status"`
-	DeletedAt          *time.Time    `gorm:"comment:软删除时间" json:"deleted_at"`
-	CreatedAt          time.Time     `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt          time.Time     `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-	Category           *Category     `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
-	Specs              []ProductSpec `gorm:"foreignKey:ProductID;references:ID" json:"specs,omitempty"`
+	ID                uint64        `gorm:"primaryKey;autoIncrement;comment:商品ID" json:"id"`
+	CategoryID        *uint64       `gorm:"index;comment:所属分类ID(可为空)" json:"category_id"`
+	Name              string        `gorm:"size:128;not null;comment:商品名称" json:"name"`
+	Description       string        `gorm:"type:text;comment:商品描述" json:"description"`
+	Images            JSON          `gorm:"type:json;comment:商品图片URL数组JSON" json:"images"`
+	Price             float64       `gorm:"type:decimal(10,2);not null;comment:商品基础价格(元)" json:"price"`
+	OriginalPrice     float64       `gorm:"type:decimal(10,2);comment:划线原价(元,0表示不展示)" json:"original_price"`
+	Stock             uint          `gorm:"not null;default:0;comment:库存数量" json:"stock"`
+	Unit              string        `gorm:"size:16;not null;default:份;comment:计量单位" json:"unit"`
+	ProductType       uint8         `gorm:"not null;default:1;comment:商品类型: 1=辅具零售 2=辅具租赁 3=康养套餐 4=陪诊服务" json:"product_type"`
+	ServiceContent    JSON          `gorm:"type:json;comment:服务内容配置JSON" json:"service_content"`
+	SaleType          uint8         `gorm:"not null;default:1;comment:销售类型: 1=一口价 2=租赁" json:"sale_type"`
+	RentalUnit        uint8         `gorm:"not null;default:0;comment:租赁计费周期: 0=非租赁 1=按天 2=按周 3=按月" json:"rental_unit"`
+	RentalPrice       float64       `gorm:"type:decimal(10,2);not null;default:0;comment:单位租金(元)" json:"rental_price"`
+	Deposit           float64       `gorm:"type:decimal(10,2);not null;default:0;comment:押金(元)" json:"deposit"`
+	MaxRentalDuration uint          `gorm:"not null;default:0;comment:最大租赁时长(0=不限)" json:"max_rental_duration"`
+	Sales             uint          `gorm:"not null;default:0;comment:累计销量" json:"sales"`
+	Sort              uint          `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
+	Status            uint8         `gorm:"not null;default:1;comment:状态: 1=上架 2=下架" json:"status"`
+	DeletedAt         *time.Time    `gorm:"comment:软删除时间" json:"deleted_at"`
+	CreatedAt         time.Time     `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt         time.Time     `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	Category          *Category     `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	Specs             []ProductSpec `gorm:"foreignKey:ProductID;references:ID" json:"specs,omitempty"`
 }
 
 func (Product) TableName() string {
@@ -260,13 +263,13 @@ type UserBehaviorEvent struct {
 	ID        uint64    `gorm:"primaryKey;autoIncrement;comment:事件ID" json:"id"`
 	UserID    uint64    `gorm:"not null;index;comment:用户ID" json:"user_id"`
 	OpenID    string    `gorm:"column:openid;size:64;index;comment:微信OpenID" json:"openid"`
-	EventType  string    `gorm:"size:32;not null;index;comment:事件类型: page_view=页面浏览 product_view=商品查看 submit_order=提交订单 pay_success=支付成功" json:"event_type"`
-	Page       string    `gorm:"size:64;comment:页面标识(如store_home/store_product)" json:"page"`
-	ProductID  *uint64   `gorm:"index;comment:关联商品ID(商品查看事件)" json:"product_id"`
-	OrderID    *uint64   `gorm:"index;comment:关联订单ID(下单/支付事件)" json:"order_id"`
-	Source     string    `gorm:"size:32;comment:事件来源: scan=扫码 direct=直接进入" json:"source"`
-	Payload    JSON      `gorm:"type:json;comment:事件附加数据JSON" json:"payload"`
-	CreatedAt  time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	EventType string    `gorm:"size:32;not null;index;comment:事件类型: page_view=页面浏览 product_view=商品查看 submit_order=提交订单 pay_success=支付成功" json:"event_type"`
+	Page      string    `gorm:"size:64;comment:页面标识(如store_home/store_product)" json:"page"`
+	ProductID *uint64   `gorm:"index;comment:关联商品ID(商品查看事件)" json:"product_id"`
+	OrderID   *uint64   `gorm:"index;comment:关联订单ID(下单/支付事件)" json:"order_id"`
+	Source    string    `gorm:"size:32;comment:事件来源: scan=扫码 direct=直接进入" json:"source"`
+	Payload   JSON      `gorm:"type:json;comment:事件附加数据JSON" json:"payload"`
+	CreatedAt time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
 }
 
 func (UserBehaviorEvent) TableName() string {
@@ -278,61 +281,94 @@ func (UserBehaviorEvent) TableName() string {
 // 用途：C端用户订单核心数据，包含金额、配送信息与状态流转
 // ============================================
 type Order struct {
-	ID                   uint64      `gorm:"primaryKey;autoIncrement;comment:订单ID" json:"id"`
-	OrderNo              string      `gorm:"size:32;uniqueIndex;not null;comment:订单编号" json:"order_no"`
-	UserID               uint64      `gorm:"not null;index;comment:下单用户ID" json:"user_id"`
-	OrderType            uint8       `gorm:"not null;default:1;comment:订单类型: 1=普通商品 2=租赁商品 3=即时服务 4=预约服务 5=上门服务 6=到店服务" json:"order_type"`
-	BizStatus            uint8       `gorm:"not null;default:0;comment:业务状态: 0=无 1=待接单 2=已接单 3=服务中 4=待支付(尾款) 5=已完成 6=已取消" json:"biz_status"`
-	ScheduledAt          *time.Time  `gorm:"comment:预约服务时间" json:"scheduled_at"`
-	AssignedStaffID      *uint64     `gorm:"index;comment:指派服务员工ID" json:"assigned_staff_id"`
-	AssignedAt           *time.Time  `gorm:"comment:指派/接单时间" json:"assigned_at"`
-	ActualStartedAt      *time.Time  `gorm:"comment:实际开始时间" json:"actual_started_at"`
-	ActualEndedAt        *time.Time  `gorm:"comment:实际结束时间" json:"actual_ended_at"`
-	TotalAmount          float64     `gorm:"type:decimal(10,2);not null;default:0;comment:商品总金额(元)" json:"total_amount"`
-	DeliveryFee          float64     `gorm:"type:decimal(10,2);not null;default:0;comment:配送费(元)" json:"delivery_fee"`
-	DiscountAmount       float64     `gorm:"type:decimal(10,2);not null;default:0;comment:优惠减免金额(元)" json:"discount_amount"`
-	PayAmount            float64     `gorm:"type:decimal(10,2);not null;default:0;comment:实付金额(元)=总金额+配送费-优惠+押金" json:"pay_amount"`
-	TotalDeposit         float64     `gorm:"type:decimal(10,2);not null;default:0;comment:总押金(元)" json:"total_deposit"`
-	DepositStatus        uint8       `gorm:"not null;default:0;comment:押金状态: 0=无押金 1=已收 2=已退 3=部分扣除" json:"deposit_status"`
-	DepositRefundAmount  float64     `gorm:"type:decimal(10,2);not null;default:0;comment:押金退还金额" json:"deposit_refund_amount"`
-	DepositDeductAmount  float64     `gorm:"type:decimal(10,2);not null;default:0;comment:押金扣除总额(损坏赔偿)" json:"deposit_deduct_amount"`
-	DepositRefundedAt    *time.Time  `gorm:"comment:押金退还时间" json:"deposit_refunded_at"`
-	RentalReturnedAt     *time.Time  `gorm:"comment:租赁归还时间" json:"rental_returned_at"`
-	RentalReturnRemark   string      `gorm:"size:256;comment:归还备注(验机情况)" json:"rental_return_remark"`
-	RentalEndAt          *time.Time  `gorm:"index;comment:租赁到期时间(支付时=paid_at+租赁时长)" json:"rental_end_at"`
-	ParentOrderID        *uint64     `gorm:"index;comment:续租关联原订单ID(0/空=普通订单)" json:"parent_order_id,omitempty"`
-	RenewFlag            uint8       `gorm:"not null;default:0;comment:是否续租单: 1=续租 0=非" json:"renew_flag"`
-	AssignedStaffName    string      `gorm:"-" json:"assigned_staff_name"`
-	RecordID             *uint64     `gorm:"index;comment:服务订单绑定的健康档案ID(服务单必填)" json:"record_id,omitempty"`
-	RecordName           string      `gorm:"-" json:"record_name,omitempty"`
-	RecordGender         uint8       `gorm:"-" json:"record_gender,omitempty"`
-	RecordBirthDate      string      `gorm:"-" json:"record_birth_date,omitempty"`
-	DeliveryDistrict     string      `gorm:"size:32;comment:收货区县(服务订单区域匹配用)" json:"delivery_district"`
-	DeliveryAddress      string      `gorm:"size:256;comment:收货地址(配送时填写)" json:"delivery_address"`
-	ContactName          string      `gorm:"size:64;comment:联系人姓名(配送时填写)" json:"contact_name"`
-	ContactPhone         string      `gorm:"size:20;comment:联系电话(配送时填写)" json:"contact_phone"`
-	Status               uint8       `gorm:"not null;default:1;comment:订单状态: 1=待支付 2=已支付 3=已完成 4=已取消 5=退款中 6=已退款" json:"status"`
-	CanReview            bool        `gorm:"-" json:"can_review,omitempty"` // 待评价标记（服务订单已完成且未评价，瞬时字段）
-	Remark               string      `gorm:"size:256;comment:用户备注" json:"remark"`
-	TransactionID        string      `gorm:"size:64;comment:微信支付交易单号" json:"transaction_id"`
-	PaidAt               *time.Time  `gorm:"comment:支付完成时间" json:"paid_at"`
-	PayNotifyPayload     JSON        `gorm:"type:json;comment:微信支付回调原始报文JSON" json:"pay_notify_payload"`
-	ProfitSharingStatus  uint8       `gorm:"not null;default:0;comment:分账状态:0未分账1分账中2分账成功3分账失败4已跳过" json:"profit_sharing_status"`
-	ProfitSharingAmount  float64     `gorm:"type:decimal(10,2);not null;default:0;comment:分账总额(元)" json:"profit_sharing_amount"`
-	ProfitSharingOrderNo string      `gorm:"size:64;comment:微信分账单号" json:"profit_sharing_order_no"`
-	ProfitSharingAt      *time.Time  `gorm:"comment:分账完成时间" json:"profit_sharing_at"`
-	ProfitSharingError   string      `gorm:"size:512;comment:分账失败原因" json:"profit_sharing_error"`
-	CompletedAt          *time.Time  `gorm:"comment:核销完成时间" json:"completed_at"`
-	CancelledAt          *time.Time  `gorm:"comment:取消时间" json:"cancelled_at"`
-	RefundedAt           *time.Time  `gorm:"comment:退款完成时间(status=6时写入)" json:"refunded_at"`
-	CreatedAt            time.Time   `gorm:"autoCreateTime;index;comment:创建时间" json:"created_at"`
-	UpdatedAt            time.Time   `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-	User                 *User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Items                []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
+	ID                   uint64        `gorm:"primaryKey;autoIncrement;comment:订单ID" json:"id"`
+	OrderNo              string        `gorm:"size:32;uniqueIndex;not null;comment:订单编号" json:"order_no"`
+	UserID               uint64        `gorm:"not null;index;comment:下单用户ID" json:"user_id"`
+	OrderType            uint8         `gorm:"not null;default:1;comment:订单类型: 1=普通商品 2=租赁商品 3=即时服务 4=预约服务 5=上门服务 6=到店服务" json:"order_type"`
+	BizStatus            uint8         `gorm:"not null;default:0;comment:业务状态: 0=无 1=待接单 2=已接单 3=服务中 5=已完成 6=已取消 (4 为历史保留位)" json:"biz_status"`
+	ScheduledAt          *time.Time    `gorm:"comment:预约服务时间" json:"scheduled_at"`
+	AssignedStaffID      *uint64       `gorm:"index;comment:指派服务员工ID" json:"assigned_staff_id"`
+	AssignedAt           *time.Time    `gorm:"comment:指派/接单时间" json:"assigned_at"`
+	ActualStartedAt      *time.Time    `gorm:"comment:实际开始时间" json:"actual_started_at"`
+	ActualEndedAt        *time.Time    `gorm:"comment:实际结束时间" json:"actual_ended_at"`
+	TotalAmount          float64       `gorm:"type:decimal(10,2);not null;default:0;comment:商品总金额(元)" json:"total_amount"`
+	DeliveryFee          float64       `gorm:"type:decimal(10,2);not null;default:0;comment:配送费(元)" json:"delivery_fee"`
+	DiscountAmount       float64       `gorm:"type:decimal(10,2);not null;default:0;comment:优惠减免金额(元)" json:"discount_amount"`
+	PayAmount            float64       `gorm:"type:decimal(10,2);not null;default:0;comment:实付金额(元)=总金额+配送费-优惠+押金" json:"pay_amount"`
+	TotalDeposit         float64       `gorm:"type:decimal(10,2);not null;default:0;comment:总押金(元)" json:"total_deposit"`
+	DepositStatus        uint8         `gorm:"not null;default:0;comment:押金状态: 0=无押金 1=已收 2=已退 3=部分扣除" json:"deposit_status"`
+	DepositRefundAmount  float64       `gorm:"type:decimal(10,2);not null;default:0;comment:押金退还金额" json:"deposit_refund_amount"`
+	DepositDeductAmount  float64       `gorm:"type:decimal(10,2);not null;default:0;comment:押金扣除总额(损坏赔偿)" json:"deposit_deduct_amount"`
+	DepositRefundedAt    *time.Time    `gorm:"comment:押金退还时间" json:"deposit_refunded_at"`
+	RentalReturnedAt     *time.Time    `gorm:"comment:租赁归还时间" json:"rental_returned_at"`
+	RentalReturnRemark   string        `gorm:"size:256;comment:归还备注(验机情况)" json:"rental_return_remark"`
+	RentalEndAt          *time.Time    `gorm:"index;comment:租赁到期时间(支付时=paid_at+租赁时长)" json:"rental_end_at"`
+	ParentOrderID        *uint64       `gorm:"index;comment:续租关联原订单ID(0/空=普通订单)" json:"parent_order_id,omitempty"`
+	RenewFlag            uint8         `gorm:"not null;default:0;comment:是否续租单: 1=续租 0=非" json:"renew_flag"`
+	AssignedStaffName    string        `gorm:"-" json:"assigned_staff_name"`
+	RecordID             *uint64       `gorm:"index;comment:服务订单绑定的健康档案ID(服务单必填)" json:"record_id,omitempty"`
+	RecordName           string        `gorm:"-" json:"record_name,omitempty"`
+	RecordGender         uint8         `gorm:"-" json:"record_gender,omitempty"`
+	RecordBirthDate      string        `gorm:"-" json:"record_birth_date,omitempty"`
+	DeliveryDistrict     string        `gorm:"size:32;comment:收货区县(服务订单区域匹配用)" json:"delivery_district"`
+	DeliveryAddress      string        `gorm:"size:256;comment:收货地址(配送时填写)" json:"delivery_address"`
+	ContactName          string        `gorm:"size:64;comment:联系人姓名(配送时填写)" json:"contact_name"`
+	ContactPhone         string        `gorm:"size:20;comment:联系电话(配送时填写)" json:"contact_phone"`
+	Status               uint8         `gorm:"not null;default:1;comment:订单状态: 1=待支付 2=已支付 3=已完成 4=已取消 5=退款中 6=已退款" json:"status"`
+	CanReview            bool          `gorm:"-" json:"can_review,omitempty"` // 待评价标记（服务订单已完成且未评价，瞬时字段）
+	Remark               string        `gorm:"size:256;comment:用户备注" json:"remark"`
+	TransactionID        string        `gorm:"size:64;comment:微信支付交易单号" json:"transaction_id"`
+	PaidAt               *time.Time    `gorm:"comment:支付完成时间" json:"paid_at"`
+	PayNotifyPayload     JSON          `gorm:"type:json;comment:微信支付回调原始报文JSON" json:"pay_notify_payload"`
+	ProfitSharingStatus  uint8         `gorm:"not null;default:0;comment:分账状态:0未分账1分账中2分账成功3分账失败4已跳过" json:"profit_sharing_status"`
+	ProfitSharingAmount  float64       `gorm:"type:decimal(10,2);not null;default:0;comment:分账总额(元)" json:"profit_sharing_amount"`
+	ProfitSharingOrderNo string        `gorm:"size:64;comment:微信分账单号" json:"profit_sharing_order_no"`
+	ProfitSharingAt      *time.Time    `gorm:"comment:分账完成时间" json:"profit_sharing_at"`
+	ProfitSharingError   string        `gorm:"size:512;comment:分账失败原因" json:"profit_sharing_error"`
+	CompletedAt          *time.Time    `gorm:"comment:核销完成时间" json:"completed_at"`
+	CancelledAt          *time.Time    `gorm:"comment:取消时间" json:"cancelled_at"`
+	RefundedAt           *time.Time    `gorm:"comment:退款完成时间(status=6时写入)" json:"refunded_at"`
+	CreatedAt            time.Time     `gorm:"autoCreateTime;index;comment:创建时间" json:"created_at"`
+	UpdatedAt            time.Time     `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	User                 *User         `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Items                []OrderItem   `gorm:"foreignKey:OrderID" json:"items,omitempty"`
+	Customer             *CustomerInfo `gorm:"-" json:"customer,omitempty"`
 }
 
 func (Order) TableName() string {
 	return "orders"
+}
+
+// CustomerInfo 服务人员工单详情增强展示信息（瞬态字段，不含身份证等敏感信息）
+type CustomerInfo struct {
+	User   *CustomerUser   `json:"user,omitempty"`
+	Record *CustomerRecord `json:"record,omitempty"`
+}
+
+// CustomerUser 下单用户增强展示信息
+type CustomerUser struct {
+	Nickname    string  `json:"nickname"`
+	Avatar      string  `json:"avatar"`
+	Phone       string  `json:"phone"`
+	TotalOrders uint    `json:"total_orders"`
+	TotalSpent  float64 `json:"total_spent"`
+}
+
+// CustomerRecord 服务订单绑定的健康档案展示信息（不含 id_card 等敏感字段）
+type CustomerRecord struct {
+	ID               uint64   `json:"id"`
+	RealName         string   `json:"real_name"`
+	Gender           uint8    `json:"gender"`
+	BirthDate        string   `json:"birth_date"`
+	Relation         uint8    `json:"relation"`
+	AssessmentLevel  string   `json:"assessment_level"`
+	Phone            string   `json:"phone"`
+	Address          string   `json:"address"`
+	AllergyHistory   []string `json:"allergy_history"`
+	ChronicTags      []string `json:"chronic_tags"`
+	MedicationList   []string `json:"medication_list"`
+	EmergencyContact string   `json:"emergency_contact"`
+	EmergencyPhone   string   `json:"emergency_phone"`
 }
 
 // ============================================
@@ -340,25 +376,25 @@ func (Order) TableName() string {
 // 用途：订单中的商品快照，记录下单时的商品名称、价格、规格与数量
 // ============================================
 type OrderItem struct {
-	ID               uint64    `gorm:"primaryKey;autoIncrement;comment:明细ID" json:"id"`
-	OrderID          uint64    `gorm:"not null;index;comment:所属订单ID" json:"order_id"`
-	ProductID        uint64    `gorm:"not null;index;comment:商品ID" json:"product_id"`
-	ProductName      string    `gorm:"size:128;not null;comment:商品名称(下单时快照)" json:"product_name"`
-	Image            string    `gorm:"size:512;comment:商品图片URL(下单时快照)" json:"image"`
-	Price            float64   `gorm:"type:decimal(10,2);not null;comment:商品单价(基础价+规格加价,下单时快照)" json:"price"`
-	Quantity         uint      `gorm:"not null;default:1;comment:购买数量" json:"quantity"`
-	SpecInfo         JSON      `gorm:"type:json;comment:规格信息JSON(下单时快照)" json:"spec_info"`
-	Subtotal         float64   `gorm:"type:decimal(10,2);not null;comment:小计金额(元)=单价×数量" json:"subtotal"`
-	SaleType         uint8     `gorm:"not null;default:1;comment:销售类型快照: 1=一口价 2=租赁" json:"sale_type"`
-	RentalUnit       uint8     `gorm:"not null;default:0;comment:租赁计费周期快照" json:"rental_unit"`
-	RentalDuration   uint      `gorm:"not null;default:0;comment:租赁时长" json:"rental_duration"`
-	UnitRentalPrice  float64   `gorm:"type:decimal(10,2);not null;default:0;comment:单位租金快照" json:"unit_rental_price"`
-	RentalSubtotal   float64   `gorm:"type:decimal(10,2);not null;default:0;comment:租金小计" json:"rental_subtotal"`
-	Deposit          float64   `gorm:"type:decimal(10,2);not null;default:0;comment:单商品押金快照" json:"deposit"`
-	DepositDeduct    float64   `gorm:"type:decimal(10,2);not null;default:0;comment:押金扣除金额" json:"deposit_deduct"`
-	CreatedAt        time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	Order            *Order    `gorm:"foreignKey:OrderID" json:"order,omitempty"`
-	Product          *Product  `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	ID              uint64    `gorm:"primaryKey;autoIncrement;comment:明细ID" json:"id"`
+	OrderID         uint64    `gorm:"not null;index;comment:所属订单ID" json:"order_id"`
+	ProductID       uint64    `gorm:"not null;index;comment:商品ID" json:"product_id"`
+	ProductName     string    `gorm:"size:128;not null;comment:商品名称(下单时快照)" json:"product_name"`
+	Image           string    `gorm:"size:512;comment:商品图片URL(下单时快照)" json:"image"`
+	Price           float64   `gorm:"type:decimal(10,2);not null;comment:商品单价(基础价+规格加价,下单时快照)" json:"price"`
+	Quantity        uint      `gorm:"not null;default:1;comment:购买数量" json:"quantity"`
+	SpecInfo        JSON      `gorm:"type:json;comment:规格信息JSON(下单时快照)" json:"spec_info"`
+	Subtotal        float64   `gorm:"type:decimal(10,2);not null;comment:小计金额(元)=单价×数量" json:"subtotal"`
+	SaleType        uint8     `gorm:"not null;default:1;comment:销售类型快照: 1=一口价 2=租赁" json:"sale_type"`
+	RentalUnit      uint8     `gorm:"not null;default:0;comment:租赁计费周期快照" json:"rental_unit"`
+	RentalDuration  uint      `gorm:"not null;default:0;comment:租赁时长" json:"rental_duration"`
+	UnitRentalPrice float64   `gorm:"type:decimal(10,2);not null;default:0;comment:单位租金快照" json:"unit_rental_price"`
+	RentalSubtotal  float64   `gorm:"type:decimal(10,2);not null;default:0;comment:租金小计" json:"rental_subtotal"`
+	Deposit         float64   `gorm:"type:decimal(10,2);not null;default:0;comment:单商品押金快照" json:"deposit"`
+	DepositDeduct   float64   `gorm:"type:decimal(10,2);not null;default:0;comment:押金扣除金额" json:"deposit_deduct"`
+	CreatedAt       time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	Order           *Order    `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Product         *Product  `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 
 func (OrderItem) TableName() string {
@@ -388,65 +424,70 @@ func (Refund) TableName() string {
 }
 
 // ============================================
-// 平台活动表 (activities)
-// 用途：服务商发布的运营活动，支持多种类型与跳转链接
-// ============================================
-type Activity struct {
-	ID        uint64     `gorm:"primaryKey;autoIncrement;comment:活动ID" json:"id"`
-	Type      string     `gorm:"size:16;not null;comment:活动类型" json:"type"`
-	Title     string     `gorm:"size:128;comment:活动标题" json:"title"`
-	Content   string     `gorm:"type:text;comment:活动内容" json:"content"`
-	Image     string     `gorm:"size:512;comment:活动封面图URL" json:"image"`
-	LinkType  string     `gorm:"size:16;comment:跳转类型: page=小程序页面 url=外部链接" json:"link_type"`
-	LinkValue string     `gorm:"size:256;comment:跳转目标值(页面路径或URL)" json:"link_value"`
-	Sort      uint       `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
-	Status    uint8      `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
-	StartTime *time.Time `gorm:"comment:活动开始时间" json:"start_time"`
-	EndTime   *time.Time `gorm:"comment:活动结束时间" json:"end_time"`
-	CreatedAt time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-}
-
-func (Activity) TableName() string {
-	return "activities"
-}
-
-// ============================================
 // 小程序轮播图表 (mini_program_banners)
 // 用途：商家配置 C 端小程序首页金刚区轮播图
 // ============================================
 type MiniProgramBanner struct {
-	ID        uint64    `gorm:"primaryKey;autoIncrement;comment:轮播图ID" json:"id"`
-	MerchantID uint64   `gorm:"not null;index;comment:所属商家ID" json:"merchant_id"`
-	Title     string    `gorm:"size:128;comment:轮播图标题(仅后台识别)" json:"title"`
-	Image     string    `gorm:"size:512;not null;comment:轮播图图片URL(七牛私有路径)" json:"image"`
-	LinkType  string    `gorm:"size:16;not null;default:'none';comment:跳转类型: none=无跳转 product=商品详情 category=分类页 url=外部链接" json:"link_type"`
-	LinkValue string    `gorm:"size:256;comment:跳转目标值: product=product_id category=空(跳分类tab) url=链接" json:"link_value"`
-	Sort      uint      `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
-	Status    uint8     `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
-	CreatedAt time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	ID         uint64    `gorm:"primaryKey;autoIncrement;comment:轮播图ID" json:"id"`
+	MerchantID uint64    `gorm:"not null;index;comment:所属商家ID" json:"merchant_id"`
+	Title      string    `gorm:"size:128;comment:轮播图标题(仅后台识别)" json:"title"`
+	Image      string    `gorm:"size:512;not null;comment:轮播图图片URL(七牛私有路径)" json:"image"`
+	LinkType   string    `gorm:"size:16;not null;default:'none';comment:跳转类型: none=无跳转 product=商品详情 category=分类页 url=外部链接" json:"link_type"`
+	LinkValue  string    `gorm:"size:256;comment:跳转目标值: product=product_id category=空(跳分类tab) url=链接" json:"link_value"`
+	Sort       uint      `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
+	Status     uint8     `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
+	CreatedAt  time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt  time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
 }
 
 func (MiniProgramBanner) TableName() string {
-	return "mini_program_banners"
+        return "mini_program_banners"
 }
 
 // ============================================
-// 系统公告表 (announcements)
-// 用途：发布的系统公告，所有商家可见
+// 小程序首页推荐商品/服务表 (store_home_recommends)
+// 用途：商家维度配置 C 端首页推荐项，可指向实物商品(产品类型1/2)或服务(产品类型3/4)
 // ============================================
-type Announcement struct {
-	ID        uint64    `gorm:"primaryKey;autoIncrement;comment:公告ID" json:"id"`
-	Title     string    `gorm:"size:128;not null;comment:公告标题" json:"title"`
-	Content   string    `gorm:"type:text;comment:公告内容" json:"content"`
-	Status    uint8     `gorm:"not null;default:1;comment:状态: 1=已发布 0=草稿/禁用" json:"status"`
-	CreatedAt time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+type HomeRecommend struct {
+	ID         uint64    `gorm:"primaryKey;autoIncrement;comment:推荐ID" json:"id"`
+	MerchantID uint64    `gorm:"not null;index;comment:所属商家ID" json:"merchant_id"`
+	ProductID  uint64    `gorm:"not null;comment:目标商品/服务ID(products.id)" json:"product_id"`
+	TargetType uint8     `gorm:"not null;default:1;comment:推荐对象类型: 1=实物商品(产品类型1/2) 2=服务(产品类型3/4)" json:"target_type"`
+	Title      string    `gorm:"size:128;comment:展示标题(空则用商品名)" json:"title"`
+	Sort       uint      `gorm:"not null;default:0;comment:排序值(越小越靠前)" json:"sort"`
+	Status     uint8     `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
+	CreatedAt  time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt  time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	Product    *Product  `gorm:"foreignKey:ProductID;references:ID" json:"product,omitempty"`
 }
 
-func (Announcement) TableName() string {
-	return "announcements"
+func (HomeRecommend) TableName() string {
+	return "store_home_recommends"
+}
+
+// ============================================
+// 打印机表 (printers)
+// 用途：商家的云打印设备配置，供 PC 后台管理
+// ============================================
+type Printer struct {
+	ID          uint64     `gorm:"primaryKey;autoIncrement;comment:打印机ID" json:"id"`
+	Name        string     `gorm:"size:64;not null;comment:打印机名称" json:"name"`
+	Type        uint8      `gorm:"not null;default:1;comment:类型: 1=飞鹅 2=通用云打印" json:"type"`
+	FeieUser    string     `gorm:"size:128;comment:飞鹅云账号" json:"feie_user"`
+	FeieUKey    string     `gorm:"size:128;comment:飞鹅云UKey(API密钥)" json:"feie_ukey"`
+	FeieSN      string     `gorm:"size:32;comment:飞鹅云打印机编号" json:"feie_sn"`
+	Status      uint8      `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
+	AutoPrint   bool       `gorm:"not null;default:false;comment:是否自动打印小票: true=自动 false=手动" json:"auto_print"`
+	IsDefault   bool       `gorm:"not null;default:false;comment:是否为默认打印机: true=默认 false=非默认" json:"is_default"`
+	PrintCount  uint       `gorm:"not null;default:0;comment:累计打印次数" json:"print_count"`
+	LastPrintAt *time.Time `gorm:"comment:最后打印时间" json:"last_print_at"`
+	Remark      string     `gorm:"size:256;comment:备注" json:"remark"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+}
+
+func (Printer) TableName() string {
+	return "printers"
 }
 
 // ============================================
@@ -517,22 +558,22 @@ func (UserAddress) TableName() string {
 // 用途：独立于商户员工的服务人员账号，用于接单小程序
 // ============================================
 type ServiceStaff struct {
-	ID            uint64     `gorm:"primaryKey;autoIncrement;comment:服务人员ID" json:"id"`
-	Username      string     `gorm:"size:64;not null;comment:登录用户名" json:"username"`
-	Password      string     `gorm:"size:128;not null;comment:加密密码(不返回)" json:"-"`
-	Name          string     `gorm:"size:64;comment:姓名" json:"name"`
-	Phone         string     `gorm:"size:20;comment:手机号" json:"phone"`
-	OpenID        string     `gorm:"column:openid;size:64;index;comment:微信OpenID(用于快捷登录)" json:"openid"`
-	Avatar        string     `gorm:"size:512;comment:头像URL" json:"avatar"`
-	Qualifications JSON     `gorm:"type:json;comment:资质材料列表JSON[{type,name,url}]" json:"qualifications,omitempty"`
-	ServiceRegion string     `gorm:"size:256;comment:服务区域(区县,逗号分隔,空=不限)" json:"service_region"`
-	QualityScore  float64    `gorm:"type:decimal(3,1);not null;default:5.0;comment:服务质量分(阶段四写入)" json:"quality_score"`
-	Status        uint8      `gorm:"not null;default:0;comment:状态: 0=待审核 1=启用 2=禁用" json:"status"`
-	AuditStatus   uint8      `gorm:"not null;default:0;comment:审核状态: 0=无/已通过 1=待审核(与status解耦)" json:"audit_status"`
-	PendingFields JSON       `gorm:"type:json;comment:审核中待变更字段快照" json:"pending_fields,omitempty"`
-	LastLoginAt   *time.Time `gorm:"comment:最后登录时间" json:"last_login_at"`
-	CreatedAt     time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt     time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	ID             uint64     `gorm:"primaryKey;autoIncrement;comment:服务人员ID" json:"id"`
+	Username       string     `gorm:"size:64;not null;comment:登录用户名" json:"username"`
+	Password       string     `gorm:"size:128;not null;comment:加密密码(不返回)" json:"-"`
+	Name           string     `gorm:"size:64;comment:姓名" json:"name"`
+	Phone          string     `gorm:"size:20;comment:手机号" json:"phone"`
+	OpenID         string     `gorm:"column:openid;size:64;index;comment:微信OpenID(用于快捷登录)" json:"openid"`
+	Avatar         string     `gorm:"size:512;comment:头像URL" json:"avatar"`
+	Qualifications JSON       `gorm:"type:json;comment:资质材料列表JSON[{type,name,url}]" json:"qualifications,omitempty"`
+	ServiceRegion  string     `gorm:"size:256;comment:服务区域(区县,逗号分隔,空=不限)" json:"service_region"`
+	QualityScore   float64    `gorm:"type:decimal(3,1);not null;default:5.0;comment:服务质量分(阶段四写入)" json:"quality_score"`
+	Status         uint8      `gorm:"not null;default:0;comment:状态: 0=待审核 1=启用 2=禁用" json:"status"`
+	AuditStatus    uint8      `gorm:"not null;default:0;comment:审核状态: 0=无/已通过 1=待审核(与status解耦)" json:"audit_status"`
+	PendingFields  JSON       `gorm:"type:json;comment:审核中待变更字段快照" json:"pending_fields,omitempty"`
+	LastLoginAt    *time.Time `gorm:"comment:最后登录时间" json:"last_login_at"`
+	CreatedAt      time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt      time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
 }
 
 func (ServiceStaff) TableName() string {
@@ -545,19 +586,19 @@ func (ServiceStaff) TableName() string {
 // 命名约定：服务人员相关表统一 `service_` 前缀（含 service_staffs）
 // ============================================
 type StaffAuditRecord struct {
-	ID            uint64     `gorm:"primaryKey;autoIncrement;comment:审核记录ID" json:"id"`
-	StaffID       uint64     `gorm:"not null;index;comment:服务人员ID" json:"staff_id"`
-	AuditType     uint8      `gorm:"not null;default:1;comment:审核类型:1=注册申请 2=信息变更 3=资质提交 4=状态变更" json:"audit_type"`
-	ApplyType     uint8      `gorm:"not null;default:1;comment:申请来源:1=自注册 2=PC添加 3=端上变更" json:"apply_type"`
-	BeforeData    JSON       `gorm:"type:json;comment:变更前字段快照" json:"before_data,omitempty"`
-	AfterData     JSON       `gorm:"type:json;comment:变更后字段快照" json:"after_data,omitempty"`
-	Qualifications JSON      `gorm:"type:json;comment:资质材料URL列表" json:"qualifications,omitempty"`
-	Status        uint8      `gorm:"not null;default:0;index;comment:审核状态:0=待审 1=通过 2=驳回" json:"status"`
-	ReviewerID    *uint64    `gorm:"comment:审核人工员ID(merchant_staffs.id)" json:"reviewer_id,omitempty"`
-	ReviewRemark  string     `gorm:"size:256;comment:审核备注" json:"review_remark"`
-	ReviewAt      *time.Time `gorm:"comment:审核时间" json:"review_at,omitempty"`
-	CreatedAt     time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt     time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	ID             uint64     `gorm:"primaryKey;autoIncrement;comment:审核记录ID" json:"id"`
+	StaffID        uint64     `gorm:"not null;index;comment:服务人员ID" json:"staff_id"`
+	AuditType      uint8      `gorm:"not null;default:1;comment:审核类型:1=注册申请 2=信息变更 3=资质提交 4=状态变更" json:"audit_type"`
+	ApplyType      uint8      `gorm:"not null;default:1;comment:申请来源:1=自注册 2=PC添加 3=端上变更" json:"apply_type"`
+	BeforeData     JSON       `gorm:"type:json;comment:变更前字段快照" json:"before_data,omitempty"`
+	AfterData      JSON       `gorm:"type:json;comment:变更后字段快照" json:"after_data,omitempty"`
+	Qualifications JSON       `gorm:"type:json;comment:资质材料URL列表" json:"qualifications,omitempty"`
+	Status         uint8      `gorm:"not null;default:0;index;comment:审核状态:0=待审 1=通过 2=驳回" json:"status"`
+	ReviewerID     *uint64    `gorm:"comment:审核人工员ID(merchant_staffs.id)" json:"reviewer_id,omitempty"`
+	ReviewRemark   string     `gorm:"size:256;comment:审核备注" json:"review_remark"`
+	ReviewAt       *time.Time `gorm:"comment:审核时间" json:"review_at,omitempty"`
+	CreatedAt      time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt      time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
 }
 
 func (StaffAuditRecord) TableName() string {
@@ -569,19 +610,19 @@ func (StaffAuditRecord) TableName() string {
 // 用途：服务订单完结时写入的签到/签退/录音快照（PRD V2.0 阶段三：服务过程安全）
 // ============================================
 type ServiceRecord struct {
-	ID                uint64     `gorm:"primaryKey;autoIncrement;comment:服务记录ID" json:"id"`
-	OrderID           uint64     `gorm:"not null;uniqueIndex;comment:订单ID" json:"order_id"`
-	StaffID           uint64     `gorm:"not null;index;comment:服务人员ID" json:"staff_id"`
-	StartTime         *time.Time `gorm:"comment:签到时间(orders快照)" json:"start_time"`
-	EndTime           *time.Time `gorm:"comment:签退时间(orders快照)" json:"end_time"`
-	GPSTrackURL       string     `gorm:"size:512;comment:轨迹聚合文件URL(可选)" json:"gps_track_url"`
-	AudioURL          string     `gorm:"size:512;comment:服务录音URL(七牛)" json:"audio_url"`
-	AudioUploadedAt   *time.Time `gorm:"comment:录音上传时间(30天清理依据)" json:"audio_uploaded_at"`
-	AudioDeletedAt    *time.Time `gorm:"comment:录音删除标记时间" json:"audio_deleted_at"`
-	SOSTriggered      uint8      `gorm:"not null;default:0;comment:是否触发SOS: 0=否 1=是" json:"sos_triggered"`
-	Status            uint8      `gorm:"not null;default:1;comment:状态: 1=正常 2=异常" json:"status"`
-	CreatedAt         time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt         time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	ID              uint64     `gorm:"primaryKey;autoIncrement;comment:服务记录ID" json:"id"`
+	OrderID         uint64     `gorm:"not null;uniqueIndex;comment:订单ID" json:"order_id"`
+	StaffID         uint64     `gorm:"not null;index;comment:服务人员ID" json:"staff_id"`
+	StartTime       *time.Time `gorm:"comment:签到时间(orders快照)" json:"start_time"`
+	EndTime         *time.Time `gorm:"comment:签退时间(orders快照)" json:"end_time"`
+	GPSTrackURL     string     `gorm:"size:512;comment:轨迹聚合文件URL(可选)" json:"gps_track_url"`
+	AudioURL        string     `gorm:"size:512;comment:服务录音URL(七牛)" json:"audio_url"`
+	AudioUploadedAt *time.Time `gorm:"comment:录音上传时间(30天清理依据)" json:"audio_uploaded_at"`
+	AudioDeletedAt  *time.Time `gorm:"comment:录音删除标记时间" json:"audio_deleted_at"`
+	SOSTriggered    uint8      `gorm:"not null;default:0;comment:是否触发SOS: 0=否 1=是" json:"sos_triggered"`
+	Status          uint8      `gorm:"not null;default:1;comment:状态: 1=正常 2=异常" json:"status"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt       time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
 }
 
 func (ServiceRecord) TableName() string {
@@ -645,12 +686,31 @@ type AlertSettings struct {
 	ServiceUnstartedMinutes int       `gorm:"not null;default:30;comment:指派超时未签到(分钟)" json:"service_unstarted_minutes"`
 	RentalOverdueHours      int       `gorm:"not null;default:24;comment:租赁逾期未归还(小时)" json:"rental_overdue_hours"`
 	RefundStuckHours        int       `gorm:"not null;default:24;comment:退款卡在处理中(小时)" json:"refund_stuck_hours"`
+	ServiceAudioRetainDays  int       `gorm:"not null;default:30;comment:服务录音保留天数(天)" json:"service_audio_retain_days"`
 	CreatedAt               time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt               time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (AlertSettings) TableName() string {
 	return "alert_settings"
+}
+
+// ============================================
+// 通用配置表 (system_configs)
+// 用途：通用 key-value + JSON + 备注 配置存储，供任意业务域复用。
+// 说明：原来 alert_settings 单行多列阈值已迁移为多条配置项（见 alertcfg 服务的 key 常量）。
+// ============================================
+type SystemConfig struct {
+	ID          uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	ConfigKey   string    `gorm:"size:100;not null;uniqueIndex;comment:配置键" json:"config_key"`
+	ConfigValue string    `gorm:"type:text;not null;comment:配置值(JSON)" json:"config_value"`
+	Remark      string    `gorm:"size:255;default:null;comment:备注" json:"remark"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (SystemConfig) TableName() string {
+	return "system_configs"
 }
 
 // ============================================
@@ -776,15 +836,15 @@ func (SysRoleMenu) TableName() string {
 // 用途：PC 管理端部门（树形），全局共享
 // ============================================
 type SysDepartment struct {
-	ID        uint64    `gorm:"primaryKey;autoIncrement;comment:部门ID" json:"id"`
-	ParentID  uint64    `gorm:"not null;default:0;comment:父部门ID(0=顶级)" json:"parent_id"`
-	Name      string    `gorm:"size:64;not null;comment:部门名称" json:"name"`
-	Leader    string    `gorm:"size:64;comment:负责人" json:"leader"`
-	Phone     string    `gorm:"size:20;comment:联系电话" json:"phone"`
-	Sort      uint      `gorm:"not null;default:0;comment:排序值" json:"sort"`
-	Status    uint8     `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
-	CreatedAt time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	ID        uint64          `gorm:"primaryKey;autoIncrement;comment:部门ID" json:"id"`
+	ParentID  uint64          `gorm:"not null;default:0;comment:父部门ID(0=顶级)" json:"parent_id"`
+	Name      string          `gorm:"size:64;not null;comment:部门名称" json:"name"`
+	Leader    string          `gorm:"size:64;comment:负责人" json:"leader"`
+	Phone     string          `gorm:"size:20;comment:联系电话" json:"phone"`
+	Sort      uint            `gorm:"not null;default:0;comment:排序值" json:"sort"`
+	Status    uint8           `gorm:"not null;default:1;comment:状态: 1=启用 0=禁用" json:"status"`
+	CreatedAt time.Time       `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt time.Time       `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
 	Children  []SysDepartment `gorm:"-" json:"children,omitempty"`
 }
 
@@ -811,34 +871,34 @@ func (MerchantStaffRole) TableName() string {
 // 用途：C端用户/服务人员维护的基础健康档案，评估后回写 assessment_level
 // ============================================
 type HealthRecord struct {
-	ID               uint64     `gorm:"primaryKey;autoIncrement;comment:档案ID" json:"id"`
-	UserID           uint64     `gorm:"not null;index:idx_health_records_user_id;comment:用户ID（多档案：普通索引）" json:"user_id"`
-	Relation         uint8      `gorm:"not null;default:1;comment:与账号关系:1本人2父母3其他亲属" json:"relation"`
-	RealName         string     `gorm:"size:64;comment:真实姓名" json:"real_name"`
-	Gender           uint8      `gorm:"not null;default:0;comment:性别:1男2女" json:"gender"`
-	BirthDate        string     `gorm:"size:16;comment:出生日期" json:"birth_date"`
-	IDCard           string     `gorm:"size:32;comment:身份证号" json:"id_card"`
-	Phone            string     `gorm:"size:20;comment:联系电话" json:"phone"`
-	EmergencyContact string     `gorm:"size:64;comment:紧急联系人" json:"emergency_contact"`
-	EmergencyPhone   string     `gorm:"size:20;comment:紧急联系电话" json:"emergency_phone"`
-	Address          string     `gorm:"size:256;comment:常住地址" json:"address"`
-	HeightCm         float64    `gorm:"type:decimal(5,1);comment:身高(cm)" json:"height_cm"`
-	WeightKg         float64    `gorm:"type:decimal(5,1);comment:体重(kg)" json:"weight_kg"`
-	BloodType        string     `gorm:"size:8;comment:血型" json:"blood_type"`
-	PastHistory      JSON       `gorm:"type:json;comment:既往病史数组" json:"past_history"`
-	AllergyHistory   JSON       `gorm:"type:json;comment:过敏史数组" json:"allergy_history"`
-	FamilyHistory    JSON       `gorm:"type:json;comment:家族病史数组" json:"family_history"`
-	SurgeryHistory   JSON       `gorm:"type:json;comment:手术史数组" json:"surgery_history"`
-	MedicationList   JSON       `gorm:"type:json;comment:长期用药数组" json:"medication_list"`
-	ChronicTags      JSON       `gorm:"type:json;comment:慢病标签数组" json:"chronic_tags"`
-	Smoking          string     `gorm:"size:32;comment:吸烟情况" json:"smoking"`
-	Drinking         string     `gorm:"size:32;comment:饮酒情况" json:"drinking"`
-	AssessmentLevel  string     `gorm:"size:32;comment:最近一次评估等级" json:"assessment_level"`
-	Remark           string     `gorm:"size:512;comment:备注" json:"remark"`
-	Status           uint8      `gorm:"not null;default:1;comment:0未建档1正常2已归档" json:"status"`
-	CreatedAt        time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt        time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-	User             *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	ID               uint64    `gorm:"primaryKey;autoIncrement;comment:档案ID" json:"id"`
+	UserID           uint64    `gorm:"not null;index:idx_health_records_user_id;comment:用户ID（多档案：普通索引）" json:"user_id"`
+	Relation         uint8     `gorm:"not null;default:1;comment:与账号关系:1本人2父母3其他亲属" json:"relation"`
+	RealName         string    `gorm:"size:64;comment:真实姓名" json:"real_name"`
+	Gender           uint8     `gorm:"not null;default:0;comment:性别:1男2女" json:"gender"`
+	BirthDate        string    `gorm:"size:16;comment:出生日期" json:"birth_date"`
+	IDCard           string    `gorm:"size:32;comment:身份证号" json:"id_card"`
+	Phone            string    `gorm:"size:20;comment:联系电话" json:"phone"`
+	EmergencyContact string    `gorm:"size:64;comment:紧急联系人" json:"emergency_contact"`
+	EmergencyPhone   string    `gorm:"size:20;comment:紧急联系电话" json:"emergency_phone"`
+	Address          string    `gorm:"size:256;comment:常住地址" json:"address"`
+	HeightCm         float64   `gorm:"type:decimal(5,1);comment:身高(cm)" json:"height_cm"`
+	WeightKg         float64   `gorm:"type:decimal(5,1);comment:体重(kg)" json:"weight_kg"`
+	BloodType        string    `gorm:"size:8;comment:血型" json:"blood_type"`
+	PastHistory      JSON      `gorm:"type:json;comment:既往病史数组" json:"past_history"`
+	AllergyHistory   JSON      `gorm:"type:json;comment:过敏史数组" json:"allergy_history"`
+	FamilyHistory    JSON      `gorm:"type:json;comment:家族病史数组" json:"family_history"`
+	SurgeryHistory   JSON      `gorm:"type:json;comment:手术史数组" json:"surgery_history"`
+	MedicationList   JSON      `gorm:"type:json;comment:长期用药数组" json:"medication_list"`
+	ChronicTags      JSON      `gorm:"type:json;comment:慢病标签数组" json:"chronic_tags"`
+	Smoking          string    `gorm:"size:32;comment:吸烟情况" json:"smoking"`
+	Drinking         string    `gorm:"size:32;comment:饮酒情况" json:"drinking"`
+	AssessmentLevel  string    `gorm:"size:32;comment:最近一次评估等级" json:"assessment_level"`
+	Remark           string    `gorm:"size:512;comment:备注" json:"remark"`
+	Status           uint8     `gorm:"not null;default:1;comment:0未建档1正常2已归档" json:"status"`
+	CreatedAt        time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt        time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	User             *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
 func (HealthRecord) TableName() string {
@@ -871,23 +931,23 @@ func (HealthAssessmentForm) TableName() string {
 // 用途：用户/服务人员每次评估的答卷与结果快照，量表名称/答案随记录保存
 // ============================================
 type HealthAssessment struct {
-	ID           uint64    `gorm:"primaryKey;autoIncrement;comment:评估ID" json:"id"`
-	UserID       uint64    `gorm:"not null;index:idx_health_assessments_user_id;comment:用户ID" json:"user_id"`
-	RecordID     *uint64   `gorm:"index:idx_health_assessments_record_id;comment:关联档案ID（阶段五 8.2 多档案）" json:"record_id"`
-	FormID       uint64    `gorm:"not null;index:idx_health_assessments_form_id;comment:量表ID" json:"form_id"`
-	FormName     string    `gorm:"size:64;comment:量表名称快照" json:"form_name"`
-	AssessorType uint8     `gorm:"not null;default:1;comment:1自助2服务人员" json:"assessor_type"`
-	StaffID      *uint64   `gorm:"comment:评估服务人员ID" json:"staff_id"`
-	Answers      JSON      `gorm:"type:json;comment:答案{key:选中label}" json:"answers"`
-	TotalScore   float64   `gorm:"type:decimal(6,1);comment:总分" json:"total_score"`
-	Level        string    `gorm:"size:32;comment:评估等级" json:"level"`
-	Conclusion   string    `gorm:"size:512;comment:评估结论" json:"conclusion"`
-	Suggestions  JSON      `gorm:"type:json;comment:建议数组" json:"suggestions"`
-	SymptomDesc  string    `gorm:"size:512;comment:症状描述" json:"symptom_desc"`
-	CreatedAt    time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	ID           uint64                `gorm:"primaryKey;autoIncrement;comment:评估ID" json:"id"`
+	UserID       uint64                `gorm:"not null;index:idx_health_assessments_user_id;comment:用户ID" json:"user_id"`
+	RecordID     *uint64               `gorm:"index:idx_health_assessments_record_id;comment:关联档案ID（阶段五 8.2 多档案）" json:"record_id"`
+	FormID       uint64                `gorm:"not null;index:idx_health_assessments_form_id;comment:量表ID" json:"form_id"`
+	FormName     string                `gorm:"size:64;comment:量表名称快照" json:"form_name"`
+	AssessorType uint8                 `gorm:"not null;default:1;comment:1自助2服务人员" json:"assessor_type"`
+	StaffID      *uint64               `gorm:"comment:评估服务人员ID" json:"staff_id"`
+	Answers      JSON                  `gorm:"type:json;comment:答案{key:选中label}" json:"answers"`
+	TotalScore   float64               `gorm:"type:decimal(6,1);comment:总分" json:"total_score"`
+	Level        string                `gorm:"size:32;comment:评估等级" json:"level"`
+	Conclusion   string                `gorm:"size:512;comment:评估结论" json:"conclusion"`
+	Suggestions  JSON                  `gorm:"type:json;comment:建议数组" json:"suggestions"`
+	SymptomDesc  string                `gorm:"size:512;comment:症状描述" json:"symptom_desc"`
+	CreatedAt    time.Time             `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
 	Form         *HealthAssessmentForm `gorm:"foreignKey:FormID" json:"form,omitempty"`
-	User         *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Record       *HealthRecord `gorm:"foreignKey:RecordID" json:"record,omitempty"`
+	User         *User                 `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Record       *HealthRecord         `gorm:"foreignKey:RecordID" json:"record,omitempty"`
 }
 
 func (HealthAssessment) TableName() string {
@@ -992,23 +1052,23 @@ func (ProfitSharingReceiver) TableName() string {
 // 用途：记录每笔支付对应的分账单及其整体状态
 // ============================================
 type ProfitSharingRecord struct {
-	ID               uint64    `gorm:"primaryKey;autoIncrement;comment:分账单ID" json:"id"`
-	MerchantID       uint64    `gorm:"not null;default:1;comment:商家ID(单商户恒为1)" json:"merchant_id"`
-	OrderID          uint64    `gorm:"not null;comment:订单ID" json:"order_id"`
-	OrderNo          string    `gorm:"size:32;not null;comment:订单编号" json:"order_no"`
-	SPMchID          string    `gorm:"size:32;comment:服务商商户号" json:"sp_mchid"`
-	SubMchID         string    `gorm:"size:32;comment:特约商户号(分账出资方)" json:"sub_mchid"`
-	AppID            string    `gorm:"size:64;comment:分账请求使用的appid(特约商户主体小程序)" json:"appid"`
-	TransactionID    string    `gorm:"size:64;comment:微信支付交易单号" json:"transaction_id"`
-	OutOrderNo       string    `gorm:"size:64;not null;comment:微信分账单号" json:"out_order_no"`
-	TotalAmount      float64   `gorm:"type:decimal(10,2);not null;default:0;comment:订单实付金额(元)" json:"total_amount"`
-	TotalShareAmount float64   `gorm:"type:decimal(10,2);not null;default:0;comment:本次分账总额(元)" json:"total_share_amount"`
-	Status           uint8     `gorm:"not null;default:0;comment:状态:0待分账1分账中2分账成功3分账失败4已跳过" json:"status"`
-	ShareTime        *time.Time `gorm:"comment:分账完成时间" json:"share_time"`
-	ErrorMessage     string    `gorm:"size:512;comment:失败原因" json:"error_message"`
-	CreatedAt        time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt        time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-	Order            *Order    `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	ID               uint64                        `gorm:"primaryKey;autoIncrement;comment:分账单ID" json:"id"`
+	MerchantID       uint64                        `gorm:"not null;default:1;comment:商家ID(单商户恒为1)" json:"merchant_id"`
+	OrderID          uint64                        `gorm:"not null;comment:订单ID" json:"order_id"`
+	OrderNo          string                        `gorm:"size:32;not null;comment:订单编号" json:"order_no"`
+	SPMchID          string                        `gorm:"size:32;comment:服务商商户号" json:"sp_mchid"`
+	SubMchID         string                        `gorm:"size:32;comment:特约商户号(分账出资方)" json:"sub_mchid"`
+	AppID            string                        `gorm:"size:64;comment:分账请求使用的appid(特约商户主体小程序)" json:"appid"`
+	TransactionID    string                        `gorm:"size:64;comment:微信支付交易单号" json:"transaction_id"`
+	OutOrderNo       string                        `gorm:"size:64;not null;comment:微信分账单号" json:"out_order_no"`
+	TotalAmount      float64                       `gorm:"type:decimal(10,2);not null;default:0;comment:订单实付金额(元)" json:"total_amount"`
+	TotalShareAmount float64                       `gorm:"type:decimal(10,2);not null;default:0;comment:本次分账总额(元)" json:"total_share_amount"`
+	Status           uint8                         `gorm:"not null;default:0;comment:状态:0待分账1分账中2分账成功3分账失败4已跳过" json:"status"`
+	ShareTime        *time.Time                    `gorm:"comment:分账完成时间" json:"share_time"`
+	ErrorMessage     string                        `gorm:"size:512;comment:失败原因" json:"error_message"`
+	CreatedAt        time.Time                     `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt        time.Time                     `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	Order            *Order                        `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 	Receivers        []ProfitSharingRecordReceiver `gorm:"foreignKey:RecordID" json:"receivers,omitempty"`
 }
 
@@ -1093,4 +1153,23 @@ type UserCoupon struct {
 
 func (UserCoupon) TableName() string {
 	return "user_coupons"
+}
+
+// ============================================
+// 订单通知日志表 (order_notify_logs)
+// 用途：服务人员接单等订单类通知的发送留痕，channel 区分公众号/小程序订阅消息、短信等
+// ============================================
+type OrderNotifyLog struct {
+	ID        uint64    `gorm:"primaryKey;autoIncrement;comment:日志ID" json:"id"`
+	OrderID   uint64    `gorm:"not null;index:idx_onn_order_id;comment:订单ID" json:"order_id"`
+	UserID    uint64    `gorm:"not null;default:0;comment:接收用户ID" json:"user_id"`
+	Channel   string    `gorm:"size:16;not null;default:wechat;comment:发送渠道(wechat/sms)" json:"channel"`
+	Content   string    `gorm:"size:255;not null;default:;comment:通知内容" json:"content"`
+	Success   uint8     `gorm:"not null;default:0;comment:是否成功: 0=失败 1=成功" json:"success"`
+	Message   string    `gorm:"size:255;not null;default:;comment:结果说明" json:"message"`
+	CreatedAt time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+}
+
+func (OrderNotifyLog) TableName() string {
+	return "order_notify_logs"
 }

@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { staffWorkorderApi, staffSafetyApi } from '@/api'
 import { OrderTypeText } from '@/types'
-import { formatDate, fromNow } from '@/utils/format'
+import { formatDate, fromNow, calcAge } from '@/utils/format'
 import { startSafety, stopSafety, isSafetyActive } from '@/utils/safety'
 
 const orderId = ref<string>('')
@@ -26,7 +26,7 @@ const orderTypeText = computed(() => {
 
 function getBizStatusText(status: number) {
   const map: Record<number, string> = {
-    0: '无', 1: '待接单', 2: '待出发', 3: '服务中', 4: '待支付尾款', 5: '已完成', 6: '已取消'
+    0: '无', 1: '待接单', 2: '待出发', 3: '服务中', 5: '已完成', 6: '已取消'
   }
   return map[status] || '未知'
 }
@@ -44,10 +44,63 @@ const canAccept = computed(() => detail.value?.biz_status === 1)
 const canCheckIn = computed(() => detail.value?.biz_status === 2)
 // 是否可签退
 const canCheckOut = computed(() => detail.value?.biz_status === 3)
-// 是否可录入照护记录（服务中/待支付/已完成且关联客户）
-const canRecordVisit = computed(() =>
-  !!detail.value?.user_id && [3, 4, 5].includes(detail.value?.biz_status)
-)
+// 是否可放弃工单（待出发阶段）
+const canGiveUp = computed(() => detail.value?.biz_status === 2)
+
+// 服务对象健康档案快照与下单人账户信息
+const record = computed(() => detail.value?.customer?.record)
+const recordUser = computed(() => detail.value?.customer?.user)
+
+// 性别文案（1男 2女）
+function getGenderText(gender?: number) {
+  if (gender === 1) return '男'
+  if (gender === 2) return '女'
+  return ''
+}
+
+// 与下单人关系文案（1本人 2父母 3其他亲属）
+function getRelationText(relation?: number) {
+  if (relation === 1) return '本人'
+  if (relation === 2) return '父母'
+  if (relation === 3) return '其他亲属'
+  return ''
+}
+
+// 服务对象展示文案：{姓名}{性别}{年龄}岁
+function getServiceObjectText() {
+  const r = record.value
+  if (!r?.real_name) return ''
+  return `${r.real_name}${getGenderText(r.gender)}${calcAge(r.birth_date)}岁`
+}
+
+// 数组字段规范化（后端快照可能返回字符串，统一转为数组）
+function normalizeStrArray(value: any): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((v): v is string => typeof v === 'string')
+  }
+  if (typeof value === 'string' && value.trim()) return [value]
+  return []
+}
+
+// 过敏史（规范化）
+const allergyList = computed(() => (record.value ? normalizeStrArray(record.value.allergy_history) : []))
+// 慢病标签（规范化）
+const chronicList = computed(() => (record.value ? normalizeStrArray(record.value.chronic_tags) : []))
+// 常用药（规范化）
+const medicationList = computed(() => (record.value ? normalizeStrArray(record.value.medication_list) : []))
+
+// 健康警示卡是否展示：冷数据（过敏/慢病/常用药）或紧急联系人任一非空
+const hasHealthWarnings = computed(() => {
+  const r = record.value
+  if (!r) return false
+  return (
+    allergyList.value.length > 0 ||
+    chronicList.value.length > 0 ||
+    medicationList.value.length > 0 ||
+    !!r.emergency_contact ||
+    !!r.emergency_phone
+  )
+})
 
 async function loadDetail() {
   if (!orderId.value) return
@@ -189,14 +242,6 @@ async function confirmCheckOut() {
         }
       })
       loadDetail()
-      // 签退成功后询问是否录入本次上门照护记录
-      uni.showModal({
-        title: '录入照护记录',
-        content: '是否录入本次上门照护记录？',
-        success: (res) => {
-          if (res.confirm) goRecordVisit()
-        }
-      })
     } else {
       uni.showToast({ title: result.message || '签退失败', icon: 'none' })
     }
@@ -205,7 +250,7 @@ async function confirmCheckOut() {
   }
 }
 
-// 一键SOS（服务中/待支付尾款阶段可触发）
+// 一键SOS（服务中阶段可触发）
 const sosSubmitting = ref(false)
 async function handleSOS() {
   if (sosSubmitting.value) return
@@ -253,16 +298,57 @@ function callPhone(phone: string) {
   uni.makePhoneCall({ phoneNumber: phone })
 }
 
-// 跳转录入照护记录（携带订单ID，无计划时走自由输入护理项）
-function goRecordVisit() {
-  if (!orderId.value) return
-  uni.navigateTo({ url: `/pages/health/care-visit-form?orderId=${orderId.value}` })
+// 一键导航：有坐标则打开地图定位，否则复制地址提示
+function navigateToAddress() {
+  const lat = detail.value?.lat
+  const lng = detail.value?.lng
+  const address = detail.value?.delivery_address
+  if (lat && lng) {
+    uni.openLocation({
+      latitude: Number(lat),
+      longitude: Number(lng),
+      name: detail.value?.delivery_address || '服务地址',
+      address: detail.value?.delivery_address || '服务地址'
+    })
+  } else if (address) {
+    uni.setClipboardData({
+      data: address,
+      success: () => {
+        uni.showToast({ title: '已复制服务地址，请粘贴到导航 app', icon: 'none' })
+      }
+    })
+  }
+}
+
+// 放弃工单（待出发阶段）
+async function handleGiveUp() {
+  uni.showModal({
+    title: '放弃工单',
+    content: '确定放弃当前工单吗？放弃后将从您的待办中移除',
+    confirmText: '放弃',
+    confirmColor: '#e64340',
+    success: async (res) => {
+      if (!res.confirm) return
+      try {
+        const result: any = await staffWorkorderApi.giveUpOrder(orderId.value)
+        if (result.code === 0) {
+          uni.showToast({ title: '已放弃工单', icon: 'success' })
+          loadDetail()
+        } else {
+          uni.showToast({ title: result.message || '放弃失败', icon: 'none' })
+        }
+      } catch (e: any) {
+        uni.showToast({ title: e?.data?.message || '放弃失败', icon: 'none' })
+      }
+    }
+  })
 }
 
 // 跳转客户健康档案（居民健康档案/健康评估）
 function goResident() {
   if (!detail.value?.user_id) return
-  uni.navigateTo({ url: `/pages/health/resident?userId=${detail.value.user_id}` })
+  const recordId = record.value?.id || ''
+  uni.navigateTo({ url: `/pages/health/resident?userId=${detail.value.user_id}&recordId=${recordId}` })
 }
 
 onLoad((options: any) => {
@@ -311,11 +397,97 @@ onShow(() => {
       </view>
       <view class="info-row" v-if="detail.delivery_address">
         <text class="info-label">服务地址</text>
-        <text class="info-value">{{ detail.delivery_address }}</text>
+        <view class="info-value-row">
+          <text class="info-value">{{ detail.delivery_address }}</text>
+          <text class="call-btn" @tap="navigateToAddress">导航</text>
+        </view>
       </view>
       <view class="info-row" v-if="detail.scheduled_at">
         <text class="info-label">预约时间</text>
         <text class="info-value">{{ formatDate(detail.scheduled_at) }}</text>
+      </view>
+    </view>
+
+    <!-- 服务对象卡 -->
+    <view class="card section" v-if="record">
+      <view class="section-title service-title">
+        <text>服务对象</text>
+        <text class="relation-tag" v-if="getRelationText(record.relation)">{{ getRelationText(record.relation) }}</text>
+      </view>
+      <view class="info-row" v-if="getServiceObjectText()">
+        <text class="info-label">被服务人</text>
+        <text class="info-value">{{ getServiceObjectText() }}</text>
+      </view>
+      <view class="info-row" v-if="record.assessment_level">
+        <text class="info-label">评估等级</text>
+        <view class="info-value-row">
+          <text class="level-badge">{{ record.assessment_level }}</text>
+        </view>
+      </view>
+      <view class="info-row" v-if="record.phone">
+        <text class="info-label">联系电话</text>
+        <view class="info-value-row">
+          <text class="info-value">{{ record.phone }}</text>
+          <text class="call-btn" @tap="callPhone(record.phone)">拨打</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 健康警示卡 -->
+    <view class="card section" v-if="hasHealthWarnings">
+      <view class="section-title">健康警示</view>
+      <view class="warn-block" v-if="allergyList.length">
+        <text class="warn-label">过敏史</text>
+        <view class="chip-wrap">
+          <text v-for="tag in allergyList" :key="tag" class="chip chip-danger">{{ tag }}</text>
+        </view>
+      </view>
+      <view class="warn-block" v-if="chronicList.length">
+        <text class="warn-label">慢病</text>
+        <view class="chip-wrap">
+          <text v-for="tag in chronicList" :key="tag" class="chip chip-warn">{{ tag }}</text>
+        </view>
+      </view>
+      <view class="warn-block" v-if="medicationList.length">
+        <text class="warn-label">常用药</text>
+        <view class="chip-wrap">
+          <text v-for="tag in medicationList" :key="tag" class="chip chip-info">{{ tag }}</text>
+        </view>
+      </view>
+      <view class="info-row" v-if="record.emergency_contact || record.emergency_phone">
+        <text class="info-label">紧急联系人</text>
+        <view class="info-value-row">
+          <text class="info-value">
+            {{ record.emergency_contact }}{{ record.emergency_phone ? ('·' + record.emergency_phone) : '' }}
+          </text>
+          <text class="call-btn" @tap="callPhone(record.emergency_phone)">拨打</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 下单人卡 -->
+    <view class="card section" v-if="recordUser && (recordUser.nickname || recordUser.avatar)">
+      <view class="section-title">下单人</view>
+      <view class="buyer-row">
+        <image
+          v-if="recordUser.avatar"
+          class="buyer-avatar"
+          :src="recordUser.avatar"
+          mode="aspectFill"
+        />
+        <view v-else class="buyer-avatar buyer-avatar-text">
+          <text>{{ (recordUser.nickname || '客')[0] }}</text>
+        </view>
+        <view class="buyer-info">
+          <view class="buyer-meta">
+            <text class="buyer-name">{{ recordUser.nickname }}</text>
+            <text class="buyer-phone" v-if="recordUser.phone" @tap="callPhone(recordUser.phone)">{{ recordUser.phone }}</text>
+          </view>
+          <view class="buyer-stats">
+            <text class="buyer-stat">累计订单 <text class="buyer-stat-num">{{ recordUser.total_orders || 0 }}</text></text>
+            <text class="buyer-stat">累计消费 <text class="buyer-stat-num">¥{{ Number(recordUser.total_spent || 0).toFixed(2) }}</text></text>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -436,11 +608,11 @@ onShow(() => {
     </view>
 
     <!-- 底部操作栏 -->
-    <view class="footer-bar" v-if="canAccept || canCheckIn || canCheckOut || canRecordVisit">
+    <view class="footer-bar" v-if="canAccept || canCheckIn || canCheckOut || canGiveUp">
       <button v-if="canAccept" class="action-btn primary" @tap="handleAccept">立即接单</button>
       <button v-if="canCheckIn" class="action-btn primary" @tap="handleCheckIn">签到开始服务</button>
+      <button v-if="canGiveUp" class="action-btn weak" @tap="handleGiveUp">放弃工单</button>
       <button v-if="canCheckOut" class="action-btn warn" @tap="openCheckoutModal">签退结束服务</button>
-      <button v-if="canRecordVisit" class="action-btn outline" @tap="goRecordVisit">录入照护记录</button>
     </view>
 
     <!-- 签退备注弹窗 -->
@@ -542,6 +714,56 @@ onShow(() => {
   border: 2rpx solid var(--primary-color);
   border-radius: 8rpx;
 }
+
+/* 服务对象卡 */
+.service-title { display: flex; align-items: center; gap: 16rpx; }
+.relation-tag {
+  font-size: 22rpx;
+  color: var(--primary-color);
+  background: var(--primary-color-light, rgba(81, 117, 40, 0.1));
+  padding: 2rpx 16rpx;
+  border-radius: 6rpx;
+  font-weight: 400;
+}
+.level-badge {
+  font-size: 26rpx;
+  color: #b0850c;
+  background: #fff7e6;
+  padding: 4rpx 20rpx;
+  border-radius: 8rpx;
+}
+
+/* 健康警示卡 */
+.warn-block { padding: 12rpx 0; }
+.warn-label { display: block; font-size: 26rpx; color: #888; margin-bottom: 12rpx; }
+.chip-wrap { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.chip {
+  font-size: 24rpx;
+  padding: 6rpx 20rpx;
+  border-radius: 24rpx;
+  &.chip-danger { background: #fff1f0; color: #f5222d; }
+  &.chip-warn { background: #fff7e6; color: #fa8c16; }
+  &.chip-info { background: #e6f4ff; color: #1989fa; }
+}
+
+/* 下单人卡 */
+.buyer-row { display: flex; align-items: center; gap: 20rpx; }
+.buyer-avatar {
+  width: 96rpx; height: 96rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--primary-color);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 40rpx; font-weight: 600;
+}
+.buyer-avatar-text { overflow: hidden; }
+.buyer-info { flex: 1; display: flex; flex-direction: column; gap: 8rpx; }
+.buyer-meta { display: flex; align-items: center; gap: 20rpx; }
+.buyer-name { font-size: 30rpx; font-weight: 600; color: #333; }
+.buyer-phone { font-size: 24rpx; color: var(--primary-color); }
+.buyer-stats { display: flex; gap: 32rpx; }
+.buyer-stat { font-size: 24rpx; color: #999; }
+.buyer-stat-num { color: #333; font-weight: 600; }
 .record-entry {
   display: flex;
   align-items: center;
@@ -640,6 +862,10 @@ onShow(() => {
     background: #fff;
     color: var(--primary-color);
     border: 2rpx solid var(--primary-color);
+  }
+  &.weak {
+    background: #f5f5f5;
+    color: #999;
   }
 }
 

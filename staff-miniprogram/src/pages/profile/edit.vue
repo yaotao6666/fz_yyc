@@ -15,7 +15,7 @@
           <view class="qual-list">
             <view v-for="(q, i) in form.qualifications" :key="i" class="qual-item">
               <input v-model="q.name" placeholder="材料名称（如执业证书）" class="qual-input" />
-              <image v-if="q.url" :src="q.url" class="qual-img" mode="aspectFill" @click="previewQual(i)" />
+              <image v-if="q.local || q.url" :src="q.local || q.url" class="qual-img" mode="aspectFill" @click="previewQual(i)" />
               <text class="qual-remove" @click="form.qualifications.splice(i, 1)">移除</text>
             </view>
             <view class="qual-add" @click="pickQualification">+ 添加材料</view>
@@ -38,12 +38,14 @@ const form = reactive({
   name: '',
   phone: '',
   avatar: '',
-  qualifications: [] as { type: string; name: string; url: string }[]
+  qualifications: [] as { type: string; name: string; url: string; local?: string }[]
 })
 
 function previewQual(index: number) {
   const q = form.qualifications[index]
-  if (q?.url) uni.previewImage({ urls: [q.url] })
+  // 优先以当前选中文件的本地路径预览，七牛私有链接无法直接被 previewImage 打开
+  const target = q?.local || q?.url
+  if (target) uni.previewImage({ urls: [target] })
 }
 
 function pickQualification() {
@@ -51,8 +53,17 @@ function pickQualification() {
     count: 1,
     sizeType: ['compressed'],
     success: (res) => {
-      uploadQualificationFile(res.tempFilePaths[0])
-        .then(({ url }) => form.qualifications.push({ type: 'certificate', name: '', url }))
+      const filePath = res.tempFilePaths[0]
+      // 立即加入列表并保留本地选中路径，上传完成后仅回填用于提交的 url
+      const item: { type: string; name: string; url: string; local?: string } = {
+        type: 'certificate',
+        name: '',
+        url: '',
+        local: filePath
+      }
+      form.qualifications.push(item)
+      uploadQualificationFile(filePath)
+        .then(({ url }) => { item.url = url })
         .catch(() => {})
     }
   })
@@ -68,7 +79,7 @@ async function loadProfile() {
     let quals: any[] = []
     if (Array.isArray(raw)) quals = raw
     else if (typeof raw === 'string' && raw.trim()) { try { quals = JSON.parse(raw) } catch {} }
-    form.qualifications = quals.map((q: any) => ({ type: q.type || '', name: q.name || '', url: q.url || '' }))
+    form.qualifications = quals.map((q: any) => ({ type: q.type || '', name: q.name || '', url: q.url || '', local: q.local || '' }))
   }
 }
 
@@ -83,7 +94,7 @@ async function handleSubmit() {
       name: form.name,
       phone: form.phone,
       avatar: form.avatar,
-      qualifications: form.qualifications
+      qualifications: form.qualifications.map((q) => ({ type: q.type, name: q.name, url: q.url }))
     })
     if (res.code === 0) {
       uni.showToast({ title: '变更已提交审核', icon: 'success' })

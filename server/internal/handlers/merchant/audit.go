@@ -9,6 +9,7 @@ import (
 	"fz_yyc_api/internal/middleware"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/pkg/database"
+	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -82,10 +83,17 @@ func StaffAuditDetail(c *gin.Context) {
 	var staff models.ServiceStaff
 	database.DB.First(&staff, record.StaffID)
 
-	// 资质材料规范化
+	qsvc := qiniu.GetService()
+
+	// 资质材料规范化（七牛私有链接需签名才能访问）
 	var quals []map[string]interface{}
 	if len(record.Qualifications) > 0 {
 		json.Unmarshal(record.Qualifications, &quals)
+	}
+	for _, q := range quals {
+		if u, ok := q["url"].(string); ok {
+			q["url"] = qsvc.BuildPrivateURL(u)
+		}
 	}
 	var beforeData, afterData map[string]interface{}
 	if len(record.BeforeData) > 0 {
@@ -94,10 +102,25 @@ func StaffAuditDetail(c *gin.Context) {
 	if len(record.AfterData) > 0 {
 		json.Unmarshal(record.AfterData, &afterData)
 	}
+	// 变更前后快照中的头像亦为七牛资源，一并签名
+	signAvatar := func(m map[string]interface{}) {
+		if m == nil {
+			return
+		}
+		if u, ok := m["avatar"].(string); ok {
+			m["avatar"] = qsvc.BuildPrivateURL(u)
+		}
+	}
+	signAvatar(beforeData)
+	signAvatar(afterData)
+
+	// staff 头像签名输出（不改动正式字段）
+	staffOut := staff
+	staffOut.Avatar = qsvc.BuildPrivateURL(staff.Avatar)
 
 	response.Success(c, gin.H{
 		"record": record,
-		"staff":  staff,
+		"staff":  staffOut,
 		"qualifications": quals,
 		"before_data":    beforeData,
 		"after_data":     afterData,

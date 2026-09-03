@@ -65,6 +65,20 @@
       }
     },
     {
+      "path": "pages/store/my-orders-goods",
+      "style": {
+        "navigationBarTitleText": "实物订单",
+        "navigationBarBackgroundColor": "#F5F5F5"
+      }
+    },
+    {
+      "path": "pages/store/my-orders-service",
+      "style": {
+        "navigationBarTitleText": "服务订单",
+        "navigationBarBackgroundColor": "#F5F5F5"
+      }
+    },
+    {
       "path": "pages/store/my-coupons",
       "style": {
         "navigationBarTitleText": "我的优惠券",

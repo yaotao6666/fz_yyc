@@ -62,6 +62,9 @@ func main() {
 	// 启动服务安全定时任务（超时预警 + 录音30天清理）
 	go tasks.StartServiceSafetyTasks()
 
+	// 启动订单/业务超时预警定时任务（启动即扫 + 5分钟粒度）
+	go tasks.StartOrderTimeoutTasks()
+
 	// 启动服务器
 	addr := config.Config.App.GetAddr()
 	log.Printf("服务启动中，监听地址: %s", addr)
@@ -104,7 +107,6 @@ func setupRoutes(r *gin.Engine) {
 		authGroup := v1.Group("/auth")
 		{
 			authGroup.POST("/merchant/login", merchant.Login)
-			authGroup.POST("/merchant/wechat-login", merchant.WechatQuickLogin)
 			authGroup.POST("/user/wechat-login", user.WechatLogin)
 		}
 
@@ -115,10 +117,11 @@ func setupRoutes(r *gin.Engine) {
 			uploadPublicGroup.POST("/callback", uploadHandler.Callback)
 
 			uploadGroup := uploadPublicGroup.Group("")
-			uploadGroup.Use(middleware.JWTAuth())
-			{
-				uploadGroup.GET("/token", uploadHandler.GetToken)
-			}
+				uploadGroup.Use(middleware.JWTAuth())
+				{
+					uploadGroup.GET("/token", uploadHandler.GetToken)
+					uploadGroup.POST("/sign", uploadHandler.Sign)
+				}
 		}
 
 		// C端店铺接口
@@ -126,6 +129,7 @@ func setupRoutes(r *gin.Engine) {
 		storeGroup.Use(middleware.OptionalJWTAuth())
 		{
 			storeGroup.GET("/home", user.GetStoreHome)
+			storeGroup.GET("/home-recommends", user.GetStoreHomeRecommends)
 			storeGroup.GET("/delivery-rules", user.GetStoreDeliveryRules)
 			storeGroup.GET("/products", user.GetProducts)
 			storeGroup.GET("/products/:product_id", user.GetProductDetail)
@@ -198,8 +202,7 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.GET("/settings", middleware.RBAC("profile:view"), merchant.GetSettings)
 				merchantOnlyGroup.PUT("/settings", middleware.RBAC("profile:update"), merchant.UpdateSettings)
 				merchantOnlyGroup.POST("/account/change-password", middleware.RBAC("profile:password"), merchant.ChangePassword)
-				merchantOnlyGroup.POST("/account/wechat/bind", middleware.RBAC("profile:update"), merchant.BindWechat)
-				merchantOnlyGroup.DELETE("/account/wechat/bind", middleware.RBAC("profile:update"), merchant.UnbindWechat)
+
 				merchantOnlyGroup.POST("/status", middleware.RBAC("profile:update"), merchant.UpdateStatus)
 				merchantOnlyGroup.GET("/qrcode", middleware.RBAC("profile:view"), merchant.GetQRCode)
 
@@ -227,15 +230,19 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.POST("/staff-audits/:id/approve", middleware.RBAC("staffaudit:approve"), merchant.ApproveStaffAudit)
 				merchantOnlyGroup.POST("/staff-audits/:id/reject", middleware.RBAC("staffaudit:reject"), merchant.RejectStaffAudit)
 
-				// 系统公告（商家查看）
-				merchantOnlyGroup.GET("/announcements", middleware.RBAC("dashboard:view"), merchant.GetAnnouncements)
-				merchantOnlyGroup.GET("/announcements/:id", middleware.RBAC("dashboard:view"), merchant.GetAnnouncementDetail)
+				// 打印机管理（PC 后台）
+				merchantOnlyGroup.GET("/printers", middleware.RBAC("printers:view"), merchant.GetPrinters)
+				merchantOnlyGroup.GET("/printers/:id", middleware.RBAC("printers:view"), merchant.GetPrinter)
+				merchantOnlyGroup.POST("/printers", middleware.RBAC("printers:create"), merchant.CreatePrinter)
+				merchantOnlyGroup.PUT("/printers/:id", middleware.RBAC("printers:update"), merchant.UpdatePrinter)
+				merchantOnlyGroup.DELETE("/printers/:id", middleware.RBAC("printers:delete"), merchant.DeletePrinter)
+				merchantOnlyGroup.POST("/printers/:id/test", middleware.RBAC("printers:update"), merchant.TestPrinter)
 
 				// 订单管理
-				merchantOnlyGroup.GET("/orders", middleware.RBAC("orders:view"), merchant.GetOrders)
+				merchantOnlyGroup.GET("/orders", middleware.RBACAny("orders:view", "order:goods", "order:service"), merchant.GetOrders)
 				merchantOnlyGroup.GET("/orders/dispatchable-staff", middleware.RBAC("order:dispatch"), merchant.GetDispatchableStaffList)
 				merchantOnlyGroup.GET("/orders/rental-due", middleware.RBAC("orderrental:view"), merchant.ListRentalDueOrders)
-				merchantOnlyGroup.GET("/orders/:order_id", middleware.RBAC("orders:view"), merchant.GetOrderDetail)
+				merchantOnlyGroup.GET("/orders/:order_id", middleware.RBACAny("orders:view", "order:goods", "order:service"), merchant.GetOrderDetail)
 				merchantOnlyGroup.POST("/orders/quick-complete", middleware.RBAC("orders:complete"), merchant.QuickCompleteOrder)
 				merchantOnlyGroup.POST("/orders/:order_id/complete", middleware.RBAC("orders:complete"), merchant.CompleteOrder)
 				merchantOnlyGroup.POST("/orders/:order_id/refund", middleware.RBAC("orders:refund"), merchant.RefundOrder)
@@ -249,6 +256,10 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.GET("/alert-events", middleware.RBAC("alert-events:view"), merchant.GetAlertEvents)
 				merchantOnlyGroup.GET("/alert-events/:id", middleware.RBAC("alert-events:view"), merchant.GetAlertEventDetail)
 				merchantOnlyGroup.POST("/alert-events/:id/handle", middleware.RBAC("alert-events:update"), merchant.HandleAlertEvent)
+
+				// 预警设置（阶段五：订单/业务超时预警阈值配置）
+				merchantOnlyGroup.GET("/alert-settings", middleware.RBAC("alert-events:view"), merchant.GetAlertSettings)
+				merchantOnlyGroup.PUT("/alert-settings", middleware.RBAC("alert-settings:update"), merchant.UpdateAlertSettings)
 
 				// 协议管理（阶段三：服务过程安全）
 				merchantOnlyGroup.GET("/agreements", middleware.RBAC("agreements:view"), merchant.GetAgreements)
@@ -291,7 +302,7 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.PUT("/products/:product_id/specs", middleware.RBAC("products:specs"), merchant.UpdateProductSpecs)
 				merchantOnlyGroup.DELETE("/products/:product_id/specs", middleware.RBAC("products:specs"), merchant.DeleteProductSpecs)
 
-			// 优惠券管理（PRD V2.0 阶段二）
+				// 优惠券管理（PRD V2.0 阶段二）
 				merchantOnlyGroup.GET("/coupon-templates", middleware.RBAC("coupon-templates:view"), merchant.GetCouponTemplates)
 				merchantOnlyGroup.GET("/coupon-templates/:id", middleware.RBAC("coupon-templates:view"), merchant.GetCouponTemplate)
 				merchantOnlyGroup.POST("/coupon-templates", middleware.RBAC("coupon-templates:create"), merchant.CreateCouponTemplate)
@@ -308,6 +319,13 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.PUT("/miniprogram-banners/:id", middleware.RBAC("banners:update"), merchant.UpdateBanner)
 				merchantOnlyGroup.PATCH("/miniprogram-banners/:id/status", middleware.RBAC("banners:status"), merchant.UpdateBannerStatus)
 				merchantOnlyGroup.DELETE("/miniprogram-banners/:id", middleware.RBAC("banners:delete"), merchant.DeleteBanner)
+
+				// 小程序首页推荐配置
+				merchantOnlyGroup.GET("/home-recommends", middleware.RBAC("home-recommend:view"), merchant.GetHomeRecommends)
+				merchantOnlyGroup.POST("/home-recommends", middleware.RBAC("home-recommend:create"), merchant.CreateHomeRecommend)
+				merchantOnlyGroup.PUT("/home-recommends/:id", middleware.RBAC("home-recommend:update"), merchant.UpdateHomeRecommend)
+				merchantOnlyGroup.PATCH("/home-recommends/:id/status", middleware.RBAC("home-recommend:status"), merchant.UpdateHomeRecommendStatus)
+				merchantOnlyGroup.DELETE("/home-recommends/:id", middleware.RBAC("home-recommend:delete"), merchant.DeleteHomeRecommend)
 
 				// RBAC 系统管理
 				merchantOnlyGroup.GET("/rbac/permissions", rbacHandler.GetMyMenus)
@@ -327,10 +345,16 @@ func setupRoutes(r *gin.Engine) {
 				merchantOnlyGroup.PUT("/rbac/departments/:id", middleware.RBAC("system:dept:create"), rbacHandler.UpdateDepartment)
 				merchantOnlyGroup.DELETE("/rbac/departments/:id", middleware.RBAC("system:dept:delete"), rbacHandler.DeleteDepartment)
 
+				// 通用系统配置（system_configs key-value + JSON + 备注）
+				merchantOnlyGroup.GET("/system-configs", middleware.RBAC("systemconfig:view"), merchant.ListSystemConfigs)
+				merchantOnlyGroup.PUT("/system-configs", middleware.RBAC("systemconfig:update"), merchant.UpdateSystemConfig)
+				merchantOnlyGroup.DELETE("/system-configs/:key", middleware.RBAC("systemconfig:update"), merchant.DeleteSystemConfig)
+
 				// 健康服务：居民健康档案 + 评估量表 + 评估记录
 				merchantOnlyGroup.GET("/health-records", middleware.RBAC("health:view"), health.MerchantListHealthRecords)
 				merchantOnlyGroup.GET("/health-records/:id", middleware.RBAC("health:view"), health.MerchantGetHealthRecord)
 				merchantOnlyGroup.PUT("/health-records/:id", middleware.RBAC("health:update"), health.MerchantUpdateHealthRecord)
+				merchantOnlyGroup.GET("/health-records/:id/assessments", middleware.RBAC("health:assessment"), health.MerchantListRecordAssessments)
 				merchantOnlyGroup.GET("/assessment-forms", middleware.RBAC("assessment:view"), health.MerchantListAssessmentForms)
 				merchantOnlyGroup.POST("/assessment-forms", middleware.RBAC("assessment:create"), health.MerchantCreateAssessmentForm)
 				merchantOnlyGroup.PUT("/assessment-forms/:id", middleware.RBAC("assessment:update"), health.MerchantUpdateAssessmentForm)
@@ -345,8 +369,8 @@ func setupRoutes(r *gin.Engine) {
 				// 健康宣教（独立板块：内容 + 两级分类）
 				merchantOnlyGroup.GET("/health-education", middleware.RBAC("education:view"), health.MerchantListEducationArticles)
 				merchantOnlyGroup.POST("/health-education", middleware.RBAC("education:create"), health.MerchantCreateEducationArticle)
-				merchantOnlyGroup.PUT("/health-education/:id", middleware.RBAC("education:create"), health.MerchantUpdateEducationArticle)
-				merchantOnlyGroup.DELETE("/health-education/:id", middleware.RBAC("education:create"), health.MerchantDeleteEducationArticle)
+				merchantOnlyGroup.PUT("/health-education/:id", middleware.RBAC("education:update"), health.MerchantUpdateEducationArticle)
+				merchantOnlyGroup.DELETE("/health-education/:id", middleware.RBAC("education:delete"), health.MerchantDeleteEducationArticle)
 				merchantOnlyGroup.GET("/education-categories", middleware.RBAC("education-categories:view"), health.MerchantListEducationCategories)
 				merchantOnlyGroup.POST("/education-categories", middleware.RBAC("education-categories:create"), health.MerchantCreateEducationCategory)
 				merchantOnlyGroup.PUT("/education-categories/:id", middleware.RBAC("education-categories:update"), health.MerchantUpdateEducationCategory)
@@ -385,6 +409,7 @@ func setupRoutes(r *gin.Engine) {
 			staffAuthedGroup.GET("/orders/accepted", serviceStaff.AcceptedOrders)
 			staffAuthedGroup.GET("/orders/:id", serviceStaff.OrderDetail)
 			staffAuthedGroup.POST("/orders/:id/accept", serviceStaff.AcceptOrder)
+			staffAuthedGroup.POST("/orders/:id/give-up", serviceStaff.GiveUpOrder)
 			staffAuthedGroup.POST("/orders/:id/check-in", serviceStaff.CheckIn)
 			staffAuthedGroup.POST("/orders/:id/check-out", serviceStaff.CheckOut)
 			// 服务过程安全（阶段三）：定位上报 / 录音提交 / SOS / 服务区域

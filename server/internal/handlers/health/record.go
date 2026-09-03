@@ -38,6 +38,7 @@ type HealthRecordUpsertRequest struct {
 	ChronicTags      []string  `json:"chronic_tags"`
 	Smoking          string    `json:"smoking"`
 	Drinking         string    `json:"drinking"`
+	AssessmentLevel  string    `json:"assessment_level"`
 	Remark           string    `json:"remark"`
 }
 
@@ -86,6 +87,10 @@ func toHealthRecord(req HealthRecordUpsertRequest) models.HealthRecord {
 	} else {
 		// 未传或非法：默认本人，兼容存量单档案前端
 		record.Relation = utils.HealthRecordRelationSelf
+	}
+	// 评估等级仅由评估流程回写，编辑时未传则保留原值，避免被覆盖为空
+	if req.AssessmentLevel != "" {
+		record.AssessmentLevel = req.AssessmentLevel
 	}
 	return record
 }
@@ -430,7 +435,7 @@ func MerchantGetHealthRecord(c *gin.Context) {
 	}
 
 	var assessments []models.HealthAssessment
-	database.DB.Where("record_id = ? OR (record_id IS NULL AND user_id = ?)", record.ID, record.UserID).
+	database.DB.Where("record_id = ?", record.ID).
 		Order("created_at DESC").
 		Find(&assessments)
 

@@ -24,3 +24,20 @@ export function fromNow(d: Date | string | number): string {
   if (diff < 86400 * 7) return Math.floor(diff / 86400) + '天前'
   return formatDate(date, 'YYYY-MM-DD')
 }
+
+/**
+ * 由出生日期字符串计算周岁年龄
+ * 无效日期返回空字符串，避免在页面展示 NaN
+ */
+export function calcAge(birthDate?: string): string {
+  if (!birthDate) return ''
+  const birth = new Date(birthDate)
+  if (isNaN(birth.getTime())) return ''
+  const now = new Date()
+  let age = now.getFullYear() - birth.getFullYear()
+  const monthDiff = now.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+    age -= 1
+  }
+  return age >= 0 ? String(age) : ''
+}

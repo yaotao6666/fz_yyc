@@ -27,7 +27,6 @@ export enum WorkorderBizStatus {
   /** 待接单 */ Pending = 1,
   /** 已接单-待出发 */ Accepted = 2,
   /** 服务中-已签到 */ InService = 3,
-  /** 待支付尾款 */ PendingPayment = 4,
   /** 已完成 */ Completed = 5,
   /** 已取消 */ Cancelled = 6
 }
@@ -63,6 +62,42 @@ export interface WorkorderItem {
   /** 服务内容快照 */
   service_content?: any
   remark?: string
+  /** 客户信息（下单人 + 服务对象健康档案快照，契约见后端工单接口） */
+  customer?: CustomerInfo
+}
+
+// 工单客户信息：下单人（customer.user）+ 服务对象（customer.record）
+export interface CustomerInfo {
+  /** 下单人信息（可部分为空） */
+  user?: CustomerUser
+  /** 服务对象健康档案快照（可能为空，为空时不展示服务对象相关卡片） */
+  record?: CustomerRecord
+}
+
+// 下单人
+export interface CustomerUser {
+  nickname?: string
+  avatar?: string
+  phone?: string
+  total_orders?: number
+  total_spent?: number
+}
+
+// 服务对象健康档案快照（relation: 1本人 2父母 3其他亲属）
+export interface CustomerRecord {
+  id: number
+  real_name?: string
+  gender?: number // 1男 2女
+  birth_date?: string
+  relation?: number // 1本人 2父母 3其他亲属
+  assessment_level?: string
+  phone?: string
+  address?: string
+  allergy_history?: string[]
+  chronic_tags?: string[]
+  medication_list?: string[]
+  emergency_contact?: string
+  emergency_phone?: string
 }
 
 export interface ScheduleDay {

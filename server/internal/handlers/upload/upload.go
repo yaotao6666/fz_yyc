@@ -29,8 +29,13 @@ func (h *UploadHandler) GetToken(c *gin.Context) {
 	}
 
 	// 录音等非图片上传：?mime=audio/*（默认 image/*）
+	// 注意：微信开发者工具上 getRecorderManager 即使声明 mp3，实际产出 video/webm；
+	//      真机上也可能产出 silk/mp3/m4a 等。录音凭证统一放宽为 audio/* + video/*。
 	mimeLimit := c.DefaultQuery("mime", "image/*")
-	if mimeLimit != "audio/*" {
+	switch mimeLimit {
+	case "audio/*":
+		mimeLimit = "audio/*;video/*"
+	default:
 		mimeLimit = "image/*"
 	}
 
@@ -50,4 +55,21 @@ func (h *UploadHandler) GetToken(c *gin.Context) {
 
 func (h *UploadHandler) Callback(c *gin.Context) {
 	response.Success(c, gin.H{"message": "ok"})
+}
+
+// SignRequest 单资源签名请求
+type SignRequest struct {
+	URL string `json:"url" binding:"required"`
+}
+
+// Sign 对单个七牛资源地址进行私有签名，供富文本编辑器实时预览粘贴/上传的图片使用
+func (h *UploadHandler) Sign(c *gin.Context) {
+	var req SignRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误: "+err.Error())
+		return
+	}
+
+	signed := qiniu.GetService().BuildPrivateURL(req.URL)
+	response.Success(c, gin.H{"url": signed})
 }

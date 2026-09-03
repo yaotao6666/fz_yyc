@@ -173,6 +173,9 @@ func GetSettings(c *gin.Context) {
 	response.Success(c, gin.H{
 		"announcement":          merchant.Announcement,
 		"business_hours":        merchant.BusinessHours,
+		"takeout_enabled":       merchant.TakeoutEnabled,
+		"dine_in_enabled":       merchant.DineInEnabled,
+		"pickup_enabled":        merchant.PickupEnabled,
 		"notify_enabled":        notifyEnabled,
 		"browse_notify_enabled": browseNotifyEnabled,
 		"wechat_bound":          wechatBound,
@@ -185,6 +188,9 @@ func GetSettings(c *gin.Context) {
 type UpdateSettingsRequest struct {
 	NotifyEnabled       *bool `json:"notify_enabled"`
 	BrowseNotifyEnabled *bool `json:"browse_notify_enabled"`
+	TakeoutEnabled      *bool `json:"takeout_enabled"`
+	DineInEnabled       *bool `json:"dine_in_enabled"`
+	PickupEnabled       *bool `json:"pickup_enabled"`
 }
 
 func UpdateSettings(c *gin.Context) {
@@ -192,6 +198,26 @@ func UpdateSettings(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
 		return
+	}
+
+	// 经营方式开关写入 merchants 表（与 UpdateStatus 一致，更新 DefaultMerchantID 行）
+	merchantUpdates := map[string]interface{}{}
+	if req.TakeoutEnabled != nil {
+		merchantUpdates["takeout_enabled"] = *req.TakeoutEnabled
+	}
+	if req.DineInEnabled != nil {
+		merchantUpdates["dine_in_enabled"] = *req.DineInEnabled
+	}
+	if req.PickupEnabled != nil {
+		merchantUpdates["pickup_enabled"] = *req.PickupEnabled
+	}
+	if len(merchantUpdates) > 0 {
+		if err := database.DB.Model(&models.Merchant{}).
+			Where("id = ?", utils.DefaultMerchantID).
+			Updates(merchantUpdates).Error; err != nil {
+			response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "更新经营方式设置失败")
+			return
+		}
 	}
 
 	if req.NotifyEnabled != nil || req.BrowseNotifyEnabled != nil {

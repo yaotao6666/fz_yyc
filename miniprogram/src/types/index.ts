@@ -254,6 +254,10 @@ export interface Order {
   delivery_info?: DeliveryInfo
   status: number
   status_text?: string
+  // 订单分类：1-2 实物订单，3-6 服务订单
+  order_type?: number
+  // 服务订单绑定的健康档案名称（服务对象）
+  record_name?: string
   // 订单运营对齐（派单/租赁）
   biz_status?: number
   assigned_staff_id?: number

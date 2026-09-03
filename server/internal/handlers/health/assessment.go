@@ -246,13 +246,39 @@ func StaffListResidentAssessments(c *gin.Context) {
 		pageSize = 10
 	}
 
+	// 按档案隔离评估记录：优先使用请求指定的 record_id，未指定时回退到该用户最近档案。
+	// 无论哪种情况都必须严格校验 record_id 归属该 user_id，防止串档或越权拉取他人档案评估。
+	rid := uint64(0)
+	if ridStr := c.Query("record_id"); ridStr != "" {
+		v, err2 := strconv.ParseUint(ridStr, 10, 64)
+		if err2 != nil {
+			response.Success(c, gin.H{"list": []models.HealthAssessment{}, "total": 0})
+			return
+		}
+		rid = v
+	}
+	if rid == 0 {
+		var rec models.HealthRecord
+		if err := database.DB.Where("user_id = ?", userID).Order("updated_at DESC").First(&rec).Error; err != nil {
+			response.Success(c, gin.H{"list": []models.HealthAssessment{}, "total": 0})
+			return
+		}
+		rid = rec.ID
+	}
+	// 严格校验 record_id 必须属于该 user_id
+	var owned models.HealthRecord
+	if err := database.DB.Where("id = ? AND user_id = ?", rid, userID).First(&owned).Error; err != nil ||
+		owned.ID != rid {
+		response.Success(c, gin.H{"list": []models.HealthAssessment{}, "total": 0})
+		return
+	}
+
+	query := database.DB.Model(&models.HealthAssessment{}).Where("user_id = ?", userID).Where("record_id = ?", rid)
 	var total int64
-	database.DB.Model(&models.HealthAssessment{}).
-		Where("user_id = ?", userID).Count(&total)
+	query.Count(&total)
 
 	var list []models.HealthAssessment
-	database.DB.Preload("Form").
-		Where("user_id = ?", userID).
+	query.Preload("Form").
 		Order("created_at DESC").
 		Offset((page - 1) * pageSize).
 		Limit(pageSize).
@@ -505,4 +531,29 @@ func MerchantListHealthAssessments(c *gin.Context) {
 		"list":  list,
 		"total": total,
 	})
+}
+
+// MerchantListRecordAssessments 管理端查看指定健康档案的评估记录。
+// 按 record_id 严格归属该档案；历史未挂档案的评估记录需经数据回填归档案，避免跨档案串数据。
+func MerchantListRecordAssessments(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "档案ID错误")
+		return
+	}
+	var record models.HealthRecord
+	if err := database.DB.First(&record, id).Error; err != nil {
+		response.Fail(c, http.StatusNotFound, response.CodeNotFound, "档案不存在")
+		return
+	}
+	var list []models.HealthAssessment
+	database.DB.
+		Where("record_id = ?", record.ID).
+		Preload("Form").
+		Order("created_at DESC").
+		Find(&list)
+	if list == nil {
+		list = []models.HealthAssessment{}
+	}
+	response.Success(c, list)
 }

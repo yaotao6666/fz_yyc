@@ -306,6 +306,34 @@ func buildStoreProductResponse(product models.Product) StoreProductResponse {
 	}
 }
 
+// GetStoreHomeRecommends 查询商家首页推荐（仅启用，排序升序），附带商品/服务快照
+func GetStoreHomeRecommends(c *gin.Context) {
+	var recommends []models.HomeRecommend
+	if err := database.DB.
+		Preload("Product").
+		Where("merchant_id = ? AND status = 1", utils.DefaultMerchantID).
+		Order("sort ASC, id DESC").
+		Find(&recommends).Error; err != nil {
+		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "查询推荐失败")
+		return
+	}
+
+	result := make([]map[string]interface{}, 0, len(recommends))
+	for _, r := range recommends {
+		if r.Product == nil {
+			continue
+		}
+		result = append(result, map[string]interface{}{
+			"id":          r.ID,
+			"product_id":  r.ProductID,
+			"target_type": r.TargetType,
+			"title":       r.Title,
+			"product":     buildStoreProductResponse(*r.Product),
+		})
+	}
+	response.Success(c, gin.H{"list": result})
+}
+
 func WechatLogin(c *gin.Context) {
 	var req WechatLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -785,6 +813,8 @@ func CreateOrder(c *gin.Context) {
 	var maxProductType uint8 // 跟踪最高商品类型以推断 order_type
 	productIDs := make([]uint64, 0, len(req.Items))
 	categoryIDs := make([]uint64, 0, len(req.Items))
+	hasGoods := false // 是否含实物商品（product_type 1/2）
+	hasService := false // 是否含服务商品（product_type 3/4）
 
 	for _, item := range req.Items {
 		var product models.Product
@@ -795,6 +825,13 @@ func CreateOrder(c *gin.Context) {
 
 		if product.ProductType > maxProductType {
 			maxProductType = product.ProductType
+		}
+
+		// 判定商品归属：实物(1/2)与服务(3/4)互斥，禁止混单支付
+		if product.ProductType == 3 || product.ProductType == 4 {
+			hasService = true
+		} else {
+			hasGoods = true
 		}
 
 		// 记录商品/分类ID集合，供优惠券适用范围匹配
@@ -881,6 +918,12 @@ func CreateOrder(c *gin.Context) {
 
 	var deliveryFee float64
 
+	// 禁止实物商品与服务商品混单支付（在创建订单事务前拦截）
+	if hasGoods && hasService {
+		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "订单不能同时包含实物商品与服务商品，请拆分下单")
+		return
+	}
+
 	discountAmount := 0.0
 
 	// 优惠券抵扣（PRD V2.0 阶段二）：提前校验并预计算抵扣金额，
@@ -921,9 +964,9 @@ func CreateOrder(c *gin.Context) {
 		case 2: // 辅具租赁
 			orderType = 2 // 租赁商品
 		case 3: // 康养套餐
-			orderType = 5 // 上门服务
+			orderType = 3 // 康养上门
 		case 4: // 陪诊服务
-			orderType = 4 // 预约服务
+			orderType = 4 // 陪诊服务
 		default: // 零售
 			orderType = 1 // 普通商品
 		}
@@ -932,6 +975,12 @@ func CreateOrder(c *gin.Context) {
 	// 服务类订单（康养/陪诊）支付后需要派工，初始 biz_status=1（待接单）
 	if bizStatus == 0 && (orderType == 3 || orderType == 4 || orderType == 5) {
 		bizStatus = 1 // 待接单
+	}
+
+	// 服务订单不计配送费，且不受商家配送参数/配送距离约束：
+	// 当前 handler 未引入配送费计算，deliveryFee 恒为 0，此处显式兜底，并忽略任何配送距离/配送参数。
+	if utils.OrderCategory(orderType) == utils.OrderCategoryService {
+		deliveryFee = 0
 	}
 
 	// 服务订单硬性规则：必须绑定 1 个本人账号下的健康档案（PRD V2.0 订单口径）
@@ -1195,6 +1244,11 @@ func GetOrders(c *gin.Context) {
 	accessibleOrders := make([]models.Order, 0, len(orders))
 	for _, order := range orders {
 		accessibleOrders = append(accessibleOrders, buildAccessibleOrder(order))
+	}
+
+	// 填充服务对象（健康档案）名称 record_name，供服务订单卡片展示
+	for i := range accessibleOrders {
+		orderquery.FillOrderRecordInfo(&accessibleOrders[i])
 	}
 
 	response.Success(c, gin.H{

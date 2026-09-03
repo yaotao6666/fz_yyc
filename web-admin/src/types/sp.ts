@@ -373,9 +373,7 @@ export const OrderTypeText: Record<number, string> = {
   1: '零售',
   2: '租赁',
   3: '康养上门',
-  4: '陪诊服务',
-  5: '科普体验',
-  6: '长护险服务'
+  4: '陪诊服务'
 }
 
 // 工单业务状态文案（biz_status）
@@ -384,7 +382,6 @@ export const BizStatusText: Record<number, string> = {
   1: '待接单',
   2: '待出发',
   3: '服务中',
-  4: '待支付尾款',
   5: '已完成',
   6: '已取消'
 }
@@ -525,6 +522,7 @@ export interface AssignRoleMenusRequest {
 export interface HealthRecord {
   id: number
   user_id: number
+  relation?: number // 1本人 2父母 3其他亲属
   real_name?: string
   gender?: number // 1男2女
   birth_date?: string
@@ -814,4 +812,90 @@ export interface MiniProgramBannerPayload {
   link_value?: string
   sort?: number
   status?: number
+}
+
+// ===================== 小程序首页推荐配置 =====================
+
+export interface HomeRecommend {
+  id: number
+  merchant_id: number
+  product_id: number
+  target_type: number // 1=实物商品(产品类型1/2) 2=服务(产品类型3/4)
+  title: string
+  sort: number
+  status: number // 1=启用 0=禁用
+  product_name?: string
+  product_price?: number
+  product_image?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface HomeRecommendListResponse {
+  list: HomeRecommend[]
+}
+
+export interface HomeRecommendPayload {
+  product_id: number
+  target_type: number
+  title?: string
+  sort?: number
+  status?: number
+}
+
+// ===================== 商家运营设置 =====================
+
+// 商家营业设置：营业状态 + 下单方式 + 公告/营业时间等
+export interface MerchantSettings {
+  takeout_enabled?: boolean // 是否开启外卖配送
+  dine_in_enabled?: boolean // 是否开启堂食
+  pickup_enabled?: boolean // 是否开启自提
+  delivery_settings?: Record<string, unknown> // 配送相关配置
+  announcement?: string // 商家公告
+  business_hours?: string // 营业时间文本
+}
+
+// ===================== 打印机管理 =====================
+
+// 打印机
+export interface Printer {
+  id: number
+  merchant_id?: number
+  name: string
+  type: number // 1=飞鹅 2=通用
+  feie_user?: string // 飞鹅云平台用户名
+  feie_ukey?: string // 飞鹅云平台密钥（仅新增时返回，编辑不回传）
+  feie_sn?: string // 飞鹅打印机编号
+  status: number // 1=启用 0=禁用
+  auto_print: number // 1=自动打印 0=手动
+  is_default: number // 1=默认打印机 0=否
+  print_count?: number // 已打印次数
+  last_print_at?: string // 最近打印时间
+  remark?: string
+  has_feie_ukey?: boolean // 编辑时后端是否已保存密钥（存在则不回显 ukey）
+  created_at?: string
+  updated_at?: string
+}
+
+// 打印机新增/编辑载荷
+export interface PrinterPayload {
+  name: string
+  type: number
+  feie_user?: string
+  feie_ukey?: string
+  feie_sn?: string
+  status: number
+  auto_print: number
+  remark?: string
+}
+
+// 打印机列表响应
+export interface PrinterListResponse {
+  list: Printer[]
+}
+
+// 打印机类型文案（1=飞鹅 2=通用）
+export const PrinterTypeText: Record<number, string> = {
+  1: '飞鹅',
+  2: '通用'
 }

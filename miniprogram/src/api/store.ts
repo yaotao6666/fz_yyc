@@ -208,6 +208,28 @@ export function getStoreHome() {
   })
 }
 
+export interface StoreRecommendItem {
+  id: number
+  product_id: number
+  target_type: number // 1=实物商品 2=服务
+  title: string
+  product: Product | null
+}
+
+// 首页推荐商品/服务（PC 后台配置）
+export function getStoreHomeRecommends() {
+  return get<{ list: StoreRecommendItem[] }>(`/api/v1/store/home-recommends`).then(data => {
+    const list = (data?.list || []).map((item: any) => ({
+      id: item.id,
+      product_id: item.product_id,
+      target_type: item.target_type,
+      title: item.title || '',
+      product: item.product ? normalizeProduct(item.product) : null
+    }))
+    return { list }
+  })
+}
+
 export function getStoreProducts(params?: {
   category_id?: number
   keyword?: string
