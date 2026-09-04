@@ -72,36 +72,6 @@ INSERT INTO `merchants` VALUES (1,'乐享辅具（云南财旭商贸）','https:
 UNLOCK TABLES;
 
 --
--- Table structure for table `merchant_delivery_settings`
---
-
-DROP TABLE IF EXISTS `merchant_delivery_settings`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `merchant_delivery_settings` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `enabled` tinyint(1) NOT NULL DEFAULT '1',
-  `base_fee` decimal(10,2) NOT NULL DEFAULT '0.00',
-  `free_delivery_amount` decimal(10,2) NOT NULL DEFAULT '0.00',
-  `max_distance` int unsigned NOT NULL DEFAULT '10',
-  `distance_rules` json DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商家配送设置表';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `merchant_delivery_settings`
---
-
-LOCK TABLES `merchant_delivery_settings` WRITE;
-/*!40000 ALTER TABLE `merchant_delivery_settings` DISABLE KEYS */;
-INSERT INTO `merchant_delivery_settings` VALUES (1,1,3.00,20.00,10,'[{\"fee\": 3, \"max_distance\": 3, \"min_distance\": 0}, {\"fee\": 5, \"max_distance\": 5, \"min_distance\": 3}]','2026-05-11 00:38:11','2026-05-19 00:29:00');
-/*!40000 ALTER TABLE `merchant_delivery_settings` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `merchant_staffs`
 --
 

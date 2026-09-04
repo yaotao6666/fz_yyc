@@ -470,9 +470,6 @@ func GetStoreHome(c *gin.Context) {
 	var hotProducts []models.Product
 	database.DB.Where("status = 1").Order("sales DESC").Limit(10).Find(&hotProducts)
 
-	var deliverySettings models.MerchantDeliverySettings
-	database.DB.First(&deliverySettings)
-
 	// C 端小程序首页启用的轮播图
 	var banners []models.MiniProgramBanner
 	database.DB.
@@ -527,31 +524,9 @@ func GetStoreHome(c *gin.Context) {
 		"merchant":             merchant,
 		"categories":           categoryResponses,
 		"hot_products":         hotProductResponses,
-		"delivery_settings":    deliverySettings,
 		"banners":              bannerResponses,
 		"pending_review_count": pendingReviewCount,
 	})
-}
-
-// GetStoreDeliveryRules 返回商家配送费规则（C端确认订单页使用）
-func GetStoreDeliveryRules(c *gin.Context) {
-	var deliverySettings models.MerchantDeliverySettings
-	if err := database.DB.First(&deliverySettings).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			// 未配置时返回默认规则，避免 C 端下单流程被 404 阻断
-			response.Success(c, gin.H{
-				"enabled":              false,
-				"base_fee":             0,
-				"free_delivery_amount": 0,
-				"max_distance":         10,
-				"distance_rules":       []interface{}{},
-			})
-			return
-		}
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "获取配送规则失败")
-		return
-	}
-	response.Success(c, deliverySettings)
 }
 
 func GetProducts(c *gin.Context) {

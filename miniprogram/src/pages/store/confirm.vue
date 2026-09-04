@@ -112,11 +112,6 @@
         <text class="amount-label">{{ hasFinalPricing ? '押金' : '预估押金' }}</text>
         <text class="amount-value">¥{{ displayDepositAmount.toFixed(2) }}</text>
       </view>
-      <!-- 服务订单不计配送费，隐藏配送费明细行 -->
-      <view v-if="!hasServiceItems" class="amount-row">
-        <text class="amount-label">{{ hasFinalPricing ? '配送费' : '预估配送费' }}</text>
-        <text class="amount-value">¥{{ displayDeliveryFee.toFixed(2) }}</text>
-      </view>
       <view class="amount-row coupon" @click="openCouponPopup">
         <text class="amount-label">优惠券</text>
         <text class="amount-value" :class="{ 'coupon-active': couponSummaryText.startsWith('-') }">
@@ -229,7 +224,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { createOrder, getStoreDeliveryRules } from '../../api/store'
+import { createOrder } from '../../api/store'
 import { createUserAddress, getUserAddresses } from '../../api'
 import { getUserHealthRecord, listUserHealthRecords } from '../../api/health'
 import { getOrderUsableCoupons } from '../../api/coupon'
@@ -239,7 +234,7 @@ import type { CartItem } from '../../stores/cart'
 import { useAnalytics } from '@utils/analytics'
 import { useAuth } from '../../utils/useAuth'
 import { parseStoreEntryOptions } from '@utils/storeEntry'
-import type { CreateOrderRequest, HealthRecord, Order, StoreDeliveryRules, UserAddress } from '@types'
+import type { CreateOrderRequest, HealthRecord, Order, UserAddress } from '@types'
 import { BrandAsset } from '../../utils/constants'
 import {
   STORE_SELECTED_ADDRESS_ID_KEY,
@@ -263,17 +258,6 @@ const selectedAddress = ref<UserAddress | null>(null)
 const addressList = ref<UserAddress[]>([])
 const loadingAddresses = ref(false)
 const isBuyNow = ref(false)
-const deliveryConfig = ref<StoreDeliveryRules>({
-  enabled: false,
-  base_fee: 0,
-  free_delivery_amount: 0,
-  max_distance: 0,
-  distance_rules: [] as { min_distance: number; max_distance: number; fee: number }[]
-})
-
-const deliveryRules = ref<{ distance: number; fee: number; label: string }[]>([])
-const deliveryDistance = ref(0)
-const deliveryDistanceIndex = ref(0)
 
 /* ============ 优惠券（PRD V2.0 阶段二） ============ */
 const usableCoupons = ref<OrderUsableCoupon[]>([])
@@ -454,11 +438,6 @@ onShow(async () => {
   applyEntryOptions(currentPage?.options)
   cartStore.restoreFromStorage()
 
-  // 服务订单不计配送费，也无需配送规则/档位；仅在实物订单时加载配送规则
-  if (!hasServiceItems.value) {
-    await loadDeliveryRules()
-  }
-
   const { ensureAuth } = useAuth()
   const authed = await ensureAuth()
   if (authed) {
@@ -470,34 +449,6 @@ onShow(async () => {
   }
   void trackPageView('store_confirm', entrySource.value)
 })
-
-async function loadDeliveryRules() {
-  try {
-    const rules = await getStoreDeliveryRules()
-    deliveryConfig.value = rules
-    deliveryRules.value = (rules.distance_rules || []).map((item) => ({
-      distance: item.max_distance,
-      fee: item.fee,
-      label: `${item.min_distance}-${item.max_distance}km · 配送费 ¥${item.fee.toFixed(2)}`
-    }))
-
-    if (deliveryRules.value.length === 0 && rules.max_distance > 0) {
-      deliveryRules.value = [{
-        distance: rules.max_distance,
-        fee: rules.base_fee,
-        label: `0-${rules.max_distance}km · 配送费 ¥${rules.base_fee.toFixed(2)}`
-      }]
-    }
-
-    if (deliveryRules.value.length > 0) {
-      deliveryDistanceIndex.value = 0
-      deliveryDistance.value = deliveryRules.value[0].distance
-    }
-  } catch (error) {
-    console.error('获取配送规则失败:', error)
-    deliveryRules.value = []
-  }
-}
 
 function readSelectedAddressId() {
   const value = uni.getStorageSync(STORE_SELECTED_ADDRESS_ID_KEY)
@@ -571,7 +522,6 @@ async function importWechatAddress() {
   }
 }
 
-const selectedDeliveryRule = computed(() => deliveryRules.value[deliveryDistanceIndex.value] || null)
 const selectedAddressText = computed(() => formatUserAddress(selectedAddress.value))
 
 const goodsAmount = computed(() => displayItems.value.reduce((sum, item) => {
@@ -583,10 +533,9 @@ const goodsAmount = computed(() => displayItems.value.reduce((sum, item) => {
 
 const hasFinalPricing = computed(() => !!finalOrder.value)
 const displayGoodsAmount = computed(() => finalOrder.value?.total_amount ?? goodsAmount.value)
-const displayDeliveryFee = computed(() => finalOrder.value?.delivery_fee ?? deliveryFee.value)
 const displayDepositAmount = computed(() => finalOrder.value?.total_deposit ?? totalDeposit.value)
 const displayDiscountAmount = computed(() => Number(finalOrder.value?.discount_amount ?? couponDiscount.value) || 0)
-const displayTotalAmount = computed(() => Math.max(0, displayGoodsAmount.value + displayDepositAmount.value + displayDeliveryFee.value - displayDiscountAmount.value))
+const displayTotalAmount = computed(() => Math.max(0, displayGoodsAmount.value + displayDepositAmount.value - displayDiscountAmount.value))
 const displayPayAmount = computed(() => finalOrder.value?.pay_amount ?? payableAmount.value)
 
 const amountCaption = computed(() => {
@@ -599,25 +548,8 @@ const amountCaption = computed(() => {
   return '以下金额为提交前预估，创建订单后会自动切换为最终支付金额'
 })
 
-const deliveryFee = computed(() => {
-  // 服务订单不计配送费（不受商家配送参数约束）
-  if (hasServiceItems.value) {
-    return 0
-  }
-
-  if (goodsAmount.value >= deliveryConfig.value.free_delivery_amount && deliveryConfig.value.free_delivery_amount > 0) {
-    return 0
-  }
-
-  if (!selectedDeliveryRule.value) {
-    return deliveryConfig.value.base_fee || 0
-  }
-
-  return selectedDeliveryRule.value.fee
-})
-
 const totalAmount = computed(() => {
-  return goodsAmount.value + totalDeposit.value + deliveryFee.value
+  return goodsAmount.value + totalDeposit.value
 })
 
 const payableAmount = computed(() => Math.max(0, totalAmount.value - couponDiscount.value))
@@ -653,7 +585,6 @@ function isAmountDifferent(currentValue: number, nextValue: number) {
 function applyFinalOrderAmount(order: Order) {
   finalAmountAdjusted.value = (
     isAmountDifferent(goodsAmount.value, order.total_amount) ||
-    isAmountDifferent(deliveryFee.value, order.delivery_fee) ||
     isAmountDifferent(payableAmount.value, order.pay_amount)
   )
   finalOrder.value = order
@@ -677,19 +608,6 @@ async function submitOrder() {
   // 禁止实物商品与服务商品混单支付
   if (hasServiceItems.value && hasGoodsItems.value) {
     return uni.showToast({ title: '订单不能同时包含实物商品与服务商品，请拆分下单', icon: 'none' })
-  }
-
-  // 服务订单不受商家配送参数约束，跳过配送档位/距离校验
-  if (!hasServiceItems.value) {
-    if (!deliveryRules.value.length) {
-      return uni.showToast({ title: '当前暂无可选配送档位', icon: 'none' })
-    }
-    if (!selectedDeliveryRule.value) {
-      return uni.showToast({ title: '请选择配送距离档位', icon: 'none' })
-    }
-    if (deliveryDistance.value > deliveryConfig.value.max_distance) {
-      return uni.showToast({ title: '已超出商家配送范围', icon: 'none' })
-    }
   }
 
   if (!/^1\d{10}$/.test(selectedAddress.value.phone || '')) {
@@ -728,7 +646,6 @@ async function submitOrder() {
       quantity: item.quantity,
       rental_duration: Number(item.sale_type) === 2 ? Number(item.rental_duration || 0) : undefined
     })),
-    delivery_distance: deliveryDistance.value,
     user_coupon_id: selectedCoupon.value?.user_coupon_id || undefined,
     record_id: hasServiceItems.value && healthRecord.value ? healthRecord.value.id : undefined,
     address_id: selectedAddress.value?.id,

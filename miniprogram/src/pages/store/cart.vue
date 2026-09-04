@@ -52,11 +52,56 @@
     </view>
 
     <!-- 空购物车 -->
-    <view class="empty-cart" v-else>
-      <text class="empty-icon">🛒</text>
-      <text class="empty-text">购物车是空的</text>
-      <button class="btn-shopping" @click="goShopping">去逛逛</button>
-    </view>
+    <template v-else>
+      <view class="empty-cart">
+        <text class="empty-icon">🛒</text>
+        <text class="empty-text">购物车是空的</text>
+        <button class="btn-shopping" @click="goShopping">去逛逛</button>
+      </view>
+
+      <!-- 购物车为空时填充首页推荐 -->
+      <view class="recommend-module">
+        <view class="recommend-header">✨ 首页推荐</view>
+
+        <view v-if="recommendLoading" class="recommend-skeleton-list">
+          <view v-for="item in 2" :key="item" class="recommend-skeleton-card">
+            <view class="recommend-skeleton-image"></view>
+            <view class="recommend-skeleton-line"></view>
+            <view class="recommend-skeleton-line short"></view>
+          </view>
+        </view>
+
+        <view v-else-if="!recommends.length" class="recommend-empty">暂无可推荐商品</view>
+
+        <view v-else class="recommend-list">
+          <view
+            v-for="item in recommends"
+            :key="item.id"
+            class="recommend-card"
+            @click="goRecommendItem(item)"
+          >
+            <image class="recommend-image" :src="getRecommendImage(item)" mode="aspectFill" />
+            <view class="recommend-info">
+              <view class="recommend-name">
+                {{ getRecommendTitle(item) }}
+                <text
+                  v-if="getRecommendTag(item)"
+                  :class="getRecommendTagClass(item)"
+                >{{ getRecommendTag(item) }}</text>
+              </view>
+              <view class="recommend-price">
+                <template v-if="Number(item.product?.sale_type) === 2">
+                  ¥{{ Number(item.product?.rental_price || 0).toFixed(2) }}/{{ getRentalUnitText(item.product?.rental_unit) }}
+                </template>
+                <template v-else>
+                  ¥{{ (item.product?.price || 0).toFixed(2) }}
+                </template>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </template>
 
     <!-- 底部结算栏 -->
     <view class="bottom-bar" v-if="cartStore.items.length > 0">
@@ -81,6 +126,9 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useCartStore, getItemPayAmount, getItemDeposit, getRentalUnitText } from '../../stores/cart'
 import type { CartItem } from '../../stores/cart'
+import { getStoreHomeRecommends } from '../../api/store'
+import type { StoreRecommendItem } from '../../api/store'
+import { BrandAsset } from '../../utils/constants'
 
 const cartStore = useCartStore()
 const selectedItems = ref<Set<string>>(new Set())
@@ -90,6 +138,11 @@ onShow(() => {
 
   // 默认全选
   selectAllItems()
+
+  // 购物车为空时加载首页推荐
+  if (!cartStore.items.length) {
+    loadRecommends()
+  }
 })
 
 function getItemKey(item: CartItem): string {
@@ -171,6 +224,61 @@ function goShopping() {
   uni.switchTab({
     url: `/pages/store/home`
   })
+}
+
+/* ============ 购物车为空时展示首页推荐 ============ */
+const recommends = ref<StoreRecommendItem[]>([])
+const recommendLoading = ref(false)
+
+async function loadRecommends() {
+  recommendLoading.value = true
+  try {
+    const res = await getStoreHomeRecommends()
+    recommends.value = res.list || []
+  } catch (_e) {
+    recommends.value = []
+  } finally {
+    recommendLoading.value = false
+  }
+}
+
+function getRecommendImage(item: StoreRecommendItem): string {
+  return item.product?.images?.[0] || item.product?.image || BrandAsset.DEFAULT_PRODUCT_IMAGE
+}
+
+function getRecommendTitle(item: StoreRecommendItem): string {
+  return item.title || item.product?.name || ''
+}
+
+function getRecommendTag(item: StoreRecommendItem): string {
+  const targetType = Number(item.target_type || 0)
+  const productType = Number(item.product?.product_type || 0)
+  const saleType = Number(item.product?.sale_type || 0)
+  if (targetType === 2 || productType === 3) return '套餐'
+  if (productType === 4) return '陪诊'
+  if (saleType === 2) return '租赁'
+  return ''
+}
+
+function getRecommendTagClass(item: StoreRecommendItem): string {
+  const tag = getRecommendTag(item)
+  if (tag === '租赁') return 'product-rental-tag'
+  if (tag === '套餐') return 'product-wellness-tag'
+  if (tag === '陪诊') return 'product-escort-tag'
+  return ''
+}
+
+function goProductDetail(productId: number) {
+  uni.navigateTo({ url: `/pages/store/product?product_id=${productId}` })
+}
+
+function goRecommendItem(item: StoreRecommendItem) {
+  const productId = item.product_id || item.product?.id
+  if (!productId) {
+    uni.showToast({ title: '该推荐商品暂不可用', icon: 'none' })
+    return
+  }
+  goProductDetail(productId)
 }
 
 function goCheckout() {
@@ -383,6 +491,142 @@ function goCheckout() {
   color: #ffffff;
   border-radius: 44rpx;
   font-size: 30rpx;
+}
+
+/* 购物车为空时展示首页推荐 */
+.recommend-module {
+  margin: 0 24rpx 20rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx 24rpx 32rpx;
+}
+
+.recommend-header {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 20rpx;
+}
+
+.recommend-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+}
+
+.recommend-card {
+  background: #ffffff;
+  border: 1rpx solid #f0f0f0;
+  border-radius: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.05);
+}
+
+.recommend-image {
+  width: 100%;
+  height: 300rpx;
+  background: #e0e0e0;
+}
+
+.recommend-info {
+  padding: 16rpx;
+}
+
+.recommend-name {
+  font-size: 28rpx;
+  color: #1a1a1a;
+  margin-bottom: 12rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.recommend-price {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #ff4d4f;
+}
+
+.recommend-empty {
+  padding: 48rpx 24rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #999999;
+}
+
+.recommend-skeleton-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+}
+
+.recommend-skeleton-card {
+  background: #ffffff;
+  border: 1rpx solid #f0f0f0;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.recommend-skeleton-image {
+  width: 100%;
+  height: 300rpx;
+  background: linear-gradient(90deg, #f2f3f5 0%, #e9ecef 50%, #f2f3f5 100%);
+  background-size: 200% 100%;
+  animation: loadingShimmer 1.2s linear infinite;
+}
+
+.recommend-skeleton-line {
+  height: 24rpx;
+  border-radius: 12rpx;
+  background: linear-gradient(90deg, #f2f3f5 0%, #e9ecef 50%, #f2f3f5 100%);
+  background-size: 200% 100%;
+  animation: loadingShimmer 1.2s linear infinite;
+  margin: 16rpx 16rpx 0;
+}
+
+.recommend-skeleton-line.short {
+  width: 40%;
+  margin-bottom: 24rpx;
+}
+
+@keyframes loadingShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.product-rental-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: #ff9500;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}
+
+.product-wellness-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: #22c55e;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}
+
+.product-escort-tag {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: #6366f1;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
 }
 
 .bottom-bar {

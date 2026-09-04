@@ -40,25 +40,6 @@ export interface WechatLoginResponse {
   user: UserInfo
 }
 
-// ============ 配送设置 ============
-
-export interface DeliverySettings {
-  enabled: boolean
-  base_fee: number
-  free_delivery_amount: number
-  distance_rules: DistanceRule[]
-  max_distance: number
-}
-
-export interface StoreDeliveryRules extends DeliverySettings {}
-
-// 配送距离规则
-export interface DistanceRule {
-  min_distance: number
-  max_distance: number
-  fee: number
-}
-
 // ============ 商品相关 ============
 
 export type CompatibleAmountValue = number | string

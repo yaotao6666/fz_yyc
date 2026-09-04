@@ -10,46 +10,9 @@ import type {
   ProductListResponse,
   ProductType,
   SpecOption,
-  StoreDeliveryRules,
   StoreHomeInfo,
   WellnessPackageContent
 } from '../types'
-
-function parseDistanceRules(value: unknown): { min_distance: number; max_distance: number; fee: number }[] {
-  if (Array.isArray(value)) {
-    return value.map((item: any) => ({
-      min_distance: Number(item?.min_distance || 0),
-      max_distance: Number(item?.max_distance || 0),
-      fee: Number(item?.fee || 0)
-    }))
-  }
-
-  if (typeof value === 'string' && value) {
-    try {
-      return parseDistanceRules(JSON.parse(value))
-    } catch (error) {
-      console.warn('解析配送规则失败:', error)
-    }
-  }
-
-  return []
-}
-
-function normalizeDeliverySettings(data: any) {
-  return {
-    enabled: !!data?.enabled,
-    base_fee: Number(data?.base_fee || 0),
-    free_delivery_amount: Number(data?.free_delivery_amount || 0),
-    max_distance: Number(data?.max_distance || 10),
-    distance_rules: parseDistanceRules(data?.distance_rules)
-  }
-}
-
-function normalizeStoreDeliveryRules(data: any): StoreDeliveryRules {
-  return {
-    ...normalizeDeliverySettings(data)
-  }
-}
 
 function normalizeStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -249,10 +212,6 @@ export function getStoreProducts(params?: {
 
 export function getStoreProduct(productId: number) {
   return get<Product>(`/api/v1/store/products/${productId}`).then(normalizeProduct)
-}
-
-export function getStoreDeliveryRules() {
-  return get<StoreDeliveryRules>(`/api/v1/store/delivery-rules`).then(normalizeStoreDeliveryRules)
 }
 
 export function createOrder(data: CreateOrderRequest) {

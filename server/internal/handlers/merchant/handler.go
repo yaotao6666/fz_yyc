@@ -1,8 +1,6 @@
 package merchant
 
 import (
-	"encoding/json"
-	"fmt"
 	"fz_yyc_api/internal/handlers/rbac"
 	"fz_yyc_api/internal/models"
 	"fz_yyc_api/internal/utils"
@@ -10,7 +8,6 @@ import (
 	"fz_yyc_api/pkg/qiniu"
 	"fz_yyc_api/pkg/response"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
@@ -154,9 +151,6 @@ func GetSettings(c *gin.Context) {
 		return
 	}
 
-	var deliverySettings models.MerchantDeliverySettings
-	database.DB.First(&deliverySettings)
-
 	notifyEnabled := true
 	browseNotifyEnabled := true
 	wechatBound := false
@@ -181,7 +175,6 @@ func GetSettings(c *gin.Context) {
 		"wechat_bound":          wechatBound,
 		"unionid":               unionID,
 		"wechat_bound_at":       wechatBoundAt,
-		"delivery_settings":     deliverySettings,
 	})
 }
 
@@ -292,127 +285,5 @@ func GetQRCode(c *gin.Context) {
 		"page":        qrCode.Page,
 		"placeholder": false,
 		"message":     "微信小程序码生成成功",
-	})
-}
-
-func GetDeliverySettings(c *gin.Context) {
-	var settings models.MerchantDeliverySettings
-	if err := database.DB.First(&settings).Error; err != nil {
-		settings = models.MerchantDeliverySettings{}
-	}
-
-	response.Success(c, gin.H{
-		"enabled":              settings.Enabled,
-		"base_fee":             settings.BaseFee,
-		"free_delivery_amount": settings.FreeDeliveryAmount,
-		"max_distance":         settings.MaxDistance,
-		"distance_rules":       settings.DistanceRules,
-	})
-}
-
-type DeliverySettingsRequest struct {
-	Enabled            bool    `json:"enabled"`
-	BaseFee            float64 `json:"base_fee"`
-	FreeDeliveryAmount float64 `json:"free_delivery_amount"`
-	MaxDistance        uint    `json:"max_distance"`
-	DistanceRules      []struct {
-		MinDistance float64 `json:"min_distance"`
-		MaxDistance float64 `json:"max_distance"`
-		Fee         float64 `json:"fee"`
-	} `json:"distance_rules"`
-}
-
-type normalizedDistanceRule struct {
-	MinDistance float64 `json:"min_distance"`
-	MaxDistance float64 `json:"max_distance"`
-	Fee         float64 `json:"fee"`
-}
-
-func normalizeDeliverySettingsRules(req DeliverySettingsRequest) ([]normalizedDistanceRule, error) {
-	if req.BaseFee < 0 {
-		return nil, fmt.Errorf("基础配送费不能小于0")
-	}
-	if req.FreeDeliveryAmount < 0 {
-		return nil, fmt.Errorf("满额免配送费门槛不能小于0")
-	}
-	if req.MaxDistance == 0 {
-		return nil, fmt.Errorf("最大配送距离必须大于0")
-	}
-
-	rules := make([]normalizedDistanceRule, 0, len(req.DistanceRules))
-	for index, rule := range req.DistanceRules {
-		if rule.MinDistance < 0 {
-			return nil, fmt.Errorf("第%d条规则起始距离不能小于0", index+1)
-		}
-		if rule.MaxDistance <= rule.MinDistance {
-			return nil, fmt.Errorf("第%d条规则结束距离必须大于起始距离", index+1)
-		}
-		if rule.Fee < 0 {
-			return nil, fmt.Errorf("第%d条规则配送费不能小于0", index+1)
-		}
-		if rule.MaxDistance > float64(req.MaxDistance) {
-			return nil, fmt.Errorf("第%d条规则超出最大配送距离", index+1)
-		}
-
-		rules = append(rules, normalizedDistanceRule{
-			MinDistance: rule.MinDistance,
-			MaxDistance: rule.MaxDistance,
-			Fee:         rule.Fee,
-		})
-	}
-
-	sort.Slice(rules, func(i, j int) bool {
-		if rules[i].MinDistance == rules[j].MinDistance {
-			return rules[i].MaxDistance < rules[j].MaxDistance
-		}
-		return rules[i].MinDistance < rules[j].MinDistance
-	})
-
-	for index := 1; index < len(rules); index++ {
-		if rules[index].MinDistance < rules[index-1].MaxDistance {
-			return nil, fmt.Errorf("第%d条规则与前一条规则区间重叠", index+1)
-		}
-	}
-
-	return rules, nil
-}
-
-func UpdateDeliverySettings(c *gin.Context) {
-	var req DeliverySettingsRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, "参数错误")
-		return
-	}
-
-	normalizedRules, err := normalizeDeliverySettingsRules(req)
-	if err != nil {
-		response.Fail(c, http.StatusBadRequest, response.CodeParamError, err.Error())
-		return
-	}
-
-	var settings models.MerchantDeliverySettings
-	if err := database.DB.First(&settings).Error; err != nil {
-		settings = models.MerchantDeliverySettings{}
-	}
-
-	settings.Enabled = req.Enabled
-	settings.BaseFee = req.BaseFee
-	settings.FreeDeliveryAmount = req.FreeDeliveryAmount
-	settings.MaxDistance = req.MaxDistance
-
-	rulesJSON, _ := json.Marshal(normalizedRules)
-	settings.DistanceRules = models.JSON(rulesJSON)
-
-	if err := database.DB.Save(&settings).Error; err != nil {
-		response.Fail(c, http.StatusInternalServerError, response.CodeServerError, "保存配送设置失败")
-		return
-	}
-
-	response.Success(c, gin.H{
-		"enabled":              settings.Enabled,
-		"base_fee":             settings.BaseFee,
-		"free_delivery_amount": settings.FreeDeliveryAmount,
-		"max_distance":         settings.MaxDistance,
-		"distance_rules":       settings.DistanceRules,
 	})
 }

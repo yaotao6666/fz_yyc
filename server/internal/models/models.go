@@ -89,25 +89,6 @@ func (Merchant) TableName() string {
 }
 
 // ============================================
-// 商家配送设置表 (merchant_delivery_settings)
-// 用途：商家配送费规则配置（单例，仅一行），包含基础运费、满减免与距离阶梯计费
-// ============================================
-type MerchantDeliverySettings struct {
-	ID                 uint64    `gorm:"primaryKey;autoIncrement;comment:设置ID" json:"id"`
-	Enabled            bool      `gorm:"not null;default:true;comment:是否启用配送费规则: true=启用 false=停用(仅控制费用规则,配送开关取merchants.takeout_enabled)" json:"enabled"`
-	BaseFee            float64   `gorm:"type:decimal(10,2);not null;default:0;comment:基础配送费(元)" json:"base_fee"`
-	FreeDeliveryAmount float64   `gorm:"type:decimal(10,2);not null;default:0;comment:满减免配送费金额(0=不启用)" json:"free_delivery_amount"`
-	MaxDistance        uint      `gorm:"not null;default:10;comment:最大配送距离(km)" json:"max_distance"`
-	DistanceRules      JSON      `gorm:"type:json;comment:距离阶梯计费规则JSON [{min_distance,max_distance,fee}]" json:"distance_rules"`
-	CreatedAt          time.Time `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt          time.Time `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-}
-
-func (MerchantDeliverySettings) TableName() string {
-	return "merchant_delivery_settings"
-}
-
-// ============================================
 // 商家员工表 (merchant_staffs)
 // 用途：商家端登录账号，支持owner/staff角色与微信快捷登录
 // ============================================
@@ -488,45 +469,6 @@ type Printer struct {
 
 func (Printer) TableName() string {
 	return "printers"
-}
-
-// ============================================
-// 商家年费表 (merchant_fees)
-// 用途：记录商家年费缴纳情况，支持已缴/免费/待缴等状态
-// ============================================
-type MerchantFee struct {
-	ID         uint64     `gorm:"primaryKey;autoIncrement;comment:年费ID" json:"id"`
-	Year       uint       `gorm:"not null;comment:缴费年度" json:"year"`
-	Amount     float64    `gorm:"type:decimal(10,2);not null;default:0;comment:年费金额(元)" json:"amount"`
-	Status     string     `gorm:"size:16;not null;comment:缴费状态: paid=已缴 free=免费 pending=待缴" json:"status"`
-	PayTime    *time.Time `gorm:"comment:缴费时间" json:"pay_time"`
-	FreeReason string     `gorm:"size:256;comment:免费原因(免费时填写)" json:"free_reason"`
-	CreatedAt  time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt  time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-}
-
-func (MerchantFee) TableName() string {
-	return "merchant_fees"
-}
-
-// ============================================
-// 商家手续费率表 (merchant_rates)
-// 用途：记录商家不同类型的手续费率及有效期
-// ============================================
-type MerchantRate struct {
-	ID            uint64     `gorm:"primaryKey;autoIncrement;comment:费率ID" json:"id"`
-	RateType      string     `gorm:"size:32;not null;comment:费率类型(如payment=支付手续费)" json:"rate_type"`
-	Rate          float64    `gorm:"type:decimal(5,4);not null;comment:费率(小数,如0.0060=0.6%)" json:"rate"`
-	EffectiveTime time.Time  `gorm:"comment:生效时间" json:"effective_time"`
-	ExpireTime    *time.Time `gorm:"comment:失效时间(空=永久有效)" json:"expire_time"`
-	Remark        string     `gorm:"size:256;comment:备注" json:"remark"`
-	Status        uint8      `gorm:"not null;default:1;comment:状态: 1=生效 0=失效" json:"status"`
-	CreatedAt     time.Time  `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
-	UpdatedAt     time.Time  `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-}
-
-func (MerchantRate) TableName() string {
-	return "merchant_rates"
 }
 
 // ============================================

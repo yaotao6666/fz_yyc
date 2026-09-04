@@ -7,8 +7,6 @@ import { get, post, put, del } from '../utils/request'
 import type { RequestOptions } from '../utils/request'
 import type {
   UploadTokenResponse,
-  DeliverySettings,
-  StoreDeliveryRules,
   Product,
   ProductApiResponse,
   ProductApiSpec,
@@ -42,42 +40,6 @@ export const ResponseCode = {
   CATEGORY_HAS_PRODUCT: 7002,
   QINIU_UPLOAD_FAILED: 8002,
 } as const
-
-function parseDistanceRules(value: unknown): { min_distance: number; max_distance: number; fee: number }[] {
-  if (Array.isArray(value)) {
-    return value.map((item: any) => ({
-      min_distance: Number(item?.min_distance || 0),
-      max_distance: Number(item?.max_distance || 0),
-      fee: Number(item?.fee || 0)
-    }))
-  }
-
-  if (typeof value === 'string' && value) {
-    try {
-      return parseDistanceRules(JSON.parse(value))
-    } catch (error) {
-      console.warn('解析配送规则失败:', error)
-    }
-  }
-
-  return []
-}
-
-function normalizeDeliverySettings(data: Partial<DeliverySettings> | null | undefined): DeliverySettings {
-  return {
-    enabled: !!data?.enabled,
-    base_fee: Number(data?.base_fee || 0),
-    free_delivery_amount: Number(data?.free_delivery_amount || 0),
-    max_distance: Number(data?.max_distance || 10),
-    distance_rules: parseDistanceRules(data?.distance_rules)
-  }
-}
-
-function normalizeStoreDeliveryRules(data: Partial<StoreDeliveryRules> | null | undefined): StoreDeliveryRules {
-  return {
-    ...normalizeDeliverySettings(data)
-  }
-}
 
 function normalizeArrayResponse<T>(response: T[] | null | undefined): T[] {
   return Array.isArray(response) ? response : []
@@ -366,13 +328,6 @@ export function getStoreProduct(productId: number) {
   return get<Product>(`/api/v1/store/products/${productId}`).then(normalizeProduct)
 }
 
-/**
- * 获取配送费规则
- */
-export function getStoreDeliveryRules() {
-  return get<StoreDeliveryRules>('/api/v1/store/delivery-rules').then(normalizeStoreDeliveryRules)
-}
-
 // ============ C端订单相关 ============
 
 /**
@@ -481,7 +436,6 @@ export default {
   getStoreHome,
   getStoreProducts,
   getStoreProduct,
-  getStoreDeliveryRules,
   trackStoreBehaviorEvent,
   // C端订单
   createOrder,

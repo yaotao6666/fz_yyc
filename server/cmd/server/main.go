@@ -130,7 +130,6 @@ func setupRoutes(r *gin.Engine) {
 		{
 			storeGroup.GET("/home", user.GetStoreHome)
 			storeGroup.GET("/home-recommends", user.GetStoreHomeRecommends)
-			storeGroup.GET("/delivery-rules", user.GetStoreDeliveryRules)
 			storeGroup.GET("/products", user.GetProducts)
 			storeGroup.GET("/products/:product_id", user.GetProductDetail)
 			storeGroup.GET("/coupons/available", user.GetAvailableCoupons)
